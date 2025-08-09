@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
@@ -98,6 +98,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       // Clear optimistic state when real data comes back
       setOptimisticBoard(null);
       setPendingMove(null);
+      setAnimatingPiece(null);
       
       if (result.challengeResult) {
         // Don't reveal pieces in toast, just indicate if it was a win/loss
@@ -115,6 +116,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       // Revert optimistic update on error
       setOptimisticBoard(null);
       setPendingMove(null);
+      setAnimatingPiece(null);
       toast.error(error instanceof Error ? error.message : "Invalid move");
     }
   });
@@ -167,6 +169,18 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const [optimisticBoard, setOptimisticBoard] = useState<any[][] | null>(null);
   const [pendingMove, setPendingMove] = useState<{fromRow: number, fromCol: number, toRow: number, toCol: number} | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  
+  // Animation states
+  const [animatingPiece, setAnimatingPiece] = useState<{
+    piece: any;
+    fromRow: number;
+    fromCol: number;
+    toRow: number;
+    toCol: number;
+    startTime: number;
+  } | null>(null);
+  const [boardRect, setBoardRect] = useState<DOMRect | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const isPlayer1 = game?.player1Id === profile.userId;
   const isPlayer2 = game?.player2Id === profile.userId;
@@ -184,6 +198,19 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Track board dimensions for animation positioning
+  useEffect(() => {
+    const updateBoardRect = () => {
+      if (boardRef.current) {
+        setBoardRect(boardRef.current.getBoundingClientRect());
+      }
+    };
+
+    updateBoardRect();
+    window.addEventListener('resize', updateBoardRect);
+    return () => window.removeEventListener('resize', updateBoardRect);
+  }, [game]); // Re-calculate when game changes
 
   // Initialize showResultModal to true if game is already finished when component loads
   // but only if the user hasn't acknowledged the result yet
@@ -206,11 +233,11 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
   // Clear optimistic state when game updates from server
   useEffect(() => {
-    if (game && optimisticBoard && !pendingMove) {
-      // If we have optimistic state but no pending move, clear it
+    if (game && optimisticBoard && !pendingMove && !animatingPiece) {
+      // If we have optimistic state but no pending move or animation, clear it
       setOptimisticBoard(null);
     }
-  }, [game, optimisticBoard, pendingMove]);
+  }, [game, optimisticBoard, pendingMove, animatingPiece]);
 
   // Helper function to format time as MM:SS
   const formatTime = (seconds: number) => {
@@ -451,7 +478,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   };
 
   const handleGameSquareClick = (row: number, col: number) => {
-    if (!game || game.status !== "playing" || !isCurrentPlayer || isMakingMove) return;
+    if (!game || game.status !== "playing" || !isCurrentPlayer || isMakingMove || animatingPiece) return;
 
     if (selectedSquare) {
       // Make move
@@ -469,19 +496,27 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         return;
       }
 
-      // Create optimistic board update
-      const newBoard = game.board.map(r => [...r]);
-      const movingPiece = newBoard[selectedSquare.row][selectedSquare.col];
-      const targetPiece = newBoard[row][col];
+      const movingPiece = game.board[selectedSquare.row][selectedSquare.col];
+      const targetPiece = game.board[row][col];
       
-      // Check if trying to move to own piece before setting up optimistic state
+      // Check if trying to move to own piece
       if (targetPiece && targetPiece.player === (isPlayer1 ? "player1" : "player2")) {
         toast.error("Cannot move to a square occupied by your own piece");
         setSelectedSquare(null);
         return;
       }
 
-      // Set up optimistic state only after validation passes
+      // Start piece animation
+      setAnimatingPiece({
+        piece: movingPiece,
+        fromRow: selectedSquare.row,
+        fromCol: selectedSquare.col,
+        toRow: row,
+        toCol: col,
+        startTime: Date.now()
+      });
+
+      // Set pending move immediately
       setPendingMove({
         fromRow: selectedSquare.row,
         fromCol: selectedSquare.col,
@@ -489,29 +524,37 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         toCol: col
       });
 
-      // Apply optimistic update
-      if (targetPiece) {
-        // Battle scenario - for now just move the piece optimistically
-        // The actual battle result will be handled by the server response
-        newBoard[row][col] = movingPiece;
-        newBoard[selectedSquare.row][selectedSquare.col] = null;
-      } else {
-        // Normal move
-        newBoard[row][col] = movingPiece;
-        newBoard[selectedSquare.row][selectedSquare.col] = null;
-      }
-
-      setOptimisticBoard(newBoard);
       setSelectedSquare(null);
 
-      // Send mutation in background
-      makeMove({
-        gameId,
-        fromRow: selectedSquare.row,
-        fromCol: selectedSquare.col,
-        toRow: row,
-        toCol: col,
-      });
+      // Delay the optimistic board update and API call to let animation play
+      setTimeout(() => {
+        // Apply optimistic update after animation
+        const newBoard = game.board.map(r => [...r]);
+        if (targetPiece) {
+          // Battle scenario
+          newBoard[row][col] = movingPiece;
+          newBoard[selectedSquare.row][selectedSquare.col] = null;
+        } else {
+          // Normal move
+          newBoard[row][col] = movingPiece;
+          newBoard[selectedSquare.row][selectedSquare.col] = null;
+        }
+
+        setOptimisticBoard(newBoard);
+
+        // Send mutation after animation completes
+        makeMove({
+          gameId,
+          fromRow: selectedSquare.row,
+          fromCol: selectedSquare.col,
+          toRow: row,
+          toCol: col,
+        });
+
+        // Clear animation state
+        setAnimatingPiece(null);
+      }, 800); // 800ms to ensure animation completes
+
     } else {
       // Select piece
       const boardToUse = optimisticBoard || game.board;
@@ -772,7 +815,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               </CardHeader>
               <CardContent>
                 <motion.div
-                  initial={{ scale: 0.95, opacity: 0 }}
+                  initial={{ scale: 1, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2 }}
                   className="grid grid-cols-9 gap-2 max-w-lg mx-auto"
@@ -1129,7 +1172,6 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 <div className="flex items-center gap-2">
                   <motion.div 
                     animate={isCurrentPlayer ? {
-                      scale: [1, 1.1, 1],
                       boxShadow: [
                         "0 0 0 0 rgba(34, 197, 94, 0.7)",
                         "0 0 0 10px rgba(34, 197, 94, 0)",
@@ -1141,10 +1183,10 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       repeat: isCurrentPlayer ? Infinity : 0,
                       ease: "easeInOut"
                     }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 ${
+                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 border-2 ${
                       isCurrentPlayer 
-                        ? 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-300 border-2 border-green-500/50 shadow-lg' 
-                        : 'bg-muted/50 text-muted-foreground border border-muted/50'
+                        ? 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-300 border-green-500/50 shadow-lg' 
+                        : 'bg-muted/50 text-muted-foreground border-muted/50'
                     }`}
                   >
                     {isCurrentPlayer ? (
@@ -1168,44 +1210,35 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
             </CardHeader>
             <CardContent>
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
+                ref={boardRef}
+                initial={{ scale: 1, opacity: 0 }}
                 animate={{ 
                   scale: 1, 
-                  opacity: 1,
-                  boxShadow: isCurrentPlayer ? [
-                    "0 0 0 0 rgba(59, 130, 246, 0.7)",
-                    "0 0 0 10px rgba(59, 130, 246, 0)",
-                    "0 0 0 0 rgba(59, 130, 246, 0)"
-                  ] : "0 0 0 0 rgba(0, 0, 0, 0)"
+                  opacity: 1
                 }}
                 transition={{ 
-                  delay: 0.1,
-                  boxShadow: {
-                    duration: 2,
-                    repeat: isCurrentPlayer ? Infinity : 0,
-                    ease: "easeInOut"
-                  }
+                  delay: 0.1
                 }}
-                className={`grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg transition-all duration-500 relative ${
+                className={`grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
                   isCurrentPlayer 
-                    ? 'ring-1 ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/30' 
-                    : 'ring-1 ring-muted bg-muted/10 border border-muted/30'
-                } ${isMakingMove ? 'pointer-events-none' : ''}`}
+                    ? 'ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30' 
+                    : 'ring-muted/30 bg-muted/10 border-muted/30'
+                } ${isMakingMove || animatingPiece ? 'pointer-events-none' : ''}`}
               >
-                {/* Loading overlay when making move */}
+                {/* Simple text indicator when making move */}
                 {isMakingMove && (
-                  <div className="absolute inset-0 bg-black/20 backdrop-blur-sm rounded-lg flex items-center justify-center z-50 pointer-events-none">
+                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
                     <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-4 flex items-center gap-3"
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 flex items-center gap-2 shadow-lg"
                     >
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full"
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
                       />
-                      <span className="text-white/90 font-medium">Making move...</span>
+                      <span className="text-white text-sm backdrop-blur-sm font-medium">Processing move...</span>
                     </motion.div>
                   </div>
                 )}
@@ -1228,6 +1261,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                     const isLastMoveFrom = game?.lastMoveFrom && 
                       game.lastMoveFrom.row === rowIndex && game.lastMoveFrom.col === colIndex;
                     
+                    // Check if this piece is being animated
+                    const isAnimatingFromPosition = animatingPiece && 
+                      animatingPiece.fromRow === rowIndex && animatingPiece.fromCol === colIndex;
+                    
+                    // Check if this is the destination square for animation
+                    const isAnimatingToPosition = animatingPiece && 
+                      animatingPiece.toRow === rowIndex && animatingPiece.toCol === colIndex;
+                    
                     // Get arrow direction for last move
                     const ArrowComponent = isLastMoveFrom && game?.lastMoveFrom && game?.lastMoveTo 
                       ? getArrowDirection(game.lastMoveFrom.row, game.lastMoveFrom.col, game.lastMoveTo.row, game.lastMoveTo.col)
@@ -1236,17 +1277,35 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                     return (
                       <motion.div
                         key={`${rowIndex}-${colIndex}`}
-                        whileHover={isCurrentPlayer ? { scale: 1.05 } : {}}
-                        whileTap={isCurrentPlayer ? { scale: 0.95 } : {}}
-                        animate={isPendingMove ? {
-                          scale: [1, 1.02, 1],
-                          opacity: [0.75, 0.9, 0.75]
-                        } : {}}
-                        transition={isPendingMove ? {
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        } : {}}
+                        whileHover={isCurrentPlayer && !animatingPiece ? { scale: 1.00 } : {}}
+                        whileTap={isCurrentPlayer && !animatingPiece ? { scale: 1 } : {}}
+                        animate={
+                          isAnimatingToPosition ? {
+                            // Pulse effect for destination square
+                            scale: [1, 1.05, 1, 1.1, 1],
+                            boxShadow: [
+                              "0 0 0 0 rgba(34, 197, 94, 0.5)",
+                              "0 0 0 4px rgba(34, 197, 94, 0.3)",
+                              "0 0 0 8px rgba(34, 197, 94, 0.2)",
+                              "0 0 0 12px rgba(34, 197, 94, 0.4)",
+                              "0 0 0 0 rgba(34, 197, 94, 0)"
+                            ]
+                          } : isPendingMove ? {
+                            scale: [1, 1.02, 1],
+                            opacity: [0.75, 0.9, 0.75]
+                          } : {}
+                        }
+                        transition={
+                          isAnimatingToPosition ? {
+                            duration: 0.75,
+                            ease: "easeInOut",
+                            times: [0, 0.3, 0.5, 0.8, 1]
+                          } : isPendingMove ? {
+                            duration: 1,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          } : {}
+                        }
                         onClick={() => handleGameSquareClick(rowIndex, colIndex)}
                         className={`
                           aspect-square border flex items-center justify-center cursor-pointer rounded-lg transition-all relative
@@ -1254,12 +1313,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           ${isSelected ? 'ring-2 ring-primary bg-primary/20 border-primary' : ''}
                           ${isValidMove ? 'ring-2 ring-green-500 bg-green-500/20 border-green-500' : ''}
                           ${highlightType === 'last-move' ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
-                          ${isPendingMove ? 'ring-2 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75' : ''}
-                          ${isCurrentPlayer ? 'hover:bg-accent' : ''}
+                          ${isPendingMove && !isAnimatingToPosition ? 'ring-2 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75' : ''}
+                          ${isAnimatingToPosition ? 'ring-2 ring-green-500 bg-green-500/20 border-green-500' : ''}
+                          ${isCurrentPlayer && !animatingPiece ? 'hover:bg-accent' : ''}
                         `}
                       >
                         {/* Spinner for pending move "from" position */}
-                        {isPendingFromPosition && (
+                        {isPendingFromPosition && !isAnimatingFromPosition && (
                           <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
                             <motion.div
                               animate={{ rotate: 360 }}
@@ -1270,7 +1330,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         )}
                         
                         {/* Arrow for last move "from" position */}
-                        {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && (
+                        {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && !isAnimatingFromPosition && (
                           <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
                             <div className="rounded-full p-1">
                               <ArrowComponent className="h-6 w-6 text-yellow-500" />
@@ -1278,7 +1338,8 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           </div>
                         )}
                         
-                        {cell && (
+                        {/* Show piece only if it's not being animated from this position */}
+                        {cell && !isAnimatingFromPosition && (
                           <div className="text-center">
                             <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
                               {cell.piece === "Hidden" ? 
@@ -1296,6 +1357,74 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       </motion.div>
                     );
                   })
+                )}
+                
+                {/* Animated piece overlay */}
+                {animatingPiece && boardRect && (
+                  <motion.div
+                    initial={{ 
+                      x: `${(animatingPiece.fromCol * (boardRect.width - 32) / 9) + 16}px`,
+                      y: `${(animatingPiece.fromRow * (boardRect.height - 32) / 8) + 16}px`,
+                      scale: 1.2,
+                      zIndex: 100
+                    }}
+                    animate={{ 
+                      x: `${(animatingPiece.toCol * (boardRect.width - 32) / 9) + 16}px`,
+                      y: `${(animatingPiece.toRow * (boardRect.height - 32) / 8) + 16}px`,
+                      scale: [1.2, 1.3, 1.2],
+                      rotate: [0, 5, -5, 0]
+                    }}
+                    transition={{
+                      duration: 0.75,
+                      ease: "easeInOut",
+                      scale: {
+                        duration: 0.75,
+                        ease: "easeInOut",
+                        times: [0, 0.5, 1]
+                      },
+                      rotate: {
+                        duration: 0.75,
+                        ease: "easeInOut",
+                        times: [0, 0.3, 0.7, 1]
+                      }
+                    }}
+                    className="absolute pointer-events-none z-50"
+                    style={{
+                      width: `${(boardRect.width - 32) / 9}px`,
+                      height: `${(boardRect.height - 32) / 8}px`,
+                    }}
+                  >
+                    <div className="w-full h-full flex items-center justify-center">
+                      <motion.div
+                        animate={{
+                          boxShadow: [
+                            "0 0 0 0 rgba(59, 130, 246, 0.7)",
+                            "0 0 15px 3px rgba(59, 130, 246, 0.4)",
+                            "0 0 10px 2px rgba(59, 130, 246, 0.6)"
+                          ]
+                        }}
+                        transition={{
+                          duration: 0.75,
+                          ease: "easeInOut"
+                        }}
+                        className={`text-center p-2 rounded-lg bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-sm border border-white/30 ${
+                          animatingPiece.piece.player === 'player1' ? 'text-blue-400' : 'text-red-400'
+                        }`}
+                      >
+                        <div className="transform scale-125">
+                          {animatingPiece.piece.piece === "Hidden" ? 
+                            getPieceDisplay(animatingPiece.piece.piece, { isOpponent: true }) : 
+                            getPieceDisplay(animatingPiece.piece.piece, { showLabel: true })
+                          }
+                        </div>
+                        {animatingPiece.piece.revealed && animatingPiece.piece.piece !== "Hidden" && (
+                          <div className="text-xs font-bold mt-1 text-muted-foreground">
+                            {animatingPiece.piece.piece.split(' ').map((word: string) => word[0]).join('')}
+                          </div>
+                        )}
+                      </motion.div>
+                    </div>
+                  </motion.div>
                 )}
               </motion.div>
             </CardContent>
