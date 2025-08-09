@@ -18,6 +18,21 @@ export const getCurrentProfile = query({
   },
 });
 
+// Get profile by username (for getting avatar URLs in lobbies, etc.)
+export const getProfileByUsername = query({
+  args: {
+    username: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_username", (q) => q.eq("username", args.username))
+      .unique();
+
+    return profile;
+  },
+});
+
 // Create or update user profile
 export const createOrUpdateProfile = mutation({
   args: {
@@ -111,6 +126,46 @@ export const updateUsername = mutation({
     // Update username
     await ctx.db.patch(currentProfile._id, {
       username: args.username,
+    });
+
+    return { success: true };
+  },
+});
+
+// Update avatar
+export const updateAvatar = mutation({
+  args: {
+    avatarUrl: v.string(),
+    avatarStorageId: v.optional(v.id("_storage")),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get current profile
+    const currentProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!currentProfile) {
+      throw new Error("Profile not found");
+    }
+
+    // Delete old avatar file if it exists and a new one is being set
+    if (currentProfile.avatarStorageId && args.avatarUrl && args.avatarStorageId !== currentProfile.avatarStorageId) {
+      try {
+        await ctx.storage.delete(currentProfile.avatarStorageId);
+      } catch (error) {
+        // If deletion fails, log but don't throw - the update should still proceed
+        console.warn("Failed to delete old avatar file:", error);
+      }
+    }
+
+    // Update avatar URL and storage ID
+    await ctx.db.patch(currentProfile._id, {
+      avatarUrl: args.avatarUrl,
+      avatarStorageId: args.avatarStorageId,
     });
 
     return { success: true };

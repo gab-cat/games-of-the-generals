@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth } from "convex/react";
+import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -12,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { UserAvatar } from "./UserAvatar";
 import { useState, useEffect } from "react";
 
 interface LayoutProps {
@@ -27,6 +28,7 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
   const { isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
   const [isScrolled, setIsScrolled] = useState(false);
+  const profile = useQuery(api.profiles.getCurrentProfile);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -134,11 +136,13 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
                             <span className="text-white/50 text-xs">Online</span>
                           </div>
                         </div>
-                        <Avatar className="h-9 w-9 ring-1 ring-white/30">
-                          <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
-                            {user.username.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <UserAvatar 
+                          username={user.username}
+                          avatarUrl={profile?.avatarUrl}
+                          rank={profile?.rank}
+                          size="sm"
+                          className="ring-1 ring-white/30"
+                        />
                       </div>
                       <ChevronDown className="w-4 h-4 text-white/60 group-hover:text-white/90 transition-colors" />
                     </Button>
@@ -152,11 +156,13 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
                   {/* User Header */}
                   <div className="px-3 py-3 border-b border-white/10">
                     <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 ring-1 ring-white/20">
-                        <AvatarFallback className="bg-white/20 text-white font-semibold">
-                          {user.username.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                      <UserAvatar 
+                        username={user.username}
+                        avatarUrl={profile?.avatarUrl}
+                        rank={profile?.rank}
+                        size="md"
+                        className="ring-1 ring-white/20"
+                      />
                       <div>
                         <div className="text-white font-medium text-sm">{user.username}</div>
                         <div className="flex items-center gap-1 mt-0.5">

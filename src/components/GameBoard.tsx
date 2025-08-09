@@ -27,6 +27,7 @@ import { Badge } from "./ui/badge";
 import { Timer } from "./Timer";
 import { GameResultModal } from "./GameResultModal";
 import { AchievementNotification } from "./AchievementNotification";
+import { UserAvatar } from "./UserAvatar";
 import { getPieceDisplay } from "../lib/piece-display";
 
 interface Profile {
@@ -72,6 +73,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const makeMove = useMutation(api.games.makeMove);
   const surrenderGame = useMutation(api.games.surrenderGame);
   const acknowledgeGameResult = useMutation(api.games.acknowledgeGameResult);
+
+  // Get player profiles for avatars
+  const player1Profile = useQuery(api.profiles.getProfileByUsername, 
+    game ? { username: game.player1Username } : "skip"
+  );
+  const player2Profile = useQuery(api.profiles.getProfileByUsername, 
+    game ? { username: game.player2Username } : "skip"
+  );
 
   const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(
     Array(8).fill(null).map(() => Array(9).fill(null))
@@ -1045,6 +1054,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   animate={{ x: 0, opacity: 1 }}
                   className="flex items-center gap-3"
                 >
+                  <UserAvatar 
+                    username={game.player1Username}
+                    avatarUrl={player1Profile?.avatarUrl}
+                    rank={player1Profile?.rank}
+                    size="sm"
+                    className="ring-2 ring-blue-400/50"
+                  />
                   <div className="w-4 h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50"></div>
                   <div>
                     <h3 className="font-semibold text-blue-400">{game.player1Username}</h3>
@@ -1061,6 +1077,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   transition={{ delay: 0.1 }}
                   className="flex items-center gap-3"
                 >
+                  <UserAvatar 
+                    username={game.player2Username}
+                    avatarUrl={player2Profile?.avatarUrl}
+                    rank={player2Profile?.rank}
+                    size="sm"
+                    className="ring-2 ring-red-400/50"
+                  />
                   <div className="w-4 h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50"></div>
                   <div>
                     <h3 className="font-semibold text-red-400">{game.player2Username}</h3>
@@ -1198,6 +1221,8 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
           // You can handle replay view here or pass it up to parent
           console.log("View replay for game:", gameId);
         }}
+        player1Profile={player1Profile}
+        player2Profile={player2Profile}
       />
     )}
     </>

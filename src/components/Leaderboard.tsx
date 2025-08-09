@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Trophy, Medal, Crown, Target } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { UserAvatar } from "./UserAvatar";
 
 export function Leaderboard() {
   const leaderboard = useQuery(api.profiles.getLeaderboard, { 
@@ -124,6 +125,14 @@ export function Leaderboard() {
                     {getRankIcon(player.position)}
                     <span className="font-bold text-lg text-white/90">#{player.position}</span>
                   </div>
+                  
+                  <UserAvatar 
+                    username={player.username}
+                    avatarUrl={player.avatarUrl}
+                    rank={player.rank}
+                    size="md"
+                    className="ring-2 ring-white/20"
+                  />
                   
                   <div>
                     <h4 className="font-semibold text-lg text-white/90">{player.username}</h4>

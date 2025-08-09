@@ -2,10 +2,10 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trophy, Target, Clock, Sword, Crown, Medal, Calendar, ChevronLeft, ChevronRight, Play } from "lucide-react";
-import { Card, CardContent } from "./ui/card";
+import { Target, Sword, Crown, Medal, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
+import { MatchItem } from "./MatchItem";
 import { Id } from "../../convex/_generated/dataModel";
 
 interface MatchHistoryProps {
@@ -178,64 +178,12 @@ export function MatchHistory({ userId, onViewReplay }: MatchHistoryProps) {
       
       <div className="space-y-2">
         {matchHistory.matches.map((match, index: number) => (
-          <motion.div
+          <MatchItem
             key={match._id}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
-            <Card className="bg-white/5 rounded-2xl backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all duration-200 shadow-lg">
-              <CardContent className="p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 flex-1">
-                    {getResultIcon(match.isWin, match.isDraw)}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-sm truncate text-white/90">vs {match.opponentUsername}</span>
-                        {getResultBadge(match.isWin, match.isDraw)}
-                      </div>
-                      <div className="text-xs truncate bg-white/10 backdrop-blur-sm border border-white/20 text-white/70 px-2 rounded-md flex w-fit mt-1 mb-2">{match.lobbyName}</div>
-                      <div className="flex items-center gap-3 text-xs text-white/60">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(match.createdAt)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {formatDuration(match.duration)}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Sword className="h-3 w-3" />
-                          {match.moves}m
-                        </span>
-                        <span className="hidden sm:flex items-center gap-1">
-                          <Trophy className="h-3 w-3" />
-                          {match.rankAtTime}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="text-xs text-white/60">
-                      {getReasonText(match.reason)}
-                    </div>
-                    {onViewReplay && (
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => onViewReplay(match.gameId)}
-                        className="h-6 px-2 text-xs rounded-full bg-white/10 border-white/20 text-white/90 hover:bg-white/20"
-                      >
-                        <Play className="h-3 w-3 mr-1" />
-                        Replay
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+            match={match}
+            index={index}
+            onViewReplay={onViewReplay}
+          />
         ))}
       </div>
     </div>

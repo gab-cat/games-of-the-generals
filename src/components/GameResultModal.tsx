@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent } from "./ui/card";
+import { UserAvatar } from "./UserAvatar";
 import { Id } from "../../convex/_generated/dataModel";
 
 interface GameResult {
@@ -25,13 +26,15 @@ interface Profile {
 
 interface GameResultModalProps {
   result: GameResult;
-  profile: Profile;
+  profile: Profile & { avatarUrl?: string };
   isPlayer1: boolean;
   isOpen: boolean;
   onClose: () => void;
   onReturnToLobby: () => void;
-  gameId?: Id<"games">;
-  onViewReplay?: (gameId: Id<"games">) => void;
+  gameId: Id<"games">;
+  onViewReplay: (gameId: Id<"games">) => void;
+  player1Profile?: (Profile & { avatarUrl?: string }) | null;
+  player2Profile?: (Profile & { avatarUrl?: string }) | null;
 }
 
 export function GameResultModal({ 
@@ -42,7 +45,9 @@ export function GameResultModal({
   onClose, 
   onReturnToLobby,
   gameId,
-  onViewReplay
+  onViewReplay,
+  player1Profile,
+  player2Profile
 }: GameResultModalProps) {
   const isWinner = (isPlayer1 && result.winner === "player1") || (!isPlayer1 && result.winner === "player2");
   const isDraw = result.winner === "draw";
@@ -184,10 +189,13 @@ export function GameResultModal({
                     transition={{ type: "spring", stiffness: 300 }}
                     className="flex items-center justify-between p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-blue-500/20 backdrop-blur-sm rounded-lg">
-                        <Target className="h-4 w-4 text-blue-400" />
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar 
+                        username={isPlayer1 ? result.player1Username : result.player2Username}
+                        avatarUrl={isPlayer1 ? player1Profile?.avatarUrl : player2Profile?.avatarUrl}
+                        rank={isPlayer1 ? player1Profile?.rank : player2Profile?.rank}
+                        size="md"
+                      />
                       <div>
                         <div className="font-semibold text-white/90">
                           {isPlayer1 ? result.player1Username : result.player2Username}
@@ -216,10 +224,13 @@ export function GameResultModal({
                     transition={{ type: "spring", stiffness: 300 }}
                     className="flex items-center justify-between p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20"
                   >
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-red-500/20 backdrop-blur-sm rounded-lg">
-                        <Sword className="h-4 w-4 text-red-400" />
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar 
+                        username={isPlayer1 ? result.player2Username : result.player1Username}
+                        avatarUrl={isPlayer1 ? player2Profile?.avatarUrl : player1Profile?.avatarUrl}
+                        rank={isPlayer1 ? player2Profile?.rank : player1Profile?.rank}
+                        size="md"
+                      />
                       <div>
                         <div className="font-semibold text-white/90">
                           {isPlayer1 ? result.player2Username : result.player1Username}

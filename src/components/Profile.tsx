@@ -5,8 +5,9 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
+import { AvatarUpload } from "./AvatarUpload";
+import { UserAvatar } from "./UserAvatar";
 import { 
-  Trophy, 
   Target, 
   Clock, 
   TrendingUp, 
@@ -16,14 +17,15 @@ import {
   Zap,
   Timer,
   Flag,
-  Star,
   Crown,
   Swords,
-  Medal,
-  Flame
+  Flame,
+  Settings
 } from "lucide-react";
+import { useState } from "react";
 
 export function Profile() {
+  const [showAvatarUpload, setShowAvatarUpload] = useState(false);
   const profileStats = useQuery(api.profiles.getProfileStats);
 
   if (!profileStats) {
@@ -49,18 +51,6 @@ export function Profile() {
 
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString();
-  };
-
-  const getRankIcon = (rank: string) => {
-    switch (rank) {
-      case "General": return <Crown className="w-6 h-6 text-yellow-400" />;
-      case "Colonel": return <Star className="w-6 h-6 text-purple-400" />;
-      case "Major": return <Award className="w-6 h-6 text-blue-400" />;
-      case "Captain": return <Trophy className="w-6 h-6 text-green-400" />;
-      case "Lieutenant": return <Target className="w-6 h-6 text-orange-400" />;
-      case "Sergeant": return <Swords className="w-6 h-6 text-red-400" />;
-      default: return <Medal className="w-6 h-6 text-gray-400" />;
-    }
   };
 
   const getRankColor = (rank: string) => {
@@ -94,14 +84,20 @@ export function Profile() {
             {/* Left side - Avatar and Info */}
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className={`w-16 h-16 bg-gradient-to-br ${getRankColor(profileStats.rank)} rounded-full flex items-center justify-center text-white text-xl font-bold ring-1 ring-white/20 shadow-lg`}>
-                  {profileStats.username.charAt(0).toUpperCase()}
-                </div>
-                <div className="absolute -bottom-0.5 -right-0.5 bg-gray-900/90 backdrop-blur-sm rounded-full p-1.5 ring-1 ring-white/20">
-                  <div className="w-4 h-4 text-white">
-                    {getRankIcon(profileStats.rank)}
-                  </div>
-                </div>
+                <UserAvatar 
+                  username={profileStats.username}
+                  avatarUrl={profileStats.avatarUrl}
+                  rank={profileStats.rank}
+                  size="xl"
+                  className="ring-1 ring-white/20 shadow-lg"
+                />
+                <button
+                  onClick={() => setShowAvatarUpload(!showAvatarUpload)}
+                  className="absolute -bottom-0.5 -right-0.5 bg-gray-900/90 backdrop-blur-sm rounded-full p-1.5 ring-1 ring-white/20 hover:bg-gray-800/90 transition-colors"
+                  title="Change avatar"
+                >
+                  <Settings className="w-4 h-4 text-white" />
+                </button>
               </div>
             
             <div>
@@ -161,6 +157,27 @@ export function Profile() {
           </div>
         </div>
         </motion.div>
+
+        {/* Avatar Upload Section */}
+        {showAvatarUpload && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-gray-800/30 backdrop-blur-xl rounded-xl border border-white/5 p-6 mb-6"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <Settings className="w-5 h-5 text-blue-400" />
+              <h2 className="text-lg font-bold text-white">Avatar Settings</h2>
+            </div>
+            <AvatarUpload 
+              username={profileStats.username}
+              currentAvatarUrl={profileStats.avatarUrl}
+              rank={profileStats.rank}
+            />
+          </motion.div>
+        )}
+
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Battle Stats */}

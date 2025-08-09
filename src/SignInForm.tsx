@@ -195,6 +195,7 @@ export function SignInForm() {
                     let toastTitle = "";
                     if (error.message.includes("Invalid password")) {
                       toastTitle = "Invalid password. Please try again.";
+                      console.log("Error message:", error);
                     } else {
                       toastTitle =
                         flow === "signIn"

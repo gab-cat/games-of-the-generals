@@ -11,6 +11,7 @@
 import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
 import type * as achievements from "../achievements.js";
 import type * as auth from "../auth.js";
+import type * as fileUpload from "../fileUpload.js";
 import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as lobbies from "../lobbies.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   ResendOTPPasswordReset: typeof ResendOTPPasswordReset;
   achievements: typeof achievements;
   auth: typeof auth;
+  fileUpload: typeof fileUpload;
   games: typeof games;
   http: typeof http;
   lobbies: typeof lobbies;

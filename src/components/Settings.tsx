@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Separator } from "./ui/separator";
+import { AvatarUpload } from "./AvatarUpload";
 import { toast } from "sonner";
 import { 
   Settings as SettingsIcon, 
@@ -15,7 +16,8 @@ import {
   Lock, 
   Save,
   Eye,
-  EyeOff
+  EyeOff,
+  Camera
 } from "lucide-react";
 
 export function Settings() {
@@ -127,11 +129,34 @@ export function Settings() {
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Username Settings */}
+        {/* Avatar Settings */}
         <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.1 }}
+        >
+          <Card className="bg-gray-800/50 border-gray-700">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Camera className="w-5 h-5" />
+                Avatar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AvatarUpload 
+                username={profile.username}
+                currentAvatarUrl={profile.avatarUrl}
+                rank={profile.rank}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Username Settings */}
+        <motion.div
+          initial={{ x: -20, opacity: 0 }}
+          animate={{ x: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
         >
           <Card className="bg-gray-800/50 border-gray-700">
             <CardHeader>
@@ -184,7 +209,7 @@ export function Settings() {
         <motion.div
           initial={{ x: 20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.3 }}
         >
           <Card className="bg-gray-800/50 border-gray-700">
             <CardHeader>
@@ -304,7 +329,7 @@ export function Settings() {
       <motion.div
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.4 }}
       >
         <Card className="bg-gray-800/50 border-gray-700">
           <CardHeader>

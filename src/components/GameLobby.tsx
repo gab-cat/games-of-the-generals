@@ -9,6 +9,7 @@ import { GameBoard } from "./GameBoard";
 import { Leaderboard } from "./Leaderboard";
 import { MatchHistory } from "./MatchHistory";
 import { GameReplay } from "./GameReplay";
+import { LobbyCard } from "./LobbyCard";
 import { motion } from "framer-motion";
 import { Plus, Users, Trophy, Target, Sword, History, Lock, Copy, ChevronDown, Key } from "lucide-react";
 import { Button } from "./ui/button";
@@ -472,52 +473,14 @@ export function GameLobby({ profile }: GameLobbyProps) {
                 ) : (
                   <>
                     {lobbies.map((lobby, index) => (
-                      <motion.div
+                      <LobbyCard
                         key={lobby._id}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                      >
-                        <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all duration-200 shadow-lg">
-                          <CardContent className="flex items-center justify-between p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm">
-                                <Users className="h-5 w-5 text-blue-300" />
-                              </div>
-                              <div>
-                                <h4 className="font-semibold text-white/90">{lobby.name}</h4>
-                                <p className="text-sm text-white/60">
-                                  Host: {lobby.hostUsername}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Badge variant={lobby.playerId ? "destructive" : "secondary"} className={lobby.playerId ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-green-500/20 text-green-300 border-green-500/30"}>
-                                {lobby.playerId ? "2/2" : "1/2"}
-                              </Badge>
-                              {lobby.hostId === profile.userId ? (
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
-                                  onClick={() => void handleLeaveLobby(lobby._id)}
-                                >
-                                  Delete
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  className={lobby.playerId ? "bg-gray-500/20 text-gray-400 border border-gray-500/30" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"}
-                                  onClick={() => void handleJoinLobby(lobby._id)}
-                                  disabled={!!lobby.playerId}
-                                >
-                                  {lobby.playerId ? "Full" : "Join Battle"}
-                                </Button>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
+                        lobby={lobby}
+                        index={index}
+                        currentUserId={profile.userId}
+                        onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
+                        onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
+                      />
                     ))}
 
                     {/* Load More Button */}

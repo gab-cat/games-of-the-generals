@@ -12,6 +12,8 @@ const applicationTables = {
     gamesPlayed: v.number(),
     rank: v.string(),
     createdAt: v.number(),
+    avatarUrl: v.optional(v.string()), // URL to compressed avatar image
+    avatarStorageId: v.optional(v.id("_storage")), // Storage ID for deleting old avatars
     // Additional stats for achievements
     totalPlayTime: v.optional(v.number()), // in milliseconds
     fastestWin: v.optional(v.number()), // in milliseconds
