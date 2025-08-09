@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { motion } from "framer-motion";
 import { Trophy, Target, Clock, Sword, Crown, Calendar, Play } from "lucide-react";
@@ -28,7 +28,7 @@ interface MatchItemProps {
 
 export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
   // Fetch opponent profile for avatar
-  const opponentProfile = useQuery(api.profiles.getProfileByUsername, {
+  const { data: opponentProfile } = useConvexQuery(api.profiles.getProfileByUsername, {
     username: match.opponentUsername
   });
 

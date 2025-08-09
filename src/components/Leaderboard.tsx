@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { motion } from "framer-motion";
 import { Trophy, Medal, Crown, Target } from "lucide-react";
@@ -7,12 +7,15 @@ import { Badge } from "./ui/badge";
 import { UserAvatar } from "./UserAvatar";
 
 export function Leaderboard() {
-  const leaderboard = useQuery(api.profiles.getLeaderboard, { 
-    limit: 15, // Load top 15 instead of 50 for better performance
-    offset: 0 
-  });
+  const { data: leaderboard, isPending: isLoadingLeaderboard, error: leaderboardError } = useConvexQuery(
+    api.profiles.getLeaderboard, 
+    { 
+      limit: 15, // Load top 15 instead of 50 for better performance
+      offset: 0 
+    }
+  );
 
-  if (leaderboard === undefined) {
+  if (isLoadingLeaderboard) {
     return (
       <div className="flex justify-center py-8">
         <motion.div
@@ -24,7 +27,21 @@ export function Leaderboard() {
     );
   }
 
-  if (leaderboard.length === 0) {
+  if (leaderboardError) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="text-center py-12"
+      >
+        <Trophy className="h-12 w-12 text-red-400 mx-auto mb-4" />
+        <p className="text-red-400">Failed to load leaderboard</p>
+        <p className="text-sm text-white/40">Please try refreshing the page</p>
+      </motion.div>
+    );
+  }
+
+  if (!leaderboard || leaderboard.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0 }}

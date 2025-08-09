@@ -3,7 +3,8 @@
 import { motion } from "framer-motion";
 import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import {
@@ -28,7 +29,16 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
   const { isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
   const [isScrolled, setIsScrolled] = useState(false);
-  const profile = useQuery(api.profiles.getCurrentProfile);
+  
+  const { data: profile, error: profileError } = useConvexQuery(
+    api.profiles.getCurrentProfile
+  );
+
+  useEffect(() => {
+    if (profileError) {
+      console.error("Error loading profile:", profileError);
+    }
+  }, [profileError]);
 
   useEffect(() => {
     const handleScroll = () => {

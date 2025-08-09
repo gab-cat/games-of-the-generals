@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "convex/react";
+import { useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -8,22 +8,22 @@ import Aurora from "./backgrounds/Aurora/Aurora";
 
 export function ProfileSetup() {
   const [username, setUsername] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const createProfile = useMutation(api.profiles.createOrUpdateProfile);
+  
+  const createProfile = useConvexMutationWithQuery(api.profiles.createOrUpdateProfile, {
+    onSuccess: () => {
+      toast.success("Profile created successfully!");
+    },
+    onError: (error) => {
+      console.error("Profile creation error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to create profile");
+    }
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) return;
 
-    setIsLoading(true);
-    try {
-      await createProfile({ username: username.trim() });
-      toast.success("Profile created successfully!");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create profile");
-    } finally {
-      setIsLoading(false);
-    }
+    createProfile.mutate({ username: username.trim() });
   };
 
   return (
@@ -240,12 +240,12 @@ export function ProfileSetup() {
 
               <motion.button
                 type="submit"
-                disabled={isLoading || !username.trim()}
+                disabled={createProfile.isPending || !username.trim()}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white py-3 px-6 rounded-full font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 transform disabled:transform-none font-body"
               >
-                {isLoading ? (
+                {createProfile.isPending ? (
                   <div className="flex items-center justify-center space-x-2">
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>Creating Profile...</span>

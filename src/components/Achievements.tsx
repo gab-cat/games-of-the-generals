@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Progress } from "./ui/progress";
@@ -9,9 +9,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Trophy, Award, Lock, CheckCircle } from "lucide-react";
 
 export function Achievements() {
-  const achievements = useQuery(api.achievements.getAllAchievements);
+  const { data: achievements, isPending: isLoadingAchievements, error: achievementsError } = useConvexQuery(
+    api.achievements.getAllAchievements
+  );
 
-  if (!achievements) {
+  if (isLoadingAchievements) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <motion.div
@@ -19,6 +21,35 @@ export function Achievements() {
           animate={{ opacity: 1, scale: 1 }}
           className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"
         />
+      </div>
+    );
+  }
+
+  if (achievementsError) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-4"
+        >
+          <div className="text-red-400 text-lg">Failed to load achievements</div>
+          <div className="text-white/60 text-sm">Please try refreshing the page</div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!achievements) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-4"
+        >
+          <div className="text-white/60 text-lg">No achievements available</div>
+        </motion.div>
       </div>
     );
   }

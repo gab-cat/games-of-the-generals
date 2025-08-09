@@ -1,4 +1,4 @@
-import { Authenticated, Unauthenticated, useQuery } from "convex/react";
+import { Authenticated, Unauthenticated } from "convex/react";
 import { api } from "../convex/_generated/api";
 import { SignInForm } from "./SignInForm";
 import { Toaster } from "sonner";
@@ -10,6 +10,7 @@ import { Achievements } from "./components/Achievements";
 import { Layout } from "./components/Layout";
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { useConvexQuery } from "./lib/convex-query-hooks";
 
 export default function App() {
   return (
@@ -21,11 +22,11 @@ export default function App() {
 }
 
 function Content() {
-  const loggedInUser = useQuery(api.auth.loggedInUser);
-  const profile = useQuery(api.profiles.getCurrentProfile);
+  const { isPending: isLoadingUser} = useConvexQuery(api.auth.loggedInUser);
+  const { data: profile, isPending: isLoadingProfile } = useConvexQuery(api.profiles.getCurrentProfile);
   const [currentPage, setCurrentPage] = useState<'lobby' | 'profile' | 'achievements' | 'settings'>('lobby');
 
-  if (loggedInUser === undefined || profile === undefined) {
+  if (isLoadingUser || isLoadingProfile) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <motion.div

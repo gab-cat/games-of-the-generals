@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
@@ -43,24 +43,63 @@ export function GameLobby({ profile }: GameLobbyProps) {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [replayGameId, setReplayGameId] = useState<string | null>(null);
   const [lobbiesCursor, setLobbiesCursor] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const LOBBIES_PER_PAGE = 10;
 
-  const lobbiesQuery = useQuery(api.lobbies.getLobbies, {
+  const { data: lobbiesQuery } = useConvexQuery(api.lobbies.getLobbies, {
     paginationOpts: {
       numItems: LOBBIES_PER_PAGE,
       cursor: lobbiesCursor || undefined,
     },
   });
+
+  const { data: activeLobby } = useConvexQuery(api.lobbies.getUserActiveLobby);
+  const { data: activeGame } = useConvexQuery(api.games.getCurrentUserGame);
+
+  const createLobbyMutation = useConvexMutationWithQuery(api.lobbies.createLobby, {
+    onSuccess: (newLobby) => {
+      setLobbyName("");
+      setIsPrivate(false);
+      setShowCreateLobby(false);
+      
+      if (isPrivate && newLobby) {
+        toast.success("Private lobby created! Share the code with your opponent.");
+      } else {
+        toast.success("Lobby created!");
+      }
+    },
+    onError: () => {
+      toast.error("Failed to create lobby");
+    }
+  });
+
+  const joinLobbyMutation = useConvexMutationWithQuery(api.lobbies.joinLobby, {
+    onError: () => {
+      toast.error("Failed to join lobby");
+    }
+  });
   
-  const activeLobby = useQuery(api.lobbies.getUserActiveLobby);
-  const activeGame = useQuery(api.games.getCurrentUserGame);
+  const joinLobbyByCodeMutation = useConvexMutationWithQuery(api.lobbies.joinLobbyByCode, {
+    onError: () => {
+      toast.error("Failed to join lobby");
+    }
+  });
   
-  const createLobby = useMutation(api.lobbies.createLobby);
-  const joinLobby = useMutation(api.lobbies.joinLobby);
-  const joinLobbyByCode = useMutation(api.lobbies.joinLobbyByCode);
-  const leaveLobby = useMutation(api.lobbies.leaveLobby);
-  const startGame = useMutation(api.games.startGame);
+  const leaveLobbyMutation = useConvexMutationWithQuery(api.lobbies.leaveLobby, {
+    onSuccess: () => {
+      toast.success("Left lobby");
+    },
+    onError: () => {
+      toast.error("Failed to leave lobby");
+    }
+  });
+  
+  const startGameMutation = useConvexMutationWithQuery(api.games.startGame, {
+    onError: () => {
+      toast.error("Failed to start game");
+    }
+  });
 
   const lobbies = lobbiesQuery?.page || [];
 
@@ -68,35 +107,32 @@ export function GameLobby({ profile }: GameLobbyProps) {
     e.preventDefault();
     if (!lobbyName.trim()) return;
 
-    try {
-      const newLobby = await createLobby({ 
-        name: lobbyName.trim(),
-        isPrivate 
-      });
-      
-      setLobbyName("");
-      setIsPrivate(false);
-      setShowCreateLobby(false);
-      
-      if (isPrivate && newLobby) {
-        // Get the created lobby to show the code
-        toast.success("Private lobby created! Share the code with your opponent.");
-      } else {
-        toast.success("Lobby created!");
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create lobby");
-    }
+    createLobbyMutation.mutate({ 
+      name: lobbyName.trim(),
+      isPrivate 
+    });
   };
 
   const handleJoinLobby = async (lobbyId: Id<"lobbies">) => {
     try {
-      await joinLobby({ lobbyId });
-      const gameId = await startGame({ lobbyId });
-      setCurrentGameId(gameId as string);
+      await new Promise<void>((resolve, reject) => {
+        joinLobbyMutation.mutate({ lobbyId }, {
+          onSuccess: () => resolve(),
+          onError: reject
+        });
+      });
+      
+      const gameId = await new Promise<string>((resolve, reject) => {
+        startGameMutation.mutate({ lobbyId }, {
+          onSuccess: (result) => resolve(result as string),
+          onError: reject
+        });
+      });
+      
+      setCurrentGameId(gameId);
       toast.success("Joined game!");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to join lobby");
+    } catch {
+      toast.error("Failed to join lobby");
     }
   };
 
@@ -105,29 +141,39 @@ export function GameLobby({ profile }: GameLobbyProps) {
     if (!joinCode.trim()) return;
 
     try {
-      const lobbyId = await joinLobbyByCode({ lobbyCode: joinCode.trim().toUpperCase() });
-      const gameId = await startGame({ lobbyId });
-      setCurrentGameId(gameId as string);
+      const lobbyId = await new Promise<Id<"lobbies">>((resolve, reject) => {
+        joinLobbyByCodeMutation.mutate({ lobbyCode: joinCode.trim().toUpperCase() }, {
+          onSuccess: (result) => resolve(result as Id<"lobbies">),
+          onError: reject
+        });
+      });
+      
+      const gameId = await new Promise<string>((resolve, reject) => {
+        startGameMutation.mutate({ lobbyId }, {
+          onSuccess: (result) => resolve(result as string),
+          onError: reject
+        });
+      });
+      
+      setCurrentGameId(gameId);
       setJoinCode("");
       setShowJoinByCode(false);
       toast.success("Joined private lobby!");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to join lobby");
+    } catch {
+      toast.error("Failed to join lobby");
     }
   };
 
   const handleLeaveLobby = async (lobbyId: Id<"lobbies">) => {
-    try {
-      await leaveLobby({ lobbyId });
-      toast.success("Left lobby");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to leave lobby");
-    }
+    leaveLobbyMutation.mutate({ lobbyId });
   };
 
   const loadMoreLobbies = () => {
     if (lobbiesQuery?.continueCursor) {
+      setIsLoadingMore(true);
       setLobbiesCursor(lobbiesQuery.continueCursor);
+      // Reset loading state after a brief delay to show animation
+      setTimeout(() => setIsLoadingMore(false), 500);
     }
   };
 
@@ -309,8 +355,16 @@ export function GameLobby({ profile }: GameLobbyProps) {
                           size="sm"
                           className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
                           onClick={() => void handleLeaveLobby(activeLobby._id)}
+                          disabled={leaveLobbyMutation.isPending}
                         >
-                          Delete
+                          {leaveLobbyMutation.isPending ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
+                              Leaving...
+                            </div>
+                          ) : (
+                            "Delete"
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -387,13 +441,27 @@ export function GameLobby({ profile }: GameLobbyProps) {
                           placeholder="ABC123"
                           maxLength={6}
                           required
+                          disabled={joinLobbyByCodeMutation.isPending || startGameMutation.isPending}
                           className="font-mono tracking-wider text-center text-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
                         />
                         <div className="flex justify-end gap-2">
                           <Button type="button" variant="outline" onClick={() => setShowJoinByCode(false)} className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
                             Cancel
                           </Button>
-                          <Button type="submit" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">Join Lobby</Button>
+                          <Button 
+                            type="submit" 
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                            disabled={joinLobbyByCodeMutation.isPending || startGameMutation.isPending}
+                          >
+                            {joinLobbyByCodeMutation.isPending || startGameMutation.isPending ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                Joining...
+                              </div>
+                            ) : (
+                              "Join Lobby"
+                            )}
+                          </Button>
                         </div>
                       </form>
                     </DialogContent>
@@ -420,6 +488,7 @@ export function GameLobby({ profile }: GameLobbyProps) {
                             onChange={(e) => setLobbyName(e.target.value)}
                             placeholder="Enter lobby name"
                             required
+                            disabled={createLobbyMutation.isPending}
                             className="bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
                           />
                           
@@ -429,7 +498,8 @@ export function GameLobby({ profile }: GameLobbyProps) {
                               id="private-lobby"
                               checked={isPrivate}
                               onChange={(e) => setIsPrivate(e.target.checked)}
-                              className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/50"
+                              disabled={createLobbyMutation.isPending}
+                              className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
                             />
                             <label htmlFor="private-lobby" className="text-sm flex items-center gap-2 text-white/80">
                               <Lock className="h-4 w-4" />
@@ -441,7 +511,20 @@ export function GameLobby({ profile }: GameLobbyProps) {
                             <Button type="button" variant="outline" onClick={() => setShowCreateLobby(false)} className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
                               Cancel
                             </Button>
-                            <Button type="submit" className="bg-gradient-to-r text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">Create</Button>
+                            <Button 
+                              type="submit" 
+                              className="bg-gradient-to-r text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                              disabled={createLobbyMutation.isPending}
+                            >
+                              {createLobbyMutation.isPending ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                  Creating...
+                                </div>
+                              ) : (
+                                "Create"
+                              )}
+                            </Button>
                           </div>
                         </form>
                       </DialogContent>
@@ -480,6 +563,8 @@ export function GameLobby({ profile }: GameLobbyProps) {
                         currentUserId={profile.userId}
                         onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
                         onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
+                        isJoining={joinLobbyMutation.isPending || startGameMutation.isPending}
+                        isLeaving={leaveLobbyMutation.isPending}
                       />
                     ))}
 
@@ -490,9 +575,19 @@ export function GameLobby({ profile }: GameLobbyProps) {
                           variant="outline"
                           onClick={loadMoreLobbies}
                           className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20"
+                          disabled={isLoadingMore}
                         >
-                          <ChevronDown className="h-4 w-4" />
-                          Load More Lobbies
+                          {isLoadingMore ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Loading...
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4" />
+                              Load More Lobbies
+                            </>
+                          )}
                         </Button>
                       </div>
                     )}

@@ -152,8 +152,11 @@ export const updateAvatar = mutation({
       throw new Error("Profile not found");
     }
 
-    // Delete old avatar file if it exists and a new one is being set
-    if (currentProfile.avatarStorageId && args.avatarUrl && args.avatarStorageId !== currentProfile.avatarStorageId) {
+    // Delete old avatar file if it exists and either:
+    // 1. Avatar URL is empty (removal)
+    // 2. A new avatar is being set with a different storage ID
+    if (currentProfile.avatarStorageId && 
+        (!args.avatarUrl || (args.avatarUrl && args.avatarStorageId !== currentProfile.avatarStorageId))) {
       try {
         await ctx.storage.delete(currentProfile.avatarStorageId);
       } catch (error) {
@@ -165,7 +168,7 @@ export const updateAvatar = mutation({
     // Update avatar URL and storage ID
     await ctx.db.patch(currentProfile._id, {
       avatarUrl: args.avatarUrl,
-      avatarStorageId: args.avatarStorageId,
+      avatarStorageId: args.avatarUrl ? args.avatarStorageId : undefined,
     });
 
     return { success: true };

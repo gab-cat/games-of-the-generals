@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
@@ -66,20 +66,80 @@ const INITIAL_PIECES = [
 ];
 
 export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
-  const game = useQuery(api.games.getGame, { gameId });
-  const moves = useQuery(api.games.getGameMoves, { gameId });
-  const matchResult = useQuery(api.games.getMatchResult, { gameId });
-  const setupPieces = useMutation(api.games.setupPieces);
-  const makeMove = useMutation(api.games.makeMove);
-  const surrenderGame = useMutation(api.games.surrenderGame);
-  const acknowledgeGameResult = useMutation(api.games.acknowledgeGameResult);
+  const { data: game, isPending: isLoadingGame } = useConvexQuery(
+    api.games.getGame, 
+    { gameId }
+  );
+  
+  const { data: moves, isPending: isLoadingMoves } = useConvexQuery(
+    api.games.getGameMoves, 
+    { gameId }
+  );
+  
+  const { data: matchResult } = useConvexQuery(
+    api.games.getMatchResult, 
+    { gameId }
+  );
+
+  const { mutate: setupPieces, isPending: isSettingUpPieces } = useConvexMutationWithQuery(api.games.setupPieces, {
+    onSuccess: () => {
+      toast.success("Pieces setup complete!");
+    },
+    onError: () => {
+      toast.error("Failed to setup pieces");
+    }
+  });
+
+  const { mutate: makeMove, isPending: isMakingMove } = useConvexMutationWithQuery(api.games.makeMove, {
+    onSuccess: (result: any) => {
+      // Clear optimistic state when real data comes back
+      setOptimisticBoard(null);
+      setPendingMove(null);
+      
+      if (result.challengeResult) {
+        // Don't reveal pieces in toast, just indicate if it was a win/loss
+        const isCurrentPlayerWinner = result.challengeResult.winner === "attacker";
+        if (isCurrentPlayerWinner) {
+          toast.success("Victory! Your piece wins the battle!");
+        } else if (result.challengeResult.winner === "defender") {
+          toast.error("Defeat! Your piece was eliminated!");
+        } else {
+          toast.info("Both pieces eliminated in battle!");
+        }
+      }
+    },
+    onError: (error: any) => {
+      // Revert optimistic update on error
+      setOptimisticBoard(null);
+      setPendingMove(null);
+      toast.error(error instanceof Error ? error.message : "Invalid move");
+    }
+  });
+
+  const { mutate: surrenderGame, isPending: isSurrendering } = useConvexMutationWithQuery(api.games.surrenderGame, {
+    onSuccess: () => {
+      toast.success("Game surrendered");
+    },
+    onError: () => {
+      toast.error("Failed to surrender");
+    }
+  });
+
+  const { mutate: acknowledgeGameResult } = useConvexMutationWithQuery(api.games.acknowledgeGameResult, {
+    onError: () => {
+      toast.error("Failed to acknowledge result");
+    }
+  });
 
   // Get player profiles for avatars
-  const player1Profile = useQuery(api.profiles.getProfileByUsername, 
-    game ? { username: game.player1Username } : "skip"
+  const { data: player1Profile, isPending: isLoadingPlayer1 } = useConvexQuery(
+    api.profiles.getProfileByUsername, 
+    game ? { username: game.player1Username } : undefined
   );
-  const player2Profile = useQuery(api.profiles.getProfileByUsername, 
-    game ? { username: game.player2Username } : "skip"
+  
+  const { data: player2Profile, isPending: isLoadingPlayer2 } = useConvexQuery(
+    api.profiles.getProfileByUsername, 
+    game ? { username: game.player2Username } : undefined
   );
 
   const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(
@@ -169,25 +229,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     toast.success("Setup cleared!");
   };
 
-  const handleSurrender = async () => {
+  const handleSurrender = () => {
     if (window.confirm("Are you sure you want to surrender? This cannot be undone.")) {
-      try {
-        await surrenderGame({ gameId });
-        toast.success("You have surrendered the game.");
-        // Don't redirect to lobby - let the result modal show
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Failed to surrender");
-      }
+      surrenderGame({ gameId });
     }
   };
 
-  const handleAcknowledgeResult = async () => {
-    try {
-      await acknowledgeGameResult({ gameId });
-    } catch (error) {
-      console.error("Failed to acknowledge result:", error);
-      // Don't show error to user as this is not critical
-    }
+  const handleAcknowledgeResult = () => {
+    acknowledgeGameResult({ gameId });
   };
 
   useEffect(() => {
@@ -309,16 +358,11 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       }
     }
 
-    try {
-      await setupPieces({ gameId, pieces });
-      toast.success("Setup complete! Waiting for opponent...");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to setup pieces");
-    }
+    setupPieces({ gameId, pieces });
   };
 
   const handleGameSquareClick = (row: number, col: number) => {
-    if (!game || game.status !== "playing" || !isCurrentPlayer) return;
+    if (!game || game.status !== "playing" || !isCurrentPlayer || isMakingMove) return;
 
     if (selectedSquare) {
       // Make move
@@ -378,27 +422,6 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         fromCol: selectedSquare.col,
         toRow: row,
         toCol: col,
-      }).then((result) => {
-        // Clear optimistic state when real data comes back
-        setOptimisticBoard(null);
-        setPendingMove(null);
-        
-        if (result.challengeResult) {
-          // Don't reveal pieces in toast, just indicate if it was a win/loss
-          const isCurrentPlayerWinner = result.challengeResult.winner === "attacker";
-          if (isCurrentPlayerWinner) {
-            toast.success("Victory! Your piece wins the battle!");
-          } else if (result.challengeResult.winner === "defender") {
-            toast.error("Defeat! Your piece was eliminated!");
-          } else {
-            toast.info("Both pieces eliminated in battle!");
-          }
-        }
-      }).catch((error) => {
-        // Revert optimistic update on error
-        setOptimisticBoard(null);
-        setPendingMove(null);
-        toast.error(error instanceof Error ? error.message : "Invalid move");
       });
     } else {
       // Select piece
@@ -454,6 +477,25 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     
     return null;
   };
+
+  if (isLoadingGame) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent"
+          />
+          <p className="text-white/70 text-lg">Loading game...</p>
+        </motion.div>
+      </div>
+    );
+  }
 
   if (!game) {
     return (
@@ -762,11 +804,25 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               >
                 <Button
                   onClick={() => void handleFinishSetup()}
-                  className="w-full py-4 text-sm text-black rounded-full"
+                  disabled={isSettingUpPieces}
+                  className="w-full py-4 text-sm text-black rounded-full disabled:opacity-50"
                   size="lg"
                 >
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                  Finish Setup & Enter Battle
+                  {isSettingUpPieces ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-5 h-5 mr-2 border-2 border-black border-t-transparent rounded-full"
+                      />
+                      Setting up pieces...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5 mr-2" />
+                      Finish Setup & Enter Battle
+                    </>
+                  )}
                 </Button>
               </motion.div>
             )}
@@ -862,12 +918,26 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               {game.status === "playing" && (isPlayer1 || isPlayer2) && (
                 <Button
                   onClick={() => void handleSurrender()}
+                  disabled={isSurrendering}
                   variant="destructive"
                   size="sm"
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 disabled:opacity-50"
                 >
-                  <Flag className="h-4 w-4" />
-                  Surrender
+                  {isSurrendering ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      Surrendering...
+                    </>
+                  ) : (
+                    <>
+                      <Flag className="h-4 w-4" />
+                      Surrender
+                    </>
+                  )}
                 </Button>
               )}
             </div>
@@ -945,12 +1015,30 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                     ease: "easeInOut"
                   }
                 }}
-                className={`grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg transition-all duration-500 ${
+                className={`grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg transition-all duration-500 relative ${
                   isCurrentPlayer 
                     ? 'ring-1 ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary/30' 
                     : 'ring-1 ring-muted bg-muted/10 border border-muted/30'
-                }`}
+                } ${isMakingMove ? 'pointer-events-none' : ''}`}
               >
+                {/* Loading overlay when making move */}
+                {isMakingMove && (
+                  <div className="absolute inset-0 bg-black/20 backdrop-blur-sm rounded-lg flex items-center justify-center z-50 pointer-events-none">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-4 flex items-center gap-3"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full"
+                      />
+                      <span className="text-white/90 font-medium">Making move...</span>
+                    </motion.div>
+                  </div>
+                )}
+                
                 {(optimisticBoard || game.board).map((row, rowIndex) =>
                   row.map((cell, colIndex) => {
                     const isSelected = selectedSquare?.row === rowIndex && selectedSquare?.col === colIndex;
@@ -1054,13 +1142,23 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   animate={{ x: 0, opacity: 1 }}
                   className="flex items-center gap-3"
                 >
-                  <UserAvatar 
-                    username={game.player1Username}
-                    avatarUrl={player1Profile?.avatarUrl}
-                    rank={player1Profile?.rank}
-                    size="sm"
-                    className="ring-2 ring-blue-400/50"
-                  />
+                  {isLoadingPlayer1 ? (
+                    <div className="w-10 h-10 rounded-full bg-blue-400/20 border-2 border-blue-400/50 flex items-center justify-center">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full"
+                      />
+                    </div>
+                  ) : (
+                    <UserAvatar 
+                      username={game.player1Username}
+                      avatarUrl={player1Profile?.avatarUrl}
+                      rank={player1Profile?.rank}
+                      size="sm"
+                      className="ring-2 ring-blue-400/50"
+                    />
+                  )}
                   <div className="w-4 h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50"></div>
                   <div>
                     <h3 className="font-semibold text-blue-400">{game.player1Username}</h3>
@@ -1077,13 +1175,23 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   transition={{ delay: 0.1 }}
                   className="flex items-center gap-3"
                 >
-                  <UserAvatar 
-                    username={game.player2Username}
-                    avatarUrl={player2Profile?.avatarUrl}
-                    rank={player2Profile?.rank}
-                    size="sm"
-                    className="ring-2 ring-red-400/50"
-                  />
+                  {isLoadingPlayer2 ? (
+                    <div className="w-10 h-10 rounded-full bg-red-400/20 border-2 border-red-400/50 flex items-center justify-center">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full"
+                      />
+                    </div>
+                  ) : (
+                    <UserAvatar 
+                      username={game.player2Username}
+                      avatarUrl={player2Profile?.avatarUrl}
+                      rank={player2Profile?.rank}
+                      size="sm"
+                      className="ring-2 ring-red-400/50"
+                    />
+                  )}
                   <div className="w-4 h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50"></div>
                   <div>
                     <h3 className="font-semibold text-red-400">{game.player2Username}</h3>
@@ -1154,38 +1262,56 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       </div>
 
       {/* Recent Moves */}
-      {moves && moves.length > 0 && (
+      {(moves && moves.length > 0) || isLoadingMoves ? (
         <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white/90">
               <Eye className="h-5 w-5 text-purple-400" />
               Recent Moves
+              {isLoadingMoves && (
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full ml-2"
+                />
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="max-h-32 overflow-y-auto space-y-2">
-              {moves.slice(-5).reverse().map((move) => (
+            {isLoadingMoves ? (
+              <div className="flex items-center justify-center py-4">
                 <motion.div
-                  key={move._id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="text-sm text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 rounded p-2"
-                >
-                  {move.moveType === "challenge" && move.challengeResult ? (
-                    <span>
-                      Battle occurred - <span className="font-semibold text-foreground">{move.challengeResult.winner} wins!</span>
-                    </span>
-                  ) : (
-                    <span>
-                      Piece moved to ({move.toRow}, {move.toCol})
-                    </span>
-                  )}
-                </motion.div>
-              ))}
-            </div>
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  className="w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full"
+                />
+                <span className="ml-2 text-white/70">Loading moves...</span>
+              </div>
+            ) : (
+              <div className="max-h-32 overflow-y-auto space-y-2">
+                {moves && moves.slice(-5).reverse().map((move) => (
+                  <motion.div
+                    key={move._id}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    className="text-sm text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 rounded p-2"
+                  >
+                    {move.moveType === "challenge" && move.challengeResult ? (
+                      <span>
+                        Battle occurred - <span className="font-semibold text-foreground">{move.challengeResult.winner} wins!</span>
+                      </span>
+                    ) : (
+                      <span>
+                        Piece moved to ({move.toRow}, {move.toCol})
+                      </span>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
+      ) : null}
     </motion.div>
 
     {/* Achievement Notifications */}

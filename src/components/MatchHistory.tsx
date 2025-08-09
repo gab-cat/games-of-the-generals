@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -17,7 +17,7 @@ export function MatchHistory({ userId, onViewReplay }: MatchHistoryProps) {
   const [currentPage, setCurrentPage] = useState(0);
   const pageSize = 8; // Increased from 5 to reduce pagination requests
   
-  const matchHistory = useQuery(api.games.getMatchHistory, { 
+  const { data: matchHistory, isPending, error } = useConvexQuery(api.games.getMatchHistory, { 
     userId: userId as Id<"users">,
     limit: pageSize,
     offset: currentPage * pageSize,
@@ -67,7 +67,21 @@ export function MatchHistory({ userId, onViewReplay }: MatchHistoryProps) {
     }
   };
 
-  if (matchHistory === undefined) {
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="text-center py-12"
+      >
+        <div className="text-red-400">
+          Error loading match history: {error.message}
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (isPending) {
     return (
       <div className="flex justify-center py-8">
         <motion.div

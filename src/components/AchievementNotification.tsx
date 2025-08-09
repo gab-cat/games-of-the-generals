@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "convex/react";
+import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
@@ -47,21 +47,35 @@ const getCategoryColor = (category: string) => {
 };
 
 export function AchievementNotification({ userId, onAchievementSeen }: AchievementNotificationProps) {
-  const recentAchievements = useQuery(api.achievements.getRecentAchievements, { 
-    userId: userId as any,
-    hoursBack: 1 
+  const { data: recentAchievements, isPending: isLoadingAchievements, error: achievementsError } = useConvexQuery(
+    api.achievements.getRecentAchievements, 
+    { 
+      userId: userId as any,
+      hoursBack: 1 
+    }
+  );
+  
+  const markAsSeen = useConvexMutationWithQuery(api.achievements.markAchievementsAsSeen, {
+    onError: (error) => {
+      console.error("Failed to mark achievements as seen:", error);
+      toast.error("Failed to update achievement status");
+    }
   });
-  const markAsSeen = useMutation(api.achievements.markAchievementsAsSeen);
   
   const [shownAchievements, setShownAchievements] = useState<Set<string>>(new Set());
   const [visibleAchievement, setVisibleAchievement] = useState<any>(null);
 
   useEffect(() => {
-    if (!recentAchievements) return;
+    if (!recentAchievements || isLoadingAchievements) return;
+    
+    if (achievementsError) {
+      console.error("Error loading achievements:", achievementsError);
+      return;
+    }
 
     // Find new achievements that haven't been shown yet
     const newAchievements = recentAchievements.filter(
-      achievement => !achievement.seenAt && !shownAchievements.has(achievement.achievementId)
+      (achievement: any) => !achievement.seenAt && !shownAchievements.has(achievement.achievementId)
     );
 
     if (newAchievements.length > 0) {
@@ -82,16 +96,16 @@ export function AchievementNotification({ userId, onAchievementSeen }: Achieveme
       setTimeout(() => {
         setVisibleAchievement(null);
         // Mark as seen in database
-        markAsSeen({ achievementIds: [achievement.achievementId] });
+        markAsSeen.mutate({ achievementIds: [achievement.achievementId] });
         onAchievementSeen?.(achievement.achievementId);
       }, 5000);
     }
-  }, [recentAchievements, shownAchievements, markAsSeen, onAchievementSeen]);
+  }, [recentAchievements, shownAchievements, markAsSeen, onAchievementSeen, isLoadingAchievements, achievementsError]);
 
   const handleDismiss = () => {
     if (visibleAchievement) {
       setVisibleAchievement(null);
-      markAsSeen({ achievementIds: [visibleAchievement.achievementId] });
+      markAsSeen.mutate({ achievementIds: [visibleAchievement.achievementId] });
       onAchievementSeen?.(visibleAchievement.achievementId);
     }
   };

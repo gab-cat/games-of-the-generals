@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { useMutation } from "convex/react";
+import { useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import { UserAvatar } from "./UserAvatar";
@@ -25,9 +25,17 @@ export function AvatarUpload({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const generateUploadUrl = useMutation(api.fileUpload.generateUploadUrl);
-  const processAvatarUpload = useMutation(api.fileUpload.processAvatarUpload);
-  const updateAvatar = useMutation(api.profiles.updateAvatar);
+  const generateUploadUrlMutation = useConvexMutationWithQuery(api.fileUpload.generateUploadUrl);
+  const processAvatarUploadMutation = useConvexMutationWithQuery(api.fileUpload.processAvatarUpload);
+  
+  const updateAvatarMutation = useConvexMutationWithQuery(api.profiles.updateAvatar, {
+    onSuccess: () => {
+      toast.success("Avatar updated successfully!");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to update avatar");
+    }
+  });
 
   const handleFileSelect = async (file: File) => {
     // Validate file
@@ -48,7 +56,12 @@ export function AvatarUpload({
       setPreviewUrl(previewObjectUrl);
       
       // Get upload URL from Convex
-      const uploadUrl = await generateUploadUrl();
+      const uploadUrl = await new Promise<string>((resolve, reject) => {
+        generateUploadUrlMutation.mutate({}, {
+          onSuccess: resolve,
+          onError: reject
+        });
+      });
       
       // Upload compressed image to Convex storage
       const uploadResponse = await fetch(uploadUrl, {
@@ -64,20 +77,24 @@ export function AvatarUpload({
       const { storageId } = await uploadResponse.json();
       
       // Process the upload to get the file URL
-      const { fileUrl } = await processAvatarUpload({ storageId });
+      const result = await new Promise<{ storageId: string; fileUrl: string | null }>((resolve, reject) => {
+        processAvatarUploadMutation.mutate({ storageId }, {
+          onSuccess: resolve,
+          onError: reject
+        });
+      });
       
-      if (!fileUrl) {
+      if (!result.fileUrl) {
         throw new Error("Failed to get file URL");
       }
       
       // Update avatar in database with the file URL and storage ID
-      await updateAvatar({ 
-        avatarUrl: fileUrl,
+      updateAvatarMutation.mutate({ 
+        avatarUrl: result.fileUrl,
         avatarStorageId: storageId
       });
       
-      toast.success("Avatar updated successfully!");
-      onAvatarUpdate?.(fileUrl);
+      onAvatarUpdate?.(result.fileUrl);
       
       // Clean up preview URL
       URL.revokeObjectURL(previewObjectUrl);
@@ -103,9 +120,8 @@ export function AvatarUpload({
   const handleRemoveAvatar = async () => {
     try {
       setIsUploading(true);
-      await updateAvatar({ avatarUrl: "" });
+      updateAvatarMutation.mutate({ avatarUrl: "" });
       setPreviewUrl(null);
-      toast.success("Avatar removed successfully!");
       onAvatarUpdate?.("");
     } catch (error) {
       console.error("Error removing avatar:", error);

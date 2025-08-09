@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useMutation, useQuery } from "convex/react";
+import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -21,9 +21,32 @@ import {
 } from "lucide-react";
 
 export function Settings() {
-  const profile = useQuery(api.profiles.getCurrentProfile);
-  const updateUsername = useMutation(api.profiles.updateUsername);
-  const changePassword = useMutation(api.settings.changePassword);
+  const { data: profile, isPending: isLoadingProfile, error: profileError } = useConvexQuery(api.profiles.getCurrentProfile);
+  
+  const updateUsernameMutation = useConvexMutationWithQuery(api.profiles.updateUsername, {
+    onSuccess: () => {
+      toast.success("Username updated successfully!");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to update username");
+    }
+  });
+
+  const changePasswordMutation = useConvexMutationWithQuery(api.settings.changePassword, {
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Password changed successfully!");
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        toast.error(result.message || "Failed to change password");
+      }
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to change password");
+    }
+  });
 
   const [username, setUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -32,15 +55,27 @@ export function Settings() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isUpdatingUsername, setIsUpdatingUsername] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Set username when profile loads
   if (profile && username === "") {
     setUsername(profile.username);
   }
 
-  if (!profile) {
+  if (profileError) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-red-400 text-center"
+        >
+          <p>Error loading profile: {profileError.message}</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (isLoadingProfile || !profile) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <motion.div
@@ -63,15 +98,7 @@ export function Settings() {
       return;
     }
 
-    setIsUpdatingUsername(true);
-    try {
-      await updateUsername({ username });
-      toast.success("Username updated successfully!");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update username");
-    } finally {
-      setIsUpdatingUsername(false);
-    }
+    updateUsernameMutation.mutate({ username });
   };
 
   const handlePasswordChange = async () => {
@@ -95,22 +122,7 @@ export function Settings() {
       return;
     }
 
-    setIsChangingPassword(true);
-    try {
-      const result = await changePassword({ currentPassword, newPassword });
-      if (result.success) {
-        toast.success("Password changed successfully!");
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-      } else {
-        toast.error(result.message || "Failed to change password");
-      }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to change password");
-    } finally {
-      setIsChangingPassword(false);
-    }
+    changePasswordMutation.mutate({ currentPassword, newPassword });
   };
 
   return (
@@ -190,10 +202,10 @@ export function Settings() {
 
                 <Button
                   onClick={() => void handleUsernameUpdate()}
-                  disabled={isUpdatingUsername || username === profile.username}
+                  disabled={updateUsernameMutation.isPending || username === profile.username}
                   className="w-full bg-blue-600 hover:bg-blue-700"
                 >
-                  {isUpdatingUsername ? (
+                  {updateUsernameMutation.isPending ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                   ) : (
                     <Save className="w-4 h-4 mr-2" />
@@ -309,10 +321,10 @@ export function Settings() {
 
                 <Button
                   onClick={() => void handlePasswordChange()}
-                  disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                  disabled={changePasswordMutation.isPending || !currentPassword || !newPassword || !confirmPassword}
                   className="w-full bg-green-600 hover:bg-green-700"
                 >
-                  {isChangingPassword ? (
+                  {changePasswordMutation.isPending ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                   ) : (
                     <Lock className="w-4 h-4 mr-2" />

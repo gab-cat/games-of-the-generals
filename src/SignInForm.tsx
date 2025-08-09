@@ -1,5 +1,4 @@
 "use client";
-import { useAuthActions } from "@convex-dev/auth/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -8,11 +7,35 @@ import { Separator } from "./components/ui/separator";
 import { Crown } from "lucide-react";
 import Aurora from "./components/backgrounds/Aurora/Aurora";
 import { PasswordResetForm } from "./PasswordResetForm";
+import { useAuthMutation } from "./lib/convex-query-hooks";
 
 export function SignInForm() {
-  const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"signIn" | "signUp" | "resetPassword">("signIn");
-  const [submitting, setSubmitting] = useState(false);
+  
+  // Use the auth mutation hook for better error handling
+  const authMutation = useAuthMutation({
+    onSuccess: () => {
+      toast.success(`Successfully ${flow === "signIn" ? "signed in" : "signed up"}!`);
+    },
+    onError: (error: any) => {
+      console.log(error)
+      let toastTitle = "";
+      if (error.message.includes("Invalid password")) {
+        toastTitle = "Invalid password. Please use a combination of letters, numbers, and special characters.";
+      } else if (error.message.includes("already exists")) {
+        toastTitle = "Account already exists. Please sign in instead.";
+        setFlow("signIn");
+      } else if (error.message.includes("User not found")) {
+        toastTitle = "Account not found. Please sign up instead.";
+        setFlow("signUp");
+      } else {
+        toastTitle = flow === "signIn"
+          ? "Invalid credentials, please try again."
+          : "Could not sign up, did you mean to sign in?";
+      }
+      toast.error(toastTitle);
+    }
+  });
 
   return (
     <div className="min-h-screen flex">
@@ -188,22 +211,11 @@ export function SignInForm() {
                 className="space-y-6"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  setSubmitting(true);
                   const formData = new FormData(e.target as HTMLFormElement);
                   formData.set("flow", flow);
-                  void signIn("password", formData).catch((error) => {
-                    let toastTitle = "";
-                    if (error.message.includes("Invalid password")) {
-                      toastTitle = "Invalid password. Please try again.";
-                      console.log("Error message:", error);
-                    } else {
-                      toastTitle =
-                        flow === "signIn"
-                          ? "Could not sign in, did you mean to sign up?"
-                          : "Could not sign up, did you mean to sign in?";
-                    }
-                    toast.error(toastTitle);
-                    setSubmitting(false);
+                  authMutation.mutate({
+                    provider: "password",
+                    formData
                   });
                 }}
               >
@@ -251,9 +263,9 @@ export function SignInForm() {
                 <Button 
                   type="submit" 
                   className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body" 
-                  disabled={submitting}
+                  disabled={authMutation.isPending}
                 >
-                  {submitting ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
+                  {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
                 </Button>
               </form>
               
@@ -282,7 +294,8 @@ export function SignInForm() {
               <Button 
                 variant="outline" 
                 className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-3 rounded-full font-medium font-body" 
-                onClick={() => void signIn("anonymous")}
+                onClick={() => authMutation.mutate({ provider: "anonymous" })}
+                disabled={authMutation.isPending}
               >
                 Enter as Guest Commander
               </Button>

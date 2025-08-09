@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { motion } from "framer-motion";
 import { 
@@ -36,7 +36,11 @@ interface GameReplayProps {
 }
 
 export function GameReplay({ gameId, onBack }: GameReplayProps) {
-  const replayData = useQuery(api.games.getGameReplay, { gameId });
+  const { data: replayData, isPending: isLoadingReplay, error: replayError } = useConvexQuery(
+    api.games.getGameReplay, 
+    { gameId }
+  );
+  
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1); // -1 means initial state
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1000); // milliseconds between moves
@@ -57,14 +61,70 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
     }, playbackSpeed);
 
     return () => clearInterval(timer);
-  }, [isPlaying, playbackSpeed, replayData]);
+  }, [isPlaying, replayData, playbackSpeed]);
+
+  // Show loading state
+  if (isLoadingReplay) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-4">
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (replayError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-4">
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-4"
+          >
+            <div className="text-red-400 text-lg">Failed to load game replay</div>
+            <div className="text-white/60 text-sm">Please try refreshing the page</div>
+            <Button onClick={onBack} variant="outline">
+              Go Back
+            </Button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show no data state
+  if (!replayData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-4">
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center space-y-4"
+          >
+            <div className="text-white/60 text-lg">Replay not available</div>
+            <Button onClick={onBack} variant="outline">
+              Go Back
+            </Button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   const reconstructBoardAtMove = (moveIndex: number) => {
     if (!replayData) return null;
 
     // Start with the initial board state (pieces placed during setup)
-    const board = replayData.initialBoard.map(row => 
-      row.map(cell => cell ? { 
+    const board = replayData.initialBoard.map((row: any) => 
+      row.map((cell: any) => cell ? { 
         ...cell, 
         revealed: false // Start with all pieces hidden
       } : null)
@@ -107,7 +167,7 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
 
   const currentBoard = reconstructBoardAtMove(currentMoveIndex);
   const currentMove = currentMoveIndex >= 0 && currentMoveIndex < (replayData?.moves.length || 0) 
-    ? replayData!.moves[currentMoveIndex] 
+    ? replayData.moves[currentMoveIndex] 
     : null;
 
   if (!replayData) {
@@ -195,8 +255,8 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                 animate={{ scale: 1, opacity: 1 }}
                 className="grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
               >
-                {(currentBoard || replayData.initialBoard).map((row, rowIndex) =>
-                  row.map((cell, colIndex) => {
+                {(currentBoard || replayData.initialBoard).map((row: any, rowIndex: number) =>
+                  row.map((cell: any, colIndex: number) => {
                     const isLastMoveFrom = currentMove?.fromRow === rowIndex && currentMove?.fromCol === colIndex;
                     const isLastMoveTo = currentMove?.toRow === rowIndex && currentMove?.toCol === colIndex;
                     const isChallenge = currentMove?.moveType === "challenge";

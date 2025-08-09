@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Badge } from "./ui/badge";
 import { Progress } from "./ui/progress";
@@ -26,9 +26,12 @@ import { useState } from "react";
 
 export function Profile() {
   const [showAvatarUpload, setShowAvatarUpload] = useState(false);
-  const profileStats = useQuery(api.profiles.getProfileStats);
+  
+  const { data: profileStats, isPending: isLoadingStats, error: statsError } = useConvexQuery(
+    api.profiles.getProfileStats
+  );
 
-  if (!profileStats) {
+  if (isLoadingStats) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <motion.div
@@ -36,6 +39,35 @@ export function Profile() {
           animate={{ opacity: 1, scale: 1 }}
           className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"
         />
+      </div>
+    );
+  }
+
+  if (statsError) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-4"
+        >
+          <div className="text-red-400 text-lg">Failed to load profile stats</div>
+          <div className="text-white/60 text-sm">Please try refreshing the page</div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  if (!profileStats) {
+    return (
+      <div className="flex justify-center items-center min-h-[60vh]">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-4"
+        >
+          <div className="text-white/60 text-lg">No profile data available</div>
+        </motion.div>
       </div>
     );
   }

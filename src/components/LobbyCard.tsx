@@ -1,4 +1,4 @@
-import { useQuery } from "convex/react";
+import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "./ui/card";
@@ -23,17 +23,20 @@ interface LobbyCardProps {
   currentUserId: Id<"users">;
   onJoin: (lobbyId: Id<"lobbies">) => void;
   onLeave: (lobbyId: Id<"lobbies">) => void;
+  isJoining?: boolean;
+  isLeaving?: boolean;
 }
 
-export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave }: LobbyCardProps) {
+export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, isJoining, isLeaving }: LobbyCardProps) {
   // Fetch host profile for avatar
-  const hostProfile = useQuery(api.profiles.getProfileByUsername, { 
+  const { data: hostProfile } = useConvexQuery(api.profiles.getProfileByUsername, { 
     username: lobby.hostUsername 
   });
   
   // Fetch player profile for avatar if there's a player
-  const playerProfile = useQuery(api.profiles.getProfileByUsername, 
-    lobby.playerUsername ? { username: lobby.playerUsername } : "skip"
+  const { data: playerProfile } = useConvexQuery(
+    api.profiles.getProfileByUsername, 
+    lobby.playerUsername ? { username: lobby.playerUsername } : undefined
   );
 
   return (
@@ -91,17 +94,34 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave }: Lobb
                 size="sm"
                 className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
                 onClick={() => onLeave(lobby._id)}
+                disabled={isLeaving}
               >
-                Delete
+                {isLeaving ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
+                    Deleting...
+                  </div>
+                ) : (
+                  "Delete"
+                )}
               </Button>
             ) : (
               <Button
                 size="sm"
                 className={lobby.playerId ? "bg-gray-500/20 text-gray-400 border border-gray-500/30" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"}
                 onClick={() => onJoin(lobby._id)}
-                disabled={!!lobby.playerId}
+                disabled={!!lobby.playerId || isJoining}
               >
-                {lobby.playerId ? "Full" : "Join Battle"}
+                {isJoining ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Joining...
+                  </div>
+                ) : lobby.playerId ? (
+                  "Full"
+                ) : (
+                  "Join Battle"
+                )}
               </Button>
             )}
           </div>
