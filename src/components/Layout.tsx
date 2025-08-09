@@ -1,0 +1,221 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown } from "lucide-react";
+import { useAuthActions } from "@convex-dev/auth/react";
+import { useConvexAuth } from "convex/react";
+import { Button } from "./ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "./ui/avatar";
+import { useState, useEffect } from "react";
+
+interface LayoutProps {
+  children: React.ReactNode;
+  user?: {
+    username: string;
+  } | null;
+  onNavigate?: (page: 'lobby' | 'profile' | 'achievements' | 'settings') => void;
+}
+
+export function Layout({ children, user, onNavigate }: LayoutProps) {
+  const { isAuthenticated } = useConvexAuth();
+  const { signOut } = useAuthActions();
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
+      {/* Minimalist Header */}
+      <motion.header
+        initial={{ y: -20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className={`sticky top-0 z-50 transition-all duration-300 ${
+          isScrolled 
+            ? 'bg-black/50 backdrop-blur-sm border-b border-white/20' 
+            : 'bg-black/40 backdrop-blur-sm border-b border-white/10'
+        }`}
+      >
+        {/* Floating particles effect */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {[...Array(8)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-1 h-1 bg-white/30 rounded-full"
+              initial={{ 
+                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200), 
+                y: Math.random() * 64,
+                opacity: 0 
+              }}
+              animate={{ 
+                x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
+                y: Math.random() * 64,
+                opacity: [0, 1, 0]
+              }}
+              transition={{ 
+                duration: 6 + Math.random() * 4, 
+                repeat: Infinity,
+                delay: i * 0.8
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+          
+          {/* Left Section - Logo & Title */}
+          <motion.div
+            initial={{ x: -20, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="flex items-center gap-4"
+          >
+            {/* Minimalist Logo */}
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              whileHover={{ scale: 1.05 }}
+              className="w-10 h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200"
+            >
+              <Gamepad2 className="w-5 h-5 text-white/90 group-hover:text-white transition-colors" />
+            </motion.div>
+            
+            {/* Clean Title */}
+            <motion.div
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex flex-col cursor-pointer"
+              onClick={() => onNavigate?.('lobby')}
+            >
+              <h1 className="text-xl font-display font-semibold text-white/95 tracking-tight hover:text-white transition-colors">
+                Games of the Generals
+              </h1>
+              <div className="w-full h-px bg-white/20 mt-1"></div>
+            </motion.div>
+          </motion.div>
+
+          {/* Right Section - User Profile */}
+          {isAuthenticated && user && (
+            <motion.div
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <Button 
+                      variant="ghost" 
+                      className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center gap-3 px-6 py-2 rounded-full group h-12"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-white/90 font-medium text-sm">{user.username}</div>
+                          <div className="flex items-center gap-1 justify-end">
+                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                            <span className="text-white/50 text-xs">Online</span>
+                          </div>
+                        </div>
+                        <Avatar className="h-9 w-9 ring-1 ring-white/30">
+                          <AvatarFallback className="bg-white/20 text-white font-semibold text-sm">
+                            {user.username.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
+                      <ChevronDown className="w-4 h-4 text-white/60 group-hover:text-white/90 transition-colors" />
+                    </Button>
+                  </motion.div>
+                </DropdownMenuTrigger>
+                
+                <DropdownMenuContent 
+                  align="end" 
+                  className="w-56 bg-gray-600/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl mt-2"
+                >
+                  {/* User Header */}
+                  <div className="px-3 py-3 border-b border-white/10">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 ring-1 ring-white/20">
+                        <AvatarFallback className="bg-white/20 text-white font-semibold">
+                          {user.username.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="text-white font-medium text-sm">{user.username}</div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
+                          <span className="text-white/60 text-xs">Online</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Menu Items */}
+                  <div className="py-1">
+                    <DropdownMenuItem 
+                      onClick={() => onNavigate?.('profile')}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <User className="h-4 w-4" />
+                      <span>Profile</span>
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem 
+                      onClick={() => onNavigate?.('achievements')}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <Trophy className="h-4 w-4" />
+                      <span>Achievements</span>
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem 
+                      onClick={() => onNavigate?.('settings')}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                    </DropdownMenuItem>
+                  </div>
+                  
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  
+                  <div className="py-1">
+                    <DropdownMenuItem
+                      onClick={() => void signOut()}
+                      className="flex items-center gap-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 mx-1 rounded-md"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Sign out</span>
+                    </DropdownMenuItem>
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </motion.div>
+          )}
+        </div>
+      </motion.header>
+
+      {/* Main Content */}
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  );
+}

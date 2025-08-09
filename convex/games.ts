@@ -1,0 +1,1041 @@
+import { query, mutation } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { api } from "./_generated/api";
+
+// Game pieces and their ranks
+const PIECES = {
+  "Flag": 0,
+  "Private": 1,
+  "Sergeant": 2,
+  "2nd Lieutenant": 3,
+  "1st Lieutenant": 4,
+  "Captain": 5,
+  "Major": 6,
+  "Lieutenant Colonel": 7,
+  "Colonel": 8,
+  "1 Star General": 9,
+  "2 Star General": 10,
+  "3 Star General": 11,
+  "4 Star General": 12,
+  "5 Star General": 13,
+  "Spy": 14,
+};
+
+// Initial piece setup for each player (21 pieces total)
+const INITIAL_PIECES = [
+  "Flag",
+  "Spy", "Spy",
+  "Private", "Private", "Private", "Private", "Private", "Private",
+  "Sergeant",
+  "2nd Lieutenant",
+  "1st Lieutenant",
+  "Captain",
+  "Major",
+  "Lieutenant Colonel",
+  "Colonel",
+  "1 Star General",
+  "2 Star General",
+  "3 Star General",
+  "4 Star General",
+  "5 Star General"
+];
+
+// Create empty board
+function createEmptyBoard() {
+  return Array(8).fill(null).map(() => Array(9).fill(null));
+}
+
+// Start a new game
+export const startGame = mutation({
+  args: {
+    lobbyId: v.id("lobbies"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const lobby = await ctx.db.get(args.lobbyId);
+    if (!lobby) throw new Error("Lobby not found");
+
+    if (lobby.status !== "playing" || !lobby.playerId) {
+      throw new Error("Lobby is not ready for game");
+    }
+
+    if (lobby.hostId !== userId && lobby.playerId !== userId) {
+      throw new Error("Not a player in this lobby");
+    }
+
+    // Check if game already exists
+    const existingGame = await ctx.db
+      .query("games")
+      .withIndex("by_lobby", (q) => q.eq("lobbyId", args.lobbyId))
+      .unique();
+
+    if (existingGame) {
+      return existingGame._id;
+    }
+
+    // Create new game
+    const gameId = await ctx.db.insert("games", {
+      lobbyId: args.lobbyId,
+      lobbyName: lobby.name,
+      player1Id: lobby.hostId,
+      player1Username: lobby.hostUsername,
+      player2Id: lobby.playerId,
+      player2Username: lobby.playerUsername!,
+      currentTurn: "player1",
+      status: "setup",
+      board: createEmptyBoard(),
+      player1Setup: false,
+      player2Setup: false,
+      spectators: [],
+      createdAt: Date.now(),
+      setupTimeStarted: Date.now(),
+      player1TimeUsed: 0,
+      player2TimeUsed: 0,
+      moveCount: 0, // Initialize move count
+    });
+
+    // Update lobby with game reference
+    await ctx.db.patch(args.lobbyId, {
+      gameId,
+    });
+
+    return gameId;
+  },
+});
+
+// Get game state
+export const getGame = query({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const game = await ctx.db.get(args.gameId);
+    
+    if (!game) return null;
+
+    // If game is finished, reveal all pieces
+    if (game.status === "finished") {
+      return game;
+    }
+
+    // Hide opponent's unrevealed pieces unless user is spectator
+    if (userId && (userId === game.player1Id || userId === game.player2Id)) {
+      const isPlayer1 = userId === game.player1Id;
+      const boardCopy = game.board.map(row => 
+        row.map(cell => {
+          if (!cell) return null;
+          
+          // Show own pieces and revealed pieces
+          if (cell.player === (isPlayer1 ? "player1" : "player2") || cell.revealed) {
+            return cell;
+          }
+          
+          // Hide opponent's unrevealed pieces
+          return {
+            piece: "Hidden",
+            player: cell.player,
+            revealed: false,
+          };
+        })
+      );
+      
+      return { ...game, board: boardCopy };
+    }
+
+    return game;
+  },
+});
+
+// Setup pieces on board
+export const setupPieces = mutation({
+  args: {
+    gameId: v.id("games"),
+    pieces: v.array(v.object({
+      piece: v.string(),
+      row: v.number(),
+      col: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.status !== "setup") {
+      throw new Error("Game is not in setup phase");
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    // Validate piece setup
+    if (args.pieces.length !== INITIAL_PIECES.length) {
+      throw new Error("Invalid number of pieces");
+    }
+
+    // Check if pieces are in correct area
+    const validRows = isPlayer1 ? [5, 6, 7] : [0, 1, 2];
+    for (const piece of args.pieces) {
+      if (!validRows.includes(piece.row) || piece.col < 0 || piece.col > 8) {
+        throw new Error("Pieces must be placed in your area");
+      }
+    }
+
+    // Update board with pieces
+    const newBoard = [...game.board];
+    for (const piece of args.pieces) {
+      newBoard[piece.row][piece.col] = {
+        piece: piece.piece,
+        player: isPlayer1 ? "player1" : "player2",
+        revealed: false,
+      };
+    }
+
+    // Update game state
+    const updates: any = {
+      board: newBoard,
+    };
+
+    if (isPlayer1) {
+      updates.player1Setup = true;
+    } else {
+      updates.player2Setup = true;
+    }
+
+    // If both players have setup, start the game
+    if ((isPlayer1 && game.player2Setup) || (isPlayer2 && game.player1Setup)) {
+      updates.status = "playing";
+      updates.gameTimeStarted = Date.now();
+      // Save the initial setup board for replay purposes
+      updates.initialSetupBoard = newBoard.map(row => 
+        row.map(cell => cell ? { ...cell, revealed: false } : null)
+      );
+    }
+
+    await ctx.db.patch(args.gameId, updates);
+  },
+});
+
+// Make a move
+export const makeMove = mutation({
+  args: {
+    gameId: v.id("games"),
+    fromRow: v.number(),
+    fromCol: v.number(),
+    toRow: v.number(),
+    toCol: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.status !== "playing") {
+      throw new Error("Game is not active");
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    const currentPlayer = isPlayer1 ? "player1" : "player2";
+    if (game.currentTurn !== currentPlayer) {
+      throw new Error("Not your turn");
+    }
+
+    // Validate move
+    const fromPiece = game.board[args.fromRow][args.fromCol];
+    if (!fromPiece || fromPiece.player !== currentPlayer) {
+      throw new Error("Invalid piece selection");
+    }
+
+    // Check if move is valid (adjacent squares only)
+    const rowDiff = Math.abs(args.toRow - args.fromRow);
+    const colDiff = Math.abs(args.toCol - args.fromCol);
+    if ((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1)) {
+      // Valid move
+    } else {
+      throw new Error("Invalid move - pieces can only move to adjacent squares");
+    }
+
+    // Check bounds
+    if (args.toRow < 0 || args.toRow > 7 || args.toCol < 0 || args.toCol > 8) {
+      throw new Error("Move out of bounds");
+    }
+
+    const toPiece = game.board[args.toRow][args.toCol];
+    const newBoard = game.board.map(row => [...row]);
+
+    let challengeResult = null;
+    let gameWinner = null;
+
+    if (toPiece) {
+      // Challenge/battle
+      if (toPiece.player === currentPlayer) {
+        throw new Error("Cannot attack your own piece");
+      }
+
+      const attackerRank = PIECES[fromPiece.piece as keyof typeof PIECES];
+      const defenderRank = PIECES[toPiece.piece as keyof typeof PIECES];
+
+      // Special rules for Game of the Generals
+      let winner: "attacker" | "defender" | "tie";
+      
+      if (fromPiece.piece === "Spy") {
+        // Spy eliminates all officers (Sergeant through 5 Star General) and Flag
+        if (toPiece.piece === "Flag" || 
+            (defenderRank >= 2 && defenderRank <= 13)) { // Sergeant to 5 Star General
+          winner = "attacker";
+        } else if (toPiece.piece === "Private") {
+          winner = "defender"; // Private eliminates Spy
+        } else if (toPiece.piece === "Spy") {
+          winner = "tie"; // Same rank eliminates each other
+        } else {
+          winner = "tie";
+        }
+      } else if (toPiece.piece === "Spy") {
+        // Spy is eliminated by Private only
+        if (fromPiece.piece === "Private") {
+          winner = "attacker";
+        } else if (fromPiece.piece === "Spy") {
+          winner = "tie"; // Same rank eliminates each other
+        } else if (attackerRank >= 2 && attackerRank <= 13) { // Sergeant to 5 Star General
+          winner = "defender"; // Spy eliminates officers
+        } else {
+          winner = "tie";
+        }
+      } else if (fromPiece.piece === "Private") {
+        // Private eliminates Spy and Flag
+        if (toPiece.piece === "Flag") {
+          winner = "attacker";
+        } else if (toPiece.piece === "Spy") {
+          winner = "attacker";
+        } else if (toPiece.piece === "Private") {
+          winner = "tie"; // Same rank eliminates each other
+        } else {
+          winner = "defender"; // All other pieces eliminate Private
+        }
+      } else if (toPiece.piece === "Private") {
+        // Private is eliminated by all pieces except Spy
+        if (fromPiece.piece === "Spy") {
+          winner = "defender"; // Spy loses to Private
+        } else if (fromPiece.piece === "Private") {
+          winner = "tie"; // Same rank eliminates each other
+        } else {
+          winner = "attacker"; // All other pieces eliminate Private
+        }
+      } else if (fromPiece.piece === "Sergeant") {
+        // Sergeant eliminates Private and Flag only
+        if (toPiece.piece === "Flag") {
+          winner = "attacker";
+        } else if (toPiece.piece === "Private") {
+          winner = "attacker";
+        } else if (toPiece.piece === "Sergeant") {
+          winner = "tie"; // Same rank eliminates each other
+        } else {
+          winner = "defender"; // Higher ranks eliminate Sergeant
+        }
+      } else if (toPiece.piece === "Sergeant") {
+        // Sergeant is eliminated by officers and eliminates Private
+        if (fromPiece.piece === "Private") {
+          winner = "defender"; // Sergeant eliminates Private
+        } else if (fromPiece.piece === "Sergeant") {
+          winner = "tie"; // Same rank eliminates each other
+        } else if (attackerRank > 2) { // Officers above Sergeant
+          winner = "attacker";
+        } else {
+          winner = "tie";
+        }
+      } else if (fromPiece.piece === "Flag" || toPiece.piece === "Flag") {
+        // Flag can eliminate opposing flag, but can be eliminated by any piece
+        if (fromPiece.piece === "Flag" && toPiece.piece === "Flag") {
+          winner = "attacker"; // Attacking flag wins
+        } else if (fromPiece.piece === "Flag") {
+          throw new Error("Flag cannot move to attack");
+        } else {
+          winner = "attacker"; // Any piece can eliminate flag
+        }
+      } else {
+        // Regular officer hierarchy: higher rank eliminates lower rank
+        if (attackerRank > defenderRank) {
+          winner = "attacker";
+        } else if (attackerRank < defenderRank) {
+          winner = "defender";
+        } else {
+          winner = "tie"; // Same rank eliminates each other
+        }
+      }
+
+      challengeResult = {
+        attacker: fromPiece.piece,
+        defender: toPiece.piece,
+        winner,
+      };
+
+      // Reveal attacking piece only when there's a challenge
+      const revealedFromPiece = { ...fromPiece, revealed: false };
+
+      if (winner === "attacker") {
+        // Attacker wins, move attacking piece and reveal it
+        newBoard[args.toRow][args.toCol] = revealedFromPiece;
+        newBoard[args.fromRow][args.fromCol] = null;
+        
+        // Check if flag was captured
+        if (toPiece.piece === "Flag") {
+          gameWinner = currentPlayer;
+        }
+      } else if (winner === "defender") {
+        // Attacker loses, only attacker piece is removed
+        // Defender piece stays and remains hidden (not revealed)
+        newBoard[args.toRow][args.toCol] = toPiece; // Keep original defender piece without revealing
+        newBoard[args.fromRow][args.fromCol] = null;
+      } else {
+        // Tie - both eliminated and both revealed
+        newBoard[args.toRow][args.toCol] = null;
+        newBoard[args.fromRow][args.fromCol] = null;
+      }
+    } else {
+      // Simple move
+      newBoard[args.toRow][args.toCol] = fromPiece;
+      newBoard[args.fromRow][args.fromCol] = null;
+
+      // Check if flag reached the opponent's back row
+      if (fromPiece.piece === "Flag") {
+        const player1BackRow = 0; // Player 1's back row (top of board)
+        const player2BackRow = 7; // Player 2's back row (bottom of board)
+        
+        if ((currentPlayer === "player1" && args.toRow === player1BackRow) ||
+            (currentPlayer === "player2" && args.toRow === player2BackRow)) {
+          gameWinner = currentPlayer;
+        }
+      }
+    }
+
+    // Record move
+    await ctx.db.insert("moves", {
+      gameId: args.gameId,
+      playerId: userId,
+      moveType: toPiece ? "challenge" : "move",
+      fromRow: args.fromRow,
+      fromCol: args.fromCol,
+      toRow: args.toRow,
+      toCol: args.toCol,
+      piece: fromPiece.piece,
+      challengeResult: challengeResult || undefined,
+      timestamp: Date.now(),
+    });
+
+    // Calculate time used for current player
+    const currentTime = Date.now();
+    let timeUsedThisTurn = 0;
+    
+    if (game.lastMoveTime || game.gameTimeStarted) {
+      const turnStartTime = game.lastMoveTime || game.gameTimeStarted || currentTime;
+      timeUsedThisTurn = Math.floor((currentTime - turnStartTime) / 1000);
+    }
+    
+    // Update game state
+    const updates: any = {
+      board: newBoard,
+      currentTurn: currentPlayer === "player1" ? "player2" : "player1",
+      lastMoveTime: currentTime,
+      lastMoveFrom: { row: args.fromRow, col: args.fromCol },
+      lastMoveTo: { row: args.toRow, col: args.toCol },
+      moveCount: (game.moveCount || 0) + 1, // Increment cached move count
+    };
+
+    // Update time used for current player
+    if (currentPlayer === "player1") {
+      updates.player1TimeUsed = (game.player1TimeUsed || 0) + timeUsedThisTurn;
+    } else {
+      updates.player2TimeUsed = (game.player2TimeUsed || 0) + timeUsedThisTurn;
+    }
+
+    if (gameWinner) {
+      updates.status = "finished";
+      updates.winner = gameWinner;
+      updates.finishedAt = Date.now();
+      
+      // Determine the reason for winning
+      if (challengeResult && challengeResult.defender === "Flag") {
+        updates.gameEndReason = "flag_captured" as const;
+      } else if (fromPiece.piece === "Flag") {
+        updates.gameEndReason = "flag_reached_base" as const;
+      } else {
+        updates.gameEndReason = "flag_captured" as const; // Default fallback
+      }
+
+      // Update lobby status
+      await ctx.db.patch(game.lobbyId, {
+        status: "finished",
+      });
+
+      // Update player stats
+      const winnerId = gameWinner === "player1" ? game.player1Id : game.player2Id;
+      const loserId = gameWinner === "player1" ? game.player2Id : game.player1Id;
+
+      // Calculate game duration and stats for achievement tracking
+      const gameDuration = currentTime - (game.gameTimeStarted || game.createdAt);
+      
+      // Count pieces eliminated and spies revealed from moves in this game
+      const gameMoves = await ctx.db
+        .query("moves")
+        .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
+        .collect();
+      
+      let winnerPiecesEliminated = 0;
+      let winnerSpiesRevealed = 0;
+      let loserPiecesEliminated = 0;
+      let loserSpiesRevealed = 0;
+      let flagCapturedByWinner = false;
+      
+      for (const move of gameMoves) {
+        if (move.challengeResult) {
+          const isWinnerMove = (gameWinner === "player1" && move.playerId === game.player1Id) ||
+                               (gameWinner === "player2" && move.playerId === game.player2Id);
+          
+          if (move.challengeResult.winner === "attacker") {
+            if (isWinnerMove) {
+              winnerPiecesEliminated++;
+              if (move.challengeResult.defender === "Flag") {
+                flagCapturedByWinner = true;
+              }
+              if (move.challengeResult.attacker === "Spy") {
+                winnerSpiesRevealed++;
+              }
+            } else {
+              loserPiecesEliminated++;
+              if (move.challengeResult.attacker === "Spy") {
+                loserSpiesRevealed++;
+              }
+            }
+          } else if (move.challengeResult.winner === "defender") {
+            if (!isWinnerMove) {
+              winnerPiecesEliminated++;
+              if (move.challengeResult.attacker === "Spy") {
+                winnerSpiesRevealed++;
+              }
+            } else {
+              loserPiecesEliminated++;
+              if (move.challengeResult.defender === "Spy") {
+                loserSpiesRevealed++;
+              }
+            }
+          }
+        }
+      }
+
+      // Update player stats with detailed information
+      await ctx.runMutation(api.profiles.updateProfileStats, { 
+        userId: winnerId, 
+        won: true,
+        gameTime: gameDuration,
+        flagCaptured: flagCapturedByWinner,
+        piecesEliminated: winnerPiecesEliminated,
+        spiesRevealed: winnerSpiesRevealed
+      });
+      
+      await ctx.runMutation(api.profiles.updateProfileStats, { 
+        userId: loserId, 
+        won: false,
+        gameTime: gameDuration,
+        flagCaptured: false,
+        piecesEliminated: loserPiecesEliminated,
+        spiesRevealed: loserSpiesRevealed
+      });
+
+      // Check and unlock achievements for both players
+      const winnerProfile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", winnerId))
+        .unique();
+      
+      const loserProfile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", loserId))
+        .unique();
+
+      if (winnerProfile) {
+        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+      }
+      
+      if (loserProfile) {
+        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+      }
+
+      // Check game-specific achievements (like Perfectionist, Comeback King)
+      await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+        gameId: args.gameId,
+        winnerId,
+        loserId
+      });
+    }
+
+    await ctx.db.patch(args.gameId, updates);
+
+    return { success: true, challengeResult, winner: gameWinner };
+  },
+});
+
+// Join as spectator
+export const joinAsSpectator = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.player1Id === userId || game.player2Id === userId) {
+      throw new Error("You are already a player in this game");
+    }
+
+    if (!game.spectators.includes(userId)) {
+      await ctx.db.patch(args.gameId, {
+        spectators: [...game.spectators, userId],
+      });
+    }
+  },
+});
+
+// Get game moves with optional filtering
+export const getGameMoves = query({
+  args: {
+    gameId: v.id("games"),
+    limit: v.optional(v.number()), // Optional limit for performance
+    moveTypes: v.optional(v.array(v.string())), // Optional filter by move types
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit || 100; // Default limit for performance
+    
+    const queryBuilder = ctx.db
+      .query("moves")
+      .withIndex("by_game_timestamp", (q) => q.eq("gameId", args.gameId))
+      .order("asc");
+
+    // Apply limit for performance
+    const moves = await queryBuilder.take(limit);
+
+    // Filter by move types if specified
+    if (args.moveTypes && args.moveTypes.length > 0) {
+      return moves.filter(move => args.moveTypes!.includes(move.moveType));
+    }
+
+    return moves;
+  },
+});
+
+// Surrender game
+export const surrenderGame = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.status !== "playing") {
+      throw new Error("Game is not active");
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    // Winner is the other player
+    const winner = isPlayer1 ? "player2" : "player1";
+    const winnerId = isPlayer1 ? game.player2Id : game.player1Id;
+    const loserId = userId;
+
+    // Calculate game duration
+    const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
+
+    // Update game state
+    await ctx.db.patch(args.gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: "surrender" as const,
+    });
+
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, {
+      status: "finished",
+    });
+
+    // Update player stats with game duration
+    await ctx.runMutation(api.profiles.updateProfileStats, { 
+      userId: winnerId, 
+      won: true,
+      gameTime: gameDuration
+    });
+    
+    await ctx.runMutation(api.profiles.updateProfileStats, { 
+      userId: loserId, 
+      won: false,
+      gameTime: gameDuration
+    });
+
+    // Check achievements for both players
+    const winnerProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", winnerId))
+      .unique();
+    
+    const loserProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", loserId))
+      .unique();
+
+    if (winnerProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+    }
+    
+    if (loserProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+    }
+
+    // Check game-specific achievements for surrender scenario
+    await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+      gameId: args.gameId,
+      winnerId,
+      loserId
+    });
+
+    return { success: true, winner };
+  },
+});
+
+// Get current user's active game
+export const getCurrentUserGame = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    // First check for active games (setup/playing) for this user
+    let game = await ctx.db
+      .query("games")
+      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "setup"))
+      .first();
+    
+    if (!game) {
+      game = await ctx.db
+        .query("games")
+        .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "playing"))
+        .first();
+    }
+    
+    if (!game) {
+      game = await ctx.db
+        .query("games")
+        .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "setup"))
+        .first();
+    }
+    
+    if (!game) {
+      game = await ctx.db
+        .query("games")
+        .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "playing"))
+        .first();
+    }
+
+    if (game) return game;
+
+    // If no active game, check for recently finished games that need acknowledgment
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    
+    // Check player1 finished games
+    const finishedGames = await ctx.db
+      .query("games")
+      .withIndex("by_status_finished", (q) => q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo))
+      .filter((q) => 
+        q.or(
+          q.and(
+            q.eq(q.field("player1Id"), userId),
+            q.neq(q.field("player1ResultAcknowledged"), true)
+          ),
+          q.and(
+            q.eq(q.field("player2Id"), userId),
+            q.neq(q.field("player2ResultAcknowledged"), true)
+          )
+        )
+      )
+      .order("desc")
+      .first();
+
+    return finishedGames;
+  },
+});
+
+// Update timer for current player (called periodically for sync) - REMOVED FOR PERFORMANCE
+// This function was causing too many unnecessary requests. Timer is now handled client-side.
+
+// Update timer for current player - REMOVED FOR PERFORMANCE  
+// This function was causing too many unnecessary requests. Timer is now handled client-side.
+
+// Check and handle timeouts - DEPRECATED - REMOVE FOR PERFORMANCE
+// This function was causing performance issues due to frequent calls
+// Timeout handling is now done client-side via Timer component
+// export const checkGameTimeout = mutation({...}); // REMOVED
+
+// Get match result details
+export const getMatchResult = query({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const game = await ctx.db.get(args.gameId);
+    if (!game) return null;
+
+    if (game.status !== "finished") return null;
+
+    // Use cached move count instead of querying moves - much faster
+    const moveCount = game.moveCount || 0;
+
+    // Determine the reason for game ending
+    let reason: "flag_captured" | "flag_reached_base" | "timeout" | "surrender" | "elimination" = "flag_captured";
+    
+    if (game.gameEndReason === "timeout") {
+      reason = "timeout";
+    } else if (game.gameEndReason === "surrender") {
+      reason = "surrender";
+    } else if (game.gameEndReason === "flag_reached_base") {
+      reason = "flag_reached_base";
+    } else {
+      // Only query moves if we need to determine the exact reason (expensive fallback)
+      if (!game.gameEndReason) {
+        const moves = await ctx.db
+          .query("moves")
+          .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
+          .order("desc")
+          .take(1);
+        
+        const lastMove = moves[0];
+        if (lastMove?.challengeResult?.defender === "Flag") {
+          reason = "flag_captured";
+        } else {
+          reason = "elimination";
+        }
+      } else {
+        reason = game.gameEndReason;
+      }
+    }
+
+    const duration = game.finishedAt ? Math.floor((game.finishedAt - game.createdAt) / 1000) : 0;
+
+    return {
+      winner: game.winner || "draw",
+      reason,
+      duration,
+      moves: moveCount, // Use cached count
+      player1Username: game.player1Username,
+      player2Username: game.player2Username,
+      finalBoard: game.board,
+    };
+  },
+});
+
+// Get match history for a user
+export const getMatchHistory = query({
+  args: {
+    userId: v.optional(v.id("users")),
+    limit: v.optional(v.number()),
+    offset: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = args.userId || await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const limit = args.limit || 10;
+    const offset = args.offset || 0;
+
+    // Get user's profile once for rank info
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    // Use indexed queries for better performance
+    const player1Games = await ctx.db
+      .query("games")
+      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "finished"))
+      .order("desc")
+      .take(limit + offset);
+
+    const player2Games = await ctx.db
+      .query("games")
+      .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "finished"))
+      .order("desc")
+      .take(limit + offset);
+
+    // Combine and sort by creation time
+    const allGames = [...player1Games, ...player2Games]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(offset, offset + limit);
+
+    // Transform games into match history format - but minimize additional queries
+    const matchHistory = await Promise.all(
+      allGames.map(async (game) => {
+        const isPlayer1 = game.player1Id === userId;
+        const opponentUsername = isPlayer1 ? game.player2Username : game.player1Username;
+        const isWin = game.winner === (isPlayer1 ? "player1" : "player2");
+        const isDraw = game.winner === undefined;
+
+        // Use cached move count instead of querying moves table
+        const movesCount = game.moveCount || 0;
+
+        return {
+          _id: game._id,
+          opponentUsername,
+          isWin,
+          isDraw,
+          reason: game.gameEndReason || "flag_captured",
+          duration: game.finishedAt ? Math.floor((game.finishedAt - game.createdAt) / 1000) : 0,
+          moves: movesCount,
+          createdAt: game.createdAt,
+          rankAtTime: profile?.rank || "Recruit",
+          gameId: game._id,
+          lobbyName: game.lobbyName,
+        };
+      })
+    );
+
+    // Get total count more efficiently
+    const totalPlayer1 = await ctx.db
+      .query("games")
+      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "finished"))
+      .collect()
+      .then(games => games.length);
+    
+    const totalPlayer2 = await ctx.db
+      .query("games")
+      .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "finished"))
+      .collect()
+      .then(games => games.length);
+
+    const totalGames = totalPlayer1 + totalPlayer2;
+
+    return {
+      matches: matchHistory,
+      total: totalGames,
+      hasMore: offset + limit < totalGames,
+    };
+  },
+});
+
+// Get game replay data
+export const getGameReplay = query({
+  args: {
+    gameId: v.id("games"),
+    moveLimit: v.optional(v.number()), // Allow limiting moves for large games
+  },
+  handler: async (ctx, args) => {
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.status !== "finished") {
+      throw new Error("Can only replay finished games");
+    }
+
+    // Limit moves if specified (useful for very long games)
+    const moveLimit = args.moveLimit || 1000; // Default limit of 1000 moves
+
+    // Get moves in chronological order with limit
+    const allMoves = await ctx.db
+      .query("moves")
+      .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
+      .order("asc")
+      .take(moveLimit);
+
+    // Filter out setup moves and keep only game moves
+    const gameMoves = allMoves.filter(move => move.moveType === "move" || move.moveType === "challenge");
+
+    // Use the saved initial setup board, or reconstruct from current board if not available
+    let initialBoard = game.initialSetupBoard;
+    
+    if (!initialBoard) {
+      // Fallback for games created before we saved initial setup
+      // Try to reconstruct initial positions from final board and moves
+      initialBoard = game.board.map(row => 
+        row.map(cell => cell ? { ...cell, revealed: false } : null)
+      );
+      
+      // If we have moves, try to reverse them to get initial positions
+      // This is a best-effort reconstruction for legacy games
+      if (gameMoves.length > 0) {
+        // For now, just use the final board with pieces hidden
+        // A more sophisticated approach could reverse-engineer the moves
+        console.warn("Game missing initial setup board, using fallback reconstruction");
+      }
+    }
+
+    return {
+      game,
+      moves: gameMoves,
+      initialBoard,
+      player1Username: game.player1Username,
+      player2Username: game.player2Username,
+      moveCount: gameMoves.length,
+      isTruncated: allMoves.length >= moveLimit, // Indicate if moves were truncated
+    };
+  },
+});
+
+// Acknowledge game result (so it won't show the modal again)
+export const acknowledgeGameResult = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.status !== "finished") {
+      throw new Error("Game is not finished");
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    // Update the acknowledgment field for the current player
+    const updateField = isPlayer1 ? "player1ResultAcknowledged" : "player2ResultAcknowledged";
+    
+    await ctx.db.patch(args.gameId, {
+      [updateField]: true,
+    });
+
+    return { success: true };
+  },
+});
