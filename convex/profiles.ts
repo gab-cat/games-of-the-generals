@@ -99,8 +99,8 @@ export const updateUsername = mutation({
       throw new Error("Username must be between 3 and 20 characters");
     }
 
-    if (!/^[a-zA-Z0-9_]+$/.test(args.username)) {
-      throw new Error("Username can only contain letters, numbers, and underscores");
+    if (!/^[a-zA-Z0-9_-]+$/.test(args.username)) {
+      throw new Error("Username can only contain letters, numbers, underscores, and hyphens");
     }
 
     // Check if username is already taken
