@@ -122,7 +122,10 @@ export const getGame = query({
       return game;
     }
 
-    // Hide opponent's unrevealed pieces unless user is spectator
+    // Check if user is a spectator
+    const isSpectator = userId && game.spectators.includes(userId);
+    
+    // Hide opponent's unrevealed pieces unless user is spectator or player
     if (userId && (userId === game.player1Id || userId === game.player2Id)) {
       const isPlayer1 = userId === game.player1Id;
       const boardCopy = game.board.map(row => 
@@ -144,6 +147,9 @@ export const getGame = query({
       );
       
       return { ...game, board: boardCopy };
+    } else if (isSpectator) {
+      // Spectators can see all pieces (both revealed and unrevealed)
+      return game;
     }
 
     return game;
@@ -446,7 +452,7 @@ export const makeMove = mutation({
     
     if (game.lastMoveTime || game.gameTimeStarted) {
       const turnStartTime = game.lastMoveTime || game.gameTimeStarted || currentTime;
-      timeUsedThisTurn = Math.floor((currentTime - turnStartTime) / 1000);
+      timeUsedThisTurn = currentTime - turnStartTime; // Keep in milliseconds
     }
     
     // Update game state
@@ -484,6 +490,9 @@ export const makeMove = mutation({
       await ctx.db.patch(game.lobbyId, {
         status: "finished",
       });
+
+      // Clean up spectator chat when game ends
+      await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
 
       // Update player stats
       const winnerId = gameWinner === "player1" ? game.player1Id : game.player2Id;
@@ -592,31 +601,7 @@ export const makeMove = mutation({
   },
 });
 
-// Join as spectator
-export const joinAsSpectator = mutation({
-  args: {
-    gameId: v.id("games"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const game = await ctx.db.get(args.gameId);
-    if (!game) throw new Error("Game not found");
-
-    if (game.player1Id === userId || game.player2Id === userId) {
-      throw new Error("You are already a player in this game");
-    }
-
-    if (!game.spectators.includes(userId)) {
-      await ctx.db.patch(args.gameId, {
-        spectators: [...game.spectators, userId],
-      });
-    }
-  },
-});
-
-// Get game moves with optional filtering
+// Get game moves with optional filtering - Optimized for performance
 export const getGameMoves = query({
   args: {
     gameId: v.id("games"),
@@ -624,18 +609,28 @@ export const getGameMoves = query({
     moveTypes: v.optional(v.array(v.string())), // Optional filter by move types
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 100; // Default limit for performance
+    const limit = Math.min(args.limit || 100, 500); // Cap at 500 moves max
     
-    const queryBuilder = ctx.db
+    let queryBuilder = ctx.db
       .query("moves")
       .withIndex("by_game_timestamp", (q) => q.eq("gameId", args.gameId))
       .order("asc");
 
+    // Optimized: Apply move type filter at database level if possible
+    if (args.moveTypes && args.moveTypes.length === 1) {
+      // Use the by_game_type index for single move type filters
+      const moveType = args.moveTypes[0] as "setup" | "move" | "challenge";
+      queryBuilder = ctx.db
+        .query("moves")
+        .withIndex("by_game_type", (q) => q.eq("gameId", args.gameId).eq("moveType", moveType))
+        .order("asc");
+    }
+
     // Apply limit for performance
     const moves = await queryBuilder.take(limit);
 
-    // Filter by move types if specified
-    if (args.moveTypes && args.moveTypes.length > 0) {
+    // Filter by move types if multiple types specified (less common case)
+    if (args.moveTypes && args.moveTypes.length > 1) {
       return moves.filter(move => args.moveTypes!.includes(move.moveType));
     }
 
@@ -687,6 +682,9 @@ export const surrenderGame = mutation({
       status: "finished",
     });
 
+    // Clean up spectator chat when game ends
+    await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
+
     // Update player stats with game duration
     await ctx.runMutation(api.profiles.updateProfileStats, { 
       userId: winnerId, 
@@ -730,46 +728,136 @@ export const surrenderGame = mutation({
   },
 });
 
-// Get current user's active game
+// Handle timeout - when a player runs out of time
+export const timeoutGame = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    if (game.status !== "playing") {
+      throw new Error("Game is not active");
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    // Check if it's actually the current player's turn
+    const isCurrentPlayer = (isPlayer1 && game.currentTurn === "player1") || 
+                           (isPlayer2 && game.currentTurn === "player2");
+    
+    if (!isCurrentPlayer) {
+      throw new Error("It's not your turn");
+    }
+
+    // Winner is the other player (timeout = automatic loss)
+    const winner = isPlayer1 ? "player2" : "player1";
+    const winnerId = isPlayer1 ? game.player2Id : game.player1Id;
+    const loserId = userId;
+
+    // Calculate game duration
+    const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
+
+    // Update game state
+    await ctx.db.patch(args.gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: "timeout" as const,
+    });
+
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, {
+      status: "finished",
+    });
+
+    // Update profiles with optimized batch operations
+    const [winnerProfile, loserProfile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", winnerId))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", loserId))
+        .unique()
+    ]);
+
+    if (winnerProfile && loserProfile) {
+      await Promise.all([
+        // Update winner profile
+        ctx.db.patch(winnerProfile._id, {
+          wins: winnerProfile.wins + 1,
+          gamesPlayed: winnerProfile.gamesPlayed + 1,
+          winStreak: (winnerProfile.winStreak || 0) + 1,
+          bestWinStreak: Math.max((winnerProfile.bestWinStreak || 0), (winnerProfile.winStreak || 0) + 1),
+          totalPlayTime: (winnerProfile.totalPlayTime || 0) + gameDuration,
+        }),
+        // Update loser profile
+        ctx.db.patch(loserProfile._id, {
+          losses: loserProfile.losses + 1,
+          gamesPlayed: loserProfile.gamesPlayed + 1,
+          winStreak: 0, // Reset win streak on loss
+          totalPlayTime: (loserProfile.totalPlayTime || 0) + gameDuration,
+        })
+      ]);
+    }
+
+    // Check game-specific achievements for timeout scenario
+    await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+      gameId: args.gameId,
+      winnerId,
+      loserId
+    });
+
+    return { success: true, winner };
+  },
+});
+
+// Get current user's active game - Optimized to reduce queries
 export const getCurrentUserGame = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // First check for active games (setup/playing) for this user
-    let game = await ctx.db
-      .query("games")
-      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "setup"))
-      .first();
-    
-    if (!game) {
-      game = await ctx.db
+    // Optimized: Use Promise.all to query both player indexes in parallel
+    const [player1Games, player2Games] = await Promise.all([
+      ctx.db
         .query("games")
-        .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "playing"))
-        .first();
-    }
-    
-    if (!game) {
-      game = await ctx.db
+        .withIndex("by_player1", (q) => q.eq("player1Id", userId))
+        .filter((q) => q.or(
+          q.eq(q.field("status"), "setup"),
+          q.eq(q.field("status"), "playing")
+        ))
+        .first(),
+      ctx.db
         .query("games")
-        .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "setup"))
-        .first();
-    }
-    
-    if (!game) {
-      game = await ctx.db
-        .query("games")
-        .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "playing"))
-        .first();
-    }
+        .withIndex("by_player2", (q) => q.eq("player2Id", userId))
+        .filter((q) => q.or(
+          q.eq(q.field("status"), "setup"),
+          q.eq(q.field("status"), "playing")
+        ))
+        .first()
+    ]);
 
-    if (game) return game;
+    // Return the most recent active game
+    const activeGame = player1Games || player2Games;
+    if (activeGame) return activeGame;
 
     // If no active game, check for recently finished games that need acknowledgment
     const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
     
-    // Check player1 finished games
+    // Optimized: Single query with filter for both players
     const finishedGames = await ctx.db
       .query("games")
       .withIndex("by_status_finished", (q) => q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo))

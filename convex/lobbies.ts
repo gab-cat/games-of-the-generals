@@ -51,6 +51,8 @@ export const createLobby = mutation({
   args: {
     name: v.string(),
     isPrivate: v.optional(v.boolean()),
+    allowSpectators: v.optional(v.boolean()),
+    maxSpectators: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -76,6 +78,8 @@ export const createLobby = mutation({
     }
 
     const isPrivate = args.isPrivate ?? false;
+    const allowSpectators = args.allowSpectators ?? true;
+    const maxSpectators = args.maxSpectators ?? undefined; // undefined means unlimited
     let lobbyCode: string | undefined;
 
     // Generate unique lobby code for private lobbies
@@ -98,6 +102,8 @@ export const createLobby = mutation({
       status: "waiting",
       isPrivate,
       lobbyCode,
+      allowSpectators,
+      maxSpectators,
       createdAt: Date.now(),
     });
   },
@@ -250,5 +256,51 @@ export const getLobby = query({
   },
   handler: async (ctx, args) => {
     return await ctx.db.get(args.lobbyId);
+  },
+});
+
+// Join a game as spectator by game ID
+export const spectateGameById = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(args.gameId);
+    if (!game) throw new Error("Game not found");
+
+    // Get the associated lobby to check spectator settings
+    const lobby = await ctx.db.get(game.lobbyId);
+    if (!lobby) throw new Error("Associated lobby not found");
+
+    // Check if spectators are allowed
+    if (lobby.allowSpectators === false) {
+      throw new Error("Spectators are not allowed in this game");
+    }
+
+    // Check if user is already a player
+    if (game.player1Id === userId || game.player2Id === userId) {
+      throw new Error("Cannot spectate a game you are playing");
+    }
+
+    // Check if user is already spectating
+    if (game.spectators.includes(userId)) {
+      return game._id; // Already spectating
+    }
+
+    // Check spectator limit
+    if (lobby.maxSpectators && game.spectators.length >= lobby.maxSpectators) {
+      throw new Error("Maximum number of spectators reached");
+    }
+
+    // Add user to spectators
+    const updatedSpectators = [...game.spectators, userId];
+    await ctx.db.patch(args.gameId, {
+      spectators: updatedSpectators,
+    });
+
+    return game._id;
   },
 });

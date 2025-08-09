@@ -15,6 +15,9 @@ import {
   Square,
   Flag,
   Eye,
+  Copy,
+  Crown,
+  Swords,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
@@ -125,6 +128,15 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
   });
 
+  const { mutate: timeoutGame } = useConvexMutationWithQuery(api.games.timeoutGame, {
+    onSuccess: () => {
+      toast.error("Time expired! You lose the game.");
+    },
+    onError: () => {
+      toast.error("Failed to process timeout");
+    }
+  });
+
   const { mutate: acknowledgeGameResult } = useConvexMutationWithQuery(api.games.acknowledgeGameResult, {
     onError: () => {
       toast.error("Failed to acknowledge result");
@@ -154,6 +166,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const [gameFinished, setGameFinished] = useState(false);
   const [optimisticBoard, setOptimisticBoard] = useState<any[][] | null>(null);
   const [pendingMove, setPendingMove] = useState<{fromRow: number, fromCol: number, toRow: number, toCol: number} | null>(null);
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   const isPlayer1 = game?.player1Id === profile.userId;
   const isPlayer2 = game?.player2Id === profile.userId;
@@ -163,6 +176,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const hasAcknowledgedResult = game?.status === "finished" && 
     ((isPlayer1 && game.player1ResultAcknowledged) || 
      (isPlayer2 && game.player2ResultAcknowledged));
+
+  // Update current time every second for timer display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Initialize showResultModal to true if game is already finished when component loads
   // but only if the user hasn't acknowledged the result yet
@@ -190,6 +211,74 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       setOptimisticBoard(null);
     }
   }, [game, optimisticBoard, pendingMove]);
+
+  // Helper function to format time as MM:SS
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Helper function to get formatted player time (matching SpectatorView logic)
+  const getPlayerTime = (isPlayer1: boolean) => {
+    if (!game) return "15:00"; // Default time display
+    
+    if (game.status === "finished") {
+      // Show final time remaining for finished games
+      const TOTAL_TIME = 15 * 60; // 15 minutes in seconds
+      const timeUsed = isPlayer1 ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
+      const timeUsedSeconds = Math.floor(timeUsed / 1000);
+      const remaining = Math.max(0, TOTAL_TIME - timeUsedSeconds);
+      return formatTime(remaining);
+    }
+    
+    if (game.status !== "playing") return "15:00"; // Default time display for setup
+    
+    const TOTAL_TIME = 15 * 60; // 15 minutes in seconds
+    const timeUsed = isPlayer1 ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
+    const timeUsedSeconds = Math.floor(timeUsed / 1000);
+    
+    // If it's current player's turn, add elapsed time since turn started
+    let currentTurnTime = 0;
+    const isCurrentTurn = (isPlayer1 && game.currentTurn === "player1") || (!isPlayer1 && game.currentTurn === "player2");
+    
+    if (isCurrentTurn && (game.lastMoveTime || game.gameTimeStarted)) {
+      const turnStartTime = game.lastMoveTime || game.gameTimeStarted || currentTime;
+      currentTurnTime = Math.floor((currentTime - turnStartTime) / 1000);
+    }
+    
+    const totalUsed = timeUsedSeconds + currentTurnTime;
+    const remaining = Math.max(0, TOTAL_TIME - totalUsed);
+    
+    // Check for timeout condition - only trigger once per timeout
+    if (remaining <= 0 && isCurrentTurn && game.status === "playing") {
+      // Trigger timeout for the current player (only the player whose time ran out)
+      if (game.currentTurn === "player1" && isPlayer1) {
+        setTimeout(() => handlePlayer1Timeout(), 100);
+      } else if (game.currentTurn === "player2" && isPlayer2) {
+        setTimeout(() => handlePlayer2Timeout(), 100);
+      }
+    }
+    
+    return formatTime(remaining);
+  };
+
+  // Timer handlers - need to be accessible by getPlayerTime
+  const handlePlayer1Timeout = () => {
+    // Only the current player whose time ran out should trigger the timeout
+    if (isPlayer1 && game?.currentTurn === "player1") {
+      toast.error("Your time expired! You lose the game.");
+      timeoutGame({ gameId });
+    }
+  };
+
+  const handlePlayer2Timeout = () => {
+    // Only the current player whose time ran out should trigger the timeout
+    if (isPlayer2 && game?.currentTurn === "player2") {
+      toast.error("Your time expired! You lose the game.");
+      timeoutGame({ gameId });
+    }
+  };
 
   const randomizeSetup = () => {
     // Clear current setup
@@ -442,11 +531,6 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }, 1000);
   };
 
-  const handleGameTimeout = () => {
-    toast.error("Time expired! You lose the game.");
-    // The server will handle the actual game termination via Timer component
-  };
-
   // Helper function to check if a square is highlighted
   const isSquareHighlighted = (row: number, col: number) => {
     // Highlight last move
@@ -531,6 +615,21 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 <Users className="h-12 w-12 text-blue-400" />
               </motion.div>
               <CardTitle className="text-xl text-white/90">Waiting for Opponent</CardTitle>
+              <div className="flex items-center justify-center gap-2 mt-2">
+                <span className="text-xs text-white/50">Game ID:</span>
+                <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70">{gameId}</code>
+                <Button
+                  onClick={() => {
+                    void navigator.clipboard.writeText(gameId);
+                    toast.success("Game ID copied to clipboard!");
+                  }}
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10"
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="text-center space-y-4">
               <p className="text-white/70">
@@ -583,6 +682,21 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   <CardTitle className="text-2xl flex items-center gap-2 text-white/90">
                     Army Setup
                   </CardTitle>
+                  <div className="flex items-center gap-2 mt-1 mb-1">
+                    <span className="text-xs text-white/50">Game ID:</span>
+                    <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70">{gameId}</code>
+                    <Button
+                      onClick={() => {
+                        void navigator.clipboard.writeText(gameId);
+                        toast.success("Game ID copied to clipboard!");
+                      }}
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10"
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
                   <p className="text-white/60 mt-1">
                     Strategically position your pieces for battle
                   </p>
@@ -847,98 +961,155 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <motion.div 
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              className="flex items-center gap-4"
-            >
-              <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.1, type: "spring" }}
-                className="w-12 h-12 bg-gradient-to-br from-red-500/20 via-purple-500/20 to-blue-500/20 backdrop-blur-sm border border-red-500/30 rounded-xl flex items-center justify-center shadow-lg"
+            {/* Game ID Section */}
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-xs text-white/50">Game ID:</span>
+              <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70">{gameId}</code>
+              <Button
+                onClick={() => {
+                  void navigator.clipboard.writeText(gameId);
+                  toast.success("Game ID copied to clipboard!");
+                }}
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10"
               >
-                <Sword className="h-6 w-6 text-red-400" />
-              </motion.div>
-              <div>
-                <CardTitle className="text-2xl flex items-center gap-2 text-white/90">
-                  {game.player1Username} vs {game.player2Username}
-                </CardTitle>
-                <div className="flex items-center gap-4 mt-2">
-                  {game.status === "playing" ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-white/60">Current Turn:</span>
-                      <Badge 
-                        variant={game.currentTurn === "player1" ? "default" : "secondary"}
-                        className={`flex items-center gap-2 ${
-                          game.currentTurn === "player1" 
-                            ? 'bg-blue-500/20 text-blue-300 border-blue-500/30' 
-                            : 'bg-red-500/20 text-red-300 border-red-500/30'
-                        }`}
-                      >
-                        <div className={`w-2 h-2 rounded-full ${
-                          game.currentTurn === "player1" ? 'bg-blue-400' : 'bg-red-400'
-                        }`}></div>
-                        {game.currentTurn === "player1" ? game.player1Username : game.player2Username}
-                      </Badge>
-                    </div>
-                  ) : (
-                    <Badge variant="outline" className="bg-white/10 text-white/70 border-white/20">
-                      Status: {game.status}
-                    </Badge>
-                  )}
+                <Copy className="h-3 w-3" />
+              </Button>
+            </div>
+
+            {/* Surrender Button */}
+            {game.status === "playing" && (isPlayer1 || isPlayer2) && (
+              <Button
+                onClick={() => void handleSurrender()}
+                disabled={isSurrendering}
+                variant="destructive"
+                size="sm"
+                className="flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSurrendering ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                    />
+                    Surrendering...
+                  </>
+                ) : (
+                  <>
+                    <Flag className="h-4 w-4" />
+                    Surrender
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+
+          {/* VS Design */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              {/* Player 1 */}
+              <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                game.status === "finished" 
+                  ? game.winner === "player1" 
+                    ? 'bg-yellow-500/20 border border-yellow-500/30 shadow-lg' 
+                    : 'bg-gray-500/10 border border-gray-500/20'
+                  : game.currentTurn === "player1" && game.status === "playing" 
+                    ? 'bg-blue-500/20 border border-blue-500/30 shadow-lg' 
+                    : 'bg-transparent'
+              }`}>
+                <UserAvatar
+                  username={player1Profile?.username || game.player1Username}
+                  avatarUrl={player1Profile?.avatarUrl}
+                  rank={player1Profile?.rank}
+                  size="md"
+                  className={`border-2 ${
+                    game.status === "finished" && game.winner === "player1" 
+                      ? 'border-yellow-400' 
+                      : 'border-blue-500/50'
+                  }`}
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white/90">{game.player1Username}</span>
+                    {game.status === "finished" && game.winner === "player1" && (
+                      <Crown className="h-4 w-4 text-yellow-400" />
+                    )}
+                    {game.currentTurn === "player1" && game.status === "playing" && (
+                      <Crown className="h-4 w-4 text-yellow-400" />
+                    )}
+                  </div>
+                  <div className={`text-sm font-mono ${
+                    game.status === "finished" && game.winner === "player1" 
+                      ? 'text-yellow-300' 
+                      : 'text-blue-300'
+                  }`}>
+                    {getPlayerTime(true)}
+                  </div>
                 </div>
               </div>
-            </motion.div>
-            <div className="flex items-center gap-3">
-              {game.status === "playing" && (
-                <div className="flex gap-4">
-                  {/* Player 1 Timer */}
-                  <Timer
-                    duration={900} // 15 minutes for game
-                    onTimeout={handleGameTimeout}
-                    label={`${game.player1Username} (${isPlayer1 ? 'You' : 'Opponent'})`}
-                    variant="game"
-                    isActive={game.currentTurn === "player1"}
-                    timeUsed={game.player1TimeUsed || 0}
-                    turnStartTime={game.currentTurn === "player1" ? (game.lastMoveTime || game.gameTimeStarted) : undefined}
-                  />
-                  {/* Player 2 Timer */}
-                  <Timer
-                    duration={900} // 15 minutes for game
-                    onTimeout={handleGameTimeout}
-                    label={`${game.player2Username} (${isPlayer2 ? 'You' : 'Opponent'})`}
-                    variant="game"
-                    isActive={game.currentTurn === "player2"}
-                    timeUsed={game.player2TimeUsed || 0}
-                    turnStartTime={game.currentTurn === "player2" ? (game.lastMoveTime || game.gameTimeStarted) : undefined}
-                  />
+
+              <Swords className="h-6 w-6 text-white/40" />
+
+              {/* Player 2 */}
+              <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                game.status === "finished" 
+                  ? game.winner === "player2" 
+                    ? 'bg-yellow-500/20 border border-yellow-500/30 shadow-lg' 
+                    : 'bg-gray-500/10 border border-gray-500/20'
+                  : game.currentTurn === "player2" && game.status === "playing" 
+                    ? 'bg-red-500/20 border border-red-500/30 shadow-lg' 
+                    : 'bg-transparent'
+              }`}>
+                <UserAvatar
+                  username={player2Profile?.username || game.player2Username}
+                  avatarUrl={player2Profile?.avatarUrl}
+                  rank={player2Profile?.rank}
+                  size="md"
+                  className={`border-2 ${
+                    game.status === "finished" && game.winner === "player2" 
+                      ? 'border-yellow-400' 
+                      : 'border-red-500/50'
+                  }`}
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white/90">{game.player2Username}</span>
+                    {game.status === "finished" && game.winner === "player2" && (
+                      <Crown className="h-4 w-4 text-yellow-400" />
+                    )}
+                    {game.currentTurn === "player2" && game.status === "playing" && (
+                      <Crown className="h-4 w-4 text-yellow-400" />
+                    )}
+                  </div>
+                  <div className={`text-sm font-mono ${
+                    game.status === "finished" && game.winner === "player2" 
+                      ? 'text-yellow-300' 
+                      : 'text-red-300'
+                  }`}>
+                    {getPlayerTime(false)}
+                  </div>
                 </div>
-              )}
-              {game.status === "playing" && (isPlayer1 || isPlayer2) && (
-                <Button
-                  onClick={() => void handleSurrender()}
-                  disabled={isSurrendering}
-                  variant="destructive"
-                  size="sm"
-                  className="flex items-center gap-2 disabled:opacity-50"
-                >
-                  {isSurrendering ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                      />
-                      Surrendering...
-                    </>
-                  ) : (
-                    <>
-                      <Flag className="h-4 w-4" />
-                      Surrender
-                    </>
-                  )}
-                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Badge 
+                variant={game.status === "playing" ? "default" : "outline"}
+                className={
+                  game.status === "playing"
+                    ? "bg-green-500/20 text-green-300 border-green-500/30"
+                    : "bg-gray-500/20 text-gray-300 border-gray-500/30"
+                }
+              >
+                {game.status === "playing" ? "Playing" : "Finished"}
+              </Badge>
+
+              {game.status === "playing" && (
+                <div className="text-sm text-white/60">
+                  Turn {Math.floor(((moves?.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
+                </div>
               )}
             </div>
           </div>

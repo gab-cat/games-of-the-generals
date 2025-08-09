@@ -54,6 +54,8 @@ const applicationTables = {
     lobbyCode: v.optional(v.string()),
     createdAt: v.number(),
     gameId: v.optional(v.id("games")),
+    allowSpectators: v.optional(v.boolean()), // Default true
+    maxSpectators: v.optional(v.number()), // Default unlimited (null)
   })
     .index("by_status", ["status"])
     .index("by_host", ["hostId"])
@@ -149,6 +151,17 @@ const applicationTables = {
     .index("by_timestamp", ["timestamp"])
     .index("by_game_timestamp", ["gameId", "timestamp"]) // Compound index for ordered game moves
     .index("by_game_type", ["gameId", "moveType"]), // Index for filtering by move type
+
+  // Spectator chat messages
+  spectatorChat: defineTable({
+    gameId: v.id("games"),
+    userId: v.id("users"),
+    username: v.string(),
+    message: v.string(),
+    timestamp: v.number(),
+  })
+    .index("by_game", ["gameId"])
+    .index("by_game_timestamp", ["gameId", "timestamp"]), // For ordered chat messages
 };
 
 export default defineSchema({
