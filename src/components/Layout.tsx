@@ -1,9 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
+import { useNavigate, useLocation } from "@tanstack/react-router";
 import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
@@ -15,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { UserAvatar } from "./UserAvatar";
+import { cn } from "../lib/utils";
 import { useState, useEffect } from "react";
 
 interface LayoutProps {
@@ -22,17 +24,42 @@ interface LayoutProps {
   user?: {
     username: string;
   } | null;
-  onNavigate?: (page: 'lobby' | 'profile' | 'achievements' | 'settings') => void;
 }
 
-export function Layout({ children, user, onNavigate }: LayoutProps) {
+export function Layout({ children, user }: LayoutProps) {
   const { isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
   
   const { data: profile, error: profileError } = useConvexQuery(
     api.profiles.getCurrentProfile
   );
+
+  const isActiveTab = (path: string) => {
+    if (path === "/" && location.pathname === "/") return true;
+    if (path !== "/" && location.pathname.startsWith(path)) return true;
+    return false;
+  };
+
+  const navigationItems = [
+    {
+      path: "/",
+      label: "Lobbies",
+      icon: Gamepad2
+    },
+    {
+      path: "/leaderboard",
+      label: "Leaderboard",
+      icon: Trophy
+    },
+    {
+      path: "/match-history",
+      label: "Match History",
+      icon: History
+    }
+  ];
 
   useEffect(() => {
     if (profileError) {
@@ -55,11 +82,12 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className={`sticky top-0 z-50 transition-all duration-300 ${
+        className={cn(
+          "sticky top-0 z-50 transition-all duration-300",
           isScrolled 
-            ? 'bg-black/50 backdrop-blur-sm border-b border-white/20' 
-            : 'bg-black/40 backdrop-blur-sm border-b border-white/10'
-        }`}
+            ? "bg-black/50 backdrop-blur-sm border-b border-white/20" 
+            : "bg-black/40 backdrop-blur-sm border-b border-white/10"
+        )}
       >
         {/* Floating particles effect */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -93,7 +121,7 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="flex items-center gap-4"
+            className="flex items-center gap-4 flex-1"
           >
             {/* Minimalist Logo */}
             <motion.div
@@ -112,7 +140,7 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
               className="flex flex-col cursor-pointer"
-              onClick={() => onNavigate?.('lobby')}
+              onClick={() => void navigate({ to: "/" })}
             >
               <h1 className="text-xl font-display font-semibold text-white/95 tracking-tight hover:text-white transition-colors">
                 Games of the Generals
@@ -121,12 +149,46 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
             </motion.div>
           </motion.div>
 
+          {/* Middle Section - Navigation */}
+          {isAuthenticated && (
+            <motion.div
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="flex items-center gap-2 flex-1 justify-center"
+            >
+              <div className="flex items-center bg-white/1 backdrop-blur-sm border border-white/20 rounded-full p-1">
+                {navigationItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Button
+                      key={item.path}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void navigate({ to: item.path })}
+                      className={cn(
+                        "rounded-full px-4 py-2 text-white/70 transition-all duration-200 flex items-center gap-2",
+                        isActiveTab(item.path) 
+                          ? "bg-white/20 text-white hover:bg-white/25" 
+                          : "bg-transparent hover:text-white"
+                      )}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+
           {/* Right Section - User Profile */}
           {isAuthenticated && user && (
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
+              className="flex-1 flex justify-end"
             >
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -186,7 +248,7 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
                   {/* Menu Items */}
                   <div className="py-1">
                     <DropdownMenuItem 
-                      onClick={() => onNavigate?.('profile')}
+                      onClick={() => void navigate({ to: "/profile" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
                       <User className="h-4 w-4" />
@@ -194,7 +256,7 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
                     </DropdownMenuItem>
                     
                     <DropdownMenuItem 
-                      onClick={() => onNavigate?.('achievements')}
+                      onClick={() => void navigate({ to: "/achievements" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
                       <Trophy className="h-4 w-4" />
@@ -202,7 +264,7 @@ export function Layout({ children, user, onNavigate }: LayoutProps) {
                     </DropdownMenuItem>
                     
                     <DropdownMenuItem 
-                      onClick={() => onNavigate?.('settings')}
+                      onClick={() => void navigate({ to: "/settings" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
                       <Settings className="h-4 w-4" />

@@ -780,36 +780,36 @@ export const timeoutGame = mutation({
       status: "finished",
     });
 
-    // Update profiles with optimized batch operations
-    const [winnerProfile, loserProfile] = await Promise.all([
-      ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", winnerId))
-        .unique(),
-      ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", loserId))
-        .unique()
-    ]);
+    // Update player stats with game duration
+    await ctx.runMutation(api.profiles.updateProfileStats, { 
+      userId: winnerId, 
+      won: true,
+      gameTime: gameDuration
+    });
+    
+    await ctx.runMutation(api.profiles.updateProfileStats, { 
+      userId: loserId, 
+      won: false,
+      gameTime: gameDuration
+    });
 
-    if (winnerProfile && loserProfile) {
-      await Promise.all([
-        // Update winner profile
-        ctx.db.patch(winnerProfile._id, {
-          wins: winnerProfile.wins + 1,
-          gamesPlayed: winnerProfile.gamesPlayed + 1,
-          winStreak: (winnerProfile.winStreak || 0) + 1,
-          bestWinStreak: Math.max((winnerProfile.bestWinStreak || 0), (winnerProfile.winStreak || 0) + 1),
-          totalPlayTime: (winnerProfile.totalPlayTime || 0) + gameDuration,
-        }),
-        // Update loser profile
-        ctx.db.patch(loserProfile._id, {
-          losses: loserProfile.losses + 1,
-          gamesPlayed: loserProfile.gamesPlayed + 1,
-          winStreak: 0, // Reset win streak on loss
-          totalPlayTime: (loserProfile.totalPlayTime || 0) + gameDuration,
-        })
-      ]);
+    // Check achievements for both players
+    const winnerProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", winnerId))
+      .unique();
+    
+    const loserProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", loserId))
+      .unique();
+
+    if (winnerProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+    }
+    
+    if (loserProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
     }
 
     // Check game-specific achievements for timeout scenario

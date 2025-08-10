@@ -27,9 +27,9 @@ import { motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Timer } from "./Timer";
-import { GameResultModal } from "./GameResultModal";
-import { AchievementNotification } from "./AchievementNotification";
+import { Timer } from "../pages/game/Timer";
+import { GameResultModal } from "../pages/game/GameResultModal";
+import { AchievementNotification } from "../pages/achievements/AchievementNotification";
 import { UserAvatar } from "./UserAvatar";
 import { getPieceDisplay } from "../lib/piece-display";
 

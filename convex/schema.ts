@@ -162,6 +162,20 @@ const applicationTables = {
   })
     .index("by_game", ["gameId"])
     .index("by_game_timestamp", ["gameId", "timestamp"]), // For ordered chat messages
+
+  // Email change verification
+  emailChangeVerifications: defineTable({
+    userId: v.id("users"),
+    currentEmail: v.string(),
+    newEmail: v.string(),
+    verificationCode: v.string(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    verified: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_code", ["verificationCode"])
+    .index("by_user_verified", ["userId", "verified"]),
 };
 
 export default defineSchema({
