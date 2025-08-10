@@ -988,6 +988,38 @@ export const getMatchHistory = query({
       cursor: v.optional(v.string()),
     })),
   },
+  returns: v.object({
+    page: v.array(v.object({
+      _id: v.id("games"),
+      opponentUsername: v.string(),
+      isWin: v.boolean(),
+      isDraw: v.boolean(),
+      reason: v.string(),
+      duration: v.number(),
+      moves: v.number(),
+      createdAt: v.number(),
+      rankAtTime: v.string(),
+      gameId: v.id("games"),
+      lobbyName: v.string(),
+    })),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+    matches: v.array(v.object({
+      _id: v.id("games"),
+      opponentUsername: v.string(),
+      isWin: v.boolean(),
+      isDraw: v.boolean(),
+      reason: v.string(),
+      duration: v.number(),
+      moves: v.number(),
+      createdAt: v.number(),
+      rankAtTime: v.string(),
+      gameId: v.id("games"),
+      lobbyName: v.string(),
+    })),
+    total: v.number(),
+    hasMore: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     const userId = args.userId || await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
@@ -1001,33 +1033,70 @@ export const getMatchHistory = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
-    // Use the new optimized finished game indexes for better performance
-    const [player1Games, player2Games] = await Promise.all([
-      ctx.db
+    // Use proper pagination with cursor support
+    let result;
+    if (paginationOpts?.cursor && paginationOpts.cursor.trim() !== "") {
+      try {
+        const paginatedQuery = ctx.db
+          .query("games")
+          .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
+          .filter((q) => 
+            q.or(
+              q.eq(q.field("player1Id"), userId),
+              q.eq(q.field("player2Id"), userId)
+            )
+          )
+          .order("desc");
+
+        result = await paginatedQuery.paginate({
+          numItems: limit,
+          cursor: paginationOpts.cursor,
+        });
+      } catch (error) {
+        // If cursor parsing fails, fall back to first page
+        console.warn("Failed to parse cursor, falling back to first page:", error);
+        const fallbackQuery = ctx.db
+          .query("games")
+          .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
+          .filter((q) => 
+            q.or(
+              q.eq(q.field("player1Id"), userId),
+              q.eq(q.field("player2Id"), userId)
+            )
+          )
+          .order("desc");
+
+        const games = await fallbackQuery.take(limit);
+        result = {
+          page: games,
+          isDone: games.length < limit,
+          continueCursor: games.length > 0 ? games[games.length - 1]._id : "",
+        };
+      }
+    } else {
+      // First page
+      const firstPageQuery = ctx.db
         .query("games")
-        .withIndex("by_player1_finished", (q) => 
-          q.eq("player1Id", userId).eq("status", "finished")
+        .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
+        .filter((q) => 
+          q.or(
+            q.eq(q.field("player1Id"), userId),
+            q.eq(q.field("player2Id"), userId)
+          )
         )
-        .order("desc")
-        .take(limit),
+        .order("desc");
 
-      ctx.db
-        .query("games")
-        .withIndex("by_player2_finished", (q) => 
-          q.eq("player2Id", userId).eq("status", "finished")
-        )
-        .order("desc")
-        .take(limit)
-    ]);
+      const games = await firstPageQuery.take(limit);
+      result = {
+        page: games,
+        isDone: games.length < limit,
+        continueCursor: games.length > 0 ? games[games.length - 1]._id : "",
+      };
+    }
 
-    // Combine and sort by finished time (most recent first)
-    const allGames = [...player1Games, ...player2Games]
-      .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
-      .slice(0, limit);
-
-    // Transform games into match history format - but minimize additional queries
+    // Transform games into match history format
     const matchHistory = await Promise.all(
-      allGames.map(async (game) => {
+      result.page.map(async (game) => {
         const isPlayer1 = game.player1Id === userId;
         const opponentUsername = isPlayer1 ? game.player2Username : game.player1Username;
         const isWin = game.winner === (isPlayer1 ? "player1" : "player2");
@@ -1047,22 +1116,19 @@ export const getMatchHistory = query({
           createdAt: game.createdAt,
           rankAtTime: profile?.rank || "Recruit",
           gameId: game._id,
-          lobbyName: game.lobbyName,
+          lobbyName: game.lobbyName || "Unknown",
         };
       })
     );
 
-    // For cursor-based pagination, we don't need total count calculation for better performance
-    // Total count calculation is expensive and rarely needed for infinite scroll
-    
     return {
       page: matchHistory,
-      isDone: matchHistory.length < limit,
-      continueCursor: matchHistory.length > 0 ? matchHistory[matchHistory.length - 1]._id : "",
-      // Legacy compatibility - total will be calculated only if needed
+      isDone: result.isDone,
+      continueCursor: result.continueCursor || "",
+      // Legacy compatibility
       matches: matchHistory,
-      total: matchHistory.length, // Simplified - shows current page count
-      hasMore: matchHistory.length >= limit,
+      total: matchHistory.length, // Current page count
+      hasMore: !result.isDone, // Consistent with isDone
     };
   },
 });

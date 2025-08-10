@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
-import { Crown } from "lucide-react";
 import ImageBackground from "../components/backgrounds/ImageBackground";
 import Squares from "../components/backgrounds/Squares/Squares";
 import { PasswordResetForm } from "./PasswordResetForm";
@@ -63,28 +62,15 @@ export function SignInForm() {
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-gray-900/75 to-slate-900/60" />
         
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center h-full px-4 sm:px-6 lg:px-12 max-w-2xl min-h-screen lg:min-h-full">
+        {/* Scrollable Content Container */}
+        <div className="relative pt-28 z-10 h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/20 hover:scrollbar-thumb-white/30">
+          <div className="flex flex-col justify-center min-h-full px-4 sm:px-6 lg:px-12 max-w-2xl py-8 lg:py-12">
           <motion.div 
             className="space-y-6 lg:space-y-10 text-left"
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
           >
-            {/* Logo/Icon */}
-            <motion.div 
-              className="flex items-center space-x-3 lg:space-x-4"
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.5, duration: 0.8, type: "spring" }}
-            >
-              <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-2xl">
-                <Crown className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
-              </div>
-              <div className="text-white/40 font-mono text-xs lg:text-sm tracking-wider">
-                TACTICAL WARFARE
-              </div>
-            </motion.div>
             
             {/* Title */}
             <div className="space-y-2">
@@ -150,7 +136,69 @@ export function SignInForm() {
                 <div className="text-xs lg:text-sm text-white/60 font-body">Battle Mode</div>
               </div>
             </motion.div>
+
+            {/* Creator Credits & Open Source Message */}
+            <motion.div 
+              className="space-y-4 pt-8 lg:pt-10 border-t border-white/10"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.0, duration: 0.6 }}
+            >
+              <div className="space-y-3">
+                <h3 className="text-lg lg:text-xl font-display font-semibold text-white/90">
+                  Crafted with Passion
+                </h3>
+                <div className="space-y-2 text-white/70 font-body text-sm lg:text-base leading-relaxed">
+                  <p>
+                    This platform was lovingly created by{" "}
+                    <a 
+                      href="https://github.com/gab-cat" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-white/90 hover:text-white transition-colors duration-200 underline underline-offset-2 font-semibold"
+                    >
+                      Gabriel Catimbang
+                    </a>
+                    {" "}to preserve and modernize the beloved Filipino strategy game of Game of the Generals.
+                  </p>
+                  <p className="text-white/60 text-xs lg:text-sm">
+                    Born from a desire to bring this tactical masterpiece to the digital age, 
+                    connecting players worldwide through strategic warfare and psychological brilliance.
+                  </p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <h4 className="text-base lg:text-lg font-display font-medium text-white/80">
+                  Open Source & Community Driven
+                </h4>
+                <p className="text-white/60 font-body text-xs lg:text-sm leading-relaxed">
+                  This project is completely open source and welcomes contributions from developers, 
+                  designers, and strategy enthusiasts. Join our mission to create the ultimate 
+                  Game of the Generals experience.
+                </p>
+                <div className="flex flex-wrap gap-2 pt-2">
+                  <a 
+                    href="https://github.com/gab-cat/games-of-the-generals" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-full text-xs text-white/80 hover:text-white transition-all duration-200 font-medium"
+                  >
+                    🚀 View Source Code
+                  </a>
+                  <a 
+                    href="https://github.com/gab-cat/games-of-the-generals/issues" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/30 rounded-full text-xs text-white/80 hover:text-white transition-all duration-200 font-medium"
+                  >
+                    💡 Contribute Ideas
+                  </a>
+                </div>
+              </div>
+            </motion.div>
           </motion.div>
+          </div>
         </div>
         
         {/* Floating Elements - Hidden on mobile */}
@@ -314,6 +362,32 @@ export function SignInForm() {
               >
                 Enter as Guest Commander
               </Button>
+
+              {/* Credits */}
+              <div className="text-center space-y-2 pt-4 border-t border-white/10">
+                <p className="text-xs text-white/50 font-body">
+                  Created by{" "}
+                  <a 
+                    href="https://github.com/gab-cat" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-white/70 hover:text-white/90 transition-colors duration-200 underline underline-offset-2"
+                  >
+                    Gabriel Catimbang
+                  </a>
+                </p>
+                <p className="text-xs text-white/40 font-body">
+                  Open source •{" "}
+                  <a 
+                    href="https://github.com/gab-cat/games-of-the-generals" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-white/60 hover:text-white/80 transition-colors duration-200 underline underline-offset-2"
+                  >
+                    Contribute on GitHub
+                  </a>
+                </p>
+              </div>
             </motion.div>
           )}
         </div>

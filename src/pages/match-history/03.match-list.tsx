@@ -1,6 +1,6 @@
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Medal } from "lucide-react";
 
@@ -18,29 +18,44 @@ interface MatchListProps {
 
 export function MatchList({ userId, onViewReplay }: MatchListProps) {
   const [currentPage, setCurrentPage] = useState(0);
+  const [cursors, setCursors] = useState<Record<number, string | null>>({ 0: null });
   const pageSize = 8;
   
-  // Get match history data
+  // Get match history data with server-side pagination
   const { data: matchHistory, isPending, error } = useConvexQuery(api.games.getMatchHistory, { 
     userId,
     paginationOpts: {
       numItems: pageSize,
+      cursor: cursors[currentPage] || undefined,
     },
   });
 
-  // Since the API returns all matches in one go, we'll handle pagination client-side
-  const allMatches = matchHistory?.matches || matchHistory?.page || [];
-  const totalMatches = allMatches.length;
-  const totalPages = Math.ceil(totalMatches / pageSize);
-  
-  // Get current page data
-  const startIndex = currentPage * pageSize;
-  const endIndex = startIndex + pageSize;
-  const currentPageMatches = allMatches.slice(startIndex, endIndex);
+  // Update cursors when new data arrives
+  useEffect(() => {
+    if (matchHistory?.continueCursor && matchHistory.continueCursor.trim() !== "") {
+      const nextPage = currentPage + 1;
+      setCursors(prev => {
+        // Only update if we don't already have this cursor
+        if (!prev[nextPage]) {
+          return {
+            ...prev,
+            [nextPage]: matchHistory.continueCursor
+          };
+        }
+        return prev;
+      });
+    }
+  }, [matchHistory?.continueCursor, currentPage]);
 
   const handlePageChange = (page: number) => {
+    if (page < 0) return;
     setCurrentPage(page);
   };
+
+  // Calculate total pages more accurately
+  const hasNextPage = matchHistory?.hasMore ?? false;
+  // We know we have at least currentPage + 1 pages, and if there's more data, we can show a next page
+  const totalPages = hasNextPage ? currentPage + 2 : Math.max(currentPage + 1, 1);
 
   if (error) {
     return <ErrorMessage error={error} />;
@@ -50,7 +65,7 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
     return <LoadingSpinner />;
   }
 
-  if (!matchHistory || allMatches.length === 0) {
+  if (!matchHistory || matchHistory.page.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -64,14 +79,24 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
     );
   }
 
+  // Use a rough estimate for total matches - show current page items plus some if there are more
+  const totalMatches = (currentPage * pageSize) + matchHistory.page.length + (hasNextPage ? pageSize : 0);
+
   return (
     <div className="space-y-3 sm:space-y-4">
-      <div className="mb-4 sm:mb-6">
+      <div className="flex flex-row justify-between mb-4 sm:mb-6">
         <MatchHistoryHeader totalMatches={totalMatches} />
+        {totalPages > 1 && (
+          <PaginationControls
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={handlePageChange}
+          />
+        )}
       </div>
       
       <div className="space-y-2 sm:space-y-3">
-        {currentPageMatches.map((match, index: number) => (
+        {matchHistory.page.map((match, index: number) => (
           <MatchItem
             key={match._id}
             match={match}
@@ -81,13 +106,7 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
         ))}
       </div>
 
-      {totalPages > 1 && (
-        <PaginationControls
-          currentPage={currentPage}
-          totalPages={totalPages}
-          onPageChange={handlePageChange}
-        />
-      )}
+
     </div>
   );
 }

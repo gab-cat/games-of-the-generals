@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { motion } from "framer-motion";
-import { Target, Crown, Sword, Calendar, Clock, Trophy, Play } from "lucide-react";
+import { Target, Crown, Sword, Calendar, Clock, Trophy, Play, Swords } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -94,7 +94,8 @@ export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
             {/* Main content */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mb-1">
-                <span className="font-medium text-sm truncate text-white/90">vs {match.opponentUsername}</span>
+                <Swords className="h-4 w-4 text-white/60" />
+                <span className="font-medium text-sm truncate text-white/90">{match.opponentUsername}</span>
                 {getResultBadge(match.isWin, match.isDraw)}
               </div>
               
