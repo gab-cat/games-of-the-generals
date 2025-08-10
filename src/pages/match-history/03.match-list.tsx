@@ -1,12 +1,11 @@
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Medal } from "lucide-react";
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { MatchHistoryHeader } from "./01.match-history-header";
-import { PaginationControls } from "./02.pagination-controls";
 import { LoadingSpinner } from "./04.loading-spinner";
 import { ErrorMessage } from "./05.error-message";
 import { MatchItem } from "./MatchItem";
@@ -17,14 +16,38 @@ interface MatchListProps {
 }
 
 export function MatchList({ userId, onViewReplay }: MatchListProps) {
-  const [currentPage, setCurrentPage] = useState(0);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [allMatches, setAllMatches] = useState<any[]>([]);
+  const [hasMore, setHasMore] = useState(true);
   const pageSize = 8; // Increased from 5 to reduce pagination requests
   
   const { data: matchHistory, isPending, error } = useConvexQuery(api.games.getMatchHistory, { 
     userId,
-    limit: pageSize,
-    offset: currentPage * pageSize,
+    paginationOpts: {
+      numItems: pageSize,
+      cursor,
+    },
   });
+
+  // Update matches when new data arrives
+  useEffect(() => {
+    if (matchHistory) {
+      if (cursor === undefined) {
+        // First load
+        setAllMatches(matchHistory.page || matchHistory.matches || []);
+      } else {
+        // Load more
+        setAllMatches(prev => [...prev, ...(matchHistory.page || [])]);
+      }
+      setHasMore(!matchHistory.isDone && matchHistory.page?.length === pageSize);
+    }
+  }, [matchHistory, cursor, pageSize]);
+
+  const loadMore = () => {
+    if (matchHistory && !matchHistory.isDone && matchHistory.continueCursor) {
+      setCursor(matchHistory.continueCursor);
+    }
+  };
 
   if (error) {
     return <ErrorMessage error={error} />;
@@ -34,7 +57,7 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
     return <LoadingSpinner />;
   }
 
-  if (!matchHistory || matchHistory.matches.length === 0) {
+  if (!matchHistory || (allMatches.length === 0 && !isPending)) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
@@ -48,21 +71,25 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
     );
   }
 
-  const totalPages = Math.ceil(matchHistory.total / pageSize);
+  const displayMatches = allMatches.length > 0 ? allMatches : (matchHistory?.matches || []);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-6">
-        <MatchHistoryHeader totalMatches={matchHistory.total} />
-        <PaginationControls 
-          currentPage={currentPage} 
-          totalPages={totalPages} 
-          onPageChange={setCurrentPage} 
-        />
+        <MatchHistoryHeader totalMatches={matchHistory?.total || displayMatches.length} />
+        {hasMore && (
+          <button 
+            onClick={loadMore}
+            disabled={isPending}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isPending ? "Loading..." : "Load More"}
+          </button>
+        )}
       </div>
       
       <div className="space-y-2">
-        {matchHistory.matches.map((match, index: number) => (
+        {displayMatches.map((match, index: number) => (
           <MatchItem
             key={match._id}
             match={match}
