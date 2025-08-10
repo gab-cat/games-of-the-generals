@@ -145,8 +145,8 @@ const BoardSquare = memo(({
       }
       onClick={() => onClick(row, col)}
       className={`
-        aspect-square border flex items-center justify-center cursor-pointer rounded-lg transition-all relative
-        bg-muted/30 border-border hover:bg-muted/50
+        aspect-square border flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all relative min-h-[38px] sm:min-h-0
+        bg-muted/30 border-border hover:bg-muted/50 p-0.5 sm:p-1
         ${isSelected ? 'ring-1 ring-primary bg-primary/20 border-primary' : ''}
         ${isValidMove ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}
         ${highlightType === 'last-move' ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
@@ -177,12 +177,21 @@ const BoardSquare = memo(({
         <div className="text-center">
           <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
             {cell.piece === "Hidden" ? 
-              getPieceDisplay(cell.piece, { isOpponent: true }) : 
-              getPieceDisplay(cell.piece, { showLabel: true })
+              getPieceDisplay(cell.piece, { isOpponent: true, size: "small" }) : 
+              <>
+                {/* Mobile: No labels, small size */}
+                <div className="block sm:hidden">
+                  {getPieceDisplay(cell.piece, { showLabel: false, size: "small" })}
+                </div>
+                {/* Desktop: With labels, medium size */}
+                <div className="hidden sm:block">
+                  {getPieceDisplay(cell.piece, { showLabel: true, size: "medium" })}
+                </div>
+              </>
             }
           </div>
           {cell.revealed && cell.piece !== "Hidden" && (
-            <div className="text-xs font-bold mt-1 text-muted-foreground">
+            <div className="text-[10px] sm:text-xs font-bold mt-0.5 sm:mt-1 text-muted-foreground leading-tight">
               {cell.piece.split(' ').map((word: string) => word[0]).join('')}
             </div>
           )}
@@ -945,7 +954,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-0"
+        className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
       >
         {/* Setup Header */}
         <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
@@ -1057,12 +1066,12 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   {isSwapMode ? "Click on pieces to swap their positions" : "Click empty spaces to place selected pieces"}
                 </p>
               </CardHeader>
-              <CardContent className="p-4 sm:p-6">
+              <CardContent className="p-2 sm:p-6">
                 <motion.div
                   initial={{ scale: 1, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-9 gap-1 sm:gap-2 max-w-lg mx-auto"
+                  className="grid grid-cols-9 gap-0.5 sm:gap-2 max-w-lg mx-auto"
                 >
                   {setupBoard.map((row, rowIndex) =>
                     row.map((cell, colIndex) => {
@@ -1078,7 +1087,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           whileTap={isValidArea ? { scale: 0.95 } : {}}
                           onClick={() => handleSetupSquareClick(rowIndex, colIndex)}
                           className={`
-                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-lg transition-all text-xs sm:text-sm
+                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[38px] sm:min-h-0 p-0.5 sm:p-1
                             ${isValidArea 
                               ? 'border-primary/50 bg-primary/10 hover:bg-primary/20' 
                               : 'border-muted bg-muted/20'
@@ -1090,7 +1099,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         >
                           {cell && (
                             <div className="text-foreground" title={cell}>
-                              {getPieceDisplay(cell, { showLabel: true })}
+                              {/* Mobile: No labels, small size */}
+                              <div className="block sm:hidden">
+                                {getPieceDisplay(cell, { showLabel: false, size: "small" })}
+                              </div>
+                              {/* Desktop: With labels, medium size */}
+                              <div className="hidden sm:block">
+                                {getPieceDisplay(cell, { showLabel: true, size: "medium" })}
+                              </div>
                             </div>
                           )}
                         </motion.div>
@@ -1136,8 +1152,16 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           }
                         `}
                       >
-                        <div className="text-foreground">{getPieceDisplay(piece, { showLabel: false })}</div>
-                        <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">{piece}</div>
+                        {/* Mobile: No labels, small size */}
+                        <div className="block sm:hidden">
+                          <div className="text-foreground">{getPieceDisplay(piece, { showLabel: false, size: "small" })}</div>
+                          <div className="text-[10px] text-center font-medium text-muted-foreground truncate w-full leading-tight">{piece}</div>
+                        </div>
+                        {/* Desktop: With labels, medium size */}
+                        <div className="hidden sm:block">
+                          <div className="text-foreground">{getPieceDisplay(piece, { showLabel: false, size: "medium" })}</div>
+                          <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">{piece}</div>
+                        </div>
                       </motion.button>
                     ))}
                   </motion.div>
@@ -1242,7 +1266,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-0"
+      className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
     >
       {/* Game Header */}
       <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
@@ -1460,7 +1484,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-2 sm:p-4 lg:p-6">
+            <CardContent className="p-1 sm:p-4 lg:p-6">
               <motion.div
                 ref={boardRef}
                 initial={{ scale: 1, opacity: 0 }}
@@ -1471,7 +1495,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 transition={{ 
                   delay: 0.1
                 }}
-                className={`grid grid-cols-9 gap-1 sm:gap-2 max-w-3xl mx-auto p-2 sm:p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
+                className={`grid grid-cols-9 gap-0.5 sm:gap-2 max-w-3xl mx-auto p-1 sm:p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
                   isCurrentPlayer 
                     ? 'ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30' 
                     : 'ring-muted/30 bg-muted/10 border-muted/30'
@@ -1581,12 +1605,21 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       >
                         <div className="transform scale-110 sm:scale-125">
                           {animatingPiece.piece.piece === "Hidden" ? 
-                            getPieceDisplay(animatingPiece.piece.piece, { isOpponent: true }) : 
-                            getPieceDisplay(animatingPiece.piece.piece, { showLabel: true })
+                            getPieceDisplay(animatingPiece.piece.piece, { isOpponent: true, size: "small" }) : 
+                            <>
+                              {/* Mobile: No labels, small size */}
+                              <div className="block sm:hidden">
+                                {getPieceDisplay(animatingPiece.piece.piece, { showLabel: false, size: "small" })}
+                              </div>
+                              {/* Desktop: With labels, medium size */}
+                              <div className="hidden sm:block">
+                                {getPieceDisplay(animatingPiece.piece.piece, { showLabel: true, size: "medium" })}
+                              </div>
+                            </>
                           }
                         </div>
                         {animatingPiece.piece.revealed && animatingPiece.piece.piece !== "Hidden" && (
-                          <div className="text-xs font-bold mt-1 text-muted-foreground">
+                          <div className="text-[10px] sm:text-xs font-bold mt-0.5 sm:mt-1 text-muted-foreground">
                             {animatingPiece.piece.piece.split(' ').map((word: string) => word[0]).join('')}
                           </div>
                         )}

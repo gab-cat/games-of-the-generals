@@ -26,26 +26,26 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
 
   // Size classes for icons
   const iconSizes = {
-    small: "w-5 h-5",
-    medium: "w-6 h-6", 
+    small: "w-4 h-4",
+    medium: "w-5 h-5", 
     large: "w-8 h-8"
   };
   
   const starSizes = {
-    small: "w-3 h-3",
-    medium: "w-4 h-4",
+    small: "w-2.5 h-2.5",
+    medium: "w-3 h-3",
     large: "w-5 h-5"
   };
   
   const triangleSizes = {
-    small: "w-4 h-4",
-    medium: "w-5 h-5",
+    small: "w-3 h-3",
+    medium: "w-4 h-4",
     large: "w-6 h-6"
   };
   
   const asteriskSizes = {
-    small: "w-5 h-5",
-    medium: "w-7 h-7",
+    small: "w-4 h-4",
+    medium: "w-5 h-5",
     large: "w-8 h-8"
   };
 
@@ -59,7 +59,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
       return (
         <div className="flex flex-col items-center justify-center">
           {icon}
-          <div className="text-xs mt-1">{label}</div>
+          <div className={`text-center mt-0.5 leading-tight ${size === 'small' ? 'text-[10px]' : 'text-xs'}`}>{label}</div>
         </div>
       );
     }
@@ -212,18 +212,18 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
       }
     },
     "5 Star General": () => {
-      // Use one size smaller for 5 star general
-      const fiveStarSize = size === "large" ? starSizes.medium : size === "medium" ? starSizes.small : "w-2.5 h-2.5";
+      // Use one size smaller for 5 star general  
+      const fiveStarSize = size === "large" ? starSizes.medium : size === "medium" ? starSizes.small : "w-2 h-2";
       
       if (showLabel) {
         const iconElement = (
           <div className="flex flex-col items-center gap-0.5">
-            <div className="flex gap-1">
+            <div className="flex gap-0.5">
               <Star className={fiveStarSize} fill="currentColor" />
               <Star className={fiveStarSize} fill="currentColor" />
               <Star className={fiveStarSize} fill="currentColor" />
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-0.5">
               <Star className={fiveStarSize} fill="currentColor" />
               <Star className={fiveStarSize} fill="currentColor" />
             </div>
