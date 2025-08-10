@@ -16,6 +16,7 @@ import type * as fileUpload from "../fileUpload.js";
 import type * as games from "../games.js";
 import type * as http from "../http.js";
 import type * as lobbies from "../lobbies.js";
+import type * as messages from "../messages.js";
 import type * as migrations from "../migrations.js";
 import type * as profiles from "../profiles.js";
 import type * as router from "../router.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   games: typeof games;
   http: typeof http;
   lobbies: typeof lobbies;
+  messages: typeof messages;
   migrations: typeof migrations;
   profiles: typeof profiles;
   router: typeof router;

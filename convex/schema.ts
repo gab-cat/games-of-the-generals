@@ -28,7 +28,8 @@ const applicationTables = {
     .index("by_wins", ["wins"])
     .index("by_username", ["username"])
     .index("by_games_wins", ["gamesPlayed", "wins"]) // Compound index for better leaderboard queries
-    .index("by_rank_wins", ["rank", "wins"]), // Index for ranking within same rank
+    .index("by_rank_wins", ["rank", "wins"]) // Index for ranking within same rank
+    .index("by_active_players", ["gamesPlayed", "username"]), // For finding active players
 
   // User achievements
   achievements: defineTable({
@@ -61,7 +62,9 @@ const applicationTables = {
     .index("by_host", ["hostId"])
     .index("by_code", ["lobbyCode"])
     .index("by_status_private", ["status", "isPrivate"])
-    .index("by_host_status", ["hostId", "status"]),
+    .index("by_host_status", ["hostId", "status"])
+    .index("by_status_created", ["status", "createdAt"]) // For sorting waiting lobbies by creation time
+    .index("by_waiting_public", ["status", "isPrivate", "createdAt"]), // Optimized for public lobby list
 
     // Active games
   games: defineTable({
@@ -124,7 +127,9 @@ const applicationTables = {
     .index("by_player2", ["player2Id"])
     .index("by_status_finished", ["status", "finishedAt"])
     .index("by_player1_status", ["player1Id", "status"])
-    .index("by_player2_status", ["player2Id", "status"]),
+    .index("by_player2_status", ["player2Id", "status"])// For recent finished games
+    .index("by_player1_finished", ["player1Id", "status", "finishedAt"]) // Player history optimization
+    .index("by_player2_finished", ["player2Id", "status", "finishedAt"]), // Player history optimization
 
   // Game moves history
   moves: defineTable({
@@ -176,6 +181,64 @@ const applicationTables = {
     .index("by_user", ["userId"])
     .index("by_code", ["verificationCode"])
     .index("by_user_verified", ["userId", "verified"]),
+
+  // Direct messages between users
+  messages: defineTable({
+    senderId: v.id("users"),
+    senderUsername: v.string(),
+    recipientId: v.id("users"),
+    recipientUsername: v.string(),
+    content: v.string(),
+    messageType: v.union(
+      v.literal("text"),
+      v.literal("lobby_invite"),
+      v.literal("game_invite")
+    ),
+    // For lobby invites
+    lobbyId: v.optional(v.id("lobbies")),
+    lobbyCode: v.optional(v.string()),
+    lobbyName: v.optional(v.string()),
+    // For game invites (spectate)
+    gameId: v.optional(v.id("games")),
+    // Metadata
+    timestamp: v.number(),
+    readAt: v.optional(v.number()),
+    editedAt: v.optional(v.number()),
+    deliveredAt: v.optional(v.number()),
+  })
+    .index("by_recipient", ["recipientId"])
+    .index("by_sender", ["senderId"])
+    .index("by_conversation", ["senderId", "recipientId"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_recipient_read", ["recipientId", "readAt"])
+    .index("by_conversation_timestamp", ["senderId", "recipientId", "timestamp"]) // For efficient conversation queries
+    .index("by_recipient_timestamp", ["recipientId", "timestamp"]) // For recipient message history
+    .index("by_sender_timestamp", ["senderId", "timestamp"]) // For sender message history
+    .index("by_message_type", ["messageType", "timestamp"]) // For filtering by message type
+    .index("by_unread_messages", ["recipientId", "readAt", "timestamp"]), // For efficient unread queries
+
+  // Chat conversations metadata
+  conversations: defineTable({
+    participant1Id: v.id("users"),
+    participant1Username: v.string(),
+    participant2Id: v.id("users"),
+    participant2Username: v.string(),
+    lastMessageId: v.optional(v.id("messages")),
+    lastMessageAt: v.number(),
+    participant1LastRead: v.optional(v.number()),
+    participant2LastRead: v.optional(v.number()),
+    participant1UnreadCount: v.number(),
+    participant2UnreadCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_participant1", ["participant1Id"])
+    .index("by_participant2", ["participant2Id"])
+    .index("by_last_message", ["lastMessageAt"])
+    .index("by_participants", ["participant1Id", "participant2Id"])
+    .index("by_participant1_last_message", ["participant1Id", "lastMessageAt"]) // For efficient sorting
+    .index("by_participant2_last_message", ["participant2Id", "lastMessageAt"]) // For efficient sorting
+    .index("by_participant1_unread", ["participant1Id", "participant1UnreadCount"]) // For unread optimization
+    .index("by_participant2_unread", ["participant2Id", "participant2UnreadCount"]), // For unread optimization
 };
 
 export default defineSchema({

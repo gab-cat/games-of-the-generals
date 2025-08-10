@@ -20,9 +20,10 @@ interface Profile {
 
 interface LobbyPageProps {
   profile: Profile;
+  onOpenMessaging?: (lobbyId?: Id<"lobbies">) => void;
 }
 
-export function LobbyPage({ profile }: LobbyPageProps) {
+export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
   const [activeTab, setActiveTab] = useState<"lobbies" | "spectate">("lobbies");
   const navigate = useNavigate();
 
@@ -49,7 +50,8 @@ export function LobbyPage({ profile }: LobbyPageProps) {
   };
 
   const handleSpectateGame = (gameId: string) => {
-    void navigate({ to: "/spectate", search: { gameId } });
+    // Use the same mutation as spectate by ID to properly validate and join
+    spectateByIdMutation.mutate({ gameId: gameId as Id<"games"> });
   };
 
   // Check if user has an active game and redirect if needed
@@ -73,6 +75,7 @@ export function LobbyPage({ profile }: LobbyPageProps) {
         onSpectateGame={handleSpectateGame}
         startGameMutation={startGameMutation}
         spectateByIdMutation={spectateByIdMutation}
+        onOpenMessaging={onOpenMessaging}
       />
     </motion.div>
   );

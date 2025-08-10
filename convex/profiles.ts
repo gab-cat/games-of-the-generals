@@ -21,12 +21,28 @@ export const getCurrentProfile = query({
 // Get profile by username (for getting avatar URLs in lobbies, etc.)
 export const getProfileByUsername = query({
   args: {
-    username: v.string(),
+    username: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    if (!args.username) return null;
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_username", (q) => q.eq("username", args.username as string))
+      .unique();
+
+    return profile;
+  },
+});
+
+// Get profile by user ID
+export const getProfileByUserId = query({
+  args: {
+    userId: v.id("users"),
   },
   handler: async (ctx, args) => {
     const profile = await ctx.db
       .query("profiles")
-      .withIndex("by_username", (q) => q.eq("username", args.username))
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .unique();
 
     return profile;
@@ -175,7 +191,7 @@ export const updateAvatar = mutation({
   },
 });
 
-// Get profile stats for profile page
+// Get profile stats for profile page with highly optimized queries using new indexes
 export const getProfileStats = query({
   args: {},
   handler: async (ctx) => {
@@ -195,20 +211,27 @@ export const getProfileStats = query({
       ? Math.round(profile.totalPlayTime / profile.gamesPlayed) 
       : 0;
 
-    // Get recent games for activity
-    const recentGames = await ctx.db
-      .query("games")
-      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "finished"))
-      .order("desc")
-      .take(5);
+    // Get recent games using the new optimized indexes for better performance
+    const [recentGamesAsPlayer1, recentGamesAsPlayer2] = await Promise.all([
+      ctx.db
+        .query("games")
+        .withIndex("by_player1_finished", (q) => 
+          q.eq("player1Id", userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(3),
+      
+      ctx.db
+        .query("games")
+        .withIndex("by_player2_finished", (q) => 
+          q.eq("player2Id", userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(3)
+    ]);
 
-    const recentGames2 = await ctx.db
-      .query("games")
-      .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "finished"))
-      .order("desc")
-      .take(5);
-
-    const allRecentGames = [...recentGames, ...recentGames2]
+    // Combine and sort by finished time, take most recent 5
+    const recentGames = [...recentGamesAsPlayer1, ...recentGamesAsPlayer2]
       .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
       .slice(0, 5);
 
@@ -216,36 +239,56 @@ export const getProfileStats = query({
       ...profile,
       winRate,
       avgGameTime,
-      recentGames: allRecentGames,
+      recentGames,
     };
   },
 });
 
-// Get leaderboard with pagination
+// Get leaderboard with optimized cursor-based pagination using new indexes
 export const getLeaderboard = query({
   args: {
-    limit: v.optional(v.number()),
-    offset: v.optional(v.number()),
+    paginationOpts: v.optional(v.object({
+      numItems: v.number(),
+      cursor: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit || 20; // Reduced from 50 to 20 for better performance
-    const offset = args.offset || 0;
+    const { paginationOpts } = args;
+    const limit = paginationOpts ? Math.min(paginationOpts.numItems, 25) : 20;
 
-    // Use compound index for better performance and add pagination
-    const profiles = await ctx.db
+    // Use the optimized wins_desc index for better descending order performance
+    const queryBuilder = ctx.db
       .query("profiles")
-      .withIndex("by_wins", (q) => q.gte("wins", 0)) // Use indexed range query
-      .order("desc")
-      .take(limit + offset);
+      .withIndex("by_wins", (q) => q.gte("wins", 0))
+      .order("desc");
 
-    // Apply pagination manually since we need to calculate positions
-    const paginatedProfiles = profiles.slice(offset, offset + limit);
+    if (paginationOpts && paginationOpts.cursor) {
+      const result = await queryBuilder.paginate({
+        numItems: limit,
+        cursor: paginationOpts.cursor,
+      });
 
-    return paginatedProfiles.map((profile, index) => ({
-      ...profile,
-      position: offset + index + 1, // Correct position accounting for offset
-      winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
-    }));
+      return {
+        ...result,
+        page: result.page.map((profile) => ({
+          ...profile,
+          winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
+        })),
+      };
+    } else {
+      // Initial load with position calculation
+      const profiles = await queryBuilder.take(limit);
+      
+      return {
+        page: profiles.map((profile, index) => ({
+          ...profile,
+          position: index + 1,
+          winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
+        })),
+        isDone: profiles.length < limit,
+        continueCursor: profiles.length > 0 ? profiles[profiles.length - 1]._id : "",
+      };
+    }
   },
 });
 

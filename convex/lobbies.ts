@@ -2,7 +2,7 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// Get all available lobbies with pagination
+// Get all available lobbies with optimized cursor-based pagination using new indexes
 export const getLobbies = query({
   args: {
     paginationOpts: v.optional(v.object({
@@ -12,25 +12,28 @@ export const getLobbies = query({
   },
   handler: async (ctx, args) => {
     const { paginationOpts } = args;
+    const limit = paginationOpts ? Math.min(paginationOpts.numItems, 20) : 15;
     
-    // Use compound index for better performance
+    // Use the new optimized waiting_public index for better performance
     const queryBuilder = ctx.db
       .query("lobbies")
-      .withIndex("by_status_private", (q) => q.eq("status", "waiting").eq("isPrivate", false))
-      .order("desc");
+      .withIndex("by_waiting_public", (q) => 
+        q.eq("status", "waiting").eq("isPrivate", false)
+      )
+      .order("desc"); // Order by creation time descending
 
-    if (paginationOpts) {
-      const paginationOptions = {
-        numItems: paginationOpts.numItems,
-        cursor: paginationOpts.cursor ?? null,
-      };
-      return await queryBuilder.paginate(paginationOptions);
+    if (paginationOpts && paginationOpts.cursor) {
+      return await queryBuilder.paginate({
+        numItems: limit,
+        cursor: paginationOpts.cursor,
+      });
     } else {
-      const lobbies = await queryBuilder.collect();
+      // Initial load
+      const lobbies = await queryBuilder.take(limit);
       return {
         page: lobbies,
-        isDone: true,
-        continueCursor: "",
+        isDone: lobbies.length < limit,
+        continueCursor: lobbies.length > 0 ? lobbies[lobbies.length - 1]._id : "",
       };
     }
   },
@@ -66,14 +69,23 @@ export const createLobby = mutation({
 
     if (!profile) throw new Error("Profile not found");
 
-    // Check if user already has an active lobby
+    // Check if user already has an active lobby - optimized query
     const existingLobby = await ctx.db
       .query("lobbies")
-      .withIndex("by_host", (q) => q.eq("hostId", userId))
-      .filter((q) => q.neq(q.field("status"), "finished"))
+      .withIndex("by_host_status", (q) => q.eq("hostId", userId).eq("status", "waiting"))
       .unique();
 
-    if (existingLobby) {
+    // Also check for playing status if waiting doesn't exist
+    if (!existingLobby) {
+      const playingLobby = await ctx.db
+        .query("lobbies")
+        .withIndex("by_host_status", (q) => q.eq("hostId", userId).eq("status", "playing"))
+        .unique();
+      
+      if (playingLobby) {
+        throw new Error("You already have an active lobby");
+      }
+    } else {
       throw new Error("You already have an active lobby");
     }
 
@@ -116,7 +128,7 @@ export const getUserActiveLobby = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // Use compound index for better performance
+    // First check if user is a host
     let lobby = await ctx.db
       .query("lobbies")
       .withIndex("by_host_status", (q) => q.eq("hostId", userId).eq("status", "waiting"))
@@ -126,6 +138,15 @@ export const getUserActiveLobby = query({
       lobby = await ctx.db
         .query("lobbies")
         .withIndex("by_host_status", (q) => q.eq("hostId", userId).eq("status", "playing"))
+        .unique();
+    }
+
+    // If not found as host, check if user is a player in any lobby
+    if (!lobby) {
+      lobby = await ctx.db
+        .query("lobbies")
+        .filter((q) => q.eq(q.field("playerId"), userId))
+        .filter((q) => q.or(q.eq(q.field("status"), "waiting"), q.eq(q.field("status"), "playing")))
         .unique();
     }
 
@@ -169,7 +190,7 @@ export const joinLobby = mutation({
     await ctx.db.patch(args.lobbyId, {
       playerId: userId,
       playerUsername: profile.username,
-      status: "playing",
+      // Keep status as "waiting" until game actually starts
     });
 
     return args.lobbyId;
@@ -216,7 +237,7 @@ export const joinLobbyByCode = mutation({
     await ctx.db.patch(lobby._id, {
       playerId: userId,
       playerUsername: profile.username,
-      status: "playing",
+      // Keep status as "waiting" until game actually starts
     });
 
     return lobby._id;

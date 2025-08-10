@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useConvexQuery, useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
+import { GameStartCountdownModal } from "../../components/GameStartCountdownModal";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -24,11 +25,12 @@ interface Profile {
 
 interface LobbyListTabProps {
   profile: Profile;
-  onGameStart: (gameId: string) => void;
+  onGameStart?: (gameId: string) => void;
   startGameMutation: any;
+  onOpenMessaging?: (lobbyId?: Id<"lobbies">) => void;
 }
 
-export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyListTabProps) {
+export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMutation, onOpenMessaging }: LobbyListTabProps) {
   const [showCreateLobby, setShowCreateLobby] = useState(false);
   const [showJoinByCode, setShowJoinByCode] = useState(false);
   const [lobbyName, setLobbyName] = useState("");
@@ -38,6 +40,20 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
   const [joinCode, setJoinCode] = useState("");
   const [lobbiesCursor, setLobbiesCursor] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [gameStartData, setGameStartData] = useState<{
+    isOpen: boolean;
+    player1Username: string;
+    player2Username: string;
+    currentUsername: string;
+  }>({
+    isOpen: false,
+    player1Username: "",
+    player2Username: "",
+    currentUsername: "",
+  });
+
+  // Track if we've already shown countdown for this lobby state to prevent duplicates
+  const countdownShownRef = useRef<string | null>(null);
 
   const LOBBIES_PER_PAGE = 10;
 
@@ -49,6 +65,110 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
   });
 
   const { data: activeLobby } = useConvexQuery(api.lobbies.getUserActiveLobby);
+  const { data: currentGame } = useConvexQuery(api.games.getCurrentUserGame);
+
+  // Show countdown modal when lobby becomes full (for host)
+  useEffect(() => {
+    const lobbyKey = `${activeLobby?._id}-${activeLobby?.playerId}-host`;
+    
+    if (activeLobby && 
+        activeLobby.playerId && 
+        activeLobby.hostId === profile.userId && 
+        !gameStartData.isOpen && 
+        !currentGame &&
+        countdownShownRef.current !== lobbyKey) { // Only if no game has started yet
+      
+      countdownShownRef.current = lobbyKey;
+      setGameStartData({
+        isOpen: true,
+        player1Username: activeLobby.hostUsername,
+        player2Username: activeLobby.playerUsername!,
+        currentUsername: profile.username,
+      });
+
+      // Auto-start the game after 10 seconds
+      setTimeout(() => {
+        if (activeLobby) {
+          void startGameMutation.mutate({ lobbyId: activeLobby._id }, {
+            onSuccess: (gameId: string) => {
+              toast.success("Battle has begun!");
+              _onGameStart?.(gameId);
+            },
+            onError: () => {
+              toast.error("Failed to start game");
+              setGameStartData(prev => ({ ...prev, isOpen: false }));
+            }
+          });
+        }
+      }, 10000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLobby, profile.userId, profile.username, currentGame, startGameMutation, _onGameStart]);
+
+  // Show countdown for non-host when they are in a lobby
+  useEffect(() => {
+    // Skip if already showing countdown
+    if (gameStartData.isOpen) return;
+    
+    // For non-host players in an active lobby, show countdown immediately
+    if (activeLobby && 
+        activeLobby.hostId !== profile.userId && 
+        !currentGame) {
+      
+      const lobbyKey = `${activeLobby._id}-non-host-player`;
+      
+      if (countdownShownRef.current !== lobbyKey) {
+        countdownShownRef.current = lobbyKey;
+        setGameStartData({
+          isOpen: true,
+          player1Username: activeLobby.hostUsername,
+          player2Username: activeLobby.playerUsername || profile.username,
+          currentUsername: profile.username,
+        });
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeLobby, profile.userId, profile.username, currentGame]);
+
+  // Monitor for game creation - this will show countdown for the non-host player when game is created
+  useEffect(() => {
+    const gameKey = `${currentGame?._id}-setup`;
+    
+    if (currentGame && 
+        currentGame.status === "setup" && 
+        activeLobby && 
+        activeLobby.playerId &&
+        activeLobby.hostId !== profile.userId && // Only for non-host player
+        !gameStartData.isOpen &&
+        countdownShownRef.current !== gameKey) {
+      
+      countdownShownRef.current = gameKey;
+      setGameStartData({
+        isOpen: true,
+        player1Username: currentGame.player1Username,
+        player2Username: currentGame.player2Username,
+        currentUsername: profile.username,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGame, activeLobby, profile.userId, profile.username]);
+
+  // Reset countdown tracking when modal closes
+  useEffect(() => {
+    if (!gameStartData.isOpen) {
+      countdownShownRef.current = null;
+    }
+  }, [gameStartData.isOpen]);
+
+
+
+  const handleCountdownComplete = () => {
+    setGameStartData(prev => ({ ...prev, isOpen: false }));
+    // Navigate to the game if we have an active game
+    if (currentGame) {
+      _onGameStart?.(currentGame._id);
+    }
+  };
 
   const createLobbyMutation = useConvexMutationWithQuery(api.lobbies.createLobby, {
     onSuccess: (newLobby) => {
@@ -110,20 +230,13 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
     try {
       await new Promise<void>((resolve, reject) => {
         joinLobbyMutation.mutate({ lobbyId }, {
-          onSuccess: () => resolve(),
+          onSuccess: () => {
+            toast.success("Joined lobby! Waiting for host to start the game...");
+            resolve();
+          },
           onError: reject
         });
       });
-      
-      const gameId = await new Promise<string>((resolve, reject) => {
-        startGameMutation.mutate({ lobbyId }, {
-          onSuccess: (result: any) => resolve(result as string),
-          onError: reject
-        });
-      });
-      
-      onGameStart(gameId);
-      toast.success("Joined game!");
     } catch {
       toast.error("Failed to join lobby");
     }
@@ -134,24 +247,17 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
     if (!joinCode.trim()) return;
 
     try {
-      const lobbyId = await new Promise<Id<"lobbies">>((resolve, reject) => {
+      await new Promise<Id<"lobbies">>((resolve, reject) => {
         joinLobbyByCodeMutation.mutate({ lobbyCode: joinCode.trim().toUpperCase() }, {
-          onSuccess: (result: any) => resolve(result as Id<"lobbies">),
+          onSuccess: (result: any) => {
+            setJoinCode("");
+            setShowJoinByCode(false);
+            toast.success("Joined private lobby! Waiting for host to start the game...");
+            resolve(result as Id<"lobbies">);
+          },
           onError: reject
         });
       });
-      
-      const gameId = await new Promise<string>((resolve, reject) => {
-        startGameMutation.mutate({ lobbyId }, {
-          onSuccess: (result: any) => resolve(result as string),
-          onError: reject
-        });
-      });
-      
-      onGameStart(gameId);
-      setJoinCode("");
-      setShowJoinByCode(false);
-      toast.success("Joined private lobby!");
     } catch {
       toast.error("Failed to join lobby");
     }
@@ -168,6 +274,10 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
       // Reset loading state after a brief delay to show animation
       setTimeout(() => setIsLoadingMore(false), 500);
     }
+  };
+
+  const handleInviteToLobby = (lobbyId: Id<"lobbies">) => {
+    onOpenMessaging?.(lobbyId);
   };
 
   const copyLobbyCode = (code: string) => {
@@ -211,6 +321,39 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
                 <Badge variant="secondary" className="bg-blue-500/20 text-blue-200 border-blue-500/30">
                   {activeLobby.playerId ? "2/2" : "1/2"}
                 </Badge>
+                
+                {/* Game Starting Indicator - show when countdown is active */}
+                {activeLobby.hostId === profile.userId && activeLobby.playerId && gameStartData.isOpen && (
+                  <div className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-orange-300/30 border-t-orange-300 rounded-full animate-spin" />
+                    Battle Starting...
+                  </div>
+                )}
+                
+                {/* Ready indicator for non-host when countdown is active */}
+                {activeLobby.hostId !== profile.userId && activeLobby.playerId && gameStartData.isOpen && (
+                  <div className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-blue-300/30 border-t-blue-300 rounded-full animate-spin" />
+                    Battle Starting...
+                  </div>
+                )}
+                
+                {/* Start Game Button - only show for host when lobby is full and no countdown active */}
+                {activeLobby.hostId === profile.userId && activeLobby.playerId && !gameStartData.isOpen && (
+                  <div className="bg-green-500/20 text-green-300 border border-green-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                    Ready to Start
+                  </div>
+                )}
+                
+                {/* Waiting indicator for non-host when lobby is full but no countdown */}
+                {activeLobby.hostId !== profile.userId && activeLobby.playerId && !gameStartData.isOpen && (
+                  <div className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+                    Waiting for Host...
+                  </div>
+                )}
+                
                 <Button
                   variant="destructive"
                   size="sm"
@@ -451,6 +594,7 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
                 currentUserId={profile.userId}
                 onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
                 onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
+                onInviteToLobby={handleInviteToLobby}
                 isJoining={joinLobbyMutation.isPending || startGameMutation.isPending}
                 isLeaving={leaveLobbyMutation.isPending}
               />
@@ -482,6 +626,15 @@ export function LobbyListTab({ profile, onGameStart, startGameMutation }: LobbyL
           </>
         )}
       </div>
+
+      {/* Game Start Countdown Modal */}
+      <GameStartCountdownModal
+        isOpen={gameStartData.isOpen}
+        onComplete={handleCountdownComplete}
+        player1Username={gameStartData.player1Username}
+        player2Username={gameStartData.player2Username}
+        currentUsername={gameStartData.currentUsername}
+      />
     </>
   );
 }

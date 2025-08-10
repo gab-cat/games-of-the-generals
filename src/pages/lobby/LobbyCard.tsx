@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { motion } from "framer-motion";
-import { Users } from "lucide-react";
+import { Users, MessageCircle } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +25,12 @@ interface LobbyCardProps {
   currentUserId: Id<"users">;
   onJoin: (lobbyId: Id<"lobbies">) => void;
   onLeave: (lobbyId: Id<"lobbies">) => void;
+  onInviteToLobby?: (lobbyId: Id<"lobbies">) => void;
   isJoining?: boolean;
   isLeaving?: boolean;
 }
 
-export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, isJoining, isLeaving }: LobbyCardProps) {
+export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInviteToLobby, isJoining, isLeaving }: LobbyCardProps) {
   // Fetch host profile for avatar
   const { data: hostProfile } = useConvexQuery(api.profiles.getProfileByUsername, { 
     username: lobby.hostUsername 
@@ -90,6 +91,19 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, isJoin
             <Badge variant={lobby.playerId ? "destructive" : "secondary"} className={lobby.playerId ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-green-500/20 text-green-300 border-green-500/30"}>
               {lobby.playerId ? "2/2" : "1/2"}
             </Badge>
+            
+            {/* Invite button - only visible for host */}
+            {lobby.hostId === currentUserId && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30"
+                onClick={() => onInviteToLobby?.(lobby._id)}
+              >
+                <MessageCircle className="h-4 w-4" />
+              </Button>
+            )}
+
             {lobby.hostId === currentUserId ? (
               <Button
                 variant="destructive"

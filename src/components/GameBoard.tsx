@@ -21,7 +21,8 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  AlertCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
@@ -201,10 +202,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
 
 
-  const { data: moves, isPending: isLoadingMoves } = useConvexQuery(
+  const { data: movesData, isPending: isLoadingMoves } = useConvexQuery(
     api.games.getGameMoves, 
     { gameId }
   );
+  
+  // Extract moves from paginated response
+  const moves = Array.isArray(movesData) ? movesData : movesData?.page || [];
   
   const { data: matchResult } = useConvexQuery(
     api.games.getMatchResult, 
@@ -801,11 +805,11 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   ]);
 
   // If not part of the game, show toast and redirect to lobby
-  if (!game) {
-    toast.error("You are not part of this game");
-    onBackToLobby();
-    return null;
-  }
+  // if (!game) {
+  //   toast.error("You are not part of this game");
+  //   onBackToLobby();
+  //   return null;
+  // }
 
 
   if (isLoadingGame) {
@@ -827,15 +831,51 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     );
   }
 
+  // show message that the game might not exist or not a player of it
   if (!game) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="animate-spin rounded-full h-12 w-12 border-2 border-blue-400 border-t-transparent"
-        />
-      </div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex justify-center items-center min-h-[60vh]"
+      >
+        <Card className="w-full max-w-md bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+          <CardContent className="text-center p-8">
+            <motion.div
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+              className="mx-auto mb-6"
+            >
+              <div className="w-16 h-16 bg-red-500/20 backdrop-blur-sm border mx-auto border-red-500/30 rounded-xl flex items-center justify-center">
+                <AlertCircle className="h-8 w-8 text-red-400" />
+              </div>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="space-y-4"
+            >
+              <h3 className="text-xl font-semibold text-white/90">Game Not Found</h3>
+              <p className="text-white/60 leading-relaxed">
+                This game doesn't exist or you're not authorized to view it. The game may have been deleted or you might not be a participant.
+              </p>
+              
+              <div className="pt-4">
+                <Button 
+                  onClick={onBackToLobby} 
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Return to Lobby
+                </Button>
+              </div>
+            </motion.div>
+          </CardContent>
+        </Card>
+      </motion.div>
     );
   }
 
@@ -1354,7 +1394,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
               {game.status === "playing" && (
                 <div className="text-sm text-white/60">
-                  Turn {Math.floor(((moves?.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
+                  Turn {Math.floor(((moves.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
                 </div>
               )}
             </div>
@@ -1705,7 +1745,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               </div>
             ) : (
               <div className="max-h-32 overflow-y-auto space-y-2">
-                {moves && moves.slice(-5).reverse().map((move) => (
+                {moves && moves.slice(-5).reverse().map((move: any) => (
                   <motion.div
                     key={move._id}
                     initial={{ opacity: 0, x: -20 }}

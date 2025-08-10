@@ -38,7 +38,7 @@ export function SignInForm() {
   });
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex -mt-8">
       {/* Left Side - Premium Design Section */}
       <motion.div 
         className="flex-1 relative overflow-hidden bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900"

@@ -58,7 +58,7 @@ export const startGame = mutation({
     const lobby = await ctx.db.get(args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
-    if (lobby.status !== "playing" || !lobby.playerId) {
+    if (lobby.status !== "waiting" || !lobby.playerId) {
       throw new Error("Lobby is not ready for game");
     }
 
@@ -97,9 +97,10 @@ export const startGame = mutation({
       moveCount: 0, // Initialize move count
     });
 
-    // Update lobby with game reference
+    // Update lobby with game reference and change status to playing
     await ctx.db.patch(args.lobbyId, {
       gameId,
+      status: "playing",
     });
 
     return gameId;
@@ -610,11 +611,15 @@ export const makeMove = mutation({
 export const getGameMoves = query({
   args: {
     gameId: v.id("games"),
-    limit: v.optional(v.number()), // Optional limit for performance
+    paginationOpts: v.optional(v.object({
+      numItems: v.number(),
+      cursor: v.optional(v.string()),
+    })),
     moveTypes: v.optional(v.array(v.string())), // Optional filter by move types
   },
   handler: async (ctx, args) => {
-    const limit = Math.min(args.limit || 100, 500); // Cap at 500 moves max
+    const { paginationOpts } = args;
+    const limit = paginationOpts ? Math.min(paginationOpts.numItems, 100) : 50;
     
     let queryBuilder = ctx.db
       .query("moves")
@@ -631,15 +636,36 @@ export const getGameMoves = query({
         .order("asc");
     }
 
-    // Apply limit for performance
-    const moves = await queryBuilder.take(limit);
+    if (paginationOpts && paginationOpts.cursor) {
+      const result = await queryBuilder.paginate({
+        numItems: limit,
+        cursor: paginationOpts.cursor,
+      });
 
-    // Filter by move types if multiple types specified (less common case)
-    if (args.moveTypes && args.moveTypes.length > 1) {
-      return moves.filter(move => args.moveTypes!.includes(move.moveType));
+      // Filter by move types if multiple types specified
+      if (args.moveTypes && args.moveTypes.length > 1) {
+        return {
+          ...result,
+          page: result.page.filter(move => args.moveTypes!.includes(move.moveType)),
+        };
+      }
+      
+      return result;
+    } else {
+      // Initial load
+      const moves = await queryBuilder.take(limit);
+
+      // Filter by move types if multiple types specified (less common case)
+      const filteredMoves = args.moveTypes && args.moveTypes.length > 1
+        ? moves.filter(move => args.moveTypes!.includes(move.moveType))
+        : moves;
+
+      return {
+        page: filteredMoves,
+        isDone: filteredMoves.length < limit,
+        continueCursor: filteredMoves.length > 0 ? filteredMoves[filteredMoves.length - 1]._id : "",
+      };
     }
-
-    return moves;
   },
 });
 
@@ -953,19 +979,21 @@ export const getMatchResult = query({
   },
 });
 
-// Get match history for a user
+// Get match history for a user with optimized cursor-based pagination
 export const getMatchHistory = query({
   args: {
     userId: v.optional(v.id("users")),
-    limit: v.optional(v.number()),
-    offset: v.optional(v.number()),
+    paginationOpts: v.optional(v.object({
+      numItems: v.number(),
+      cursor: v.optional(v.string()),
+    })),
   },
   handler: async (ctx, args) => {
     const userId = args.userId || await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const limit = args.limit || 10;
-    const offset = args.offset || 0;
+    const { paginationOpts } = args;
+    const limit = paginationOpts ? Math.min(paginationOpts.numItems, 20) : 10;
 
     // Get user's profile once for rank info
     const profile = await ctx.db
@@ -973,23 +1001,29 @@ export const getMatchHistory = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
-    // Use indexed queries for better performance
-    const player1Games = await ctx.db
-      .query("games")
-      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "finished"))
-      .order("desc")
-      .take(limit + offset);
+    // Use the new optimized finished game indexes for better performance
+    const [player1Games, player2Games] = await Promise.all([
+      ctx.db
+        .query("games")
+        .withIndex("by_player1_finished", (q) => 
+          q.eq("player1Id", userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(limit),
 
-    const player2Games = await ctx.db
-      .query("games")
-      .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "finished"))
-      .order("desc")
-      .take(limit + offset);
+      ctx.db
+        .query("games")
+        .withIndex("by_player2_finished", (q) => 
+          q.eq("player2Id", userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(limit)
+    ]);
 
-    // Combine and sort by creation time
+    // Combine and sort by finished time (most recent first)
     const allGames = [...player1Games, ...player2Games]
-      .sort((a, b) => b.createdAt - a.createdAt)
-      .slice(offset, offset + limit);
+      .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
+      .slice(0, limit);
 
     // Transform games into match history format - but minimize additional queries
     const matchHistory = await Promise.all(
@@ -1018,25 +1052,17 @@ export const getMatchHistory = query({
       })
     );
 
-    // Get total count more efficiently
-    const totalPlayer1 = await ctx.db
-      .query("games")
-      .withIndex("by_player1_status", (q) => q.eq("player1Id", userId).eq("status", "finished"))
-      .collect()
-      .then(games => games.length);
+    // For cursor-based pagination, we don't need total count calculation for better performance
+    // Total count calculation is expensive and rarely needed for infinite scroll
     
-    const totalPlayer2 = await ctx.db
-      .query("games")
-      .withIndex("by_player2_status", (q) => q.eq("player2Id", userId).eq("status", "finished"))
-      .collect()
-      .then(games => games.length);
-
-    const totalGames = totalPlayer1 + totalPlayer2;
-
     return {
+      page: matchHistory,
+      isDone: matchHistory.length < limit,
+      continueCursor: matchHistory.length > 0 ? matchHistory[matchHistory.length - 1]._id : "",
+      // Legacy compatibility - total will be calculated only if needed
       matches: matchHistory,
-      total: totalGames,
-      hasMore: offset + limit < totalGames,
+      total: matchHistory.length, // Simplified - shows current page count
+      hasMore: matchHistory.length >= limit,
     };
   },
 });

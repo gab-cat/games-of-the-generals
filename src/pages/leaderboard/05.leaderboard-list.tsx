@@ -6,13 +6,13 @@ import { LeaderboardLoading } from "./03.leaderboard-loading";
 import { LeaderboardError } from "./04.leaderboard-error";
 
 export function LeaderboardList() {
-  const { data: leaderboard, isPending: isLoadingLeaderboard, error: leaderboardError } = useConvexQuery(
+  const { data: leaderboardData, isPending: isLoadingLeaderboard, error: leaderboardError } = useConvexQuery(
     api.profiles.getLeaderboard, 
-    { 
-      limit: 15, // Load top 15 instead of 50 for better performance
-      offset: 0 
-    }
+    {} // Use default pagination settings
   );
+
+  // Extract leaderboard from paginated response
+  const leaderboard = Array.isArray(leaderboardData) ? leaderboardData : leaderboardData?.page || [];
 
   if (isLoadingLeaderboard) {
     return <LeaderboardLoading />;
@@ -31,7 +31,7 @@ export function LeaderboardList() {
       <LeaderboardHeader />
       
       <div className="space-y-3">
-        {leaderboard.map((player, index) => (
+        {leaderboard.map((player: any, index: number) => (
           <PlayerRow 
             key={player._id} 
             player={player} 

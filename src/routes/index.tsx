@@ -6,10 +6,29 @@ import { LobbyPage } from '../pages/lobby/00.lobby-page'
 import { useConvexQuery } from '../lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
 import { motion } from 'framer-motion'
+import { Id } from '../../convex/_generated/dataModel'
+import { useEffect } from 'react'
+
+type IndexSearch = {
+  lobbyId?: string
+}
 
 function IndexComponent() {
+  const { lobbyId } = Route.useSearch()
   const { isPending: isLoadingUser } = useConvexQuery(api.auth.loggedInUser)
   const { data: profile, isPending: isLoadingProfile } = useConvexQuery(api.profiles.getCurrentProfile)
+
+  const handleOpenMessaging = (lobbyId?: Id<"lobbies">) => {
+    if (typeof window !== 'undefined' && (window as any).openMessagingWithLobby) {
+      (window as any).openMessagingWithLobby(lobbyId)
+    }
+  }
+
+  // Handle lobbyId from URL parameter - Only for navigation, not for opening messaging
+  useEffect(() => {
+    // Remove the automatic messaging panel opening
+    // The lobbyId parameter is now only used for navigation after joining a lobby
+  }, [lobbyId, profile]);
 
   if (isLoadingUser || isLoadingProfile) {
     return (
@@ -33,7 +52,7 @@ function IndexComponent() {
                 {!profile ? (
           <SetupPage />
         ) : (
-          <LobbyPage profile={profile} />
+          <LobbyPage profile={profile} onOpenMessaging={handleOpenMessaging} />
         )}
       </Authenticated>
     </>
@@ -42,4 +61,9 @@ function IndexComponent() {
 
 export const Route = createFileRoute('/')({
   component: IndexComponent,
+  validateSearch: (search: Record<string, unknown>): IndexSearch => {
+    return {
+      lobbyId: typeof search.lobbyId === 'string' ? search.lobbyId : undefined,
+    }
+  },
 })

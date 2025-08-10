@@ -16,25 +16,46 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { UserAvatar } from "./UserAvatar";
+import { MessageButton } from "./messaging/MessageButton";
+import { MessagingPanel } from "./messaging/MessagingPanel";
 import { cn } from "../lib/utils";
 import { useState, useEffect } from "react";
+import { Id } from "../../convex/_generated/dataModel";
 
 interface LayoutProps {
   children: React.ReactNode;
   user?: {
     username: string;
   } | null;
+  onOpenMessagingWithLobby?: (handler: (lobbyId: Id<"lobbies">) => void) => void;
 }
 
-export function Layout({ children, user }: LayoutProps) {
+export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps) {
   const { isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
   const navigate = useNavigate();
   const location = useLocation();
   const [isScrolled, setIsScrolled] = useState(false);
+  const [isMessagingOpen, setIsMessagingOpen] = useState(false);
+  const [inviteLobbyId, setInviteLobbyId] = useState<Id<"lobbies"> | null>(null);
+
+  // Expose function to open messaging with lobby invite
+  useEffect(() => {
+    if (onOpenMessagingWithLobby) {
+      onOpenMessagingWithLobby((lobbyId: Id<"lobbies">) => {
+        setInviteLobbyId(lobbyId);
+        setIsMessagingOpen(true);
+      });
+    }
+  }, [onOpenMessagingWithLobby]);
   
   const { data: profile, error: profileError } = useConvexQuery(
     api.profiles.getCurrentProfile
+  );
+
+  const { data: unreadCount = 0 } = useConvexQuery(
+    api.messages.getUnreadCount,
+    isAuthenticated ? {} : "skip"
   );
 
   const isActiveTab = (path: string) => {
@@ -182,14 +203,22 @@ export function Layout({ children, user }: LayoutProps) {
             </motion.div>
           )}
 
-          {/* Right Section - User Profile */}
+          {/* Right Section - Messages & User Profile */}
           {isAuthenticated && user && (
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="flex-1 flex justify-end"
+              className="flex-1 flex justify-end items-center gap-3"
             >
+              {/* Message Button */}
+              <MessageButton
+                unreadCount={unreadCount}
+                isActive={isMessagingOpen}
+                onClick={() => setIsMessagingOpen(!isMessagingOpen)}
+              />
+
+              {/* User Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <motion.div
@@ -294,6 +323,26 @@ export function Layout({ children, user }: LayoutProps) {
       <main className="flex-1 max-w-7xl mx-auto mt-8">
         {children}
       </main>
+
+      {/* Messaging Panel */}
+      <MessagingPanel
+        isOpen={isMessagingOpen}
+        onClose={() => {
+          setIsMessagingOpen(false);
+          setInviteLobbyId(null); // Clear invite lobby ID when panel closes
+        }}
+        inviteLobbyId={inviteLobbyId}
+        onNavigateToLobby={(lobbyId) => {
+          setIsMessagingOpen(false);
+          setInviteLobbyId(null);
+          void navigate({ to: "/", search: { lobbyId } });
+        }}
+        onNavigateToGame={(gameId) => {
+          setIsMessagingOpen(false);
+          setInviteLobbyId(null);
+          void navigate({ to: "/game", search: { gameId } });
+        }}
+      />
     </div>
   );
 }

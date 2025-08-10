@@ -23,6 +23,7 @@ interface LobbyTabsProps {
   onSpectateGame: (gameId: string) => void;
   startGameMutation: any;
   spectateByIdMutation: any;
+  onOpenMessaging?: (lobbyId?: Id<"lobbies">) => void;
 }
 
 export function LobbyTabs({ 
@@ -32,7 +33,8 @@ export function LobbyTabs({
   onGameStart, 
   onSpectateGame,
   startGameMutation,
-  spectateByIdMutation
+  spectateByIdMutation,
+  onOpenMessaging
 }: LobbyTabsProps) {
 
   const handleTabChange = (value: string) => {
@@ -61,6 +63,7 @@ export function LobbyTabs({
               profile={profile} 
               onGameStart={onGameStart}
               startGameMutation={startGameMutation}
+              onOpenMessaging={onOpenMessaging}
             />
           </TabsContent>
 
