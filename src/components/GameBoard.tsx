@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
 import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
@@ -23,7 +23,7 @@ import {
   ArrowUp,
   ArrowDown
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -49,7 +49,7 @@ interface GameBoardProps {
   onBackToLobby: () => void;
 }
 
-// Game pieces for setup (21 pieces total)
+// Game pieces for setup (21 pieces total) - Memoized constant
 const INITIAL_PIECES = [
   "Flag",
   "Spy", "Spy",
@@ -68,12 +68,139 @@ const INITIAL_PIECES = [
   "5 Star General"
 ];
 
+// Constants for better performance
+const TOTAL_TIME_SECONDS = 15 * 60; // 15 minutes
+const ANIMATION_DURATION = 800;
+const BOARD_ROWS = 8;
+const BOARD_COLS = 9;
+
+// Create empty board factory function
+const createEmptyBoard = () => Array(BOARD_ROWS).fill(null).map(() => Array(BOARD_COLS).fill(null));
+
+// Memoized board square component for better performance
+const BoardSquare = memo(({ 
+  row, 
+  col, 
+  cell, 
+  isSelected, 
+  isValidMove, 
+  highlightType, 
+  isPendingMove, 
+  isPendingFromPosition, 
+  isLastMoveFrom, 
+  isAnimatingFromPosition, 
+  isAnimatingToPosition, 
+  isCurrentPlayer, 
+  animatingPiece, 
+  ArrowComponent,
+  onClick 
+}: {
+  row: number;
+  col: number;
+  cell: any;
+  isSelected: boolean;
+  isValidMove: boolean;
+  highlightType: string | null;
+  isPendingMove: boolean;
+  isPendingFromPosition: boolean;
+  isLastMoveFrom: boolean;
+  isAnimatingFromPosition: boolean;
+  isAnimatingToPosition: boolean;
+  isCurrentPlayer: boolean;
+  animatingPiece: any;
+  ArrowComponent: any;
+  onClick: (row: number, col: number) => void;
+}) => {
+  return (
+    <motion.div
+      key={`${row}-${col}`}
+      whileHover={isCurrentPlayer && !animatingPiece ? { scale: 1.00 } : {}}
+      whileTap={isCurrentPlayer && !animatingPiece ? { scale: 1 } : {}}
+      animate={
+        isAnimatingToPosition ? {
+          scale: [1, 1.05, 1, 1.1, 1],
+          boxShadow: [
+            "0 0 0 0 rgba(34, 197, 94, 0.5)",
+            "0 0 0 4px rgba(34, 197, 94, 0.3)",
+            "0 0 0 8px rgba(34, 197, 94, 0.2)",
+            "0 0 0 12px rgba(34, 197, 94, 0.4)",
+            "0 0 0 0 rgba(34, 197, 94, 0)"
+          ]
+        } : isPendingMove ? {
+          scale: [1, 1.02, 1],
+          opacity: [0.75, 0.9, 0.75]
+        } : {}
+      }
+      transition={
+        isAnimatingToPosition ? {
+          duration: 0.75,
+          ease: "easeInOut",
+          times: [0, 0.3, 0.5, 0.8, 1]
+        } : isPendingMove ? {
+          duration: 1,
+          repeat: Infinity,
+          ease: "easeInOut"
+        } : {}
+      }
+      onClick={() => onClick(row, col)}
+      className={`
+        aspect-square border flex items-center justify-center cursor-pointer rounded-lg transition-all relative
+        bg-muted/30 border-border hover:bg-muted/50
+        ${isSelected ? 'ring-1 ring-primary bg-primary/20 border-primary' : ''}
+        ${isValidMove ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}
+        ${highlightType === 'last-move' ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
+        ${isPendingMove && !isAnimatingToPosition ? 'ring-1 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75' : ''}
+        ${isAnimatingToPosition ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}
+        ${isCurrentPlayer && !animatingPiece ? 'hover:bg-accent' : ''}
+      `}
+    >
+      {isPendingFromPosition && !isAnimatingFromPosition && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full"
+          />
+        </div>
+      )}
+      
+      {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && !isAnimatingFromPosition && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+          <div className="rounded-full p-1">
+            <ArrowComponent className="h-6 w-6 text-yellow-500" />
+          </div>
+        </div>
+      )}
+      
+      {cell && !isAnimatingFromPosition && (
+        <div className="text-center">
+          <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
+            {cell.piece === "Hidden" ? 
+              getPieceDisplay(cell.piece, { isOpponent: true }) : 
+              getPieceDisplay(cell.piece, { showLabel: true })
+            }
+          </div>
+          {cell.revealed && cell.piece !== "Hidden" && (
+            <div className="text-xs font-bold mt-1 text-muted-foreground">
+              {cell.piece.split(' ').map((word: string) => word[0]).join('')}
+            </div>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+});
+
+BoardSquare.displayName = 'BoardSquare';
+
 export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const { data: game, isPending: isLoadingGame } = useConvexQuery(
     api.games.getGame, 
     { gameId }
   );
-  
+
+
+
   const { data: moves, isPending: isLoadingMoves } = useConvexQuery(
     api.games.getGameMoves, 
     { gameId }
@@ -145,21 +272,20 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
   });
 
-  // Get player profiles for avatars
+  // Get player profiles for avatars - conditional queries
   const { data: player1Profile, isPending: isLoadingPlayer1 } = useConvexQuery(
     api.profiles.getProfileByUsername, 
-    game ? { username: game.player1Username } : undefined
+    game?.player1Username ? { username: game.player1Username } : "skip"
   );
   
   const { data: player2Profile, isPending: isLoadingPlayer2 } = useConvexQuery(
     api.profiles.getProfileByUsername, 
-    game ? { username: game.player2Username } : undefined
+    game?.player2Username ? { username: game.player2Username } : "skip"
   );
 
-  const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(
-    Array(8).fill(null).map(() => Array(9).fill(null))
-  );
-  const [availablePieces, setAvailablePieces] = useState([...INITIAL_PIECES]);
+  // Optimized state initialization
+  const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() => createEmptyBoard());
+  const [availablePieces, setAvailablePieces] = useState(() => [...INITIAL_PIECES]);
   const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
   const [selectedSquare, setSelectedSquare] = useState<{row: number, col: number} | null>(null);
   const [selectedSetupSquare, setSelectedSetupSquare] = useState<{row: number, col: number} | null>(null);
@@ -182,16 +308,32 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const [boardRect, setBoardRect] = useState<DOMRect | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
-  const isPlayer1 = game?.player1Id === profile.userId;
-  const isPlayer2 = game?.player2Id === profile.userId;
-  const isCurrentPlayer = game?.currentTurn === (isPlayer1 ? "player1" : "player2");
+  // Memoized computed values
+  const isPlayer1 = useMemo(() => game?.player1Id === profile.userId, [game?.player1Id, profile.userId]);
+  const isPlayer2 = useMemo(() => game?.player2Id === profile.userId, [game?.player2Id, profile.userId]);
+  const isCurrentPlayer = useMemo(() => 
+    game?.currentTurn === (isPlayer1 ? "player1" : "player2"), 
+    [game?.currentTurn, isPlayer1]
+  );
   
   // Check if current user has acknowledged the result
-  const hasAcknowledgedResult = game?.status === "finished" && 
+  const hasAcknowledgedResult = useMemo(() => 
+    game?.status === "finished" && 
     ((isPlayer1 && game.player1ResultAcknowledged) || 
-     (isPlayer2 && game.player2ResultAcknowledged));
+     (isPlayer2 && game.player2ResultAcknowledged)),
+    [game?.status, game?.player1ResultAcknowledged, game?.player2ResultAcknowledged, isPlayer1, isPlayer2]
+  );
 
-  // Update current time every second for timer display
+  // Memoized board dimensions
+  const updateBoardRect = useCallback(() => {
+    if (boardRef.current) {
+      setBoardRect(boardRef.current.getBoundingClientRect());
+    }
+  }, []);
+
+  // Optimized useEffect hooks with proper dependencies
+  
+  // Timer effect - optimized with cleanup
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentTime(Date.now());
@@ -199,18 +341,22 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Track board dimensions for animation positioning
+  // Board rect tracking - optimized with throttling
   useEffect(() => {
-    const updateBoardRect = () => {
-      if (boardRef.current) {
-        setBoardRect(boardRef.current.getBoundingClientRect());
-      }
+    let timeoutId: NodeJS.Timeout;
+    
+    const throttledUpdate = () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      timeoutId = setTimeout(updateBoardRect, 100);
     };
 
     updateBoardRect();
-    window.addEventListener('resize', updateBoardRect);
-    return () => window.removeEventListener('resize', updateBoardRect);
-  }, [game]); // Re-calculate when game changes
+    window.addEventListener('resize', throttledUpdate);
+    return () => {
+      window.removeEventListener('resize', throttledUpdate);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [updateBoardRect]);
 
   // Initialize showResultModal to true if game is already finished when component loads
   // but only if the user hasn't acknowledged the result yet
@@ -239,35 +385,48 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
   }, [game, optimisticBoard, pendingMove, animatingPiece]);
 
-  // Helper function to format time as MM:SS
-  const formatTime = (seconds: number) => {
+  // Memoized helper functions
+  const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
+  }, []);
 
-  // Helper function to get formatted player time (matching SpectatorView logic)
-  const getPlayerTime = (isPlayer1: boolean) => {
+  // Memoized timeout handlers
+  const handlePlayer1Timeout = useCallback(() => {
+    if (isPlayer1 && game?.currentTurn === "player1") {
+      toast.error("Your time expired! You lose the game.");
+      timeoutGame({ gameId });
+    }
+  }, [isPlayer1, game?.currentTurn, timeoutGame, gameId]);
+
+  const handlePlayer2Timeout = useCallback(() => {
+    if (isPlayer2 && game?.currentTurn === "player2") {
+      toast.error("Your time expired! You lose the game.");
+      timeoutGame({ gameId });
+    }
+  }, [isPlayer2, game?.currentTurn, timeoutGame, gameId]);
+
+  // Optimized getPlayerTime function with timeout handling
+  const getPlayerTime = useCallback((isPlayerParam: boolean) => {
     if (!game) return "15:00"; // Default time display
     
     if (game.status === "finished") {
       // Show final time remaining for finished games
-      const TOTAL_TIME = 15 * 60; // 15 minutes in seconds
-      const timeUsed = isPlayer1 ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
+      const timeUsed = isPlayerParam ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
       const timeUsedSeconds = Math.floor(timeUsed / 1000);
-      const remaining = Math.max(0, TOTAL_TIME - timeUsedSeconds);
+      const remaining = Math.max(0, TOTAL_TIME_SECONDS - timeUsedSeconds);
       return formatTime(remaining);
     }
     
     if (game.status !== "playing") return "15:00"; // Default time display for setup
     
-    const TOTAL_TIME = 15 * 60; // 15 minutes in seconds
-    const timeUsed = isPlayer1 ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
+    const timeUsed = isPlayerParam ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
     const timeUsedSeconds = Math.floor(timeUsed / 1000);
     
     // If it's current player's turn, add elapsed time since turn started
     let currentTurnTime = 0;
-    const isCurrentTurn = (isPlayer1 && game.currentTurn === "player1") || (!isPlayer1 && game.currentTurn === "player2");
+    const isCurrentTurn = (isPlayerParam && game.currentTurn === "player1") || (!isPlayerParam && game.currentTurn === "player2");
     
     if (isCurrentTurn && (game.lastMoveTime || game.gameTimeStarted)) {
       const turnStartTime = game.lastMoveTime || game.gameTimeStarted || currentTime;
@@ -275,53 +434,35 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
     
     const totalUsed = timeUsedSeconds + currentTurnTime;
-    const remaining = Math.max(0, TOTAL_TIME - totalUsed);
+    const remaining = Math.max(0, TOTAL_TIME_SECONDS - totalUsed);
     
     // Check for timeout condition - only trigger once per timeout
     if (remaining <= 0 && isCurrentTurn && game.status === "playing") {
       // Trigger timeout for the current player (only the player whose time ran out)
-      if (game.currentTurn === "player1" && isPlayer1) {
+      if (game.currentTurn === "player1" && isPlayerParam && isPlayer1) {
         setTimeout(() => handlePlayer1Timeout(), 100);
-      } else if (game.currentTurn === "player2" && isPlayer2) {
+      } else if (game.currentTurn === "player2" && !isPlayerParam && isPlayer2) {
         setTimeout(() => handlePlayer2Timeout(), 100);
       }
     }
     
     return formatTime(remaining);
-  };
+  }, [game, currentTime, formatTime, handlePlayer1Timeout, handlePlayer2Timeout, isPlayer1, isPlayer2]);
 
-  // Timer handlers - need to be accessible by getPlayerTime
-  const handlePlayer1Timeout = () => {
-    // Only the current player whose time ran out should trigger the timeout
-    if (isPlayer1 && game?.currentTurn === "player1") {
-      toast.error("Your time expired! You lose the game.");
-      timeoutGame({ gameId });
-    }
-  };
+  // Memoized valid rows calculation
+  const validRows = useMemo(() => isPlayer1 ? [5, 6, 7] : [0, 1, 2], [isPlayer1]);
 
-  const handlePlayer2Timeout = () => {
-    // Only the current player whose time ran out should trigger the timeout
-    if (isPlayer2 && game?.currentTurn === "player2") {
-      toast.error("Your time expired! You lose the game.");
-      timeoutGame({ gameId });
-    }
-  };
-
-  const randomizeSetup = () => {
-    // Clear current setup
-    setSetupBoard(Array(8).fill(null).map(() => Array(9).fill(null)));
+  // Memoized game actions
+  const randomizeSetup = useCallback(() => {
+    setSetupBoard(createEmptyBoard());
     setAvailablePieces([...INITIAL_PIECES]);
     
-    // Get player's valid rows
-    const validRows = isPlayer1 ? [5, 6, 7] : [0, 1, 2];
     const shuffledPieces = [...INITIAL_PIECES].sort(() => Math.random() - 0.5);
-    
-    const newBoard = Array(8).fill(null).map(() => Array(9).fill(null));
+    const newBoard = createEmptyBoard();
     let pieceIndex = 0;
     
-    // Fill the valid area with shuffled pieces
     for (const row of validRows) {
-      for (let col = 0; col < 9; col++) {
+      for (let col = 0; col < BOARD_COLS; col++) {
         if (pieceIndex < shuffledPieces.length) {
           newBoard[row][col] = shuffledPieces[pieceIndex];
           pieceIndex++;
@@ -334,27 +475,82 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     setSelectedPiece(null);
     setIsSwapMode(true);
     toast.success("Pieces randomized!");
-  };
+  }, [validRows]);
 
-  const clearSetup = () => {
-    setSetupBoard(Array(8).fill(null).map(() => Array(9).fill(null)));
+  const clearSetup = useCallback(() => {
+    setSetupBoard(createEmptyBoard());
     setAvailablePieces([...INITIAL_PIECES]);
     setSelectedPiece(null);
     setSelectedSetupSquare(null);
     setIsSwapMode(false);
     toast.success("Setup cleared!");
-  };
+  }, []);
 
-  const handleSurrender = () => {
+  const handleSurrender = useCallback(() => {
     if (window.confirm("Are you sure you want to surrender? This cannot be undone.")) {
       surrenderGame({ gameId });
     }
-  };
+  }, [surrenderGame, gameId]);
 
-  const handleAcknowledgeResult = () => {
+  const handleAcknowledgeResult = useCallback(() => {
     acknowledgeGameResult({ gameId });
-  };
+  }, [acknowledgeGameResult, gameId]);
 
+  // Helper function to check if a square is highlighted - memoized
+  const isSquareHighlighted = useCallback((row: number, col: number) => {
+    if (game?.lastMoveFrom && game?.lastMoveTo) {
+      if ((game.lastMoveFrom.row === row && game.lastMoveFrom.col === col) ||
+          (game.lastMoveTo.row === row && game.lastMoveTo.col === col)) {
+        return "last-move";
+      }
+    }
+    
+    if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
+      return "selected";
+    }
+    
+    return null;
+  }, [game?.lastMoveFrom, game?.lastMoveTo, selectedSquare]);
+
+  // Helper function to get arrow direction for moves - memoized
+  const getArrowDirection = useCallback((fromRow: number, fromCol: number, toRow: number, toCol: number) => {
+    const rowDiff = toRow - fromRow;
+    const colDiff = toCol - fromCol;
+    
+    if (rowDiff > 0) return ArrowDown;
+    if (rowDiff < 0) return ArrowUp;
+    if (colDiff > 0) return ArrowRight;
+    if (colDiff < 0) return ArrowLeft;
+    
+    return null;
+  }, []);
+
+  // Result modal state management
+  useEffect(() => {
+    if (game?.status === "finished" && !gameFinished && !hasAcknowledgedResult) {
+      setShowResultModal(true);
+      setGameFinished(true);
+    }
+  }, [game?.status, gameFinished, hasAcknowledgedResult]);
+
+  // Auto-select next piece optimization
+  useEffect(() => {
+    if (availablePieces.length === 0) {
+      setIsSwapMode(true);
+      setSelectedPiece(null);
+    } else if (!selectedPiece && availablePieces.length > 0 && !isSwapMode) {
+      setSelectedPiece(availablePieces[0]);
+    }
+  }, [selectedPiece, availablePieces, isSwapMode]);
+
+  // Optimistic state cleanup
+  useEffect(() => {
+    if (game && optimisticBoard && !pendingMove && !animatingPiece) {
+      setOptimisticBoard(null);
+    }
+  }, [game, optimisticBoard, pendingMove, animatingPiece]);
+
+  // Game result toast notification - separated for better performance
   useEffect(() => {
     if (game?.status === "finished" && !hasAcknowledgedResult) {
       const isCurrentUserWinner = game.winner === (isPlayer1 ? "player1" : "player2");
@@ -365,7 +561,6 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         toast.error("Defeat! You lost the game.");
       }
       
-      // Show results modal immediately for finished games (only if not acknowledged)
       if (!gameFinished) {
         setShowResultModal(true);
         setGameFinished(true);
@@ -373,8 +568,8 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
   }, [game?.status, game?.winner, isPlayer1, gameFinished, hasAcknowledgedResult]);
 
-  const handleSetupSquareClick = (row: number, col: number) => {
-    const validRows = isPlayer1 ? [5, 6, 7] : [0, 1, 2];
+  // Memoized setup square click handler
+  const handleSetupSquareClick = useCallback((row: number, col: number) => {
     if (!validRows.includes(row)) {
       toast.error("You can only place pieces in your area");
       return;
@@ -382,18 +577,15 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
     const currentPiece = setupBoard[row][col];
     
-    // If in swap mode or no available pieces, handle swapping
     if (isSwapMode || availablePieces.length === 0) {
       if (selectedSetupSquare) {
         const selectedPiece = setupBoard[selectedSetupSquare.row][selectedSetupSquare.col];
         
         if (selectedSetupSquare.row === row && selectedSetupSquare.col === col) {
-          // Deselect if clicking the same square
           setSelectedSetupSquare(null);
           return;
         }
         
-        // Swap pieces
         const newBoard = setupBoard.map(r => [...r]);
         newBoard[selectedSetupSquare.row][selectedSetupSquare.col] = currentPiece;
         newBoard[row][col] = selectedPiece;
@@ -403,67 +595,48 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         return;
       }
 
-      // If there's a piece here, select it for swapping
       if (currentPiece) {
         setSelectedSetupSquare({ row, col });
         return;
       }
       
-      // If no piece here and in swap mode, show message
       if (isSwapMode) {
         toast.info("Click on a piece to select it for swapping");
         return;
       }
     }
 
-    // Normal placing mode
     if (currentPiece) {
       toast.error("Square is already occupied. Enable swap mode to move pieces.");
       return;
     }
 
-    // If no piece selected from available pieces, can't place
     if (!selectedPiece) {
       toast.error("Please select a piece to place");
       return;
     }
 
-    // Place piece
     const newBoard = setupBoard.map(r => [...r]);
     newBoard[row][col] = selectedPiece;
     setSetupBoard(newBoard);
 
-    // Remove piece from available pieces
     const pieceIndex = availablePieces.indexOf(selectedPiece);
     const newAvailable = [...availablePieces];
     newAvailable.splice(pieceIndex, 1);
     setAvailablePieces(newAvailable);
 
-    setSelectedPiece(null); // Will auto-select next piece via useEffect
-  };
+    setSelectedPiece(null);
+  }, [validRows, setupBoard, isSwapMode, availablePieces, selectedSetupSquare, selectedPiece]);
 
-  const _handleRemovePiece = (row: number, col: number) => {
-    const piece = setupBoard[row][col];
-    if (!piece) return;
-
-    // Remove from board
-    const newBoard = setupBoard.map(r => [...r]);
-    newBoard[row][col] = null;
-    setSetupBoard(newBoard);
-
-    // Add back to available pieces
-    setAvailablePieces([...availablePieces, piece].sort());
-  };
-
-  const handleFinishSetup = async () => {
+  const handleFinishSetup = useCallback(async () => {
     if (availablePieces.length > 0) {
       toast.error("Please place all pieces before finishing setup");
       return;
     }
 
     const pieces = [];
-    for (let row = 0; row < 8; row++) {
-      for (let col = 0; col < 9; col++) {
+    for (let row = 0; row < BOARD_ROWS; row++) {
+      for (let col = 0; col < BOARD_COLS; col++) {
         if (setupBoard[row][col]) {
           pieces.push({
             piece: setupBoard[row][col]!,
@@ -475,20 +648,18 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
 
     setupPieces({ gameId, pieces });
-  };
+  }, [availablePieces.length, setupBoard, setupPieces, gameId]);
 
-  const handleGameSquareClick = (row: number, col: number) => {
+  // Optimized game square click handler
+  const handleGameSquareClick = useCallback((row: number, col: number) => {
     if (!game || game.status !== "playing" || !isCurrentPlayer || isMakingMove || animatingPiece) return;
 
     if (selectedSquare) {
-      // Make move
       if (selectedSquare.row === row && selectedSquare.col === col) {
-        // Deselect
         setSelectedSquare(null);
         return;
       }
 
-      // Check if it's a valid move (adjacent squares only)
       const isValidMove = Math.abs(selectedSquare.row - row) + Math.abs(selectedSquare.col - col) === 1;
       if (!isValidMove) {
         toast.error("Invalid move: pieces can only move to adjacent squares");
@@ -499,14 +670,12 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       const movingPiece = game.board[selectedSquare.row][selectedSquare.col];
       const targetPiece = game.board[row][col];
       
-      // Check if trying to move to own piece
       if (targetPiece && targetPiece.player === (isPlayer1 ? "player1" : "player2")) {
         toast.error("Cannot move to a square occupied by your own piece");
         setSelectedSquare(null);
         return;
       }
 
-      // Start piece animation
       setAnimatingPiece({
         piece: movingPiece,
         fromRow: selectedSquare.row,
@@ -516,7 +685,6 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         startTime: Date.now()
       });
 
-      // Set pending move immediately
       setPendingMove({
         fromRow: selectedSquare.row,
         fromCol: selectedSquare.col,
@@ -524,86 +692,121 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         toCol: col
       });
 
+      const fromSquare = selectedSquare;
       setSelectedSquare(null);
 
-      // Delay the optimistic board update and API call to let animation play
       setTimeout(() => {
-        // Apply optimistic update after animation
         const newBoard = game.board.map(r => [...r]);
-        if (targetPiece) {
-          // Battle scenario
-          newBoard[row][col] = movingPiece;
-          newBoard[selectedSquare.row][selectedSquare.col] = null;
-        } else {
-          // Normal move
-          newBoard[row][col] = movingPiece;
-          newBoard[selectedSquare.row][selectedSquare.col] = null;
-        }
+        newBoard[row][col] = movingPiece;
+        newBoard[fromSquare.row][fromSquare.col] = null;
 
         setOptimisticBoard(newBoard);
 
-        // Send mutation after animation completes
         makeMove({
           gameId,
-          fromRow: selectedSquare.row,
-          fromCol: selectedSquare.col,
+          fromRow: fromSquare.row,
+          fromCol: fromSquare.col,
           toRow: row,
           toCol: col,
         });
 
-        // Clear animation state
         setAnimatingPiece(null);
-      }, 800); // 800ms to ensure animation completes
+      }, ANIMATION_DURATION);
 
     } else {
-      // Select piece
       const boardToUse = optimisticBoard || game.board;
       const piece = boardToUse[row][col];
       if (piece && piece.player === (isPlayer1 ? "player1" : "player2")) {
         setSelectedSquare({ row, col });
       }
     }
-  };
+  }, [game, isCurrentPlayer, isMakingMove, animatingPiece, selectedSquare, isPlayer1, optimisticBoard, makeMove, gameId]);
 
-  // Timer handlers - simplified since server now handles timeout enforcement
-  const handleSetupTimeout = () => {
+  const handleSetupTimeout = useCallback(() => {
     toast.error("Setup time expired! Pieces will be placed randomly.");
     randomizeSetup();
     setTimeout(() => {
       void handleFinishSetup();
     }, 1000);
-  };
+  }, [randomizeSetup, handleFinishSetup]);
 
-  // Helper function to check if a square is highlighted
-  const isSquareHighlighted = (row: number, col: number) => {
-    // Highlight last move
-    if (game?.lastMoveFrom && game?.lastMoveTo) {
-      if ((game.lastMoveFrom.row === row && game.lastMoveFrom.col === col) ||
-          (game.lastMoveTo.row === row && game.lastMoveTo.col === col)) {
-        return "last-move";
-      }
-    }
-    
-    // Highlight selected square
-    if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
-      return "selected";
-    }
-    
-    return null;
-  };
+  // Memoized board data for performance
+  const boardData = useMemo(() => {
+    return optimisticBoard || game?.board;
+  }, [optimisticBoard, game?.board]);
 
-  // Helper function to get arrow direction for moves
-  const getArrowDirection = (fromRow: number, fromCol: number, toRow: number, toCol: number) => {
-    const rowDiff = toRow - fromRow;
-    const colDiff = toCol - fromCol;
+  // Memoized board squares rendering
+  const renderBoardSquares = useMemo(() => {
+    if (!boardData) return null;
     
-    if (rowDiff > 0) return ArrowDown; // Moving down
-    if (rowDiff < 0) return ArrowUp;   // Moving up  
-    if (colDiff > 0) return ArrowRight; // Moving right
-    if (colDiff < 0) return ArrowLeft;  // Moving left
-    
+    return boardData.map((row, rowIndex) =>
+      row.map((cell, colIndex) => {
+        const isSelected = selectedSquare?.row === rowIndex && selectedSquare?.col === colIndex;
+        const isValidMove = selectedSquare && 
+          Math.abs(selectedSquare.row - rowIndex) + Math.abs(selectedSquare.col - colIndex) === 1;
+        const highlightType = isSquareHighlighted(rowIndex, colIndex);
+        const isPendingMove = pendingMove && 
+          ((pendingMove.fromRow === rowIndex && pendingMove.fromCol === colIndex) ||
+           (pendingMove.toRow === rowIndex && pendingMove.toCol === colIndex));
+        
+        const isPendingFromPosition = pendingMove && 
+          pendingMove.fromRow === rowIndex && pendingMove.fromCol === colIndex;
+        
+        const isLastMoveFrom = game?.lastMoveFrom && 
+          game.lastMoveFrom.row === rowIndex && game.lastMoveFrom.col === colIndex;
+        
+        const isAnimatingFromPosition = animatingPiece && 
+          animatingPiece.fromRow === rowIndex && animatingPiece.fromCol === colIndex;
+        
+        const isAnimatingToPosition = animatingPiece && 
+          animatingPiece.toRow === rowIndex && animatingPiece.toCol === colIndex;
+        
+        const ArrowComponent = isLastMoveFrom && game?.lastMoveFrom && game?.lastMoveTo 
+          ? getArrowDirection(game.lastMoveFrom.row, game.lastMoveFrom.col, game.lastMoveTo.row, game.lastMoveTo.col)
+          : null;
+        
+        return (
+          <BoardSquare
+            key={`${rowIndex}-${colIndex}`}
+            row={rowIndex}
+            col={colIndex}
+            cell={cell}
+            isSelected={isSelected}
+            isValidMove={!!isValidMove}
+            highlightType={highlightType}
+            isPendingMove={!!isPendingMove}
+            isPendingFromPosition={!!isPendingFromPosition}
+            isLastMoveFrom={!!isLastMoveFrom}
+            isAnimatingFromPosition={!!isAnimatingFromPosition}
+            isAnimatingToPosition={!!isAnimatingToPosition}
+            isCurrentPlayer={isCurrentPlayer}
+            animatingPiece={animatingPiece}
+            ArrowComponent={ArrowComponent}
+            onClick={handleGameSquareClick}
+          />
+        );
+      })
+    );
+  }, [
+    boardData,
+    selectedSquare,
+    pendingMove,
+    animatingPiece,
+    game?.lastMoveFrom,
+    game?.lastMoveTo,
+    isCurrentPlayer,
+    isSquareHighlighted,
+    getArrowDirection,
+    handleGameSquareClick
+  ]);
+
+  // If not part of the game, show toast and redirect to lobby
+  if (!game) {
+    toast.error("You are not part of this game");
+    onBackToLobby();
     return null;
-  };
+  }
+
 
   if (isLoadingGame) {
     return (
@@ -840,7 +1043,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                               : 'border-muted bg-muted/20'
                             }
                             ${isOccupied ? 'bg-accent border-accent-foreground/50' : ''}
-                            ${isSelected ? 'ring-2 ring-yellow-500 bg-yellow-500/20' : ''}
+                            ${isSelected ? 'ring-1 ring-yellow-500 bg-yellow-500/20' : ''}
                             ${selectedPiece && isValidArea && !isOccupied ? 'hover:bg-primary/30' : ''}
                           `}
                         >
@@ -887,7 +1090,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         className={`
                           p-3 border-2 rounded-lg text-sm transition-all flex flex-col items-center gap-1
                           ${selectedPiece === piece 
-                            ? 'border-primary bg-primary/20 ring-2 ring-primary/50' 
+                            ? 'border-primary bg-primary/20 ring-1 ring-primary/50' 
                             : 'border-border bg-card hover:bg-accent hover:border-accent-foreground/50'
                           }
                         `}
@@ -1226,138 +1429,51 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 } ${isMakingMove || animatingPiece ? 'pointer-events-none' : ''}`}
               >
                 {/* Simple text indicator when making move */}
-                {isMakingMove && (
-                  <div className="absolute top-2 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none">
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-2 flex items-center gap-2 shadow-lg"
+                <AnimatePresence>
+                  {isMakingMove && (
+                    <motion.div 
+                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3, ease: "easeInOut" }}
                     >
+                      {/* Soft feathered blur backdrop - board-sized circle */}
                       <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="absolute inset-0 backdrop-blur-sm"
+                        style={{
+                          width: '100vw',
+                          height: '100vh',
+                          top: '-50vh',
+                          left: '-50vw',
+                          maskImage: 'radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0) 80%)',
+                          WebkitMaskImage: 'radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0) 80%)'
+                        }}
                       />
-                      <span className="text-white text-sm backdrop-blur-sm font-medium">Processing move...</span>
-                    </motion.div>
-                  </div>
-                )}
-                
-                {(optimisticBoard || game.board).map((row, rowIndex) =>
-                  row.map((cell, colIndex) => {
-                    const isSelected = selectedSquare?.row === rowIndex && selectedSquare?.col === colIndex;
-                    const isValidMove = selectedSquare && 
-                      Math.abs(selectedSquare.row - rowIndex) + Math.abs(selectedSquare.col - colIndex) === 1;
-                    const highlightType = isSquareHighlighted(rowIndex, colIndex);
-                    const isPendingMove = pendingMove && 
-                      ((pendingMove.fromRow === rowIndex && pendingMove.fromCol === colIndex) ||
-                       (pendingMove.toRow === rowIndex && pendingMove.toCol === colIndex));
-                    
-                    // Check if this is the "from" position of pending move (for spinner)
-                    const isPendingFromPosition = pendingMove && 
-                      pendingMove.fromRow === rowIndex && pendingMove.fromCol === colIndex;
-                    
-                    // Check if this is part of the last move (for arrow)
-                    const isLastMoveFrom = game?.lastMoveFrom && 
-                      game.lastMoveFrom.row === rowIndex && game.lastMoveFrom.col === colIndex;
-                    
-                    // Check if this piece is being animated
-                    const isAnimatingFromPosition = animatingPiece && 
-                      animatingPiece.fromRow === rowIndex && animatingPiece.fromCol === colIndex;
-                    
-                    // Check if this is the destination square for animation
-                    const isAnimatingToPosition = animatingPiece && 
-                      animatingPiece.toRow === rowIndex && animatingPiece.toCol === colIndex;
-                    
-                    // Get arrow direction for last move
-                    const ArrowComponent = isLastMoveFrom && game?.lastMoveFrom && game?.lastMoveTo 
-                      ? getArrowDirection(game.lastMoveFrom.row, game.lastMoveFrom.col, game.lastMoveTo.row, game.lastMoveTo.col)
-                      : null;
-                    
-                    return (
+                      
                       <motion.div
-                        key={`${rowIndex}-${colIndex}`}
-                        whileHover={isCurrentPlayer && !animatingPiece ? { scale: 1.00 } : {}}
-                        whileTap={isCurrentPlayer && !animatingPiece ? { scale: 1 } : {}}
-                        animate={
-                          isAnimatingToPosition ? {
-                            // Pulse effect for destination square
-                            scale: [1, 1.05, 1, 1.1, 1],
-                            boxShadow: [
-                              "0 0 0 0 rgba(34, 197, 94, 0.5)",
-                              "0 0 0 4px rgba(34, 197, 94, 0.3)",
-                              "0 0 0 8px rgba(34, 197, 94, 0.2)",
-                              "0 0 0 12px rgba(34, 197, 94, 0.4)",
-                              "0 0 0 0 rgba(34, 197, 94, 0)"
-                            ]
-                          } : isPendingMove ? {
-                            scale: [1, 1.02, 1],
-                            opacity: [0.75, 0.9, 0.75]
-                          } : {}
-                        }
-                        transition={
-                          isAnimatingToPosition ? {
-                            duration: 0.75,
-                            ease: "easeInOut",
-                            times: [0, 0.3, 0.5, 0.8, 1]
-                          } : isPendingMove ? {
-                            duration: 1,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          } : {}
-                        }
-                        onClick={() => handleGameSquareClick(rowIndex, colIndex)}
-                        className={`
-                          aspect-square border flex items-center justify-center cursor-pointer rounded-lg transition-all relative
-                          bg-muted/30 border-border hover:bg-muted/50
-                          ${isSelected ? 'ring-2 ring-primary bg-primary/20 border-primary' : ''}
-                          ${isValidMove ? 'ring-2 ring-green-500 bg-green-500/20 border-green-500' : ''}
-                          ${highlightType === 'last-move' ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
-                          ${isPendingMove && !isAnimatingToPosition ? 'ring-2 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75' : ''}
-                          ${isAnimatingToPosition ? 'ring-2 ring-green-500 bg-green-500/20 border-green-500' : ''}
-                          ${isCurrentPlayer && !animatingPiece ? 'hover:bg-accent' : ''}
-                        `}
+                        initial={{ opacity: 0, y: -10, scale: 0.9 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.9 }}
+                        transition={{ duration: 0.3, ease: "easeInOut" }}
+                        className="relative bg-white/20 backdrop-blur-xl shadow-2xl shadow-white/10 border border-white/20 rounded-full px-4 py-2 flex items-center gap-2"
                       >
-                        {/* Spinner for pending move "from" position */}
-                        {isPendingFromPosition && !isAnimatingFromPosition && (
-                          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                              className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full"
-                            />
-                          </div>
-                        )}
-                        
-                        {/* Arrow for last move "from" position */}
-                        {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && !isAnimatingFromPosition && (
-                          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                            <div className="rounded-full p-1">
-                              <ArrowComponent className="h-6 w-6 text-yellow-500" />
-                            </div>
-                          </div>
-                        )}
-                        
-                        {/* Show piece only if it's not being animated from this position */}
-                        {cell && !isAnimatingFromPosition && (
-                          <div className="text-center">
-                            <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
-                              {cell.piece === "Hidden" ? 
-                                getPieceDisplay(cell.piece, { isOpponent: true }) : 
-                                getPieceDisplay(cell.piece, { showLabel: true })
-                              }
-                            </div>
-                            {cell.revealed && cell.piece !== "Hidden" && (
-                              <div className="text-xs font-bold mt-1 text-muted-foreground">
-                                {cell.piece.split(' ').map((word: string) => word[0]).join('')}
-                              </div>
-                            )}
-                          </div>
-                        )}
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                        />
+                        <span className="text-white !bg-transparent text-sm  font-medium">Processing move...</span>
                       </motion.div>
-                    );
-                  })
-                )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
+                {renderBoardSquares}
                 
                 {/* Animated piece overlay */}
                 {animatingPiece && boardRect && (
@@ -1388,7 +1504,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         times: [0, 0.3, 0.7, 1]
                       }
                     }}
-                    className="absolute pointer-events-none z-50"
+                    className="absolute pointer-events-none z-50 size-20"
                     style={{
                       width: `${(boardRect.width - 32) / 9}px`,
                       height: `${(boardRect.height - 32) / 8}px`,
@@ -1456,7 +1572,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       avatarUrl={player1Profile?.avatarUrl}
                       rank={player1Profile?.rank}
                       size="sm"
-                      className="ring-2 ring-blue-400/50"
+                      className="ring-1 ring-blue-400/50"
                     />
                   )}
                   <div className="w-4 h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50"></div>
@@ -1489,7 +1605,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       avatarUrl={player2Profile?.avatarUrl}
                       rank={player2Profile?.rank}
                       size="sm"
-                      className="ring-2 ring-red-400/50"
+                      className="ring-1 ring-red-400/50"
                     />
                   )}
                   <div className="w-4 h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50"></div>

@@ -117,6 +117,11 @@ export const getGame = query({
     
     if (!game) return null;
 
+    // Should not allow if not part of the game
+    if (userId && ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)) {
+      throw new Error("Not a participant in this game");
+    }
+
     // If game is finished, reveal all pieces
     if (game.status === "finished") {
       return game;

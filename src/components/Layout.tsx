@@ -291,7 +291,7 @@ export function Layout({ children, user }: LayoutProps) {
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1">
+      <main className="flex-1 max-w-7xl mx-auto mt-8">
         {children}
       </main>
     </div>
