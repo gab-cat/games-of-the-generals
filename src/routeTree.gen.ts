@@ -17,6 +17,7 @@ import { Route as MatchHistoryRouteImport } from './routes/match-history'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GameRouteImport } from './routes/game'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AiGameRouteImport } from './routes/ai-game'
 import { Route as AchievementsRouteImport } from './routes/achievements'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
@@ -61,6 +62,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AiGameRoute = AiGameRouteImport.update({
+  id: '/ai-game',
+  path: '/ai-game',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AchievementsRoute = AchievementsRouteImport.update({
   id: '/achievements',
   path: '/achievements',
@@ -81,6 +87,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/achievements': typeof AchievementsRoute
+  '/ai-game': typeof AiGameRoute
   '/auth': typeof AuthRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/achievements': typeof AchievementsRoute
+  '/ai-game': typeof AiGameRoute
   '/auth': typeof AuthRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -108,6 +116,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/achievements': typeof AchievementsRoute
+  '/ai-game': typeof AiGameRoute
   '/auth': typeof AuthRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/achievements'
+    | '/ai-game'
     | '/auth'
     | '/game'
     | '/leaderboard'
@@ -136,6 +146,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/achievements'
+    | '/ai-game'
     | '/auth'
     | '/game'
     | '/leaderboard'
@@ -149,6 +160,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/achievements'
+    | '/ai-game'
     | '/auth'
     | '/game'
     | '/leaderboard'
@@ -163,6 +175,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   AchievementsRoute: typeof AchievementsRoute
+  AiGameRoute: typeof AiGameRoute
   AuthRoute: typeof AuthRoute
   GameRoute: typeof GameRoute
   LeaderboardRoute: typeof LeaderboardRoute
@@ -231,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ai-game': {
+      id: '/ai-game'
+      path: '/ai-game'
+      fullPath: '/ai-game'
+      preLoaderRoute: typeof AiGameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/achievements': {
       id: '/achievements'
       path: '/achievements'
@@ -259,6 +279,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AchievementsRoute: AchievementsRoute,
+  AiGameRoute: AiGameRoute,
   AuthRoute: AuthRoute,
   GameRoute: GameRoute,
   LeaderboardRoute: LeaderboardRoute,

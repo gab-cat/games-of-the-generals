@@ -359,7 +359,7 @@ export function MessagingPanel({
             ) : (
               <div className="h-full flex flex-col">
                 {/* Search */}
-                <div className="p-4 border-b border-white/10">
+                <div className="p-4">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
                     <Input
@@ -412,7 +412,7 @@ export function MessagingPanel({
                         <div
                           key={conversation._id}
                           onClick={() => setSelectedConversation(conversation.otherParticipant.id)}
-                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+                          className="flex items-center gap-3 p-3 rounded-3xl hover:bg-white/10 cursor-pointer transition-colors"
                         >
                           <div className="relative">
                             <UserAvatar

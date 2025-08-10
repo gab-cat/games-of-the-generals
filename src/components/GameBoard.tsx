@@ -1297,7 +1297,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   disabled={isSurrendering}
                   variant="destructive"
                   size="sm"
-                  className="flex items-center gap-2 disabled:opacity-50 w-full sm:w-auto"
+                  className="flex items-center rounded-full gap-2 disabled:opacity-50 w-full sm:w-auto"
                 >
                   {isSurrendering ? (
                     <>

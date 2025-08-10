@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -69,6 +69,11 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       path: "/",
       label: "Lobbies",
       icon: Gamepad2
+    },
+    {
+      path: "/ai-game",
+      label: "VS AI",
+      icon: Bot
     },
     {
       path: "/leaderboard",

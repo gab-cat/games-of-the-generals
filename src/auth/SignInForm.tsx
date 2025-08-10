@@ -56,13 +56,12 @@ export function SignInForm() {
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
         {/* Image Background */}
-                {/* Image Background */}
         <div className="absolute inset-0">
-          <ImageBackground overlayOpacity={0.4} leftFeatherOnly={true} />
+          <ImageBackground overlayOpacity={0} leftFeatherOnly={true} />
         </div>
         
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-gray-900/70 to-slate-900/90" />
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-gray-900/75 to-slate-900/60" />
         
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-center h-full px-4 sm:px-6 lg:px-12 max-w-2xl min-h-screen lg:min-h-full">

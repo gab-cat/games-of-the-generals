@@ -71,95 +71,89 @@ function LobbyInviteMessage({ message, onNavigateToLobby, copyLobbyCode, current
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <Users className="w-4 h-4" />
-        Lobby Invitation
-      </div>
-      <p className="text-sm">{message.content}</p>
-      {message.lobbyName && (
-        <div className="text-sm opacity-90">
-          <strong>{message.lobbyName}</strong>
-        </div>
-      )}
-      
-      {/* Lobby status and actions */}
-      <div className="space-y-2">
-        {lobbyInfo ? (
-          <>
-            {lobbyInfo.status === "waiting" ? (
-              <div className="text-xs text-green-300 bg-green-500/20 px-2 py-1 rounded">
-                Lobby available • {lobbyInfo.playerId ? "2/2" : "1/2"} players
-              </div>
-            ) : lobbyInfo.status === "playing" ? (
-              <div className="text-xs text-yellow-300 bg-yellow-500/20 px-2 py-1 rounded">
-                Match in progress
-              </div>
-            ) : lobbyInfo.status === "finished" ? (
-              <div className="text-xs text-red-300 bg-red-500/20 px-2 py-1 rounded">
-                Match finished • Cannot join
-              </div>
-            ) : (
-              <div className="text-xs text-gray-300 bg-gray-500/20 px-2 py-1 rounded">
-                Lobby closed
-              </div>
-            )}
-            
-            <div className="flex gap-2 pt-2">
-              {message.lobbyCode && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => copyLobbyCode(message.lobbyCode!)}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20"
-                >
-                  <Copy className="w-3 h-3 mr-1" />
-                  Copy Code
-                </Button>
-              )}
-              {/* Only show join/view buttons for recipients (not senders) */}
-              {!isOwnMessage && message.lobbyId && lobbyInfo?.status === "waiting" && onJoinLobby && (
-                <Button
-                  size="sm"
-                  onClick={() => onJoinLobby(message.lobbyId!)}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <ExternalLink className="w-3 h-3 mr-1" />
-                  Join Lobby
-                </Button>
-              )}
-              {!isOwnMessage && message.lobbyId && onNavigateToLobby && (lobbyInfo?.status === "playing" || lobbyInfo?.status === "finished") && (
-                <Button
-                  size="sm"
-                  onClick={() => onNavigateToLobby(message.lobbyId!)}
-                  className="bg-purple-600 hover:bg-purple-700"
-                  disabled={lobbyInfo.status === "finished"}
-                >
-                  <ExternalLink className="w-3 h-3 mr-1" />
-                  {lobbyInfo.status === "finished" ? "Match Ended" : "View Lobby"}
-                </Button>
-              )}
-            </div>
-          </>
-        ) : message.lobbyId ? (
-          <div className="text-xs text-gray-300 bg-gray-500/20 px-2 py-1 rounded">
-            Loading lobby status...
+        {/* Header with icon and lobby name */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Users className="w-4 h-4 text-blue-400" />
+            <span>Lobby Invite</span>
           </div>
-        ) : (
-          <div className="flex gap-2 pt-2">
+          {message.lobbyName && (
+            <span className="text-xs text-white/70 font-mono bg-white/10 px-2 py-1 rounded break-words max-w-[120px] truncate">
+              {message.lobbyName}
+            </span>
+          )}
+        </div>      {/* Status indicator */}
+      {lobbyInfo ? (
+        <div className="flex items-center justify-between">
+          {lobbyInfo.status === "waiting" ? (
+            <div className="text-xs text-green-400 flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+              Available • {lobbyInfo.playerId ? "2/2" : "1/2"} players
+            </div>
+          ) : lobbyInfo.status === "playing" ? (
+            <div className="text-xs text-yellow-400 flex items-center gap-1">
+              <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+              In Progress
+            </div>
+          ) : (
+            <div className="text-xs text-red-400 flex items-center gap-1">
+              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+              Ended
+            </div>
+          )}
+          
+          {/* Action buttons - compact */}
+          <div className="flex ml-2 gap-1">
             {message.lobbyCode && (
               <Button
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => copyLobbyCode(message.lobbyCode!)}
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                className="h-6 px-2 text-xs text-white/80 hover:text-white hover:bg-white/20"
               >
-                <Copy className="w-3 h-3 mr-1" />
-                Copy Code
+                <Copy className="w-3 h-3" />
+              </Button>
+            )}
+            {!isOwnMessage && message.lobbyId && lobbyInfo?.status === "waiting" && onJoinLobby && (
+              <Button
+                size="sm"
+                onClick={() => onJoinLobby(message.lobbyId!)}
+                className="h-6 px-3 text-xs bg-green-600 hover:bg-green-700"
+              >
+                Join
+              </Button>
+            )}
+            {!isOwnMessage && message.lobbyId && onNavigateToLobby && (lobbyInfo?.status === "playing" || lobbyInfo?.status === "finished") && (
+              <Button
+                size="sm"
+                onClick={() => onNavigateToLobby(message.lobbyId!)}
+                className="h-6 px-3 text-xs bg-purple-600 hover:bg-purple-700"
+                disabled={lobbyInfo.status === "finished"}
+              >
+                View
               </Button>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      ) : message.lobbyId ? (
+        <div className="text-xs text-white/50 flex items-center gap-1">
+          <div className="w-2 h-2 bg-white/30 rounded-full animate-pulse"></div>
+          Loading...
+        </div>
+      ) : (
+        message.lobbyCode && (
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => copyLobbyCode(message.lobbyCode!)}
+              className="h-6 px-2 text-xs text-white/80 hover:text-white hover:bg-white/20"
+            >
+              <Copy className="w-3 h-3" />
+            </Button>
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -342,25 +336,91 @@ export function ConversationView({
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
-  const renderMessage = (message: Message | OptimisticMessage, isOwn: boolean, isOptimistic = false) => {
+  // Helper function to determine message clustering
+  const getMessagePosition = (
+    currentMessage: Message | OptimisticMessage,
+    previousMessage: Message | OptimisticMessage | null,
+    nextMessage: Message | OptimisticMessage | null
+  ): 'single' | 'first' | 'middle' | 'last' => {
+    const currentSender = currentMessage.senderId;
+    const prevSender = previousMessage?.senderId;
+    const nextSender = nextMessage?.senderId;
+
+    const isFromSameSenderAsPrev = prevSender === currentSender;
+    const isFromSameSenderAsNext = nextSender === currentSender;
+
+    if (!isFromSameSenderAsPrev && !isFromSameSenderAsNext) return 'single';
+    if (!isFromSameSenderAsPrev && isFromSameSenderAsNext) return 'first';
+    if (isFromSameSenderAsPrev && isFromSameSenderAsNext) return 'middle';
+    if (isFromSameSenderAsPrev && !isFromSameSenderAsNext) return 'last';
+    return 'single';
+  };
+
+  const renderMessage = (message: Message | OptimisticMessage, isOwn: boolean, messagePosition: 'single' | 'first' | 'middle' | 'last', isOptimistic = false) => {
+    const showAvatar = messagePosition === 'single' || messagePosition === 'first';
+    const showTimestamp = messagePosition === 'single' || messagePosition === 'last';
+    
+    // Adjust spacing based on message position
+    const marginBottom = messagePosition === 'last' || messagePosition === 'single' ? 'mb-4' : 'mb-1';
+    
+    // Adjust border radius based on message position and owner
+    const getBorderRadius = () => {
+      const baseRadius = 'rounded-2xl';
+      
+      if (isOwn) {
+        switch (messagePosition) {
+          case 'single':
+            return 'rounded-2xl rounded-br-md';
+          case 'first':
+            return 'rounded-2xl rounded-br-md';
+          case 'middle':
+            return 'rounded-r-md rounded-l-2xl';
+          case 'last':
+            return 'rounded-2xl rounded-tr-md';
+          default:
+            return baseRadius;
+        }
+      } else {
+        switch (messagePosition) {
+          case 'single':
+            return 'rounded-2xl rounded-bl-md';
+          case 'first':
+            return 'rounded-2xl rounded-bl-md';
+          case 'middle':
+            return 'rounded-l-md rounded-r-2xl';
+          case 'last':
+            return 'rounded-2xl rounded-tl-md';
+          default:
+            return baseRadius;
+        }
+      }
+    };
+
     return (
       <motion.div
         key={message._id}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "flex gap-2 mb-4",
+          "flex gap-2",
+          marginBottom,
           isOwn ? "justify-end" : "justify-start"
         )}
       >
         {!isOwn && (
-          <UserAvatar
-            username={message.senderUsername || otherUserProfile?.username || ""}
-            avatarUrl={otherUserProfile?.avatarUrl}
-            rank={otherUserProfile?.rank}
-            size="sm"
-            className="mt-1"
-          />
+          <div className="w-8 flex flex-col justify-start">
+            {showAvatar ? (
+              <UserAvatar
+                username={message.senderUsername || otherUserProfile?.username || ""}
+                avatarUrl={otherUserProfile?.avatarUrl}
+                rank={otherUserProfile?.rank}
+                size="sm"
+                className="mt-1"
+              />
+            ) : (
+              <div className="w-8 h-8"></div>
+            )}
+          </div>
         )}
         
         <div className={cn(
@@ -369,10 +429,11 @@ export function ConversationView({
         )}>
           {/* Message bubble */}
           <div className={cn(
-            "rounded-2xl px-4 py-2 shadow-sm",
+            "px-4 py-2 shadow-sm relative",
+            getBorderRadius(),
             isOwn 
-              ? "bg-blue-600 text-white rounded-br-md"
-              : "bg-white/10 text-white rounded-bl-md",
+              ? "bg-blue-600 text-white"
+              : "bg-white/10 text-white",
             message.messageType !== "text" && "border border-white/20",
             isOptimistic && "opacity-70"
           )}>
@@ -386,59 +447,59 @@ export function ConversationView({
               />
             ) : message.messageType === "game_invite" ? (
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <ExternalLink className="w-4 h-4" />
-                  Game Invitation
-                </div>
-                <p className="text-sm">{message.content}</p>
-                <div className="pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <ExternalLink className="w-4 h-4 text-purple-400" />
+                    <span>Game Invite</span>
+                  </div>
                   {message.gameId && onNavigateToGame && (
                     <Button
                       size="sm"
                       onClick={() => onNavigateToGame(message.gameId!)}
-                      className="bg-purple-600 hover:bg-purple-700"
+                      className="h-6 px-3 text-xs bg-purple-600 hover:bg-purple-700"
                     >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Watch Game
+                      Watch
                     </Button>
                   )}
                 </div>
               </div>
             ) : (
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
             )}
-          </div>
-          
-          {/* Message metadata */}
-          <div className={cn(
-            "flex items-center gap-1 text-xs text-white/50",
-            isOwn ? "justify-end" : "justify-start"
-          )}>
-            <span>{formatTime(('timestamp' in message ? message.timestamp : message._creationTime) || Date.now())}</span>
-            {isOwn && !isOptimistic && (
-              <div className="flex items-center">
-                {message.readAt ? (
-                  <CheckCheck className="w-3 h-3 text-blue-400" />
-                ) : message.deliveredAt ? (
-                  <Check className="w-3 h-3" />
-                ) : (
-                  <AlertCircle className="w-3 h-3 text-yellow-400" />
+            
+            {/* Timestamp and status inline with message */}
+            {showTimestamp && (
+              <div className={cn(
+                "flex items-center gap-1 text-xs text-white/50 mt-1",
+                isOwn ? "justify-end" : "justify-start"
+              )}>
+                <span>{formatTime(('timestamp' in message ? message.timestamp : message._creationTime) || Date.now())}</span>
+                {isOwn && !isOptimistic && (
+                  <div className="flex items-center ml-1">
+                    {message.readAt ? (
+                      <CheckCheck className="w-3 h-3 text-blue-400" />
+                    ) : message.deliveredAt ? (
+                      <Check className="w-3 h-3" />
+                    ) : (
+                      <AlertCircle className="w-3 h-3 text-yellow-400" />
+                    )}
+                  </div>
                 )}
-              </div>
-            )}
-            {isOptimistic && 'status' in message && (
-              <div className="flex items-center gap-1">
-                {message.status === "sending" ? (
-                  <div className="w-3 h-3 border border-white/30 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-4 px-1 text-xs text-red-400 hover:text-red-300"
-                    onClick={() => void retryFailedMessage(message._id, message.content)}
-                  >
-                    Retry
-                  </Button>
+                {isOptimistic && 'status' in message && (
+                  <div className="flex items-center gap-1">
+                    {message.status === "sending" ? (
+                      <div className="w-3 h-3 border border-white/30 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-4 px-1 text-xs text-red-400 hover:text-red-300"
+                        onClick={() => void retryFailedMessage(message._id, message.content)}
+                      >
+                        Retry
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -446,13 +507,19 @@ export function ConversationView({
         </div>
         
         {isOwn && (
-          <UserAvatar
-            username={message.senderUsername || currentUserProfile?.username || ""}
-            avatarUrl={currentUserProfile?.avatarUrl}
-            rank={currentUserProfile?.rank}
-            size="sm"
-            className="mt-1"
-          />
+          <div className="w-8 flex flex-col justify-start">
+            {showAvatar ? (
+              <UserAvatar
+                username={message.senderUsername || currentUserProfile?.username || ""}
+                avatarUrl={currentUserProfile?.avatarUrl}
+                rank={currentUserProfile?.rank}
+                size="sm"
+                className="mt-1"
+              />
+            ) : (
+              <div className="w-8 h-8"></div>
+            )}
+          </div>
         )}
       </motion.div>
     );
@@ -523,10 +590,16 @@ export function ConversationView({
           </div>
         ) : (
           <div className="space-y-1">
-            {messages.map((message: Message | OptimisticMessage) => {
+            {messages.map((message: Message | OptimisticMessage, index) => {
               const isOptimistic = 'isOptimistic' in message;
               const isOwn = isOptimistic || message.senderId === currentUserProfile?.userId;
-              return renderMessage(message, isOwn, isOptimistic);
+              
+              // Determine message position for clustering
+              const previousMessage = index > 0 ? messages[index - 1] : null;
+              const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
+              const messagePosition = getMessagePosition(message, previousMessage, nextMessage);
+              
+              return renderMessage(message, isOwn, messagePosition, isOptimistic);
             })}
             <div ref={messagesEndRef} />
           </div>

@@ -25,7 +25,7 @@ export function MessageButton({ unreadCount, isActive, onClick, className }: Mes
         className={cn(
           "relative rounded-full py-5 px-6 transition-all duration-200",
           isActive 
-            ? "bg-blue-600 hover:bg-blue-700 text-white shadow-lg" 
+            ? "bg-gray-400/50 hover:bg-gray-100 text-white shadow-lg" 
             : "bg-white/10 hover:bg-white/20 text-white/90 border border-white/20"
         )}
       >

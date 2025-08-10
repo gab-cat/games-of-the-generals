@@ -1,0 +1,823 @@
+import { query, mutation, action } from "./_generated/server";
+import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
+import { api } from "./_generated/api";
+
+// Game pieces and their ranks (same as regular games)
+const PIECES = {
+  "Flag": 0,
+  "Private": 1,
+  "Sergeant": 2,
+  "2nd Lieutenant": 3,
+  "1st Lieutenant": 4,
+  "Captain": 5,
+  "Major": 6,
+  "Lieutenant Colonel": 7,
+  "Colonel": 8,
+  "1 Star General": 9,
+  "2 Star General": 10,
+  "3 Star General": 11,
+  "4 Star General": 12,
+  "5 Star General": 13,
+  "Spy": 14,
+};
+
+// Initial piece setup for each player (21 pieces total)
+const INITIAL_PIECES = [
+  "Flag",
+  "Spy", "Spy",
+  "Private", "Private", "Private", "Private", "Private", "Private",
+  "Sergeant",
+  "2nd Lieutenant",
+  "1st Lieutenant",
+  "Captain",
+  "Major",
+  "Lieutenant Colonel",
+  "Colonel",
+  "1 Star General",
+  "2 Star General",
+  "3 Star General",
+  "4 Star General",
+  "5 Star General"
+];
+
+// Create empty board
+function createEmptyBoard() {
+  return Array(8).fill(null).map(() => Array(9).fill(null));
+}
+
+// Generate random AI setup
+function generateAISetup() {
+  const shuffledPieces = [...INITIAL_PIECES].sort(() => Math.random() - 0.5);
+  const board = createEmptyBoard();
+  let pieceIndex = 0;
+  
+  // AI places pieces in rows 0, 1, 2 (top of board)
+  for (let row = 0; row < 3; row++) {
+    for (let col = 0; col < 9; col++) {
+      if (pieceIndex < shuffledPieces.length) {
+        board[row][col] = {
+          piece: shuffledPieces[pieceIndex],
+          player: "player2",
+          revealed: false,
+        };
+        pieceIndex++;
+      }
+    }
+  }
+  
+  return board;
+}
+
+// Start a new AI game session
+export const startAIGameSession = mutation({
+  args: { 
+    profileId: v.id("profiles"), 
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard"))
+  },
+  returns: v.object({ 
+    sessionId: v.string(), 
+    initialBoard: v.array(v.array(v.union(v.null(), v.object({
+      piece: v.string(),
+      player: v.union(v.literal("player1"), v.literal("player2")),
+      revealed: v.boolean(),
+    }))))
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const profile = await ctx.db.get(args.profileId);
+    if (!profile || profile.userId !== userId) {
+      throw new Error("Invalid profile");
+    }
+
+    // Generate unique session ID
+    const sessionId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Generate AI setup
+    const aiBoard = generateAISetup();
+    
+    // Store session in database
+    await ctx.db.insert("aiGameSessions", {
+      sessionId,
+      playerId: userId,
+      playerUsername: profile.username,
+      difficulty: args.difficulty,
+      status: "setup",
+      currentTurn: "player1",
+      board: aiBoard,
+      playerSetup: false,
+      aiSetup: true,
+      createdAt: Date.now(),
+      setupTimeStarted: Date.now(),
+      moveCount: 0,
+    });
+
+    return { 
+      sessionId, 
+      initialBoard: aiBoard
+    };
+  },
+});
+
+// Get AI game session
+export const getAIGameSession = query({
+  args: { sessionId: v.string() },
+  returns: v.union(v.null(), v.object({
+    _id: v.id("aiGameSessions"),
+    _creationTime: v.number(),
+    sessionId: v.string(),
+    playerId: v.id("users"),
+    playerUsername: v.string(),
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
+    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+    board: v.array(v.array(v.union(v.null(), v.object({
+      piece: v.string(),
+      player: v.union(v.literal("player1"), v.literal("player2")),
+      revealed: v.boolean(),
+    })))),
+    playerSetup: v.boolean(),
+    aiSetup: v.boolean(),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+    gameEndReason: v.optional(v.union(
+      v.literal("flag_captured"),
+      v.literal("flag_reached_base"),
+      v.literal("timeout"),
+      v.literal("surrender"),
+      v.literal("elimination")
+    )),
+    createdAt: v.number(),
+    setupTimeStarted: v.optional(v.number()),
+    gameTimeStarted: v.optional(v.number()),
+    lastMoveTime: v.optional(v.number()),
+    lastMoveFrom: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    lastMoveTo: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    moveCount: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const session = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .unique();
+
+    if (!session || session.playerId !== userId) {
+      return null;
+    }
+
+    return session;
+  },
+});
+
+// Setup player pieces for AI game
+export const setupAIGamePieces = mutation({
+  args: {
+    sessionId: v.string(),
+    pieces: v.array(v.object({
+      piece: v.string(),
+      row: v.number(),
+      col: v.number(),
+    })),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const session = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .unique();
+
+    if (!session || session.playerId !== userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    if (session.status !== "setup") {
+      throw new Error("Game is not in setup phase");
+    }
+
+    // Validate piece setup
+    if (args.pieces.length !== INITIAL_PIECES.length) {
+      throw new Error("Invalid number of pieces");
+    }
+
+    // Check if pieces are in correct area (player uses rows 5, 6, 7)
+    const validRows = [5, 6, 7];
+    for (const piece of args.pieces) {
+      if (!validRows.includes(piece.row) || piece.col < 0 || piece.col > 8) {
+        throw new Error("Pieces must be placed in your area");
+      }
+    }
+
+    // Update board with player pieces
+    const newBoard = [...session.board];
+    for (const piece of args.pieces) {
+      newBoard[piece.row][piece.col] = {
+        piece: piece.piece,
+        player: "player1",
+        revealed: false,
+      };
+    }
+
+    // Start the game since AI is always ready
+    await ctx.db.patch(session._id, {
+      board: newBoard,
+      playerSetup: true,
+      status: "playing",
+      gameTimeStarted: Date.now(),
+    });
+
+    return null;
+  },
+});
+
+// Battle logic helper function
+function resolveBattle(attacker: string, defender: string): "attacker" | "defender" | "tie" {
+  const attackerRank = PIECES[attacker as keyof typeof PIECES];
+  const defenderRank = PIECES[defender as keyof typeof PIECES];
+
+  if (attacker === "Spy") {
+    if (defender === "Flag" || (defenderRank >= 2 && defenderRank <= 13)) {
+      return "attacker";
+    } else if (defender === "Private") {
+      return "defender";
+    } else if (defender === "Spy") {
+      return "tie";
+    } else {
+      return "tie";
+    }
+  } else if (defender === "Spy") {
+    if (attacker === "Private") {
+      return "attacker";
+    } else if (attacker === "Spy") {
+      return "tie";
+    } else if (attackerRank >= 2 && attackerRank <= 13) {
+      return "defender";
+    } else {
+      return "tie";
+    }
+  } else if (attacker === "Private") {
+    if (defender === "Flag" || defender === "Spy") {
+      return "attacker";
+    } else if (defender === "Private") {
+      return "tie";
+    } else {
+      return "defender";
+    }
+  } else if (defender === "Private") {
+    if (attacker === "Spy") {
+      return "defender";
+    } else if (attacker === "Private") {
+      return "tie";
+    } else {
+      return "attacker";
+    }
+  } else if (attacker === "Flag" || defender === "Flag") {
+    if (attacker === "Flag" && defender === "Flag") {
+      return "attacker";
+    } else if (attacker === "Flag") {
+      throw new Error("Flag cannot move to attack");
+    } else {
+      return "attacker";
+    }
+  } else {
+    if (attackerRank > defenderRank) {
+      return "attacker";
+    } else if (attackerRank < defenderRank) {
+      return "defender";
+    } else {
+      return "tie";
+    }
+  }
+}
+
+// Make a move in AI game
+export const makeAIGameMove = mutation({
+  args: {
+    sessionId: v.string(),
+    fromRow: v.number(),
+    fromCol: v.number(),
+    toRow: v.number(),
+    toCol: v.number(),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    challengeResult: v.optional(v.object({
+      attacker: v.string(),
+      defender: v.string(),
+      winner: v.union(v.literal("attacker"), v.literal("defender"), v.literal("tie")),
+    })),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2")))
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const session = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .unique();
+
+    if (!session || session.playerId !== userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    if (session.status !== "playing") {
+      throw new Error("Game is not active");
+    }
+
+    if (session.currentTurn !== "player1") {
+      throw new Error("Not your turn");
+    }
+
+    // Validate move
+    const fromPiece = session.board[args.fromRow][args.fromCol];
+    if (!fromPiece || fromPiece.player !== "player1") {
+      throw new Error("Invalid piece selection");
+    }
+
+    // Check if move is valid (adjacent squares only)
+    const rowDiff = Math.abs(args.toRow - args.fromRow);
+    const colDiff = Math.abs(args.toCol - args.fromCol);
+    if (!((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1))) {
+      throw new Error("Invalid move - pieces can only move to adjacent squares");
+    }
+
+    // Check bounds
+    if (args.toRow < 0 || args.toRow > 7 || args.toCol < 0 || args.toCol > 8) {
+      throw new Error("Move out of bounds");
+    }
+
+    const toPiece = session.board[args.toRow][args.toCol];
+    const newBoard = session.board.map((row: any) => [...row]);
+
+    let challengeResult: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" } | null = null;
+    let gameWinner: "player1" | "player2" | null = null;
+
+    if (toPiece) {
+      // Challenge/battle
+      if (toPiece.player === "player1") {
+        throw new Error("Cannot attack your own piece");
+      }
+
+      const winner = resolveBattle(fromPiece.piece, toPiece.piece);
+
+      challengeResult = {
+        attacker: fromPiece.piece,
+        defender: toPiece.piece,
+        winner,
+      };
+
+      const revealedFromPiece = { ...fromPiece, revealed: false };
+
+      if (winner === "attacker") {
+        newBoard[args.toRow][args.toCol] = revealedFromPiece;
+        newBoard[args.fromRow][args.fromCol] = null;
+        
+        if (toPiece.piece === "Flag") {
+          gameWinner = "player1";
+        }
+      } else if (winner === "defender") {
+        newBoard[args.toRow][args.toCol] = toPiece;
+        newBoard[args.fromRow][args.fromCol] = null;
+      } else {
+        newBoard[args.toRow][args.toCol] = null;
+        newBoard[args.fromRow][args.fromCol] = null;
+      }
+    } else {
+      // Simple move
+      newBoard[args.toRow][args.toCol] = fromPiece;
+      newBoard[args.fromRow][args.fromCol] = null;
+
+      // Check if flag reached the opponent's back row
+      if (fromPiece.piece === "Flag" && args.toRow === 0) {
+        gameWinner = "player1";
+      }
+    }
+
+    // Update session
+    const updates: any = {
+      board: newBoard,
+      currentTurn: "player2", // Switch to AI turn
+      lastMoveTime: Date.now(),
+      lastMoveFrom: { row: args.fromRow, col: args.fromCol },
+      lastMoveTo: { row: args.toRow, col: args.toCol },
+      moveCount: session.moveCount + 1,
+    };
+
+    if (gameWinner) {
+      updates.status = "finished";
+      updates.winner = gameWinner;
+      updates.gameEndReason = challengeResult && challengeResult.defender === "Flag" 
+        ? "flag_captured" 
+        : fromPiece.piece === "Flag" 
+          ? "flag_reached_base" 
+          : "flag_captured";
+    }
+
+    await ctx.db.patch(session._id, updates);
+
+    return { 
+      success: true, 
+      challengeResult: challengeResult || undefined, 
+      winner: gameWinner || undefined
+    } as { 
+      success: boolean; 
+      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" }; 
+      winner?: "player1" | "player2" 
+    };
+  },
+});
+
+// Generate AI move
+export const generateAIMove = action({
+  args: { 
+    sessionId: v.string(),
+  },
+  returns: v.union(v.null(), v.object({
+    fromRow: v.number(),
+    fromCol: v.number(),
+    toRow: v.number(),
+    toCol: v.number(),
+    piece: v.string(),
+  })),
+  handler: async (ctx, args): Promise<{
+    fromRow: number;
+    fromCol: number;
+    toRow: number;
+    toCol: number;
+    piece: string;
+  } | null> => {
+    // Get session data directly from database instead of using query
+    const sessions = await ctx.runQuery(api.aiGame.getCurrentUserAIGame, {});
+    const session = sessions && sessions.sessionId === args.sessionId ? sessions : null;
+
+    if (!session || session.status !== "playing" || session.currentTurn !== "player2") {
+      return null;
+    }
+
+    // Simple AI logic based on difficulty
+    const aiPieces = [];
+    
+    // Find all AI pieces
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 9; col++) {
+        const piece = session.board[row][col];
+        if (piece && piece.player === "player2") {
+          aiPieces.push({ row, col, piece: piece.piece });
+        }
+      }
+    }
+
+    // Get all possible moves for AI pieces
+    const possibleMoves = [];
+    for (const aiPiece of aiPieces) {
+      const directions = [
+        { row: -1, col: 0 }, // up
+        { row: 1, col: 0 },  // down
+        { row: 0, col: -1 }, // left
+        { row: 0, col: 1 },  // right
+      ];
+
+      for (const dir of directions) {
+        const newRow = aiPiece.row + dir.row;
+        const newCol = aiPiece.col + dir.col;
+
+        // Check bounds
+        if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 8) continue;
+
+        const targetPiece = session.board[newRow][newCol];
+        
+        // Can't move to own piece
+        if (targetPiece && targetPiece.player === "player2") continue;
+
+        possibleMoves.push({
+          fromRow: aiPiece.row,
+          fromCol: aiPiece.col,
+          toRow: newRow,
+          toCol: newCol,
+          piece: aiPiece.piece,
+          isAttack: !!targetPiece,
+          targetPiece: targetPiece?.piece,
+        });
+      }
+    }
+
+    if (possibleMoves.length === 0) {
+      return null;
+    }
+
+    let selectedMove;
+
+    switch (session.difficulty) {
+      case "easy": {
+        // Random move
+        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+        break;
+      }
+        
+      case "medium": {
+        // Prefer attacks, avoid suicidal moves
+        const attacks = possibleMoves.filter(move => move.isAttack);
+        if (attacks.length > 0) {
+          // Prefer attacking with stronger pieces or spy attacks
+          const goodAttacks = attacks.filter(move => 
+            move.piece === "Spy" || 
+            (move.targetPiece === "Flag") ||
+            (PIECES[move.piece as keyof typeof PIECES] > PIECES[move.targetPiece as keyof typeof PIECES])
+          );
+          selectedMove = goodAttacks.length > 0 
+            ? goodAttacks[Math.floor(Math.random() * goodAttacks.length)]
+            : attacks[Math.floor(Math.random() * attacks.length)];
+        } else {
+          // Move forward when possible
+          const forwardMoves = possibleMoves.filter(move => move.toRow > move.fromRow);
+          selectedMove = forwardMoves.length > 0
+            ? forwardMoves[Math.floor(Math.random() * forwardMoves.length)]
+            : possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+        }
+        break;
+      }
+        
+      case "hard": {
+        // More strategic: prioritize flag capture, good trades, positioning
+        let bestMoves = possibleMoves;
+        
+        // Highest priority: Flag attacks
+        const flagAttacks = possibleMoves.filter(move => move.targetPiece === "Flag");
+        if (flagAttacks.length > 0) {
+          bestMoves = flagAttacks;
+        } else {
+          // Good attacks (Spy attacks, or favorable rank battles)
+          const goodAttacks = possibleMoves.filter(move => 
+            move.isAttack && (
+              move.piece === "Spy" && move.targetPiece !== "Private" ||
+              move.piece === "Private" && move.targetPiece === "Spy" ||
+              (move.piece !== "Spy" && move.targetPiece !== "Spy" && 
+               PIECES[move.piece as keyof typeof PIECES] > PIECES[move.targetPiece as keyof typeof PIECES])
+            )
+          );
+          
+          if (goodAttacks.length > 0) {
+            bestMoves = goodAttacks;
+          } else {
+            // Advance pieces strategically
+            const advanceMoves = possibleMoves.filter(move => !move.isAttack && move.toRow > move.fromRow);
+            if (advanceMoves.length > 0) {
+              bestMoves = advanceMoves;
+            }
+          }
+        }
+        
+        selectedMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+        break;
+      }
+        
+      default:
+        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+    }
+
+    return {
+      fromRow: selectedMove.fromRow,
+      fromCol: selectedMove.fromCol,
+      toRow: selectedMove.toRow,
+      toCol: selectedMove.toCol,
+      piece: selectedMove.piece,
+    };
+  },
+});
+
+// Execute AI move
+export const executeAIMove = mutation({
+  args: {
+    sessionId: v.string(),
+    fromRow: v.number(),
+    fromCol: v.number(),
+    toRow: v.number(),
+    toCol: v.number(),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    challengeResult: v.optional(v.object({
+      attacker: v.string(),
+      defender: v.string(),
+      winner: v.union(v.literal("attacker"), v.literal("defender"), v.literal("tie")),
+    })),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2")))
+  }),
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .unique();
+
+    if (!session || session.status !== "playing" || session.currentTurn !== "player2") {
+      throw new Error("Invalid AI move attempt");
+    }
+
+    // Execute move (similar to player move but for AI)
+    const fromPiece = session.board[args.fromRow][args.fromCol];
+    if (!fromPiece || fromPiece.player !== "player2") {
+      throw new Error("Invalid AI piece selection");
+    }
+
+    const toPiece = session.board[args.toRow][args.toCol];
+    const newBoard = session.board.map((row: any) => [...row]);
+
+    let challengeResult: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" } | null = null;
+    let gameWinner: "player1" | "player2" | null = null;
+
+    if (toPiece) {
+      // Battle logic
+      const winner = resolveBattle(fromPiece.piece, toPiece.piece);
+
+      challengeResult = {
+        attacker: fromPiece.piece,
+        defender: toPiece.piece,
+        winner,
+      };
+
+      const revealedFromPiece = { ...fromPiece, revealed: false };
+
+      if (winner === "attacker") {
+        newBoard[args.toRow][args.toCol] = revealedFromPiece;
+        newBoard[args.fromRow][args.fromCol] = null;
+        
+        if (toPiece.piece === "Flag") {
+          gameWinner = "player2";
+        }
+      } else if (winner === "defender") {
+        newBoard[args.toRow][args.toCol] = toPiece;
+        newBoard[args.fromRow][args.fromCol] = null;
+      } else {
+        newBoard[args.toRow][args.toCol] = null;
+        newBoard[args.fromRow][args.fromCol] = null;
+      }
+    } else {
+      // Simple move
+      newBoard[args.toRow][args.toCol] = fromPiece;
+      newBoard[args.fromRow][args.fromCol] = null;
+
+      // Check if AI flag reached player's back row
+      if (fromPiece.piece === "Flag" && args.toRow === 7) {
+        gameWinner = "player2";
+      }
+    }
+
+    // Update session
+    const updates: any = {
+      board: newBoard,
+      currentTurn: "player1", // Switch back to player
+      lastMoveTime: Date.now(),
+      lastMoveFrom: { row: args.fromRow, col: args.fromCol },
+      lastMoveTo: { row: args.toRow, col: args.toCol },
+      moveCount: session.moveCount + 1,
+    };
+
+    if (gameWinner) {
+      updates.status = "finished";
+      updates.winner = gameWinner;
+      updates.gameEndReason = challengeResult && challengeResult.defender === "Flag" 
+        ? "flag_captured" 
+        : fromPiece.piece === "Flag" 
+          ? "flag_reached_base" 
+          : "flag_captured";
+    }
+
+    await ctx.db.patch(session._id, updates);
+
+    return { 
+      success: true, 
+      challengeResult: challengeResult || undefined, 
+      winner: gameWinner || undefined
+    } as { 
+      success: boolean; 
+      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" }; 
+      winner?: "player1" | "player2" 
+    };
+  },
+});
+
+// Surrender AI game
+export const surrenderAIGame = mutation({
+  args: { sessionId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const session = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .unique();
+
+    if (!session || session.playerId !== userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    if (session.status !== "playing") {
+      throw new Error("Game is not active");
+    }
+
+    await ctx.db.patch(session._id, {
+      status: "finished",
+      winner: "player2",
+      gameEndReason: "surrender",
+    });
+
+    return null;
+  },
+});
+
+// Clean up AI game session
+export const cleanupAIGameSession = mutation({
+  args: { sessionId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const session = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
+      .unique();
+
+    if (!session || session.playerId !== userId) {
+      throw new Error("Session not found or unauthorized");
+    }
+
+    // Delete the session
+    await ctx.db.delete(session._id);
+
+    return null;
+  },
+});
+
+// Get current user's active AI game
+export const getCurrentUserAIGame = query({
+  args: {},
+  returns: v.union(v.null(), v.object({
+    _id: v.id("aiGameSessions"),
+    _creationTime: v.number(),
+    sessionId: v.string(),
+    playerId: v.id("users"),
+    playerUsername: v.string(),
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
+    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+    board: v.array(v.array(v.union(v.null(), v.object({
+      piece: v.string(),
+      player: v.union(v.literal("player1"), v.literal("player2")),
+      revealed: v.boolean(),
+    })))),
+    playerSetup: v.boolean(),
+    aiSetup: v.boolean(),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+    gameEndReason: v.optional(v.union(
+      v.literal("flag_captured"),
+      v.literal("flag_reached_base"),
+      v.literal("timeout"),
+      v.literal("surrender"),
+      v.literal("elimination")
+    )),
+    createdAt: v.number(),
+    setupTimeStarted: v.optional(v.number()),
+    gameTimeStarted: v.optional(v.number()),
+    lastMoveTime: v.optional(v.number()),
+    lastMoveFrom: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    lastMoveTo: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    moveCount: v.number(),
+  })),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const activeSession = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_player_status", (q) => q.eq("playerId", userId))
+      .filter((q) => q.or(
+        q.eq(q.field("status"), "setup"),
+        q.eq(q.field("status"), "playing")
+      ))
+      .first();
+
+    return activeSession;
+  },
+});

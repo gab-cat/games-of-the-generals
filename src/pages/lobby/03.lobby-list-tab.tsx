@@ -5,13 +5,14 @@ import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { LobbyCard } from "./LobbyCard";
 import { motion } from "framer-motion";
-import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key } from "lucide-react";
+import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { GameStartCountdownModal } from "../../components/GameStartCountdownModal";
+import generateName from "@scaleway/random-name";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -214,16 +215,23 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
 
   const handleCreateLobby = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!lobbyName.trim()) return;
+    
+    // Generate random name if no name is provided
+    const finalLobbyName = lobbyName.trim() || generateName();
 
     const maxSpectatorsNum = maxSpectators.trim() === "" ? undefined : parseInt(maxSpectators.trim());
     
     createLobbyMutation.mutate({ 
-      name: lobbyName.trim(),
+      name: finalLobbyName,
       isPrivate,
       allowSpectators,
       maxSpectators: maxSpectatorsNum,
     });
+  };
+
+  const generateRandomName = () => {
+    const randomName = generateName();
+    setLobbyName(randomName);
   };
 
   const handleJoinLobby = async (lobbyId: Id<"lobbies">) => {
@@ -489,14 +497,30 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={(e) => void handleCreateLobby(e)} className="space-y-4">
-                  <Input
-                    value={lobbyName}
-                    onChange={(e) => setLobbyName(e.target.value)}
-                    placeholder="Enter lobby name"
-                    required
-                    disabled={createLobbyMutation.isPending}
-                    className="bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
-                  />
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        value={lobbyName}
+                        onChange={(e) => setLobbyName(e.target.value)}
+                        placeholder="Enter lobby name"
+                        disabled={createLobbyMutation.isPending}
+                        className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={generateRandomName}
+                        disabled={createLobbyMutation.isPending}
+                        className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20 px-3"
+                        title="Generate random name"
+                      >
+                        <Shuffle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-white/50">
+                      Leave empty to auto-generate a random name
+                    </p>
+                  </div>
                   
                   <div className="flex items-center space-x-2">
                     <input

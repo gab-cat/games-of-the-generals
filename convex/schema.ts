@@ -239,6 +239,47 @@ const applicationTables = {
     .index("by_participant2_last_message", ["participant2Id", "lastMessageAt"]) // For efficient sorting
     .index("by_participant1_unread", ["participant1Id", "participant1UnreadCount"]) // For unread optimization
     .index("by_participant2_unread", ["participant2Id", "participant2UnreadCount"]), // For unread optimization
+
+  // AI Game Sessions (ephemeral, not for replays/achievements)
+  aiGameSessions: defineTable({
+    sessionId: v.string(),
+    playerId: v.id("users"),
+    playerUsername: v.string(),
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
+    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+    board: v.array(v.array(v.union(v.null(), v.object({
+      piece: v.string(),
+      player: v.union(v.literal("player1"), v.literal("player2")),
+      revealed: v.boolean(),
+    })))),
+    playerSetup: v.boolean(),
+    aiSetup: v.boolean(),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+    gameEndReason: v.optional(v.union(
+      v.literal("flag_captured"),
+      v.literal("flag_reached_base"),
+      v.literal("timeout"),
+      v.literal("surrender"),
+      v.literal("elimination")
+    )),
+    createdAt: v.number(),
+    setupTimeStarted: v.optional(v.number()),
+    gameTimeStarted: v.optional(v.number()),
+    lastMoveTime: v.optional(v.number()),
+    lastMoveFrom: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    lastMoveTo: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    moveCount: v.number(),
+  })
+    .index("by_session_id", ["sessionId"])
+    .index("by_player", ["playerId"])
+    .index("by_player_status", ["playerId", "status"]),
 };
 
 export default defineSchema({
