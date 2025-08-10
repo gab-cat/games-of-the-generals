@@ -33,7 +33,7 @@ function RootComponent() {
       </Layout>
       <ConvertAnonymousPopup />
       <Toaster theme="dark" className="rounded-2xl" />
-      <TanStackRouterDevtools />
+      {import.meta.env.DEV && <TanStackRouterDevtools />}
     </div>
   )
 }

@@ -98,7 +98,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 lg:pb-0">
       {/* Minimalist Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -135,14 +135,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           ))}
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="relative max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between">
           
           {/* Left Section - Logo & Title */}
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="flex items-center gap-4 flex-1"
+            className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0"
           >
             {/* Minimalist Logo */}
             <motion.div
@@ -150,9 +150,9 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
               whileHover={{ scale: 1.05 }}
-              className="w-10 h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200"
+              className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200 flex-shrink-0"
             >
-              <Gamepad2 className="w-5 h-5 text-white/90 group-hover:text-white transition-colors" />
+              <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-white/90 group-hover:text-white transition-colors" />
             </motion.div>
             
             {/* Clean Title */}
@@ -160,11 +160,12 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               initial={{ y: -10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="flex flex-col cursor-pointer"
+              className="flex flex-col cursor-pointer min-w-0"
               onClick={() => void navigate({ to: "/" })}
             >
-              <h1 className="text-xl font-display font-semibold text-white/95 tracking-tight hover:text-white transition-colors">
-                Games of the Generals
+              <h1 className="text-base sm:text-xl font-display font-semibold text-white/95 tracking-tight hover:text-white transition-colors truncate">
+                <span className="hidden sm:inline">Games of the Generals</span>
+                <span className="sm:hidden">GoG</span>
               </h1>
               <div className="w-full h-px bg-white/20 mt-1"></div>
             </motion.div>
@@ -176,7 +177,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               initial={{ y: -10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="flex items-center gap-2 flex-1 justify-center"
+              className="hidden lg:flex items-center gap-2 flex-1 justify-center"
             >
               <div className="flex items-center bg-white/1 backdrop-blur-sm border border-white/20 rounded-full p-1">
                 {navigationItems.map((item) => {
@@ -195,7 +196,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       )}
                     >
                       <Icon className="w-4 h-4" />
-                      {item.label}
+                      <span className="hidden xl:inline">{item.label}</span>
                     </Button>
                   );
                 })}
@@ -209,7 +210,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="flex-1 flex justify-end items-center gap-3"
+              className="flex-1 flex justify-end items-center gap-2 sm:gap-3 min-w-0"
             >
               {/* Message Button */}
               <MessageButton
@@ -227,11 +228,11 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                   >
                     <Button 
                       variant="ghost" 
-                      className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center gap-3 px-6 py-2 rounded-full group h-12"
+                      className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2 rounded-full group h-10 sm:h-12 min-w-0"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <div className="text-white/90 font-medium text-sm">{user.username}</div>
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                        <div className="text-right hidden sm:block">
+                          <div className="text-white/90 font-medium text-sm truncate">{user.username}</div>
                           <div className="flex items-center gap-1 justify-end">
                             <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                             <span className="text-white/50 text-xs">Online</span>
@@ -242,17 +243,17 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                           avatarUrl={profile?.avatarUrl}
                           rank={profile?.rank}
                           size="sm"
-                          className="ring-1 ring-white/30"
+                          className="ring-1 ring-white/30 flex-shrink-0"
                         />
                       </div>
-                      <ChevronDown className="w-4 h-4 text-white/60 group-hover:text-white/90 transition-colors" />
+                      <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-white/60 group-hover:text-white/90 transition-colors flex-shrink-0" />
                     </Button>
                   </motion.div>
                 </DropdownMenuTrigger>
                 
                 <DropdownMenuContent 
                   align="end" 
-                  className="w-56 bg-gray-600/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl mt-2"
+                  className="w-56 bg-black/50 backdrop-blur-lg border border-white/20 shadow-2xl rounded-2xl mt-2"
                 >
                   {/* User Header */}
                   <div className="px-3 py-3 border-b border-white/10">
@@ -320,9 +321,43 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto mt-8">
+      <main className="flex-1 max-w-7xl mx-auto mt-4 sm:mt-8 px-3 sm:px-6">
         {children}
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      {isAuthenticated && (
+        <motion.nav
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/40  backdrop-blur-2xl border-t border-white/20"
+        >
+          <div className="flex items-center justify-around py-3 px-2">
+            {navigationItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = isActiveTab(item.path);
+              return (
+                <Button
+                  key={item.path}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void navigate({ to: item.path })}
+                  className={cn(
+                    "flex flex-row rounded-full border border-none items-center bg-white/1 gap-2 px-4 py-2 transition-all duration-200 w-28 h-10 flex-shrink-0",
+                    isActive 
+                      ? "border-white/20 text-white" 
+                      : "text-white/70 hover:text-white hover:bg-white/10"
+                  )}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-xs font-medium text-center leading-tight">{item.label}</span>
+                </Button>
+              );
+            })}
+          </div>
+        </motion.nav>
+      )}
 
       {/* Messaging Panel */}
       <MessagingPanel

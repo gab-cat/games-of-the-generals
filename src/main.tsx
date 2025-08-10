@@ -43,8 +43,8 @@ createRoot(document.getElementById("root")!).render(
     <ConvexAuthProvider client={convex}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        {/* Add React Query DevTools for development */}
-        <ReactQueryDevtools initialIsOpen={false} />
+        {/* Add React Query DevTools for development only */}
+        {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
     </ConvexAuthProvider>
   </ConvexProvider>,

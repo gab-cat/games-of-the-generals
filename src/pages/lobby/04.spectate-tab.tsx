@@ -86,7 +86,7 @@ export function SpectateTab({ onSpectateGame, spectateByIdMutation }: SpectateTa
         >
           <Dialog open={showSpectateById} onOpenChange={setShowSpectateById}>
             <DialogTrigger asChild>
-              <Button className="flex items-center gap-2 bg-gradient-to-r text-white from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+              <Button variant='gradient' className="flex items-center gap-2 transition-all">
                 <Search className="h-4 w-4" />
                 Spectate by ID
               </Button>
@@ -114,7 +114,8 @@ export function SpectateTab({ onSpectateGame, spectateByIdMutation }: SpectateTa
                   </Button>
                   <Button 
                     type="submit" 
-                    className="bg-gradient-to-r text-white from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    variant="gradient"
+                    className="transition-all"
                     disabled={spectateByIdMutation.isPending}
                   >
                     {spectateByIdMutation.isPending ? (

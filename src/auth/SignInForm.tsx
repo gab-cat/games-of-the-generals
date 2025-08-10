@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
 import { Crown } from "lucide-react";
-import Aurora from "../components/backgrounds/Aurora/Aurora";
+import ImageBackground from "../components/backgrounds/ImageBackground";
+import Squares from "../components/backgrounds/Squares/Squares";
 import { PasswordResetForm } from "./PasswordResetForm";
 import { useAuthMutation } from "../lib/convex-query-hooks";
 
@@ -38,89 +39,93 @@ export function SignInForm() {
   });
 
   return (
-    <div className="min-h-screen flex -mt-8">
+    <div className="absolute inset-0 w-screen h-screen overflow-hidden">
+      {/* Mobile Background */}
+      <div className="absolute inset-0 lg:hidden bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900">
+        <div className="absolute inset-0">
+          <ImageBackground overlayOpacity={0.6} />
+        </div>
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-900/60 via-gray-900/80 to-slate-950/95" />
+      </div>
+
       {/* Left Side - Premium Design Section */}
       <motion.div 
-        className="flex-1 relative overflow-hidden bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900"
+        className="absolute top-0 left-0 w-full h-full lg:w-1/2 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 overflow-hidden lg:block hidden"
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
-        {/* Aurora Background */}
-        <div className="absolute inset-0 opacity-30">
-          <Aurora 
-            colorStops={["#374151", "#4B5563", "#6B7280"]}
-            blend={0.4}
-            amplitude={0.8}
-            speed={0.2}
-          />
+        {/* Image Background */}
+                {/* Image Background */}
+        <div className="absolute inset-0">
+          <ImageBackground overlayOpacity={0.4} leftFeatherOnly={true} />
         </div>
         
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-gray-900/70 to-slate-900/90" />
         
         {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center h-full px-12 max-w-2xl">
+        <div className="relative z-10 flex flex-col justify-center h-full px-4 sm:px-6 lg:px-12 max-w-2xl min-h-screen lg:min-h-full">
           <motion.div 
-            className="space-y-10 text-left"
+            className="space-y-6 lg:space-y-10 text-left"
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             {/* Logo/Icon */}
             <motion.div 
-              className="flex items-center space-x-4"
+              className="flex items-center space-x-3 lg:space-x-4"
               initial={{ scale: 0, rotate: -180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ delay: 0.5, duration: 0.8, type: "spring" }}
             >
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-2xl">
-                <Crown className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl bg-gradient-to-br from-slate-600 to-gray-700 flex items-center justify-center shadow-2xl">
+                <Crown className="w-6 h-6 lg:w-8 lg:h-8 text-white" />
               </div>
-              <div className="text-white/40 font-mono text-sm tracking-wider">
+              <div className="text-white/40 font-mono text-xs lg:text-sm tracking-wider">
                 TACTICAL WARFARE
               </div>
             </motion.div>
             
             {/* Title */}
             <div className="space-y-2">
-              <h1 className="text-7xl font-display font-bold bg-gradient-to-r from-slate-300 via-gray-200 to-slate-300 bg-clip-text text-transparent leading-tight">
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-display font-bold bg-gradient-to-r from-slate-300 via-gray-200 to-slate-300 bg-clip-text text-transparent leading-tight">
                 Games of the
               </h1>
-              <h1 className="text-7xl font-display font-bold bg-gradient-to-r from-gray-200 via-slate-100 to-gray-200 bg-clip-text text-transparent">
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-display font-bold bg-gradient-to-r from-gray-200 via-slate-100 to-gray-200 bg-clip-text text-transparent">
                 Generals
               </h1>
-              <div className="w-24 h-1 bg-gradient-to-r from-slate-400 to-gray-500 mt-4"></div>
+              <div className="w-16 lg:w-24 h-1 bg-gradient-to-r from-slate-400 to-gray-500 mt-4"></div>
             </div>
             
             {/* Game Description */}
-            <div className="space-y-6 text-white/80 font-body max-w-lg">
-              <p className="text-base font-body font-light leading-relaxed">
+            <div className="space-y-4 lg:space-y-6 text-white/80 font-body max-w-lg">
+              <p className="text-sm lg:text-base font-body font-light leading-relaxed">
                 Master the ancient Filipino military strategy game where deception and tactical brilliance determine victory.
               </p>
               
-              <div className="space-y-4">
+              <div className="space-y-3 lg:space-y-4 hidden sm:block">
                 <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-slate-400 rounded-full mt-2"></div>
+                  <div className="w-2 h-2 bg-slate-400 rounded-full mt-2 flex-shrink-0"></div>
                   <div>
-                    <h3 className="font-semibold font-display text-white/90 mb-1">Strategic Gameplay</h3>
-                    <p className="text-sm text-white/70">Deploy 21 pieces with hidden ranks. Only you know your army's true strength.</p>
+                    <h3 className="font-semibold font-display text-white/90 mb-1 text-sm lg:text-base">Strategic Gameplay</h3>
+                    <p className="text-xs lg:text-sm text-white/70">Deploy 21 pieces with hidden ranks. Only you know your army's true strength.</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-slate-400 rounded-full mt-2"></div>
+                  <div className="w-2 h-2 bg-slate-400 rounded-full mt-2 flex-shrink-0"></div>
                   <div>
-                    <h3 className="font-semibold font-display text-white/90 mb-1">Mind Games</h3>
-                    <p className="text-sm text-white/70">Bluff, deceive, and outmaneuver opponents through pure psychological warfare.</p>
+                    <h3 className="font-semibold font-display text-white/90 mb-1 text-sm lg:text-base">Mind Games</h3>
+                    <p className="text-xs lg:text-sm text-white/70">Bluff, deceive, and outmaneuver opponents through pure psychological warfare.</p>
                   </div>
                 </div>
                 
                 <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-slate-400 rounded-full mt-2"></div>
+                  <div className="w-2 h-2 bg-slate-400 rounded-full mt-2 flex-shrink-0"></div>
                   <div>
-                    <h3 className="font-semibold font-display text-white/90 mb-1">Global Competition</h3>
-                    <p className="text-sm text-white/70">Challenge players worldwide in real-time strategic battles.</p>
+                    <h3 className="font-semibold font-display text-white/90 mb-1 text-sm lg:text-base">Global Competition</h3>
+                    <p className="text-xs lg:text-sm text-white/70">Challenge players worldwide in real-time strategic battles.</p>
                   </div>
                 </div>
               </div>
@@ -128,30 +133,30 @@ export function SignInForm() {
             
             {/* Game Stats */}
             <motion.div 
-              className="grid grid-cols-3 gap-8 pt-8 border-t border-white/10"
+              className="grid grid-cols-3 gap-4 lg:gap-8 pt-6 lg:pt-8 border-t border-white/10"
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.6 }}
             >
               <div>
-                <div className="text-2xl font-display font-bold text-white">21</div>
-                <div className="text-sm text-white/60 font-body">Unique Pieces</div>
+                <div className="text-xl lg:text-2xl font-display font-bold text-white">21</div>
+                <div className="text-xs lg:text-sm text-white/60 font-body">Unique Pieces</div>
               </div>
               <div>
-                <div className="text-2xl font-display font-bold text-white">∞</div>
-                <div className="text-sm text-white/60 font-body">Strategies</div>
+                <div className="text-xl lg:text-2xl font-display font-bold text-white">∞</div>
+                <div className="text-xs lg:text-sm text-white/60 font-body">Strategies</div>
               </div>
               <div>
-                <div className="text-2xl font-display font-bold text-white">1v1</div>
-                <div className="text-sm text-white/60 font-body">Battle Mode</div>
+                <div className="text-xl lg:text-2xl font-display font-bold text-white">1v1</div>
+                <div className="text-xs lg:text-sm text-white/60 font-body">Battle Mode</div>
               </div>
             </motion.div>
           </motion.div>
         </div>
         
-        {/* Floating Elements */}
+        {/* Floating Elements - Hidden on mobile */}
         <motion.div 
-          className="absolute top-20 left-20 w-2 h-2 bg-slate-400 rounded-full opacity-40"
+          className="absolute top-20 left-20 w-2 h-2 bg-slate-400 rounded-full opacity-40 hidden lg:block"
           animate={{ 
             y: [0, -20, 0],
             opacity: [0.2, 0.4, 0.2]
@@ -159,7 +164,7 @@ export function SignInForm() {
           transition={{ duration: 3, repeat: Infinity }}
         />
         <motion.div 
-          className="absolute bottom-32 left-32 w-1 h-1 bg-gray-400 rounded-full opacity-30"
+          className="absolute bottom-32 left-32 w-1 h-1 bg-gray-400 rounded-full opacity-30 hidden lg:block"
           animate={{ 
             y: [0, -15, 0],
             opacity: [0.1, 0.3, 0.1]
@@ -167,7 +172,7 @@ export function SignInForm() {
           transition={{ duration: 4, repeat: Infinity, delay: 1 }}
         />
         <motion.div 
-          className="absolute top-40 right-40 w-1.5 h-1.5 bg-slate-300 rounded-full opacity-35"
+          className="absolute top-40 right-40 w-1.5 h-1.5 bg-slate-300 rounded-full opacity-35 hidden lg:block"
           animate={{ 
             y: [0, -25, 0],
             opacity: [0.15, 0.35, 0.15]
@@ -178,12 +183,23 @@ export function SignInForm() {
 
       {/* Right Side - Sign In Form */}
       <motion.div 
-        className="flex-1 flex items-center justify-center bg-slate-950/95 backdrop-blur-xl"
+        className="absolute top-0 left-0 w-full h-full lg:left-1/2 lg:w-1/2 flex items-center justify-center z-10 overflow-hidden"
         initial={{ x: 100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
       >
-        <div className="w-full max-w-md px-8">
+        {/* Squares Background for Right Side */}
+        <div className="absolute inset-0 opacity-30">
+          <Squares 
+            direction="diagonal"
+            speed={0.5}
+            borderColor="rgba(148, 163, 184, 0.3)"
+            squareSize={60}
+            hoverFillColor="rgba(148, 163, 184, 0.1)"
+          />
+        </div>
+        
+        <div className="w-full max-w-md px-4 sm:px-6 lg:px-8 py-8 lg:py-0 min-h-screen lg:min-h-full flex flex-col justify-center relative z-20">
           {flow === "resetPassword" ? (
             <PasswordResetForm onBack={() => setFlow("signIn")} />
           ) : (
@@ -191,14 +207,14 @@ export function SignInForm() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.6, duration: 0.6 }}
-              className="space-y-8"
+              className="space-y-6 lg:space-y-8"
             >
               {/* Header */}
-              <div className="text-center space-y-3">
-                <h2 className="text-3xl font-display font-bold text-white">
+              <div className="text-center space-y-2 lg:space-y-3">
+                <h2 className="text-2xl lg:text-3xl font-display font-bold text-white">
                   {flow === "signIn" ? "Welcome Back" : "Join the Battle"}
                 </h2>
-                <p className="text-white/60 text-lg font-body">
+                <p className="text-white/60 text-base lg:text-lg font-body">
                   {flow === "signIn" 
                     ? "Continue your strategic journey" 
                     : "Create your commander profile"
@@ -208,7 +224,7 @@ export function SignInForm() {
 
               {/* Form */}
               <form
-                className="space-y-6"
+                className="space-y-5 lg:space-y-6"
                 onSubmit={(e) => {
                   e.preventDefault();
                   const formData = new FormData(e.target as HTMLFormElement);
@@ -219,7 +235,7 @@ export function SignInForm() {
                   });
                 }}
               >
-                <div className="space-y-5">
+                <div className="space-y-4 lg:space-y-5">
                   <div className="space-y-2">
                     <label htmlFor="email" className="text-sm font-medium text-white/90 font-body">
                       Email Address
@@ -229,7 +245,7 @@ export function SignInForm() {
                       name="email"
                       type="email"
                       placeholder="commander@example.com"
-                      className="w-full px-4 py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
                       required
                     />
                   </div>
@@ -243,7 +259,7 @@ export function SignInForm() {
                         <button
                           type="button"
                           onClick={() => setFlow("resetPassword")}
-                          className="text-sm text-white/60 hover:text-white/90 transition-colors duration-200 hover:underline underline-offset-4 font-body"
+                          className="text-xs underline sm:text-sm text-white/60 hover:text-white/90 transition-colors duration-200 hover:underline underline-offset-4 font-body"
                         >
                           Forgot password?
                         </button>
@@ -254,7 +270,7 @@ export function SignInForm() {
                       name="password"
                       type="password"
                       placeholder="Enter your password"
-                      className="w-full px-4 py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body"
+                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
                       required
                     />
                   </div>
@@ -262,7 +278,7 @@ export function SignInForm() {
                 
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body" 
+                  className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2.5 sm:py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm lg:text-base" 
                   disabled={authMutation.isPending}
                 >
                   {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
@@ -274,7 +290,7 @@ export function SignInForm() {
                 <button
                   type="button"
                   onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
-                  className="text-sm text-white/60 hover:text-white/90 transition-colors duration-200 hover:underline underline-offset-4 font-body"
+                  className="text-xs sm:text-sm text-white/60 underline hover:text-white/90 transition-colors duration-200 hover:underline underline-offset-4 font-body"
                 >
                   {flow === "signIn" 
                     ? "New to the battlefield? Create an account" 
@@ -286,14 +302,14 @@ export function SignInForm() {
               {/* Divider */}
               <div className="flex items-center">
                 <Separator className="flex-1 bg-white/20" />
-                <span className="mx-4 text-white/40 text-sm font-medium font-mono">OR</span>
+                <span className="mx-3 sm:mx-4 text-white/40 text-xs sm:text-sm font-medium font-mono">OR</span>
                 <Separator className="flex-1 bg-white/20" />
               </div>
 
               {/* Anonymous Sign In */}
               <Button 
                 variant="outline" 
-                className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-3 rounded-full font-medium font-body" 
+                className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
                 onClick={() => authMutation.mutate({ provider: "anonymous" })}
                 disabled={authMutation.isPending}
               >

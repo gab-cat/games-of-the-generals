@@ -377,11 +377,11 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
       )}
 
       {/* Create/Join Lobby Actions */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <motion.div 
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          className="flex items-center gap-4"
+          className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
         >
           {/* Battle Rooms Icon Section */}
           <div className="flex items-center gap-3">
@@ -389,17 +389,17 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.1, type: "spring" }}
-              className="w-12 h-12 bg-gradient-to-br from-orange-500/20 via-red-500/20 to-pink-500/20 backdrop-blur-sm border border-orange-500/30 rounded-xl flex items-center justify-center shadow-lg"
+              className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-500/20 via-red-500/20 to-pink-500/20 backdrop-blur-sm border border-orange-500/30 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
             >
-              <Sword className="h-6 w-6 text-orange-400" />
+              <Sword className="h-5 w-5 sm:h-6 sm:w-6 text-orange-400" />
             </motion.div>
             
-            <div className="flex flex-col">
+            <div className="flex flex-col min-w-0">
               <motion.h3 
                 initial={{ y: -10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="text-lg font-semibold text-white/90"
+                className="text-base sm:text-lg font-semibold text-white/90"
               >
                 Battle Rooms
               </motion.h3>
@@ -409,7 +409,7 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
                 transition={{ delay: 0.4, duration: 0.6 }}
                 className="flex items-center gap-2"
               >
-                <div className="h-0.5 w-8 bg-gradient-to-r from-orange-500/60 to-red-500/60 rounded-full"></div>
+                <div className="h-0.5 w-6 sm:w-8 bg-gradient-to-r from-orange-500/60 to-red-500/60 rounded-full"></div>
                 <span className="text-xs text-white/50 font-mono">
                   {lobbies.length} available
                 </span>
@@ -422,13 +422,14 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
           initial={{ x: 20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="flex gap-2"
+          className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto"
         >
           <Dialog open={showJoinByCode} onOpenChange={setShowJoinByCode}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20">
+              <Button variant="outline" className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20 w-full sm:w-auto">
                 <Key className="h-4 w-4" />
-                Join by Code
+                <span className="sm:hidden">Join by Code</span>
+                <span className="hidden sm:inline">Join by Code</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] bg-gray-500/10 backdrop-blur-md  border border-white/10">
@@ -474,9 +475,10 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
           {!activeLobby && (
             <Dialog open={showCreateLobby} onOpenChange={setShowCreateLobby}>
               <DialogTrigger asChild>
-                <Button className="flex items-center gap-2 bg-gradient-to-r text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                <Button className="flex items-center justify-center gap-2 bg-gradient-to-r text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full sm:w-auto">
                   <Plus className="h-4 w-4" />
-                  Create Lobby
+                  <span className="sm:hidden">Create Room</span>
+                  <span className="hidden sm:inline">Create Lobby</span>
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-[425px] bg-gray-500/10 backdrop-blur-md border border-white/10">

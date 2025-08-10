@@ -1,6 +1,6 @@
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Medal } from "lucide-react";
 
@@ -8,6 +8,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { MatchHistoryHeader } from "./01.match-history-header";
 import { LoadingSpinner } from "./04.loading-spinner";
 import { ErrorMessage } from "./05.error-message";
+import { PaginationControls } from "./02.pagination-controls";
 import { MatchItem } from "./MatchItem";
 
 interface MatchListProps {
@@ -16,37 +17,29 @@ interface MatchListProps {
 }
 
 export function MatchList({ userId, onViewReplay }: MatchListProps) {
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
-  const [allMatches, setAllMatches] = useState<any[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const pageSize = 8; // Increased from 5 to reduce pagination requests
+  const [currentPage, setCurrentPage] = useState(0);
+  const pageSize = 8;
   
+  // Get match history data
   const { data: matchHistory, isPending, error } = useConvexQuery(api.games.getMatchHistory, { 
     userId,
     paginationOpts: {
       numItems: pageSize,
-      cursor,
     },
   });
 
-  // Update matches when new data arrives
-  useEffect(() => {
-    if (matchHistory) {
-      if (cursor === undefined) {
-        // First load
-        setAllMatches(matchHistory.page || matchHistory.matches || []);
-      } else {
-        // Load more
-        setAllMatches(prev => [...prev, ...(matchHistory.page || [])]);
-      }
-      setHasMore(!matchHistory.isDone && matchHistory.page?.length === pageSize);
-    }
-  }, [matchHistory, cursor, pageSize]);
+  // Since the API returns all matches in one go, we'll handle pagination client-side
+  const allMatches = matchHistory?.matches || matchHistory?.page || [];
+  const totalMatches = allMatches.length;
+  const totalPages = Math.ceil(totalMatches / pageSize);
+  
+  // Get current page data
+  const startIndex = currentPage * pageSize;
+  const endIndex = startIndex + pageSize;
+  const currentPageMatches = allMatches.slice(startIndex, endIndex);
 
-  const loadMore = () => {
-    if (matchHistory && !matchHistory.isDone && matchHistory.continueCursor) {
-      setCursor(matchHistory.continueCursor);
-    }
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (error) {
@@ -57,39 +50,28 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
     return <LoadingSpinner />;
   }
 
-  if (!matchHistory || (allMatches.length === 0 && !isPending)) {
+  if (!matchHistory || allMatches.length === 0) {
     return (
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="text-center py-12"
+        className="text-center py-8 sm:py-12 px-4"
       >
-        <Medal className="h-12 w-12 text-white/40 mx-auto mb-4" />
-        <p className="text-white/60">No battle history yet.</p>
-        <p className="text-sm text-white/40">Fight your first battle to start your legend!</p>
+        <Medal className="h-10 w-10 sm:h-12 sm:w-12 text-white/40 mx-auto mb-4" />
+        <p className="text-white/60 text-sm sm:text-base">No battle history yet.</p>
+        <p className="text-xs sm:text-sm text-white/40">Fight your first battle to start your legend!</p>
       </motion.div>
     );
   }
 
-  const displayMatches = allMatches.length > 0 ? allMatches : (matchHistory?.matches || []);
-
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between mb-6">
-        <MatchHistoryHeader totalMatches={matchHistory?.total || displayMatches.length} />
-        {hasMore && (
-          <button 
-            onClick={loadMore}
-            disabled={isPending}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isPending ? "Loading..." : "Load More"}
-          </button>
-        )}
+    <div className="space-y-3 sm:space-y-4">
+      <div className="mb-4 sm:mb-6">
+        <MatchHistoryHeader totalMatches={totalMatches} />
       </div>
       
-      <div className="space-y-2">
-        {displayMatches.map((match, index: number) => (
+      <div className="space-y-2 sm:space-y-3">
+        {currentPageMatches.map((match, index: number) => (
           <MatchItem
             key={match._id}
             match={match}
@@ -98,6 +80,14 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
           />
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <PaginationControls
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+        />
+      )}
     </div>
   );
 }

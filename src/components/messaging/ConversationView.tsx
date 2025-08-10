@@ -472,10 +472,10 @@ export function ConversationView({
       <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-slate-900/50">
         {onBack && (
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={onBack}
-            className="p-1 text-white/80 hover:text-white hover:bg-white/10"
+            className="p-2 text-white/80 hover:text-white hover:bg-white/10"
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
@@ -548,7 +548,8 @@ export function ConversationView({
             onClick={() => void handleSendMessage()}
             disabled={!newMessage.trim() || isLoading}
             size="sm"
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            variant='gradient'
+            className="disabled:opacity-50 rounded-full"
           >
             <Send className="w-4 h-4" />
           </Button>

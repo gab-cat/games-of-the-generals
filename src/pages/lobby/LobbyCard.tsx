@@ -49,37 +49,37 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
       transition={{ delay: index * 0.1 }}
     >
       <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all duration-200 shadow-lg">
-        <CardContent className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm">
-              <Users className="h-5 w-5 text-blue-300" />
+        <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 gap-3 sm:gap-0">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm flex-shrink-0">
+              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300" />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <UserAvatar 
                 username={lobby.hostUsername}
                 avatarUrl={hostProfile?.avatarUrl}
                 rank={hostProfile?.rank}
                 size="sm"
-                className="ring-1 ring-white/20"
+                className="ring-1 ring-white/20 flex-shrink-0"
               />
-              <div>
-                <h4 className="font-semibold text-white/90">{lobby.name}</h4>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-white/60">
+              <div className="min-w-0 flex-1">
+                <h4 className="font-semibold text-sm sm:text-base text-white/90 truncate">{lobby.name}</h4>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                  <p className="text-xs sm:text-sm text-white/60 truncate">
                     Host: {lobby.hostUsername}
                   </p>
                   {lobby.playerUsername && playerProfile && (
                     <>
-                      <span className="text-white/40">•</span>
+                      <span className="hidden sm:inline text-white/40">•</span>
                       <div className="flex items-center gap-1">
                         <UserAvatar 
                           username={lobby.playerUsername}
                           avatarUrl={playerProfile.avatarUrl}
                           rank={playerProfile.rank}
                           size="sm"
-                          className="ring-1 ring-white/20 w-5 h-5"
+                          className="ring-1 ring-white/20 w-4 h-4 sm:w-5 sm:h-5"
                         />
-                        <span className="text-sm text-white/60">{lobby.playerUsername}</span>
+                        <span className="text-xs sm:text-sm text-white/60 truncate">{lobby.playerUsername}</span>
                       </div>
                     </>
                   )}
@@ -87,7 +87,7 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
             <Badge variant={lobby.playerId ? "destructive" : "secondary"} className={lobby.playerId ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-green-500/20 text-green-300 border-green-500/30"}>
               {lobby.playerId ? "2/2" : "1/2"}
             </Badge>
@@ -97,10 +97,11 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
               <Button
                 variant="ghost"
                 size="sm"
-                className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30"
+                className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 h-8 w-8 sm:h-9 sm:w-auto sm:px-3 p-0 sm:p-2"
                 onClick={() => onInviteToLobby?.(lobby._id)}
               >
                 <MessageCircle className="h-4 w-4" />
+                <span className="hidden sm:inline ml-2">Invite</span>
               </Button>
             )}
 
@@ -108,14 +109,15 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
               <Button
                 variant="destructive"
                 size="sm"
-                className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs sm:text-sm"
                 onClick={() => onLeave(lobby._id)}
                 disabled={isLeaving}
               >
                 {isLeaving ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
-                    Deleting...
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Deleting...</span>
+                    <span className="sm:hidden">...</span>
                   </div>
                 ) : (
                   "Delete"
@@ -124,19 +126,23 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
             ) : (
               <Button
                 size="sm"
-                className={lobby.playerId ? "bg-gray-500/20 text-gray-400 border border-gray-500/30" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"}
+                className={lobby.playerId ? "bg-gray-500/20 text-gray-400 border border-gray-500/30 text-xs sm:text-sm" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-xs sm:text-sm"}
                 onClick={() => onJoin(lobby._id)}
                 disabled={!!lobby.playerId || isJoining}
               >
                 {isJoining ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Joining...
+                  <div className="flex items-center gap-1 sm:gap-2">
+                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Joining...</span>
+                    <span className="sm:hidden">...</span>
                   </div>
                 ) : lobby.playerId ? (
                   "Full"
                 ) : (
-                  "Join Battle"
+                  <>
+                    <span className="hidden sm:inline">Join Battle</span>
+                    <span className="sm:hidden">Join</span>
+                  </>
                 )}
               </Button>
             )}

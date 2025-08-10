@@ -305,10 +305,10 @@ export function MessagingPanel({
               <div className="flex items-center gap-3">
                 {showNewMessage ? (
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setShowNewMessage(false)}
-                    className="p-1 text-white/80 hover:text-white hover:bg-white/10"
+                    className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
@@ -323,10 +323,10 @@ export function MessagingPanel({
                 )}
               </div>
               
-              <div className="flex items-center gap-1">
+              <div className="flex items-center mr-8 gap-1">
                 {!showNewMessage && (
                   <Button
-                    variant="ghost"
+                    variant="secondary"
                     size="sm"
                     onClick={handleNewMessage}
                     className="p-2 text-white/80 rounded-full hover:text-white hover:bg-white/10"

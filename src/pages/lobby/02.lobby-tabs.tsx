@@ -44,21 +44,24 @@ export function LobbyTabs({
   return (
     <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
       <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <CardHeader>
-          <TabsList className="grid rounded-full w-fit grid-cols-2 bg-white/10 backdrop-blur-sm border border-white/20 mx-auto">
-            <TabsTrigger value="lobbies" className="flex rounded-full items-center gap-2 border data-[state=active]:border-white/30 data-[state=active]:bg-white/10 text-white/70 data-[state=active]:text-white">
-              <Sword className="h-4 w-4" />
-              Battle Lobbies
+        <CardHeader className="p-4 sm:px-6 sm:pt-4 sm:pb-0">
+          <TabsList className="grid rounded-full h-full w-full sm:w-fit grid-cols-2 bg-black/20 backdrop-blur-sm border border-white/20">
+            <TabsTrigger value="lobbies" className="flex rounded-full transition-all items-center hover:bg-white/5 justify-center gap-2 data-[state=active]:bg-white/10 text-white/70 data-[state=active]:text-white px-3 sm:px-4 py-2">
+              <Sword className="h-4 w-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium">
+                <span className="hidden sm:inline">Battle Lobbies</span>
+                <span className="sm:hidden">Lobbies</span>
+              </span>
             </TabsTrigger>
-            <TabsTrigger value="spectate" className="flex rounded-full items-center gap-2 border data-[state=active]:border-white/30 data-[state=active]:bg-white/10 text-white/70 data-[state=active]:text-white">
-              <Eye className="h-4 w-4" />
-              Spectate
+            <TabsTrigger value="spectate" className="flex rounded-full transition-all hover:bg-white/5 items-center justify-center gap-2 data-[state=active]:bg-white/10 text-white/70 data-[state=active]:text-white px-3 sm:px-4 py-2">
+              <Eye className="h-4 w-4 flex-shrink-0" />
+              <span className="text-xs sm:text-sm font-medium">Spectate</span>
             </TabsTrigger>
           </TabsList>
         </CardHeader>
 
-        <CardContent>
-          <TabsContent value="lobbies" className="space-y-4">
+        <CardContent className="p-3 sm:p-6 sm:py-2">
+          <TabsContent value="lobbies" className="space-y-3 sm:space-y-4">
             <LobbyListTab 
               profile={profile} 
               onGameStart={onGameStart}
@@ -67,7 +70,7 @@ export function LobbyTabs({
             />
           </TabsContent>
 
-          <TabsContent value="spectate" className="space-y-4">
+          <TabsContent value="spectate" className="space-y-3 sm:space-y-4">
             <SpectateTab 
               onSpectateGame={onSpectateGame}
               spectateByIdMutation={spectateByIdMutation}

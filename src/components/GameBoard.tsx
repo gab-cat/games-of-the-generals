@@ -945,32 +945,32 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
+        className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-0"
       >
         {/* Setup Header */}
         <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardHeader>
-            <div className="flex items-center justify-between">
+          <CardHeader className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <motion.div 
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                className="flex items-center gap-4"
+                className="flex items-center gap-3 sm:gap-4"
               >
                 <motion.div
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.1, type: "spring" }}
-                  className="w-12 h-12 bg-gradient-to-br from-red-500/20 via-orange-500/20 to-yellow-500/20 backdrop-blur-sm border border-red-500/30 rounded-xl flex items-center justify-center shadow-lg"
+                  className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-500/20 via-orange-500/20 to-yellow-500/20 backdrop-blur-sm border border-red-500/30 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
                 >
-                  <Sword className="h-6 w-6 text-red-400" />
+                  <Sword className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
                 </motion.div>
-                <div>
-                  <CardTitle className="text-2xl flex items-center gap-2 text-white/90">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-white/90">
                     Army Setup
                   </CardTitle>
-                  <div className="flex items-center gap-2 mt-1 mb-1">
+                  <div className="flex items-center gap-2 mt-1 mb-1 flex-wrap">
                     <span className="text-xs text-white/50">Game ID:</span>
-                    <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70">{gameId}</code>
+                    <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70 break-all">{gameId}</code>
                     <Button
                       onClick={() => {
                         void navigator.clipboard.writeText(gameId);
@@ -978,17 +978,17 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       }}
                       size="sm"
                       variant="ghost"
-                      className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10"
+                      className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10 flex-shrink-0"
                     >
                       <Copy className="h-3 w-3" />
                     </Button>
                   </div>
-                  <p className="text-white/60 mt-1">
+                  <p className="text-white/60 mt-1 text-sm sm:text-base">
                     Strategically position your pieces for battle
                   </p>
                 </div>
               </motion.div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <Timer
                   duration={300} // 5 minutes for setup
                   onTimeout={handleSetupTimeout}
@@ -998,7 +998,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   timeUsed={game.setupTimeStarted ? Math.floor((Date.now() - game.setupTimeStarted) / 1000) : 0}
                   turnStartTime={game.setupTimeStarted}
                 />
-                <Button variant="outline" onClick={onBackToLobby} className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
+                <Button variant="outline" onClick={onBackToLobby} className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20 w-full sm:w-auto">
                   Back to Lobby
                 </Button>
               </div>
@@ -1008,14 +1008,15 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
         {/* Controls */}
         <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardContent className="p-6">
-            <div className="flex flex-wrap justify-between items-center gap-4">
-              <div className="flex items-center gap-3">
-                <Button onClick={randomizeSetup} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                <Button onClick={randomizeSetup} className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-sm">
                   <Shuffle className="h-4 w-4" />
-                  Randomize
+                  <span className="hidden sm:inline">Randomize</span>
+                  <span className="sm:hidden">Random</span>
                 </Button>
-                <Button onClick={clearSetup} variant="outline" className="flex items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
+                <Button onClick={clearSetup} variant="outline" className="flex items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-sm">
                   <RefreshCw className="h-4 w-4" />
                   Clear
                 </Button>
@@ -1024,17 +1025,17 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   <Button
                     onClick={() => setIsSwapMode(!isSwapMode)}
                     variant={isSwapMode ? "default" : "outline"}
-                    className={`flex items-center gap-2 ${isSwapMode ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700' : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20'}`}
+                    className={`flex items-center gap-2 text-sm ${isSwapMode ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700' : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20'}`}
                   >
                     <ArrowRightLeft className="h-4 w-4" />
-                    {isSwapMode ? 'Exit Swap Mode' : 'Swap Mode'}
+                    <span className="hidden sm:inline">{isSwapMode ? 'Exit Swap Mode' : 'Swap Mode'}</span>
+                    <span className="sm:hidden">Swap</span>
                   </Button>
                 )}
               </div>
               
-              
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
                   {availablePieces.length === 0 ? 'All pieces placed - Swap Mode' : 
                    isSwapMode ? 'Swap Mode Active' : `${availablePieces.length} pieces remaining`}
                 </Badge>
@@ -1043,25 +1044,25 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Game Board */}
           <div className="lg:col-span-2">
             <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white/90">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
                   <Target className="h-5 w-5 text-blue-400" />
                   Battle Grid
                 </CardTitle>
-                <p className="text-sm text-white/60">
+                <p className="text-xs sm:text-sm text-white/60">
                   {isSwapMode ? "Click on pieces to swap their positions" : "Click empty spaces to place selected pieces"}
                 </p>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 <motion.div
                   initial={{ scale: 1, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-9 gap-2 max-w-lg mx-auto"
+                  className="grid grid-cols-9 gap-1 sm:gap-2 max-w-lg mx-auto"
                 >
                   {setupBoard.map((row, rowIndex) =>
                     row.map((cell, colIndex) => {
@@ -1077,7 +1078,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           whileTap={isValidArea ? { scale: 0.95 } : {}}
                           onClick={() => handleSetupSquareClick(rowIndex, colIndex)}
                           className={`
-                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-lg transition-all
+                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-lg transition-all text-xs sm:text-sm
                             ${isValidArea 
                               ? 'border-primary/50 bg-primary/10 hover:bg-primary/20' 
                               : 'border-muted bg-muted/20'
@@ -1102,19 +1103,19 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
           </div>
 
           {/* Available Pieces & Controls */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {availablePieces.length > 0 && (
               <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-white/90">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
                     <Square className="h-5 w-5 text-purple-400" />
                     Available Pieces ({availablePieces.length})
                   </CardTitle>
-                  <Badge variant="outline" className="w-fit bg-purple-500/20 text-purple-300 border-purple-500/30">
+                  <Badge variant="outline" className="w-fit bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs sm:text-sm">
                     Selected: {selectedPiece}
                   </Badge>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
@@ -1128,7 +1129,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setSelectedPiece(piece)}
                         className={`
-                          p-3 border-2 rounded-lg text-sm transition-all flex flex-col items-center gap-1
+                          p-2 sm:p-3 border-2 rounded-lg text-xs sm:text-sm transition-all flex flex-col items-center gap-1
                           ${selectedPiece === piece 
                             ? 'border-primary bg-primary/20 ring-1 ring-primary/50' 
                             : 'border-border bg-card hover:bg-accent hover:border-accent-foreground/50'
@@ -1136,7 +1137,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         `}
                       >
                         <div className="text-foreground">{getPieceDisplay(piece, { showLabel: false })}</div>
-                        <div className="text-xs text-center font-medium text-muted-foreground">{piece}</div>
+                        <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">{piece}</div>
                       </motion.button>
                     ))}
                   </motion.div>
@@ -1146,13 +1147,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
             {/* Legend */}
             <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white/90">
+              <CardHeader className="p-4 sm:p-6">
+                <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
                   <Info className="h-5 w-5 text-orange-400" />
                   Piece Legend
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-4 sm:p-6">
                 <div className="max-h-60 overflow-y-auto">
                   <table className="w-full text-xs">
                     <thead>
@@ -1205,7 +1206,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 <Button
                   onClick={() => void handleFinishSetup()}
                   disabled={isSettingUpPieces}
-                  className="w-full py-4 text-sm text-black rounded-full disabled:opacity-50"
+                  className="w-full py-3 sm:py-4 text-sm text-black rounded-full disabled:opacity-50"
                   size="lg"
                 >
                   {isSettingUpPieces ? (
@@ -1213,13 +1214,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-5 h-5 mr-2 border-2 border-black border-t-transparent rounded-full"
+                        className="w-4 h-4 sm:w-5 sm:h-5 mr-2 border-2 border-black border-t-transparent rounded-full"
                       />
                       Setting up pieces...
                     </>
                   ) : (
                     <>
-                      <CheckCircle className="h-5 w-5 mr-2" />
+                      <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                       Finish Setup & Enter Battle
                     </>
                   )}
@@ -1241,16 +1242,16 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      className="space-y-4 sm:space-y-6 px-2 sm:px-4 lg:px-0"
     >
       {/* Game Header */}
       <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             {/* Game ID Section */}
-            <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 order-2 sm:order-1">
               <span className="text-xs text-white/50">Game ID:</span>
-              <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70">{gameId}</code>
+              <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70 break-all">{gameId}</code>
               <Button
                 onClick={() => {
                   void navigator.clipboard.writeText(gameId);
@@ -1258,7 +1259,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 }}
                 size="sm"
                 variant="ghost"
-                className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10"
+                className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10 flex-shrink-0"
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -1266,37 +1267,41 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
             {/* Surrender Button */}
             {game.status === "playing" && (isPlayer1 || isPlayer2) && (
-              <Button
-                onClick={() => void handleSurrender()}
-                disabled={isSurrendering}
-                variant="destructive"
-                size="sm"
-                className="flex items-center gap-2 disabled:opacity-50"
-              >
-                {isSurrendering ? (
-                  <>
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                    />
-                    Surrendering...
-                  </>
-                ) : (
-                  <>
-                    <Flag className="h-4 w-4" />
-                    Surrender
-                  </>
-                )}
-              </Button>
+              <div className="order-1 sm:order-2">
+                <Button
+                  onClick={() => void handleSurrender()}
+                  disabled={isSurrendering}
+                  variant="destructive"
+                  size="sm"
+                  className="flex items-center gap-2 disabled:opacity-50 w-full sm:w-auto"
+                >
+                  {isSurrendering ? (
+                    <>
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                      />
+                      <span className="hidden sm:inline">Surrendering...</span>
+                      <span className="sm:hidden">...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Flag className="h-4 w-4" />
+                      <span className="hidden sm:inline">Surrender</span>
+                      <span className="sm:hidden">Give Up</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
 
           {/* VS Design */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
               {/* Player 1 */}
-              <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+              <div className={`flex items-center gap-3 p-3 rounded-lg transition-all w-full sm:w-auto ${
                 game.status === "finished" 
                   ? game.winner === "player1" 
                     ? 'bg-yellow-500/20 border border-yellow-500/30 shadow-lg' 
@@ -1316,17 +1321,17 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       : 'border-blue-500/50'
                   }`}
                 />
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white/90">{game.player1Username}</span>
+                    <span className="font-semibold text-white/90 text-sm sm:text-base truncate">{game.player1Username}</span>
                     {game.status === "finished" && game.winner === "player1" && (
-                      <Crown className="h-4 w-4 text-yellow-400" />
+                      <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                     )}
                     {game.currentTurn === "player1" && game.status === "playing" && (
-                      <Crown className="h-4 w-4 text-yellow-400" />
+                      <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                     )}
                   </div>
-                  <div className={`text-sm font-mono ${
+                  <div className={`text-xs sm:text-sm font-mono ${
                     game.status === "finished" && game.winner === "player1" 
                       ? 'text-yellow-300' 
                       : 'text-blue-300'
@@ -1336,10 +1341,12 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 </div>
               </div>
 
-              <Swords className="h-6 w-6 text-white/40" />
+              <div className="hidden sm:flex">
+                <Swords className="h-6 w-6 text-white/40" />
+              </div>
 
               {/* Player 2 */}
-              <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+              <div className={`flex items-center gap-3 p-3 rounded-lg transition-all w-full sm:w-auto ${
                 game.status === "finished" 
                   ? game.winner === "player2" 
                     ? 'bg-yellow-500/20 border border-yellow-500/30 shadow-lg' 
@@ -1359,17 +1366,17 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       : 'border-red-500/50'
                   }`}
                 />
-                <div>
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white/90">{game.player2Username}</span>
+                    <span className="font-semibold text-white/90 text-sm sm:text-base truncate">{game.player2Username}</span>
                     {game.status === "finished" && game.winner === "player2" && (
-                      <Crown className="h-4 w-4 text-yellow-400" />
+                      <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                     )}
                     {game.currentTurn === "player2" && game.status === "playing" && (
-                      <Crown className="h-4 w-4 text-yellow-400" />
+                      <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                     )}
                   </div>
-                  <div className={`text-sm font-mono ${
+                  <div className={`text-xs sm:text-sm font-mono ${
                     game.status === "finished" && game.winner === "player2" 
                       ? 'text-yellow-300' 
                       : 'text-red-300'
@@ -1380,7 +1387,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
               <Badge 
                 variant={game.status === "playing" ? "default" : "outline"}
                 className={
@@ -1393,7 +1400,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               </Badge>
 
               {game.status === "playing" && (
-                <div className="text-sm text-white/60">
+                <div className="text-xs sm:text-sm text-white/60 text-center sm:text-left">
                   Turn {Math.floor(((moves.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
                 </div>
               )}
@@ -1402,15 +1409,15 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
         {/* Game Board */}
-        <div className="lg:col-span-3">
+        <div className="xl:col-span-3">
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <Target className="h-5 w-5 text-blue-400" />
-                  <span className="text-white/90">Battle Arena</span>
+                  <span className="text-white/90 text-lg sm:text-xl">Battle Arena</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <motion.div 
@@ -1426,7 +1433,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       repeat: isCurrentPlayer ? Infinity : 0,
                       ease: "easeInOut"
                     }}
-                    className={`px-4 py-2 rounded-full text-sm font-bold flex items-center gap-2 border-2 ${
+                    className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 border-2 ${
                       isCurrentPlayer 
                         ? 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-300 border-green-500/50 shadow-lg' 
                         : 'bg-muted/50 text-muted-foreground border-muted/50'
@@ -1439,19 +1446,21 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                           className="w-2 h-2 rounded-full bg-green-400"
                         />
-                        <strong>YOUR TURN</strong>
+                        <strong className="hidden sm:inline">YOUR TURN</strong>
+                        <strong className="sm:hidden">YOUR TURN</strong>
                       </>
                     ) : (
                       <>
                         <div className="w-2 h-2 rounded-full bg-gray-400" />
-                        <span>Opponent's Turn</span>
+                        <span className="hidden sm:inline">Opponent's Turn</span>
+                        <span className="sm:hidden">Waiting</span>
                       </>
                     )}
                   </motion.div>
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-2 sm:p-4 lg:p-6">
               <motion.div
                 ref={boardRef}
                 initial={{ scale: 1, opacity: 0 }}
@@ -1462,7 +1471,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                 transition={{ 
                   delay: 0.1
                 }}
-                className={`grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
+                className={`grid grid-cols-9 gap-1 sm:gap-2 max-w-3xl mx-auto p-2 sm:p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
                   isCurrentPlayer 
                     ? 'ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30' 
                     : 'ring-muted/30 bg-muted/10 border-muted/30'
@@ -1500,14 +1509,17 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.9 }}
                         transition={{ duration: 0.3, ease: "easeInOut" }}
-                        className="relative bg-white/20 backdrop-blur-xl shadow-2xl shadow-white/10 border border-white/20 rounded-full px-4 py-2 flex items-center gap-2"
+                        className="relative bg-white/20 backdrop-blur-xl shadow-2xl shadow-white/10 border border-white/20 rounded-full px-3 sm:px-4 py-2 flex items-center gap-2"
                       >
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                          className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full"
                         />
-                        <span className="text-white !bg-transparent text-sm  font-medium">Processing move...</span>
+                        <span className="text-white !bg-transparent text-xs sm:text-sm font-medium">
+                          <span className="hidden sm:inline">Processing move...</span>
+                          <span className="sm:hidden">Moving...</span>
+                        </span>
                       </motion.div>
                     </motion.div>
                   )}
@@ -1563,11 +1575,11 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                           duration: 0.75,
                           ease: "easeInOut"
                         }}
-                        className={`text-center p-2 rounded-lg bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-sm border border-white/30 ${
+                        className={`text-center p-1 sm:p-2 rounded-lg bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-sm border border-white/30 ${
                           animatingPiece.piece.player === 'player1' ? 'text-blue-400' : 'text-red-400'
                         }`}
                       >
-                        <div className="transform scale-125">
+                        <div className="transform scale-110 sm:scale-125">
                           {animatingPiece.piece.piece === "Hidden" ? 
                             getPieceDisplay(animatingPiece.piece.piece, { isOpponent: true }) : 
                             getPieceDisplay(animatingPiece.piece.piece, { showLabel: true })
@@ -1588,22 +1600,22 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
         </div>
 
         {/* Game Info & Legend */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Player Info */}
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             <Card className="bg-black/20 backdrop-blur-xl border border-blue-500/30 shadow-lg shadow-blue-500/10">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <motion.div 
                   initial={{ x: -10, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
                   className="flex items-center gap-3"
                 >
                   {isLoadingPlayer1 ? (
-                    <div className="w-10 h-10 rounded-full bg-blue-400/20 border-2 border-blue-400/50 flex items-center justify-center">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-400/20 border-2 border-blue-400/50 flex items-center justify-center">
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full"
+                        className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-blue-400 border-t-transparent rounded-full"
                       />
                     </div>
                   ) : (
@@ -1615,16 +1627,16 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       className="ring-1 ring-blue-400/50"
                     />
                   )}
-                  <div className="w-4 h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50"></div>
-                  <div>
-                    <h3 className="font-semibold text-blue-400">{game.player1Username}</h3>
-                    <div className="text-blue-400/80 text-sm">Blue Army</div>
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50 flex-shrink-0"></div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-blue-400 text-sm sm:text-base truncate">{game.player1Username}</h3>
+                    <div className="text-blue-400/80 text-xs sm:text-sm">Blue Army</div>
                   </div>
                 </motion.div>
               </CardContent>
             </Card>
             <Card className="bg-black/20 backdrop-blur-xl border border-red-500/30 shadow-lg shadow-red-500/10">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <motion.div 
                   initial={{ x: -10, opacity: 0 }}
                   animate={{ x: 0, opacity: 1 }}
@@ -1632,11 +1644,11 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   className="flex items-center gap-3"
                 >
                   {isLoadingPlayer2 ? (
-                    <div className="w-10 h-10 rounded-full bg-red-400/20 border-2 border-red-400/50 flex items-center justify-center">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-400/20 border-2 border-red-400/50 flex items-center justify-center">
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full"
+                        className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-red-400 border-t-transparent rounded-full"
                       />
                     </div>
                   ) : (
@@ -1648,10 +1660,10 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       className="ring-1 ring-red-400/50"
                     />
                   )}
-                  <div className="w-4 h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50"></div>
-                  <div>
-                    <h3 className="font-semibold text-red-400">{game.player2Username}</h3>
-                    <div className="text-red-400/80 text-sm">Red Army</div>
+                  <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50 flex-shrink-0"></div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold text-red-400 text-sm sm:text-base truncate">{game.player2Username}</h3>
+                    <div className="text-red-400/80 text-xs sm:text-sm">Red Army</div>
                   </div>
                 </motion.div>
               </CardContent>
@@ -1660,20 +1672,20 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
           {/* Legend */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-white/90">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
                 <Info className="h-5 w-5 text-orange-400" />
                 Piece Legend
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="max-h-80 overflow-y-auto">
-                <table className="w-full text-sm">
+            <CardContent className="p-4 sm:p-6">
+              <div className="max-h-60 sm:max-h-80 overflow-y-auto">
+                <table className="w-full text-xs sm:text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left py-2 px-1 font-medium text-muted-foreground">Icon</th>
-                      <th className="text-left py-2 px-1 font-medium text-muted-foreground">Piece</th>
-                      <th className="text-left py-2 px-1 font-medium text-muted-foreground">Rank</th>
+                      <th className="text-left py-1 sm:py-2 px-1 font-medium text-muted-foreground">Icon</th>
+                      <th className="text-left py-1 sm:py-2 px-1 font-medium text-muted-foreground">Piece</th>
+                      <th className="text-left py-1 sm:py-2 px-1 font-medium text-muted-foreground">Rank</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1695,13 +1707,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                       { piece: "Flag", rank: "Goal" }
                     ].map(({ piece, rank }) => (
                       <tr key={piece} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-1">
+                        <td className="py-1 sm:py-2 px-1">
                           <div className="flex justify-center">
                             {getPieceDisplay(piece, { size: "medium" })}
                           </div>
                         </td>
-                        <td className="py-2 px-1 font-medium">{piece}</td>
-                        <td className="py-2 px-1 text-muted-foreground">{rank}</td>
+                        <td className="py-1 sm:py-2 px-1 font-medium truncate">{piece}</td>
+                        <td className="py-1 sm:py-2 px-1 text-muted-foreground">{rank}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1720,8 +1732,8 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
       {/* Recent Moves */}
       {(moves && moves.length > 0) || isLoadingMoves ? (
         <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-white/90">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
               <Eye className="h-5 w-5 text-purple-400" />
               Recent Moves
               {isLoadingMoves && (
@@ -1733,15 +1745,15 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6">
             {isLoadingMoves ? (
               <div className="flex items-center justify-center py-4">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-6 h-6 border-2 border-purple-400 border-t-transparent rounded-full"
+                  className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-purple-400 border-t-transparent rounded-full"
                 />
-                <span className="ml-2 text-white/70">Loading moves...</span>
+                <span className="ml-2 text-white/70 text-sm sm:text-base">Loading moves...</span>
               </div>
             ) : (
               <div className="max-h-32 overflow-y-auto space-y-2">
@@ -1750,7 +1762,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                     key={move._id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className="text-sm text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 rounded p-2"
+                    className="text-xs sm:text-sm text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 rounded p-2"
                   >
                     {move.moveType === "challenge" && move.challengeResult ? (
                       <span>
