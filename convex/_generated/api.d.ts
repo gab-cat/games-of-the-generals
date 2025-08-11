@@ -23,6 +23,7 @@ import type * as profiles from "../profiles.js";
 import type * as router from "../router.js";
 import type * as sendEmails from "../sendEmails.js";
 import type * as settings from "../settings.js";
+import type * as setupPresets from "../setupPresets.js";
 import type * as spectate from "../spectate.js";
 
 import type {
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   router: typeof router;
   sendEmails: typeof sendEmails;
   settings: typeof settings;
+  setupPresets: typeof setupPresets;
   spectate: typeof spectate;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

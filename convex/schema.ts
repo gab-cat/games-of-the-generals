@@ -185,6 +185,26 @@ const applicationTables = {
     .index("by_code", ["verificationCode"])
     .index("by_user_verified", ["userId", "verified"]),
 
+  // Setup presets for game piece arrangements
+  setupPresets: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    isDefault: v.boolean(),
+    isBuiltIn: v.boolean(), // For popular/built-in presets
+    pieces: v.array(v.object({
+      piece: v.string(),
+      row: v.number(),
+      col: v.number(),
+    })),
+    createdAt: v.number(),
+    upvotes: v.optional(v.number()), // Track upvotes for future features
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_default", ["userId", "isDefault"])
+    .index("by_user_builtin", ["userId", "isBuiltIn"])
+    .index("by_builtin", ["isBuiltIn"])
+    .index("by_upvotes", ["upvotes"]), // For popular presets
+
   // Direct messages between users
   messages: defineTable({
     senderId: v.id("users"),

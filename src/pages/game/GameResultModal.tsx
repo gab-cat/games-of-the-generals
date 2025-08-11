@@ -101,7 +101,7 @@ export function GameResultModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] bg-black/20 backdrop-blur-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="sr-only">Game Result</DialogTitle>
         </DialogHeader>

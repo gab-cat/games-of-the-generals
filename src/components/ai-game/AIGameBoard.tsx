@@ -21,6 +21,7 @@ import {
 import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { getPieceDisplay } from "../../lib/piece-display";
+import { SetupPresets } from "../setup-presets/SetupPresets";
 import { toast } from "sonner";
 
 const INITIAL_PIECES = [
@@ -146,6 +147,23 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
     setSelectedSetupSquare(null);
     setIsSwapMode(false);
     toast.success("Setup cleared!");
+  }, []);
+
+  const loadPresetSetup = useCallback((pieces: { piece: string; row: number; col: number }[]) => {
+    // Clear the board first
+    const newBoard = createEmptyBoard();
+    
+    // Place the pieces from the preset
+    for (const { piece, row, col } of pieces) {
+      newBoard[row][col] = piece;
+    }
+    
+    setSetupBoard(newBoard);
+    setAvailablePieces([]);
+    setSelectedPiece(null);
+    setSelectedSetupSquare(null);
+    setIsSwapMode(true);
+    toast.success("Preset loaded successfully!");
   }, []);
 
   // Memoized setup square click handler
@@ -482,6 +500,12 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
                 </CardContent>
               </Card>
             )}
+
+            {/* Setup Presets */}
+            <SetupPresets 
+              currentSetup={setupBoard}
+              onLoadPreset={loadPresetSetup}
+            />
 
             {/* Legend */}
             <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">

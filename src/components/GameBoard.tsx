@@ -23,7 +23,9 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowDown,
-  AlertCircle
+  AlertCircle,
+  ChevronUp,
+  ChevronDown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
@@ -34,6 +36,7 @@ import { GameResultModal } from "../pages/game/GameResultModal";
 import { AchievementNotification } from "../pages/achievements/AchievementNotification";
 import { UserAvatar } from "./UserAvatar";
 import { getPieceDisplay } from "../lib/piece-display";
+import { SetupPresets } from "./setup-presets/SetupPresets";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -321,6 +324,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const [optimisticBoard, setOptimisticBoard] = useState<any[][] | null>(null);
   const [pendingMove, setPendingMove] = useState<{fromRow: number, fromCol: number, toRow: number, toCol: number} | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   
   // Animation states
   const [animatingPiece, setAnimatingPiece] = useState<{
@@ -518,6 +522,23 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     setSelectedSetupSquare(null);
     setIsSwapMode(false);
     toast.success("Setup cleared!");
+  }, []);
+
+  const loadPresetSetup = useCallback((pieces: { piece: string; row: number; col: number }[]) => {
+    // Clear the board first
+    const newBoard = createEmptyBoard();
+    
+    // Place the pieces from the preset
+    for (const { piece, row, col } of pieces) {
+      newBoard[row][col] = piece;
+    }
+    
+    setSetupBoard(newBoard);
+    setAvailablePieces([]);
+    setSelectedPiece(null);
+    setSelectedSetupSquare(null);
+    setIsSwapMode(true);
+    toast.success("Preset loaded successfully!");
   }, []);
 
   const handleSurrender = useCallback(() => {
@@ -1181,6 +1202,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
           {/* Available Pieces & Controls */}
           <div className="space-y-4 sm:space-y-6">
+            {/* Setup Presets - moved to top */}
+            <SetupPresets 
+              currentSetup={displaySetupBoard}
+              onLoadPreset={loadPresetSetup}
+              shouldFlipBoard={shouldFlipBoard}
+            />
+
             {availablePieces.length > 0 && (
               <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
                 <CardHeader className="p-4 sm:p-6">
@@ -1230,56 +1258,77 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               </Card>
             )}
 
-            {/* Legend */}
+            {/* Collapsible Legend - moved to bottom */}
             <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                  <Info className="h-5 w-5 text-orange-400" />
-                  Piece Legend
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4 sm:p-6">
-                <div className="max-h-60 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-white/20">
-                        <th className="text-left py-1 px-1 font-medium text-white/70">Icon</th>
-                        <th className="text-left py-1 px-1 font-medium text-white/70">Piece</th>
-                        <th className="text-center py-1 px-1 font-medium text-white/70">Rank</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { piece: "5 Star General", rank: "1", short: "5★ Gen" },
-                        { piece: "4 Star General", rank: "2", short: "4★ Gen" },
-                        { piece: "3 Star General", rank: "3", short: "3★ Gen" },
-                        { piece: "2 Star General", rank: "4", short: "2★ Gen" },
-                        { piece: "1 Star General", rank: "5", short: "1★ Gen" },
-                        { piece: "Colonel", rank: "6", short: "Col" },
-                        { piece: "Lieutenant Colonel", rank: "7", short: "Lt Col" },
-                        { piece: "Major", rank: "8", short: "Maj" },
-                        { piece: "Captain", rank: "9", short: "Cpt" },
-                        { piece: "1st Lieutenant", rank: "10", short: "1st Lt" },
-                        { piece: "2nd Lieutenant", rank: "11", short: "2nd Lt" },
-                        { piece: "Sergeant", rank: "12", short: "Sgt" },
-                        { piece: "Private", rank: "13", short: "Pvt" },
-                        { piece: "Spy", rank: "★", short: "Spy" },
-                        { piece: "Flag", rank: "🏁", short: "Flag" }
-                      ].map(({ piece, rank, short }) => (
-                        <tr key={piece} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="py-1 px-1">
-                            <div className="flex justify-center">
-                              {getPieceDisplay(piece, { size: "small" })}
-                            </div>
-                          </td>
-                          <td className="py-1 px-1 font-medium">{short}</td>
-                          <td className="py-1 px-1 text-muted-foreground text-center">{rank}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <CardHeader className="p-4 sm:p-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
+                    <Info className="h-5 w-5 text-orange-400" />
+                    Piece Legend
+                  </CardTitle>
+                  <Button
+                    onClick={() => setIsLegendExpanded(!isLegendExpanded)}
+                    variant="ghost"
+                    size="sm"
+                    className="text-white/70 hover:text-white"
+                  >
+                    {isLegendExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
                 </div>
-              </CardContent>
+              </CardHeader>
+              <AnimatePresence>
+                {isLegendExpanded && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <CardContent className="p-4 sm:p-4 sm:pt-0">
+                      <div className="max-h-60 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-white/20">
+                              <th className="text-left py-1 px-1 font-medium text-white/70">Icon</th>
+                              <th className="text-left py-1 px-1 font-medium text-white/70">Piece</th>
+                              <th className="text-center py-1 px-1 font-medium text-white/70">Rank</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[
+                              { piece: "5 Star General", rank: "1", short: "5★ Gen" },
+                              { piece: "4 Star General", rank: "2", short: "4★ Gen" },
+                              { piece: "3 Star General", rank: "3", short: "3★ Gen" },
+                              { piece: "2 Star General", rank: "4", short: "2★ Gen" },
+                              { piece: "1 Star General", rank: "5", short: "1★ Gen" },
+                              { piece: "Colonel", rank: "6", short: "Col" },
+                              { piece: "Lieutenant Colonel", rank: "7", short: "Lt Col" },
+                              { piece: "Major", rank: "8", short: "Maj" },
+                              { piece: "Captain", rank: "9", short: "Cpt" },
+                              { piece: "1st Lieutenant", rank: "10", short: "1st Lt" },
+                              { piece: "2nd Lieutenant", rank: "11", short: "2nd Lt" },
+                              { piece: "Sergeant", rank: "12", short: "Sgt" },
+                              { piece: "Private", rank: "13", short: "Pvt" },
+                              { piece: "Spy", rank: "★", short: "Spy" },
+                              { piece: "Flag", rank: "🏁", short: "Flag" }
+                            ].map(({ piece, rank, short }) => (
+                              <tr key={piece} className="border-b border-border/50 hover:bg-muted/30">
+                                <td className="py-1 px-1">
+                                  <div className="flex justify-center">
+                                    {getPieceDisplay(piece, { size: "small" })}
+                                  </div>
+                                </td>
+                                <td className="py-1 px-1 font-medium">{short}</td>
+                                <td className="py-1 px-1 text-muted-foreground text-center">{rank}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Card>
 
             {availablePieces.length === 0 && (
