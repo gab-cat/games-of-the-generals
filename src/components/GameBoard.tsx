@@ -3,6 +3,7 @@ import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
+import { useNavigate } from "@tanstack/react-router";
 import { 
   Shuffle,
   RefreshCw,
@@ -77,6 +78,16 @@ const BOARD_COLS = 9;
 
 // Create empty board factory function
 const createEmptyBoard = () => Array(BOARD_ROWS).fill(null).map(() => Array(BOARD_COLS).fill(null));
+
+// Helper functions for board flipping
+const flipRowForDisplay = (row: number, shouldFlip: boolean) => shouldFlip ? BOARD_ROWS - 1 - row : row;
+const flipRowForLogic = (displayRow: number, shouldFlip: boolean) => shouldFlip ? BOARD_ROWS - 1 - displayRow : displayRow;
+
+// Helper function to flip board data for display
+const flipBoardForDisplay = (board: any[][], shouldFlip: boolean) => {
+  if (!shouldFlip) return board;
+  return [...board].reverse();
+};
 
 // Memoized board square component for better performance
 const BoardSquare = memo(({ 
@@ -204,6 +215,8 @@ const BoardSquare = memo(({
 BoardSquare.displayName = 'BoardSquare';
 
 export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
+  const navigate = useNavigate();
+  
   const { data: game, isPending: isLoadingGame } = useConvexQuery(
     api.games.getGame, 
     { gameId }
@@ -329,6 +342,8 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     [game?.currentTurn, isPlayer1]
   );
   
+  // Determine if board should be flipped (player2 sees board flipped so they appear at bottom)
+  const shouldFlipBoard = useMemo(() => isPlayer2, [isPlayer2]);
   // Check if current user has acknowledged the result
   const hasAcknowledgedResult = useMemo(() => 
     game?.status === "finished" && 
@@ -462,8 +477,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     return formatTime(remaining);
   }, [game, currentTime, formatTime, handlePlayer1Timeout, handlePlayer2Timeout, isPlayer1, isPlayer2]);
 
-  // Memoized valid rows calculation
+  // Memoized valid rows calculation - logical positions (not display positions)
   const validRows = useMemo(() => isPlayer1 ? [5, 6, 7] : [0, 1, 2], [isPlayer1]);
+  
+  // Valid rows for display (considering board flip for player2)
+  const validDisplayRows = useMemo(() => {
+    if (!shouldFlipBoard) return validRows;
+    return validRows.map(row => flipRowForDisplay(row, shouldFlipBoard));
+  }, [validRows, shouldFlipBoard]);
 
   // Memoized game actions
   const randomizeSetup = useCallback(() => {
@@ -509,6 +530,16 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     acknowledgeGameResult({ gameId });
   }, [acknowledgeGameResult, gameId]);
 
+  const handleViewReplay = useCallback((gameId: Id<"games">) => {
+    void navigate({ to: "/spectate", search: { gameId: gameId as string } });
+  }, [navigate]);
+
+  const handleReturnToLobby = useCallback(() => {
+    void handleAcknowledgeResult();
+    setShowResultModal(false);
+    onBackToLobby();
+  }, [handleAcknowledgeResult, onBackToLobby]);
+
   // Helper function to check if a square is highlighted - memoized
   const isSquareHighlighted = useCallback((row: number, col: number) => {
     if (game?.lastMoveFrom && game?.lastMoveTo) {
@@ -526,12 +557,20 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   }, [game?.lastMoveFrom, game?.lastMoveTo, selectedSquare]);
 
   // Helper function to get arrow direction for moves - memoized
-  const getArrowDirection = useCallback((fromRow: number, fromCol: number, toRow: number, toCol: number) => {
+  const getArrowDirection = useCallback((fromRow: number, fromCol: number, toRow: number, toCol: number, isFlipped: boolean = false) => {
     const rowDiff = toRow - fromRow;
     const colDiff = toCol - fromCol;
     
-    if (rowDiff > 0) return ArrowDown;
-    if (rowDiff < 0) return ArrowUp;
+    // If board is flipped, reverse the row direction logic
+    if (isFlipped) {
+      if (rowDiff > 0) return ArrowUp;   // Down becomes up when flipped
+      if (rowDiff < 0) return ArrowDown; // Up becomes down when flipped
+    } else {
+      if (rowDiff > 0) return ArrowDown;
+      if (rowDiff < 0) return ArrowUp;
+    }
+    
+    // Column directions remain the same regardless of flip
     if (colDiff > 0) return ArrowRight;
     if (colDiff < 0) return ArrowLeft;
     
@@ -582,34 +621,33 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   }, [game?.status, game?.winner, isPlayer1, gameFinished, hasAcknowledgedResult]);
 
   // Memoized setup square click handler
-  const handleSetupSquareClick = useCallback((row: number, col: number) => {
-    if (!validRows.includes(row)) {
+  const handleSetupSquareClick = useCallback((logicalRow: number, logicalCol: number) => {
+    if (!validRows.includes(logicalRow)) {
       toast.error("You can only place pieces in your area");
       return;
     }
 
-    const currentPiece = setupBoard[row][col];
+    const currentPiece = setupBoard[logicalRow][logicalCol];
     
     if (isSwapMode || availablePieces.length === 0) {
       if (selectedSetupSquare) {
         const selectedPiece = setupBoard[selectedSetupSquare.row][selectedSetupSquare.col];
         
-        if (selectedSetupSquare.row === row && selectedSetupSquare.col === col) {
+        if (selectedSetupSquare.row === logicalRow && selectedSetupSquare.col === logicalCol) {
           setSelectedSetupSquare(null);
           return;
         }
         
         const newBoard = setupBoard.map(r => [...r]);
         newBoard[selectedSetupSquare.row][selectedSetupSquare.col] = currentPiece;
-        newBoard[row][col] = selectedPiece;
+        newBoard[logicalRow][logicalCol] = selectedPiece;
         setSetupBoard(newBoard);
         setSelectedSetupSquare(null);
-        toast.success("Pieces swapped!");
         return;
       }
 
       if (currentPiece) {
-        setSelectedSetupSquare({ row, col });
+        setSelectedSetupSquare({ row: logicalRow, col: logicalCol });
         return;
       }
       
@@ -630,7 +668,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     }
 
     const newBoard = setupBoard.map(r => [...r]);
-    newBoard[row][col] = selectedPiece;
+    newBoard[logicalRow][logicalCol] = selectedPiece;
     setSetupBoard(newBoard);
 
     const pieceIndex = availablePieces.indexOf(selectedPiece);
@@ -640,6 +678,12 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
 
     setSelectedPiece(null);
   }, [validRows, setupBoard, isSwapMode, availablePieces, selectedSetupSquare, selectedPiece]);
+
+  // Handler for display setup square clicks (converts display coordinates to logical)
+  const handleDisplaySetupSquareClick = useCallback((displayRow: number, displayCol: number) => {
+    const logicalRow = flipRowForLogic(displayRow, shouldFlipBoard);
+    handleSetupSquareClick(logicalRow, displayCol);
+  }, [shouldFlipBoard, handleSetupSquareClick]);
 
   const handleFinishSetup = useCallback(async () => {
     if (availablePieces.length > 0) {
@@ -748,40 +792,54 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     return optimisticBoard || game?.board;
   }, [optimisticBoard, game?.board]);
 
+  // Memoized display board data (flipped for player2)
+  const displayBoardData = useMemo(() => {
+    if (!boardData) return null;
+    return flipBoardForDisplay(boardData, shouldFlipBoard);
+  }, [boardData, shouldFlipBoard]);
+
+  // Memoized display setup board data (flipped for player2)
+  const displaySetupBoard = useMemo(() => {
+    return flipBoardForDisplay(setupBoard, shouldFlipBoard);
+  }, [setupBoard, shouldFlipBoard]);
+
   // Memoized board squares rendering
   const renderBoardSquares = useMemo(() => {
-    if (!boardData) return null;
+    if (!displayBoardData) return null;
     
-    return boardData.map((row, rowIndex) =>
+    return displayBoardData.map((row, displayRowIndex) =>
       row.map((cell, colIndex) => {
-        const isSelected = selectedSquare?.row === rowIndex && selectedSquare?.col === colIndex;
+        // Convert display coordinates to logical coordinates for game logic
+        const logicalRowIndex = flipRowForLogic(displayRowIndex, shouldFlipBoard);
+        
+        const isSelected = selectedSquare?.row === logicalRowIndex && selectedSquare?.col === colIndex;
         const isValidMove = selectedSquare && 
-          Math.abs(selectedSquare.row - rowIndex) + Math.abs(selectedSquare.col - colIndex) === 1;
-        const highlightType = isSquareHighlighted(rowIndex, colIndex);
+          Math.abs(selectedSquare.row - logicalRowIndex) + Math.abs(selectedSquare.col - colIndex) === 1;
+        const highlightType = isSquareHighlighted(logicalRowIndex, colIndex);
         const isPendingMove = pendingMove && 
-          ((pendingMove.fromRow === rowIndex && pendingMove.fromCol === colIndex) ||
-           (pendingMove.toRow === rowIndex && pendingMove.toCol === colIndex));
+          ((pendingMove.fromRow === logicalRowIndex && pendingMove.fromCol === colIndex) ||
+           (pendingMove.toRow === logicalRowIndex && pendingMove.toCol === colIndex));
         
         const isPendingFromPosition = pendingMove && 
-          pendingMove.fromRow === rowIndex && pendingMove.fromCol === colIndex;
+          pendingMove.fromRow === logicalRowIndex && pendingMove.fromCol === colIndex;
         
         const isLastMoveFrom = game?.lastMoveFrom && 
-          game.lastMoveFrom.row === rowIndex && game.lastMoveFrom.col === colIndex;
+          game.lastMoveFrom.row === logicalRowIndex && game.lastMoveFrom.col === colIndex;
         
         const isAnimatingFromPosition = animatingPiece && 
-          animatingPiece.fromRow === rowIndex && animatingPiece.fromCol === colIndex;
+          animatingPiece.fromRow === logicalRowIndex && animatingPiece.fromCol === colIndex;
         
         const isAnimatingToPosition = animatingPiece && 
-          animatingPiece.toRow === rowIndex && animatingPiece.toCol === colIndex;
+          animatingPiece.toRow === logicalRowIndex && animatingPiece.toCol === colIndex;
         
         const ArrowComponent = isLastMoveFrom && game?.lastMoveFrom && game?.lastMoveTo 
-          ? getArrowDirection(game.lastMoveFrom.row, game.lastMoveFrom.col, game.lastMoveTo.row, game.lastMoveTo.col)
+          ? getArrowDirection(game.lastMoveFrom.row, game.lastMoveFrom.col, game.lastMoveTo.row, game.lastMoveTo.col, shouldFlipBoard)
           : null;
         
         return (
           <BoardSquare
-            key={`${rowIndex}-${colIndex}`}
-            row={rowIndex}
+            key={`${displayRowIndex}-${colIndex}`}
+            row={logicalRowIndex}
             col={colIndex}
             cell={cell}
             isSelected={isSelected}
@@ -795,13 +853,14 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
             isCurrentPlayer={isCurrentPlayer}
             animatingPiece={animatingPiece}
             ArrowComponent={ArrowComponent}
-            onClick={handleGameSquareClick}
+            onClick={(row, col) => handleGameSquareClick(row, col)}
           />
         );
       })
     );
   }, [
-    boardData,
+    displayBoardData,
+    shouldFlipBoard,
     selectedSquare,
     pendingMove,
     animatingPiece,
@@ -1073,19 +1132,21 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   transition={{ delay: 0.2 }}
                   className="grid grid-cols-9 gap-0.5 sm:gap-2 max-w-lg mx-auto"
                 >
-                  {setupBoard.map((row, rowIndex) =>
+                  {displaySetupBoard.map((row, displayRowIndex) =>
                     row.map((cell, colIndex) => {
-                      const validRows = isPlayer1 ? [5, 6, 7] : [0, 1, 2];
-                      const isValidArea = validRows.includes(rowIndex);
+                      // Check if this display row is in the valid area for the current player
+                      const isValidArea = validDisplayRows.includes(displayRowIndex);
                       const isOccupied = !!cell;
-                      const isSelected = selectedSetupSquare?.row === rowIndex && selectedSetupSquare?.col === colIndex;
+                      // Convert selected square logical coordinates to display coordinates for comparison
+                      const selectedDisplayRow = selectedSetupSquare ? flipRowForDisplay(selectedSetupSquare.row, shouldFlipBoard) : -1;
+                      const isSelected = selectedDisplayRow === displayRowIndex && selectedSetupSquare?.col === colIndex;
                       
                       return (
                         <motion.div
-                          key={`${rowIndex}-${colIndex}`}
+                          key={`${displayRowIndex}-${colIndex}`}
                           whileHover={isValidArea ? { scale: 1.05 } : {}}
                           whileTap={isValidArea ? { scale: 0.95 } : {}}
-                          onClick={() => handleSetupSquareClick(rowIndex, colIndex)}
+                          onClick={() => handleDisplaySetupSquareClick(displayRowIndex, colIndex)}
                           className={`
                             aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[38px] sm:min-h-0 p-0.5 sm:p-1
                             ${isValidArea 
@@ -1556,13 +1617,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                   <motion.div
                     initial={{ 
                       x: `${(animatingPiece.fromCol * (boardRect.width - 32) / 9) + 16}px`,
-                      y: `${(animatingPiece.fromRow * (boardRect.height - 32) / 8) + 16}px`,
+                      y: `${(flipRowForDisplay(animatingPiece.fromRow, shouldFlipBoard) * (boardRect.height - 32) / 8) + 16}px`,
                       scale: 1.2,
                       zIndex: 100
                     }}
                     animate={{ 
                       x: `${(animatingPiece.toCol * (boardRect.width - 32) / 9) + 16}px`,
-                      y: `${(animatingPiece.toRow * (boardRect.height - 32) / 8) + 16}px`,
+                      y: `${(flipRowForDisplay(animatingPiece.toRow, shouldFlipBoard) * (boardRect.height - 32) / 8) + 16}px`,
                       scale: [1.2, 1.3, 1.2],
                       rotate: [0, 5, -5, 0]
                     }}
@@ -1836,18 +1897,9 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
           void handleAcknowledgeResult();
           setShowResultModal(false);
         }}
-        onReturnToLobby={() => {
-          void handleAcknowledgeResult();
-          setShowResultModal(false);
-          onBackToLobby();
-        }}
+        onReturnToLobby={handleReturnToLobby}
         gameId={gameId}
-        onViewReplay={(gameId) => {
-          void handleAcknowledgeResult();
-          setShowResultModal(false);
-          // You can handle replay view here or pass it up to parent
-          console.log("View replay for game:", gameId);
-        }}
+        onViewReplay={handleViewReplay}
         player1Profile={player1Profile}
         player2Profile={player2Profile}
       />

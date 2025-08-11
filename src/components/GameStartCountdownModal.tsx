@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from './ui/dialog';
-import { Sword, Shield } from 'lucide-react';
+import { Sword } from 'lucide-react';
 import { useConvexQuery } from '../lib/convex-query-hooks';
 import { api } from '../../convex/_generated/api';
 import { UserAvatar } from './UserAvatar';
@@ -57,70 +57,74 @@ export function GameStartCountdownModal({
 
   const progress = ((10 - countdown) / 10) * 100;
   const circumference = 2 * Math.PI * 50; // radius = 50
-  const strokeDasharray = circumference;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
       <DialogContent 
-        className="max-w-md bg-gradient-to-br from-slate-900/95 via-slate-800/95 to-slate-900/95 backdrop-blur-xl border border-blue-500/20 shadow-2xl [&>button]:hidden"
+        className="max-w-lg bg-black/20 backdrop-blur-sm border border-slate-700/50 shadow-2xl [&>button]:hidden shadow-blue-500/20"
         aria-describedby="countdown-description"
       >
-        <div className="flex flex-col items-center space-y-6 py-8">
+        {/* Subtle background glow */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-cyan-500/5 rounded-lg" />
+
+        <div className="relative flex flex-col items-center space-y-6 py-8 px-6">
           {/* Hidden description for accessibility */}
           <div id="countdown-description" className="sr-only">
             Game starting countdown timer. Battle will begin in {countdown} seconds.
           </div>
-          {/* Battle Icon */}
+          
+          {/* Battle Icon with Glowing Ring */}
           <motion.div
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ duration: 0.8, type: "spring", bounce: 0.4 }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
             className="relative"
           >
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-red-500/20 rounded-full flex items-center justify-center border border-blue-500/30">
-              <Sword className="h-10 w-10 text-blue-400" />
-            </div>
+            {/* Outer glowing ring */}
+            <motion.div
+              className="absolute inset-0 rounded-full"
+              animate={{
+                boxShadow: [
+                  "0 0 20px rgba(59, 130, 246, 0.3)",
+                  "0 0 30px rgba(59, 130, 246, 0.5)",
+                  "0 0 20px rgba(59, 130, 246, 0.3)"
+                ]
+              }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+            />
             
-            {/* Decorative shields */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="absolute -left-6 top-1/2 transform -translate-y-1/2"
-            >
-              <Shield className="h-6 w-6 text-blue-300/60" />
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
-              className="absolute -right-6 top-1/2 transform -translate-y-1/2"
-            >
-              <Shield className="h-6 w-6 text-red-300/60" />
-            </motion.div>
+            {/* Main sword container */}
+            <div className="w-20 h-20 bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-full flex items-center justify-center border border-slate-600/50 shadow-lg relative z-10">
+              <Sword className="h-10 w-10 text-slate-300" />
+            </div>
           </motion.div>
 
-          {/* Title */}
+          {/* Clean Title */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.4 }}
+            transition={{ delay: 0.4, duration: 0.5 }}
             className="text-center"
           >
-            <h2 className="text-2xl font-bold text-white mb-2">Battle Commencing!</h2>
-            <p className="text-slate-300 text-sm">Prepare for strategic warfare</p>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              Battle Commencing!
+            </h2>
+            <p className="text-slate-400 text-sm">
+              Prepare for strategic warfare
+            </p>
           </motion.div>
 
-          {/* Players */}
+          {/* Clean Players Section */}
           <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.6 }}
+            transition={{ delay: 0.5, duration: 0.5 }}
             className="flex items-center justify-center space-x-8"
           >
+            {/* Player 1 */}
             <div className="text-center">
-              <div className="mb-2">
+              <div className="mb-3">
                 <UserAvatar 
                   username={player1Username}
                   avatarUrl={player1Profile?.avatarUrl}
@@ -129,30 +133,36 @@ export function GameStartCountdownModal({
                   className={`mx-auto ${
                     currentUsername === player1Username 
                       ? 'ring-2 ring-blue-400' 
-                      : ''
+                      : 'ring-1 ring-slate-600'
                   }`}
                 />
+                {/* Clean YOU indicator */}
+                {currentUsername === player1Username && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.8, type: "spring" }}
+                    className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium shadow-md"
+                  >
+                    YOU
+                  </motion.div>
+                )}
               </div>
-              <p className={`text-xs font-medium ${
+              <p className={`text-sm font-medium ${
                 currentUsername === player1Username ? 'text-blue-300' : 'text-slate-400'
               }`}>
                 {player1Username}
-                {currentUsername === player1Username && (
-                  <span className="block text-xs text-blue-400">(You)</span>
-                )}
               </p>
             </div>
 
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="text-slate-400"
-            >
-              <Sword className="h-6 w-6" />
-            </motion.div>
+            {/* Simple VS indicator */}
+            <div className="bg-slate-700/50 border border-slate-600/50 rounded-full px-3 py-1">
+              <span className="text-slate-300 font-medium text-sm">VS</span>
+            </div>
 
+            {/* Player 2 */}
             <div className="text-center">
-              <div className="mb-2">
+              <div className="mb-3 relative">
                 <UserAvatar 
                   username={player2Username}
                   avatarUrl={player2Profile?.avatarUrl}
@@ -161,82 +171,91 @@ export function GameStartCountdownModal({
                   className={`mx-auto ${
                     currentUsername === player2Username 
                       ? 'ring-2 ring-red-400' 
-                      : ''
+                      : 'ring-1 ring-slate-600'
                   }`}
                 />
+                {/* Clean YOU indicator */}
+                {currentUsername === player2Username && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ delay: 0.8, type: "spring" }}
+                    className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-medium shadow-md"
+                  >
+                    YOU
+                  </motion.div>
+                )}
               </div>
-              <p className={`text-xs font-medium ${
+              <p className={`text-sm font-medium ${
                 currentUsername === player2Username ? 'text-red-300' : 'text-slate-400'
               }`}>
                 {player2Username}
-                {currentUsername === player2Username && (
-                  <span className="block text-xs text-red-400">(You)</span>
-                )}
               </p>
             </div>
           </motion.div>
 
-          {/* Countdown */}
+          {/* Clean Countdown */}
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 0.8, type: "spring" }}
+            transition={{ delay: 0.6, type: "spring" }}
             className="relative"
           >
-            {/* Progress Ring */}
+            {/* Simple Progress Ring */}
             <svg width="120" height="120" className="transform -rotate-90">
               {/* Background ring */}
               <circle
                 cx="60"
                 cy="60"
                 r="50"
-                stroke="currentColor"
-                strokeWidth="8"
+                stroke="rgba(100, 116, 139, 0.3)"
+                strokeWidth="4"
                 fill="transparent"
-                className="text-slate-700/50"
               />
               {/* Progress ring */}
               <motion.circle
                 cx="60"
                 cy="60"
                 r="50"
-                stroke="currentColor"
-                strokeWidth="8"
+                stroke={countdown > 5 ? "#3b82f6" : countdown > 3 ? "#f59e0b" : "#ef4444"}
+                strokeWidth="4"
                 fill="transparent"
-                strokeDasharray={strokeDasharray}
+                strokeDasharray={circumference}
                 initial={{ strokeDashoffset: circumference }}
                 animate={{ strokeDashoffset }}
                 transition={{ duration: 0.5, ease: "easeInOut" }}
-                className={countdown > 5 ? "text-blue-400" : countdown > 3 ? "text-yellow-400" : "text-red-400"}
+                className="drop-shadow-sm"
               />
             </svg>
             
-            {/* Countdown number */}
+            {/* Clean countdown number */}
             <div className="absolute inset-0 flex items-center justify-center">
               <AnimatePresence mode="wait">
-                <motion.span
+                <motion.div
                   key={countdown}
-                  initial={{ scale: 0.5, opacity: 0 }}
+                  initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 1.5, opacity: 0 }}
-                  transition={{ duration: 0.3, type: "spring" }}
-                  className={`text-4xl font-bold ${
+                  exit={{ scale: 1.1, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-center"
+                >
+                  <span className={`text-4xl font-bold ${
                     countdown > 5 ? "text-blue-400" : 
                     countdown > 3 ? "text-yellow-400" : 
                     countdown > 0 ? "text-red-400" : "text-green-400"
-                  }`}
-                >
-                  {countdown > 0 ? countdown : "GO!"}
-                </motion.span>
+                  }`}>
+                    {countdown > 0 ? countdown : "GO!"}
+                  </span>
+                </motion.div>
               </AnimatePresence>
             </div>
           </motion.div>
 
-          {/* Subtitle */}
+          {/* Clean Subtitle */}
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
+            transition={{ delay: 0.7 }}
             className="text-slate-400 text-sm text-center"
           >
             {countdown > 0 ? "Starting in..." : "Enter the battlefield!"}

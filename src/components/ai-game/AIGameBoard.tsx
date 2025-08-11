@@ -169,7 +169,6 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
         newBoard[row][col] = selectedPieceValue;
         setSetupBoard(newBoard);
         setSelectedSetupSquare(null);
-        toast.success("Pieces swapped!");
         return;
       }
 
