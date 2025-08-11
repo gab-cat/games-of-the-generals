@@ -19,6 +19,7 @@ import type * as http from "../http.js";
 import type * as lobbies from "../lobbies.js";
 import type * as messages from "../messages.js";
 import type * as migrations from "../migrations.js";
+import type * as performance from "../performance.js";
 import type * as profiles from "../profiles.js";
 import type * as router from "../router.js";
 import type * as sendEmails from "../sendEmails.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   lobbies: typeof lobbies;
   messages: typeof messages;
   migrations: typeof migrations;
+  performance: typeof performance;
   profiles: typeof profiles;
   router: typeof router;
   sendEmails: typeof sendEmails;

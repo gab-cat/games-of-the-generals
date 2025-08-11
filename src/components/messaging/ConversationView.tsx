@@ -604,9 +604,9 @@ export function ConversationView({
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col bg-gradient-to-b from-slate-800/50 to-slate-900/50">
+      <div className="h-full flex flex-col bg-gray-900/20">
         {/* Chat Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-slate-900/50">
+        <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-gray-900/40">
           {onBack && (
             <Button
               variant="secondary"
@@ -624,8 +624,8 @@ export function ConversationView({
             className="ring-1 ring-white/20"
           />
           <div>
-            <h3 className="font-medium text-white">{otherUserProfile.username}</h3>
-            <p className="text-sm text-white/60">
+            <h3 className="font-sm text-white">{otherUserProfile.username}</h3>
+            <p className="text-xs text-white/60">
               {otherUserProfile.rank && `${otherUserProfile.rank} • `}
               {otherUserProfile.wins}W {otherUserProfile.losses}L
             </p>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle } from "lucide-react";
+import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText } from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -295,14 +295,15 @@ export function MessagingPanel({
       <Sheet open={isOpen} onOpenChange={onClose} >
         <SheetContent 
           side="right" 
-          className="w-full max-w-md p-0 bg-gray-600/20 backdrop-blur-xl border-white/20 text-white"
+          className="w-full max-w-md p-0 bg-gray-700/20 backdrop-blur-xl border-white/20 text-white"
         >
           <SheetHeader className={cn(
-            "p-4 border-b border-white/20 bg-gray-600/40",
+            "p-4 border-b border-white/20 bg-gray-900/40",
             selectedConversation && "hidden" // Hide header when in conversation view
           )}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <MessageSquareText className="w-6 h-6 text-white/80" />
                 {showNewMessage ? (
                   <Button
                     variant="secondary"

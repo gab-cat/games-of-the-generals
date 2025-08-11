@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Sword } from 'lucide-react';
@@ -14,7 +14,7 @@ interface GameStartCountdownModalProps {
   currentUsername: string;
 }
 
-export function GameStartCountdownModal({ 
+export const GameStartCountdownModal = memo(function GameStartCountdownModal({ 
   isOpen, 
   onComplete, 
   player1Username, 
@@ -264,4 +264,4 @@ export function GameStartCountdownModal({
       </DialogContent>
     </Dialog>
   );
-}
+});

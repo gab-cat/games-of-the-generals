@@ -217,7 +217,7 @@ const BoardSquare = memo(({
 
 BoardSquare.displayName = 'BoardSquare';
 
-export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
+const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const navigate = useNavigate();
   
   const { data: game, isPending: isLoadingGame } = useConvexQuery(
@@ -1010,15 +1010,12 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
               <p className="text-white/70">
                 Your army is ready! Waiting for your opponent to finish their setup...
               </p>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg p-4">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full p-4">
                 <div className="flex items-center justify-center gap-2 text-sm text-white/70">
                   <CheckCircle className="h-4 w-4 text-green-400" />
-                  <span>Your setup complete</span>
+                  <span>Your setup is complete</span>
                 </div>
               </div>
-              <Button variant="outline" onClick={onBackToLobby} className="w-full bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
-                Return to Lobby
-              </Button>
             </CardContent>
           </Card>
         </motion.div>
@@ -1955,4 +1952,8 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
     )}
     </>
   );
-}
+});
+
+GameBoard.displayName = 'GameBoard';
+
+export { GameBoard };

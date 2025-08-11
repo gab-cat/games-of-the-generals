@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { motion } from "framer-motion";
 import { Clock, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -14,7 +14,7 @@ interface TimerProps {
   turnStartTime?: number; // timestamp when current turn started
 }
 
-export function Timer({ 
+export const Timer = memo(function Timer({ 
   duration, 
   onTimeout, 
   label, 
@@ -158,4 +158,4 @@ export function Timer({
       )}
     </motion.div>
   );
-}
+});

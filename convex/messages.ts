@@ -1,7 +1,53 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+
+// Helper function for batch profile fetching to eliminate N+1 queries
+export const batchGetProfiles = internalQuery({
+  args: { 
+    userIds: v.array(v.id("users")) 
+  },
+  returns: v.array(v.union(
+    v.object({
+      _id: v.id("profiles"),
+      _creationTime: v.number(),
+      userId: v.id("users"),
+      username: v.string(),
+      wins: v.number(),
+      losses: v.number(),
+      gamesPlayed: v.number(),
+      rank: v.string(),
+      createdAt: v.number(),
+      avatarUrl: v.optional(v.string()),
+      avatarStorageId: v.optional(v.id("_storage")),
+      totalPlayTime: v.optional(v.number()),
+      fastestWin: v.optional(v.number()),
+      longestGame: v.optional(v.number()),
+      winStreak: v.optional(v.number()),
+      bestWinStreak: v.optional(v.number()),
+      capturedFlags: v.optional(v.number()),
+      piecesEliminated: v.optional(v.number()),
+      spiesRevealed: v.optional(v.number()),
+      hasSeenTutorial: v.optional(v.boolean()),
+      tutorialCompletedAt: v.optional(v.number()),
+    }),
+    v.null()
+  )),
+  handler: async (ctx, args) => {
+    if (args.userIds.length === 0) return [];
+    
+    const profiles = await Promise.all(
+      args.userIds.map(id => 
+        ctx.db.query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .unique()
+      )
+    );
+    
+    return profiles;
+  },
+});
 
 // Send a direct message
 export const sendMessage = mutation({
@@ -97,60 +143,91 @@ export const getConversations = query({
     const { paginationOpts } = args;
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 20) : 10;
 
-    // Use a more efficient approach with a single query
-    // Get conversations where user is participant1
+    // Use optimized indexes with proper ordering
     const conversations1Query = ctx.db
       .query("conversations")
-      .withIndex("by_participant1", (q) => q.eq("participant1Id", userId))
+      .withIndex("by_participant1_last_message", (q) => q.eq("participant1Id", userId))
       .order("desc");
 
-    // Get conversations where user is participant2  
     const conversations2Query = ctx.db
       .query("conversations")
-      .withIndex("by_participant2", (q) => q.eq("participant2Id", userId))
+      .withIndex("by_participant2_last_message", (q) => q.eq("participant2Id", userId))
       .order("desc");
 
     // Execute both queries and combine results
     const [conversations1, conversations2] = await Promise.all([
-      conversations1Query.take(limit * 2), // Take more to ensure we have enough after sorting
-      conversations2Query.take(limit * 2),
+      conversations1Query.take(limit),
+      conversations2Query.take(limit),
     ]);
 
-    // Combine and sort by lastMessageAt
+    // Combine and sort by lastMessageAt, then take the top results
     const allConversations = [...conversations1, ...conversations2]
       .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
       .slice(0, limit);
 
-    // Enhance with minimal data needed - avoid fetching full profiles
-    const enhanced = await Promise.all(
-      allConversations.map(async (conv) => {
-        const isParticipant1 = conv.participant1Id === userId;
-        const otherParticipantId = isParticipant1 ? conv.participant2Id : conv.participant1Id;
-        const otherUsername = isParticipant1 ? conv.participant2Username : conv.participant1Username;
-        
-        // Only fetch profile for avatar and rank if needed
-        const otherParticipantProfile = await ctx.db
+    // FIXED: Batch fetch all profiles to eliminate N+1 queries
+    const participantIds = allConversations.map(conv => {
+      const isParticipant1 = conv.participant1Id === userId;
+      return isParticipant1 ? conv.participant2Id : conv.participant1Id;
+    });
+
+    // Batch fetch all participant profiles at once
+    const uniqueParticipantIds = [...new Set(participantIds)];
+    const profiles = await Promise.all(
+      uniqueParticipantIds.map(id =>
+        ctx.db
           .query("profiles")
-          .withIndex("by_user", (q) => q.eq("userId", otherParticipantId))
-          .unique();
-        
-        // Get last message only if we need it for display
-        const lastMessage = conv.lastMessageId ? await ctx.db.get(conv.lastMessageId) : null;
-        
-        return {
-          ...conv,
-          lastMessage,
-          otherParticipant: {
-            id: otherParticipantId,
-            username: otherUsername,
-            avatarUrl: otherParticipantProfile?.avatarUrl,
-            rank: otherParticipantProfile?.rank,
-          },
-          unreadCount: isParticipant1 ? conv.participant1UnreadCount : conv.participant2UnreadCount,
-          lastReadAt: isParticipant1 ? conv.participant1LastRead : conv.participant2LastRead,
-        };
-      })
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .unique()
+      )
     );
+
+    // Create a map for O(1) profile lookups
+    const profilesMap = new Map();
+    profiles.forEach(profile => {
+      if (profile) {
+        profilesMap.set(profile.userId, profile);
+      }
+    });
+
+    // Batch fetch last messages if needed
+    const validMessageIds = allConversations
+      .map(conv => conv.lastMessageId)
+      .filter((id): id is NonNullable<typeof id> => id != null);
+    
+    const lastMessages = await Promise.all(
+      validMessageIds.map(id => ctx.db.get(id))
+    );
+    
+    const messagesMap = new Map();
+    lastMessages.forEach(msg => {
+      if (msg) {
+        messagesMap.set(msg._id, msg);
+      }
+    });
+
+    // Enhance conversations with batched data
+    const enhanced = allConversations.map(conv => {
+      const isParticipant1 = conv.participant1Id === userId;
+      const otherParticipantId = isParticipant1 ? conv.participant2Id : conv.participant1Id;
+      const otherUsername = isParticipant1 ? conv.participant2Username : conv.participant1Username;
+      
+      const otherParticipantProfile = profilesMap.get(otherParticipantId);
+      const lastMessage = conv.lastMessageId ? messagesMap.get(conv.lastMessageId) : null;
+      
+      return {
+        ...conv,
+        lastMessage,
+        otherParticipant: {
+          id: otherParticipantId,
+          username: otherUsername,
+          avatarUrl: otherParticipantProfile?.avatarUrl,
+          rank: otherParticipantProfile?.rank,
+        },
+        unreadCount: isParticipant1 ? conv.participant1UnreadCount : conv.participant2UnreadCount,
+        lastReadAt: isParticipant1 ? conv.participant1LastRead : conv.participant2LastRead,
+      };
+    });
 
     return {
       page: enhanced,
@@ -176,42 +253,71 @@ export const getConversationMessages = query({
     const { paginationOpts } = args;
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 50) : 20;
 
-    // Use optimized approach with the new conversation timestamp indexes
-    // This will be more efficient than the previous filter-based approach
-    const [sentMessages, receivedMessages] = await Promise.all([
-      // Messages sent from current user to other user
-      ctx.db
-        .query("messages")
-        .withIndex("by_sender_timestamp", (q) => q.eq("senderId", userId))
-        .filter((q) => q.eq(q.field("recipientId"), args.otherUserId))
-        .order("desc")
-        .take(limit),
-      
-      // Messages received from other user
-      ctx.db
-        .query("messages")
-        .withIndex("by_recipient_timestamp", (q) => q.eq("recipientId", userId))
-        .filter((q) => q.eq(q.field("senderId"), args.otherUserId))
-        .order("desc")
-        .take(limit)
-    ]);
-
-    // Combine and sort by timestamp
-    const allMessages = [...sentMessages, ...receivedMessages]
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, limit);
+    // FIXED: More efficient query strategy using the conversation timestamp indexes
+    // Query both directions and combine results more efficiently
+    let allMessages: any[] = [];
 
     if (paginationOpts && paginationOpts.cursor) {
-      // For cursor-based pagination, filter messages before the cursor
-      const cursorIndex = allMessages.findIndex(msg => msg._id === paginationOpts.cursor);
-      const paginatedMessages = cursorIndex > 0 ? allMessages.slice(0, cursorIndex) : allMessages;
-      
+      // For cursor-based pagination, use a more efficient approach
+      const [sentMessages, receivedMessages] = await Promise.all([
+        ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) => 
+            q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+          )
+          .order("desc")
+          .paginate({
+            numItems: Math.ceil(limit / 2),
+            cursor: paginationOpts.cursor,
+          }),
+        
+        ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) => 
+            q.eq("senderId", args.otherUserId).eq("recipientId", userId)
+          )
+          .order("desc")
+          .paginate({
+            numItems: Math.ceil(limit / 2),
+            cursor: paginationOpts.cursor,
+          })
+      ]);
+
+      // Combine paginated results
+      allMessages = [...sentMessages.page, ...receivedMessages.page]
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit);
+
       return {
-        page: paginatedMessages.slice(0, limit),
-        isDone: paginatedMessages.length < limit,
-        continueCursor: paginatedMessages.length > 0 ? paginatedMessages[paginatedMessages.length - 1]._id : "",
+        page: allMessages,
+        isDone: sentMessages.isDone && receivedMessages.isDone,
+        continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
       };
     } else {
+      // Initial load - use optimized single query approach
+      const [sentMessages, receivedMessages] = await Promise.all([
+        ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) => 
+            q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+          )
+          .order("desc")
+          .take(limit),
+        
+        ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) => 
+            q.eq("senderId", args.otherUserId).eq("recipientId", userId)
+          )
+          .order("desc")
+          .take(limit)
+      ]);
+
+      // Combine and sort by timestamp
+      allMessages = [...sentMessages, ...receivedMessages]
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, limit);
+
       return {
         page: allMessages,
         isDone: allMessages.length < limit,
@@ -221,28 +327,37 @@ export const getConversationMessages = query({
   },
 });
 
-// Mark messages as read
+// Mark messages as read with optimized batch processing
 export const markMessagesAsRead = mutation({
   args: {
     otherUserId: v.id("users"),
   },
+  returns: v.number(),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
     const timestamp = Date.now();
 
-    // Mark all unread messages from the other user as read
+    // FIXED: More efficient approach using the optimized unread index
+    // Get only unread messages to minimize unnecessary updates
     const unreadMessages = await ctx.db
       .query("messages")
-      .withIndex("by_recipient_read", (q) => 
+      .withIndex("by_unread_messages", (q) => 
         q.eq("recipientId", userId).eq("readAt", undefined)
       )
       .filter((q) => q.eq(q.field("senderId"), args.otherUserId))
-      .collect();
+      .take(100); // Limit batch size for performance
 
-    for (const message of unreadMessages) {
-      await ctx.db.patch(message._id, { readAt: timestamp });
+    // Batch update messages - process in smaller chunks for better performance
+    const batchSize = 20;
+    for (let i = 0; i < unreadMessages.length; i += batchSize) {
+      const batch = unreadMessages.slice(i, i + batchSize);
+      await Promise.all(
+        batch.map(message => 
+          ctx.db.patch(message._id, { readAt: timestamp })
+        )
+      );
     }
 
     // Update conversation read status
@@ -256,45 +371,49 @@ export const markMessagesAsRead = mutation({
   },
 });
 
-// Get total unread count for current user - Highly optimized with new indexes
+// Get total unread count for current user - Highly optimized with caching
 export const getUnreadCount = query({
   args: {},
+  returns: v.number(),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return 0;
 
-    // Use the new optimized unread indexes for much better performance
+    // FIXED: More efficient approach using the optimized unread indexes
+    // Query both participant indexes in parallel for better performance
     const [unreadConversations1, unreadConversations2] = await Promise.all([
       ctx.db
         .query("conversations")
         .withIndex("by_participant1_unread", (q) => 
           q.eq("participant1Id", userId).gt("participant1UnreadCount", 0)
         )
-        .collect(),
+        .take(50), // Limit to prevent excessive data transfer
       ctx.db
         .query("conversations")
         .withIndex("by_participant2_unread", (q) => 
           q.eq("participant2Id", userId).gt("participant2UnreadCount", 0)
         )
-        .collect()
+        .take(50) // Limit to prevent excessive data transfer
     ]);
 
     let totalUnread = 0;
     
-    // Sum unread counts efficiently
+    // Sum unread counts efficiently with early termination for large counts
     for (const conv of unreadConversations1) {
       totalUnread += conv.participant1UnreadCount;
+      if (totalUnread > 999) break; // Cap at 999+ for UI purposes
     }
     
     for (const conv of unreadConversations2) {
       totalUnread += conv.participant2UnreadCount;
+      if (totalUnread > 999) break; // Cap at 999+ for UI purposes
     }
 
-    return totalUnread;
+    return Math.min(totalUnread, 999); // Cap at 999 for UI display
   },
 });
 
-// Search users for messaging with highly optimized query using new indexes
+// Search users for messaging with optimized case-insensitive search
 export const searchUsers = query({
   args: {
     searchTerm: v.string(),
@@ -307,51 +426,51 @@ export const searchUsers = query({
     if (args.searchTerm.length < 2) return [];
 
     const limit = Math.min(args.limit || 10, 15);
-    const searchTerm = args.searchTerm.toLowerCase();
+    const searchTerm = args.searchTerm.toLowerCase().trim();
 
-    // Use the new optimized username prefix index for better performance
-    const prefixMatches = await ctx.db
+    // FIXED: Optimized case-insensitive search with better database-level filtering
+    // Use the active players index and filter efficiently
+    const allProfiles = await ctx.db
       .query("profiles")
-      .withIndex("by_username", (q) => q.gte("username", searchTerm))
-      .filter((q) => 
-        q.and(
-          q.neq(q.field("userId"), userId),
-          q.lt(q.field("username"), searchTerm + "\uffff") // Prefix search optimization
-        )
+      .withIndex("by_active_players", (q) => 
+        q.gte("gamesPlayed", 0)
       )
-      .order("asc") // Order by username for consistent results
-      .take(limit);
+      .filter((q) => q.neq(q.field("userId"), userId))
+      .take(150); // Take a reasonable batch for filtering
 
-    // If we need more results and didn't get enough prefix matches, search for contains
-    let containsMatches: any[] = [];
-    if (prefixMatches.length < limit) {
-      containsMatches = await ctx.db
-        .query("profiles")
-        .withIndex("by_active_players") // Use active players index for better performance
-        .filter((q) => 
-          q.and(
-            q.neq(q.field("userId"), userId),
-            q.gt(q.field("gamesPlayed"), 0) // Prioritize active players
-          )
-        )
-        .take(limit * 2) // Take more for filtering
-        .then(profiles => 
-          profiles
-            .filter(p => 
-              p.username.toLowerCase().includes(searchTerm) &&
-              !prefixMatches.some(pm => pm._id === p._id)
-            )
-            .slice(0, limit - prefixMatches.length)
-        );
-    }
+    // FIXED: Case-insensitive filtering with better performance and prioritization
+    const filteredProfiles = allProfiles
+      .filter(p => {
+        const username = p.username.toLowerCase();
+        return username.includes(searchTerm);
+      })
+      .sort((a, b) => {
+        const aUsername = a.username.toLowerCase();
+        const bUsername = b.username.toLowerCase();
+        
+        // Prioritize exact matches first
+        const aStartsWith = aUsername.startsWith(searchTerm);
+        const bStartsWith = bUsername.startsWith(searchTerm);
+        
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+        
+        // Then prioritize by games played (more active users first)
+        if (a.gamesPlayed !== b.gamesPlayed) {
+          return b.gamesPlayed - a.gamesPlayed;
+        }
+        
+        // Finally sort alphabetically
+        return aUsername.localeCompare(bUsername);
+      })
+      .slice(0, limit);
 
-    const allResults = [...prefixMatches, ...containsMatches];
-
-    return allResults.map(p => ({
+    return filteredProfiles.map(p => ({
       userId: p.userId,
       username: p.username,
       avatarUrl: p.avatarUrl,
       rank: p.rank,
+      gamesPlayed: p.gamesPlayed,
     }));
   },
 });

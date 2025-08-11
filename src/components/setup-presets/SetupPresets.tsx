@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -74,15 +74,15 @@ interface PresetData {
  * - Resets when board becomes empty again for subsequent auto-loads
  * - Transforms piece coordinates when board is flipped for player2
  */
-export function SetupPresets({ 
+export const SetupPresets = React.memo(({ 
   currentSetup, 
   onLoadPreset, 
   onApplyDefault,
   autoLoadDefault = true, // Default to true for backwards compatibility
   shouldFlipBoard = false, // Default to false for backwards compatibility
   className 
-}: SetupPresetsProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+}: SetupPresetsProps) => {
+  const [isExpanded, setIsExpanded] = useState(false); // Changed default to false for better performance
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [newPresetName, setNewPresetName] = useState("");
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
@@ -103,64 +103,69 @@ export function SetupPresets({
 
   // No need to initialize built-in presets since they're now hardcoded
 
-  // Helper functions to handle board flipping for player2
-  const transformPiecesForDisplay = useCallback((pieces: { piece: string; row: number; col: number }[]) => {
-    if (!shouldFlipBoard) return pieces;
+  // Memoized board empty check
+  const isBoardEmpty = useMemo(() => {
+    return currentSetup.flat().every(cell => cell === null);
+  }, [currentSetup]);
+
+  // Memoized helper functions to handle board flipping for player2
+  const transformPiecesForDisplay = useMemo(() => {
+    if (!shouldFlipBoard) {
+      return (pieces: { piece: string; row: number; col: number }[]) => pieces;
+    }
     
     // When board is flipped, we need to transform the row coordinates
     // The board has 8 rows (0-7), so row X becomes row (7-X) when flipped
-    return pieces.map(piece => ({
-      ...piece,
-      row: 7 - piece.row
-    }));
+    return (pieces: { piece: string; row: number; col: number }[]) => 
+      pieces.map(piece => ({
+        ...piece,
+        row: 7 - piece.row
+      }));
   }, [shouldFlipBoard]);
 
-  const transformPiecesFromDisplay = useCallback((pieces: { piece: string; row: number; col: number }[]) => {
-    if (!shouldFlipBoard) return pieces;
+  const transformPiecesFromDisplay = useMemo(() => {
+    if (!shouldFlipBoard) {
+      return (pieces: { piece: string; row: number; col: number }[]) => pieces;
+    }
     
     // When saving, we need to convert display coordinates back to logical coordinates
     // If display shows row X and board is flipped, the logical row is (7-X)
-    return pieces.map(piece => ({
-      ...piece,
-      row: 7 - piece.row
-    }));
+    return (pieces: { piece: string; row: number; col: number }[]) =>
+      pieces.map(piece => ({
+        ...piece,
+        row: 7 - piece.row
+      }));
   }, [shouldFlipBoard]);
 
   // Auto-load default preset when component loads
   useEffect(() => {
-    if (defaultPreset && !hasAutoLoaded.current && autoLoadDefault) {
-      // Check if the board is empty (no pieces placed yet)
-      const isEmpty = currentSetup.flat().every(cell => cell === null);
-      
-      if (isEmpty) {
-        hasAutoLoaded.current = true;
-        // Only auto-load if the board is empty (no pieces placed yet)
-        void loadPreset({ presetId: defaultPreset._id }).then((preset) => {
-          const transformedPieces = transformPiecesForDisplay(preset.pieces);
-          onLoadPreset(transformedPieces);
-          toast.success(`Auto-loaded default preset: ${preset.name}`, {
-            duration: 2000,
-          });
-        }).catch((error) => {
-          console.error("Failed to auto-load default preset:", error);
-          toast.error("Failed to load default preset");
-          hasAutoLoaded.current = false; // Reset on error so user can try again
+    if (defaultPreset && !hasAutoLoaded.current && autoLoadDefault && isBoardEmpty) {
+      hasAutoLoaded.current = true;
+      // Only auto-load if the board is empty (no pieces placed yet)
+      void loadPreset({ presetId: defaultPreset._id }).then((preset) => {
+        const transformedPieces = transformPiecesForDisplay(preset.pieces);
+        onLoadPreset(transformedPieces);
+        toast.success(`Auto-loaded default preset: ${preset.name}`, {
+          duration: 2000,
         });
-      }
+      }).catch((error) => {
+        console.error("Failed to auto-load default preset:", error);
+        toast.error("Failed to load default preset");
+        hasAutoLoaded.current = false; // Reset on error so user can try again
+      });
     }
-  }, [defaultPreset, currentSetup, loadPreset, onLoadPreset, autoLoadDefault, transformPiecesForDisplay]);
+  }, [defaultPreset, autoLoadDefault, isBoardEmpty, loadPreset, onLoadPreset, transformPiecesForDisplay]);
 
   // Reset auto-load flag when board becomes empty again
   useEffect(() => {
-    const isEmpty = currentSetup.flat().every(cell => cell === null);
-    if (isEmpty && hasAutoLoaded.current) {
+    if (isBoardEmpty && hasAutoLoaded.current) {
       // Only reset if the board was previously loaded and is now empty
       hasAutoLoaded.current = false;
     }
-  }, [currentSetup]);
+  }, [isBoardEmpty]);
 
-  // Convert current setup to pieces array
-  const getCurrentPieces = useCallback(() => {
+  // Convert current setup to pieces array - memoized for performance
+  const getCurrentPieces = useMemo(() => {
     const pieces: { piece: string; row: number; col: number }[] = [];
     for (let row = 0; row < currentSetup.length; row++) {
       for (let col = 0; col < currentSetup[row].length; col++) {
@@ -176,27 +181,21 @@ export function SetupPresets({
 
   const handleSavePreset = useCallback(async () => {
     if (!newPresetName.trim()) {
-      toast.error("Please enter a preset name");
-      return;
-    }
-
-    const pieces = getCurrentPieces();
-    if (pieces.length === 0) {
-      toast.error("No pieces to save");
+      alert("Please enter a preset name");
       return;
     }
 
     try {
+      const pieces = getCurrentPieces;
       await savePreset({
         name: newPresetName.trim(),
-        pieces,
+        pieces: pieces,
       });
-      
       setNewPresetName("");
       setShowSaveDialog(false);
-      toast.success("Preset saved successfully!");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to save preset");
+      console.error("Failed to save preset:", error);
+      alert("Failed to save preset");
     }
   }, [newPresetName, getCurrentPieces, savePreset]);
 
@@ -292,6 +291,10 @@ export function SetupPresets({
     setEditingName("");
   }, []);
 
+  // Memoized preset data to avoid recalculation on every render
+  const customPresets = useMemo(() => presets || [], [presets]);
+  const builtInPresets = useMemo(() => defaultPresets || [], [defaultPresets]);
+
   if (presets === undefined) {
     return (
       <Card className={cn("bg-black/20 backdrop-blur-xl border border-white/10", className)}>
@@ -301,9 +304,6 @@ export function SetupPresets({
       </Card>
     );
   }
-
-  const customPresets = presets || [];
-  const builtInPresets = defaultPresets || [];
 
   return (
     <Card className={cn("bg-black/20 backdrop-blur-xl border border-white/10", className)}>
@@ -549,4 +549,4 @@ export function SetupPresets({
       </AnimatePresence>
     </Card>
   );
-}
+});
