@@ -9,7 +9,7 @@ import { EmailSection } from "./05.email-section";
 
 export function SettingsList() {
   const { data: profile, isPending: isLoadingProfile, error: profileError } = useConvexQuery(api.profiles.getCurrentProfile);
-  const { data: userSettings } = useConvexQuery(api.settings.getUserSettings);
+  const { data: userSettings, isPending: isLoadingSettings } = useConvexQuery(api.settings.getUserSettings);
 
   if (profileError) {
     return (
@@ -25,7 +25,7 @@ export function SettingsList() {
     );
   }
 
-  if (isLoadingProfile || !profile) {
+  if (isLoadingProfile || !profile || isLoadingSettings) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <motion.div
@@ -33,6 +33,20 @@ export function SettingsList() {
           animate={{ opacity: 1, scale: 1 }}
           className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"
         />
+      </div>
+    );
+  }
+
+  // If account is anonymous, only show the convert account section
+  if (userSettings?.isAnonymous) {
+    return (
+      <div className="space-y-6">
+        <SettingsHeader />
+        <div className="flex justify-center">
+          <div className="max-w-md w-full">
+            <EmailSection currentEmail={userSettings?.email} />
+          </div>
+        </div>
       </div>
     );
   }

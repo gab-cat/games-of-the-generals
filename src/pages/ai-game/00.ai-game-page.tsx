@@ -181,7 +181,7 @@ export function AIGamePage() {
                 Select the AI difficulty that matches your skill level
               </CardDescription>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="">
               <Tabs value={selectedDifficulty} onValueChange={(value) => setSelectedDifficulty(value as Difficulty)}>
                 <TabsList className="flex w-fit rounded-full  bg-white/5 backdrop-blur-sm border border-white/10 mb-6">
                   {(Object.entries(difficultyConfig) as [Difficulty, typeof difficultyConfig.easy][]).map(([key, config], index) => (
@@ -268,7 +268,7 @@ export function AIGamePage() {
                 Game Rules
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6">
+            <CardContent className="">
               <div className="grid gap-4 md:grid-cols-2">
                 {[
                   { icon: "🎯", title: "Objective", description: "Capture the enemy flag or reach their back row with your flag." },

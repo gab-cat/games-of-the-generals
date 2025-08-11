@@ -367,3 +367,59 @@ export const updateProfileStats = mutation({
     return profile._id;
   },
 });
+
+// Mark tutorial as completed
+export const markTutorialCompleted = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get current profile
+    const currentProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!currentProfile) {
+      throw new Error("Profile not found");
+    }
+
+    // Mark tutorial as completed
+    await ctx.db.patch(currentProfile._id, {
+      hasSeenTutorial: true,
+      tutorialCompletedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+// Check if user has seen tutorial
+export const checkTutorialStatus = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { hasSeenTutorial: false, isFirstLogin: false };
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!profile) {
+      return { hasSeenTutorial: false, isFirstLogin: true };
+    }
+
+    // Consider it first login if profile was just created (within last 5 minutes) and no tutorial seen
+    const isRecentProfile = profile.createdAt && (Date.now() - profile.createdAt) < 5 * 60 * 1000;
+    const hasSeenTutorial = profile.hasSeenTutorial || false;
+    const isFirstLogin = isRecentProfile && !hasSeenTutorial;
+
+    return {
+      hasSeenTutorial,
+      isFirstLogin,
+      tutorialCompletedAt: profile.tutorialCompletedAt,
+    };
+  },
+});

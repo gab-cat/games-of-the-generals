@@ -1145,7 +1145,7 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setSelectedPiece(piece)}
                         className={`
-                          p-2 sm:p-3 border-2 rounded-lg text-xs sm:text-sm transition-all flex flex-col items-center gap-1
+                          p-2 sm:p-3 border-2 rounded-lg text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-1 min-h-[60px] sm:min-h-[80px]
                           ${selectedPiece === piece 
                             ? 'border-primary bg-primary/20 ring-1 ring-primary/50' 
                             : 'border-border bg-card hover:bg-accent hover:border-accent-foreground/50'
@@ -1153,13 +1153,13 @@ export function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
                         `}
                       >
                         {/* Mobile: No labels, small size */}
-                        <div className="block sm:hidden">
-                          <div className="text-foreground">{getPieceDisplay(piece, { showLabel: false, size: "small" })}</div>
+                        <div className="flex sm:hidden flex-col items-center justify-center gap-1">
+                          <div className="text-foreground flex items-center justify-center">{getPieceDisplay(piece, { showLabel: false, size: "small" })}</div>
                           <div className="text-[10px] text-center font-medium text-muted-foreground truncate w-full leading-tight">{piece}</div>
                         </div>
                         {/* Desktop: With labels, medium size */}
-                        <div className="hidden sm:block">
-                          <div className="text-foreground">{getPieceDisplay(piece, { showLabel: false, size: "medium" })}</div>
+                        <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:gap-1">
+                          <div className="text-foreground flex items-center justify-center">{getPieceDisplay(piece, { showLabel: false, size: "medium" })}</div>
                           <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">{piece}</div>
                         </div>
                       </motion.button>

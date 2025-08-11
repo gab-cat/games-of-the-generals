@@ -23,6 +23,9 @@ const applicationTables = {
     capturedFlags: v.optional(v.number()),
     piecesEliminated: v.optional(v.number()),
     spiesRevealed: v.optional(v.number()),
+    // Tutorial state
+    hasSeenTutorial: v.optional(v.boolean()),
+    tutorialCompletedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_wins", ["wins"])

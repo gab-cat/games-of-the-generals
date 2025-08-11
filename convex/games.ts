@@ -983,10 +983,10 @@ export const getMatchResult = query({
 export const getMatchHistory = query({
   args: {
     userId: v.optional(v.id("users")),
-    paginationOpts: v.optional(v.object({
+    paginationOpts: v.object({
       numItems: v.number(),
       cursor: v.optional(v.string()),
-    })),
+    }),
   },
   returns: v.object({
     page: v.array(v.object({
@@ -1003,21 +1003,7 @@ export const getMatchHistory = query({
       lobbyName: v.string(),
     })),
     isDone: v.boolean(),
-    continueCursor: v.string(),
-    matches: v.array(v.object({
-      _id: v.id("games"),
-      opponentUsername: v.string(),
-      isWin: v.boolean(),
-      isDraw: v.boolean(),
-      reason: v.string(),
-      duration: v.number(),
-      moves: v.number(),
-      createdAt: v.number(),
-      rankAtTime: v.string(),
-      gameId: v.id("games"),
-      lobbyName: v.string(),
-    })),
-    total: v.number(),
+    continueCursor: v.union(v.string(), v.null()),
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
@@ -1025,7 +1011,7 @@ export const getMatchHistory = query({
     if (!userId) throw new Error("Not authenticated");
 
     const { paginationOpts } = args;
-    const limit = paginationOpts ? Math.min(paginationOpts.numItems, 20) : 10;
+    const limit = Math.min(paginationOpts.numItems, 20);
 
     // Get user's profile once for rank info
     const profile = await ctx.db
@@ -1035,8 +1021,9 @@ export const getMatchHistory = query({
 
     // Use proper pagination with cursor support
     let result;
-    if (paginationOpts?.cursor && paginationOpts.cursor.trim() !== "") {
+    if (paginationOpts.cursor && paginationOpts.cursor.trim() !== "") {
       try {
+        // Create a fresh query for pagination
         const paginatedQuery = ctx.db
           .query("games")
           .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
@@ -1053,7 +1040,7 @@ export const getMatchHistory = query({
           cursor: paginationOpts.cursor,
         });
       } catch (error) {
-        // If cursor parsing fails, fall back to first page
+        // If cursor parsing fails, fall back to first page with proper pagination
         console.warn("Failed to parse cursor, falling back to first page:", error);
         const fallbackQuery = ctx.db
           .query("games")
@@ -1066,15 +1053,14 @@ export const getMatchHistory = query({
           )
           .order("desc");
 
-        const games = await fallbackQuery.take(limit);
-        result = {
-          page: games,
-          isDone: games.length < limit,
-          continueCursor: games.length > 0 ? games[games.length - 1]._id : "",
-        };
+        // Use paginate even for fallback to get proper cursor
+        result = await fallbackQuery.paginate({
+          numItems: limit,
+          cursor: null,
+        });
       }
     } else {
-      // First page
+      // First page - create a fresh query with proper pagination
       const firstPageQuery = ctx.db
         .query("games")
         .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
@@ -1086,12 +1072,10 @@ export const getMatchHistory = query({
         )
         .order("desc");
 
-      const games = await firstPageQuery.take(limit);
-      result = {
-        page: games,
-        isDone: games.length < limit,
-        continueCursor: games.length > 0 ? games[games.length - 1]._id : "",
-      };
+      result = await firstPageQuery.paginate({
+        numItems: limit,
+        cursor: null,
+      });
     }
 
     // Transform games into match history format
@@ -1124,11 +1108,8 @@ export const getMatchHistory = query({
     return {
       page: matchHistory,
       isDone: result.isDone,
-      continueCursor: result.continueCursor || "",
-      // Legacy compatibility
-      matches: matchHistory,
-      total: matchHistory.length, // Current page count
-      hasMore: !result.isDone, // Consistent with isDone
+      continueCursor: result.continueCursor,
+      hasMore: !result.isDone,
     };
   },
 });

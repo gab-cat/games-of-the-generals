@@ -18,9 +18,14 @@ import {
 import { UserAvatar } from "./UserAvatar";
 import { MessageButton } from "./messaging/MessageButton";
 import { MessagingPanel } from "./messaging/MessagingPanel";
+import { MessageNotification } from "./messaging/MessageNotification";
+import { TutorialButton } from "./TutorialButton";
+import { TutorialModal } from "./TutorialModal";
 import { cn } from "../lib/utils";
 import { useState, useEffect } from "react";
 import { Id } from "../../convex/_generated/dataModel";
+import { useMutation } from "convex/react";
+import { toast } from "sonner";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,6 +43,16 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMessagingOpen, setIsMessagingOpen] = useState(false);
   const [inviteLobbyId, setInviteLobbyId] = useState<Id<"lobbies"> | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [hasCheckedTutorial, setHasCheckedTutorial] = useState(false);
+
+  const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
+
+  // Check tutorial status
+  const { data: tutorialStatus } = useConvexQuery(
+    api.profiles.checkTutorialStatus,
+    isAuthenticated ? {} : "skip"
+  );
 
   // Expose function to open messaging with lobby invite
   useEffect(() => {
@@ -48,6 +63,16 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       });
     }
   }, [onOpenMessagingWithLobby]);
+
+  // Check if tutorial should be shown on first login
+  useEffect(() => {
+    if (tutorialStatus && !hasCheckedTutorial && isAuthenticated) {
+      if (tutorialStatus.isFirstLogin && !tutorialStatus.hasSeenTutorial) {
+        setShowTutorial(true);
+      }
+      setHasCheckedTutorial(true);
+    }
+  }, [tutorialStatus, hasCheckedTutorial, isAuthenticated]);
   
   const { data: profile, error: profileError } = useConvexQuery(
     api.profiles.getCurrentProfile
@@ -217,6 +242,9 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               transition={{ delay: 0.2 }}
               className="flex-1 flex justify-end items-center gap-2 sm:gap-3 min-w-0"
             >
+              {/* Tutorial Button */}
+              <TutorialButton variant="icon" size="md" />
+
               {/* Message Button */}
               <MessageButton
                 unreadCount={unreadCount}
@@ -336,9 +364,9 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/40  backdrop-blur-2xl border-t border-white/20"
+          className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/40 backdrop-blur-2xl border-t border-white/20"
         >
-          <div className="flex items-center justify-around py-3 px-2">
+          <div className="flex items-center justify-around py-2 px-1 sm:py-3 sm:px-2">
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActiveTab(item.path);
@@ -349,14 +377,16 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                   size="sm"
                   onClick={() => void navigate({ to: item.path })}
                   className={cn(
-                    "flex flex-row rounded-full border border-none items-center bg-white/1 gap-2 px-4 py-2 transition-all duration-200 w-28 h-10 flex-shrink-0",
+                    "flex flex-col items-center justify-center gap-1 px-2 py-5 transition-all duration-200 min-w-0 flex-1 max-w-20 sm:max-w-24 rounded-full",
                     isActive 
-                      ? "border-white/20 text-white" 
+                      ? "bg-white/20 text-white" 
                       : "text-white/70 hover:text-white hover:bg-white/10"
                   )}
                 >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-xs font-medium text-center leading-tight">{item.label}</span>
+                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                  <span className="text-[10px] sm:text-xs text-white font-medium text-center leading-tight w-full">
+                    {item.label}
+                  </span>
                 </Button>
               );
             })}
@@ -381,6 +411,33 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           setIsMessagingOpen(false);
           setInviteLobbyId(null);
           void navigate({ to: "/game", search: { gameId } });
+        }}
+      />
+
+      {/* Message Notifications */}
+      <MessageNotification
+        onOpenMessaging={() => setIsMessagingOpen(true)}
+        onNavigateToLobby={(lobbyId) => {
+          void navigate({ to: "/", search: { lobbyId } });
+        }}
+        onNavigateToGame={(gameId) => {
+          void navigate({ to: "/game", search: { gameId } });
+        }}
+      />
+
+      {/* Tutorial Modal for first-time users */}
+      <TutorialModal
+        isOpen={showTutorial}
+        onClose={() => setShowTutorial(false)}
+        onComplete={() => {
+          markTutorialCompleted()
+            .then(() => {
+              toast.success("Tutorial completed! Welcome to the battle, General!");
+            })
+            .catch((error) => {
+              console.error("Failed to mark tutorial as completed:", error);
+            });
+          setShowTutorial(false);
         }}
       />
     </div>

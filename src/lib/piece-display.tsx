@@ -2,12 +2,12 @@ import React from "react";
 import { 
   Flag, 
   Eye, 
-  User, 
   Star, 
-  Shield, 
   Square,
   Triangle,
-  Asterisk
+  Asterisk,
+  ChevronUp,
+  ChevronsUp
 } from "lucide-react";
 
 export interface PieceDisplayOptions {
@@ -29,6 +29,13 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     small: "w-4 h-4",
     medium: "w-5 h-5", 
     large: "w-8 h-8"
+  };
+  
+  // Larger sizes for Private and Sergeant chevrons
+  const chevronSizes = {
+    small: "w-6 h-6",
+    medium: "w-8 h-8",
+    large: "w-10 h-10"
   };
   
   const starSizes = {
@@ -53,17 +60,24 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
   const starSize = starSizes[size];
   const triangleSize = triangleSizes[size];
   const asteriskSize = asteriskSizes[size];
+  const chevronSize = chevronSizes[size];
 
   const createPieceElement = (icon: React.ReactElement, label: string) => {
     if (showLabel) {
       return (
         <div className="flex flex-col items-center justify-center">
-          {icon}
+          <div className="flex items-center justify-center">
+            {icon}
+          </div>
           <div className={`text-center mt-0.5 leading-tight ${size === 'small' ? 'text-[10px]' : 'text-xs'}`}>{label}</div>
         </div>
       );
     }
-    return icon;
+    return (
+      <div className="flex items-center justify-center">
+        {icon}
+      </div>
+    );
   };
 
   const pieceElements: Record<string, () => React.ReactElement> = {
@@ -76,11 +90,11 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
       "Spy"
     ),
     "Private": () => createPieceElement(
-      <User className={iconSize} />,
+      <ChevronUp className={chevronSize} />,
       "Private"
     ),
     "Sergeant": () => createPieceElement(
-      <Shield className={iconSize}  />,
+      <ChevronsUp className={chevronSize}  />,
       "Sergeant"
     ),
     "2nd Lieutenant": () => createPieceElement(
@@ -89,7 +103,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     ),
     "1st Lieutenant": () => {
       const iconElement = (
-        <div className="flex gap-1">
+        <div className="flex items-center justify-center gap-1">
           <Triangle className={starSize} fill="currentColor" />
           <Triangle className={starSize} fill="currentColor" />
         </div>
@@ -98,9 +112,9 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     },
     "Captain": () => {
       const iconElement = (
-        <div className="flex flex-col items-center gap-0.5">
+        <div className="flex flex-col items-center justify-center gap-0.5">
           <Triangle className={starSize} fill="currentColor" />
-          <div className="flex gap-1">
+          <div className="flex items-center justify-center gap-1">
             <Triangle className={starSize} fill="currentColor" />
             <Triangle className={starSize} fill="currentColor" />
           </div>
@@ -114,7 +128,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     ),
     "Lieutenant Colonel": () => {
       const iconElement = (
-        <div className="flex">
+        <div className="flex items-center justify-center gap-0.5">
           <Asterisk className={asteriskSize} />
           <Asterisk className={asteriskSize} />
         </div>
@@ -123,9 +137,9 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     },
     "Colonel": () => {
       const iconElement = (
-        <div className="flex flex-col items-center gap-0">
+        <div className="flex flex-col items-center justify-center gap-0">
           <Asterisk className={asteriskSize} />
-          <div className="flex gap-0 -mt-2 leading-0">
+          <div className="flex items-center justify-center gap-0 -mt-2">
             <Asterisk className={asteriskSize} />
             <Asterisk className={asteriskSize} />
           </div>
@@ -151,7 +165,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     "2 Star General": () => {
       if (showLabel) {
         const iconElement = (
-          <div className="flex gap-1">
+          <div className="flex items-center justify-center gap-1">
             <Star className={starSize} fill="currentColor" />
             <Star className={starSize} fill="currentColor" />
           </div>
@@ -159,7 +173,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
         return createPieceElement(iconElement, "2 Star");
       } else {
         return (
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-center gap-0.5">
             <span className="text-xs font-bold">2</span>
             <Star className={starSize} fill="currentColor" />
           </div>
@@ -169,9 +183,9 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     "3 Star General": () => {
       if (showLabel) {
         const iconElement = (
-          <div className="flex flex-col items-center gap-0.5">
+          <div className="flex flex-col items-center justify-center gap-0.5">
             <Star className={starSize} fill="currentColor" />
-            <div className="flex gap-1">
+            <div className="flex items-center justify-center gap-1">
               <Star className={starSize} fill="currentColor" />
               <Star className={starSize} fill="currentColor" />
             </div>
@@ -180,7 +194,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
         return createPieceElement(iconElement, "3 Star");
       } else {
         return (
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-center gap-0.5">
             <span className="text-xs font-bold">3</span>
             <Star className={starSize} fill="currentColor" />
           </div>
@@ -190,12 +204,12 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
     "4 Star General": () => {
       if (showLabel) {
         const iconElement = (
-          <div className="flex flex-col items-center gap-0.5">
-            <div className="flex gap-1">
+          <div className="flex flex-col items-center justify-center gap-0.5">
+            <div className="flex items-center justify-center gap-1">
               <Star className={starSize} fill="currentColor" />
               <Star className={starSize} fill="currentColor" />
             </div>
-            <div className="flex gap-1">
+            <div className="flex items-center justify-center gap-1">
               <Star className={starSize} fill="currentColor" />
               <Star className={starSize} fill="currentColor" />
             </div>
@@ -204,7 +218,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
         return createPieceElement(iconElement, "4 Star");
       } else {
         return (
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-center gap-0.5">
             <span className="text-xs font-bold">4</span>
             <Star className={starSize} fill="currentColor" />
           </div>
@@ -217,13 +231,13 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
       
       if (showLabel) {
         const iconElement = (
-          <div className="flex flex-col items-center gap-0.5">
-            <div className="flex gap-0.5">
+          <div className="flex flex-col items-center justify-center gap-0.5">
+            <div className="flex items-center justify-center gap-0.5">
               <Star className={fiveStarSize} fill="currentColor" />
               <Star className={fiveStarSize} fill="currentColor" />
               <Star className={fiveStarSize} fill="currentColor" />
             </div>
-            <div className="flex gap-0.5">
+            <div className="flex items-center justify-center gap-0.5">
               <Star className={fiveStarSize} fill="currentColor" />
               <Star className={fiveStarSize} fill="currentColor" />
             </div>
@@ -232,7 +246,7 @@ export function getPieceDisplay(piece: string, options: PieceDisplayOptions = {}
         return createPieceElement(iconElement, "5 Star");
       } else {
         return (
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-center gap-0.5">
             <span className="text-xs font-bold">5</span>
             <Star className={starSize} fill="currentColor" />
           </div>

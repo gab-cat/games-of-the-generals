@@ -317,7 +317,7 @@ export function MessagingPanel({
                   {showNewMessage ? "New Message" : "Messages"}
                 </SheetTitle>
                 {!showNewMessage && unreadCount > 0 && (
-                  <Badge variant="destructive" className="bg-red-500">
+                  <Badge variant="destructive" className="bg-red-500 text-white rounded-full">
                     {unreadCount}
                   </Badge>
                 )}
@@ -412,7 +412,7 @@ export function MessagingPanel({
                         <div
                           key={conversation._id}
                           onClick={() => setSelectedConversation(conversation.otherParticipant.id)}
-                          className="flex items-center gap-3 p-3 rounded-3xl hover:bg-white/10 cursor-pointer transition-colors"
+                          className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
                         >
                           <div className="relative">
                             <UserAvatar
@@ -421,18 +421,13 @@ export function MessagingPanel({
                               size="md"
                               className="ring-1 ring-white/20"
                             />
-                            {conversation.unreadCount > 0 && (
-                              <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
-                                <div className="w-2 h-2 bg-white rounded-full" />
-                              </div>
-                            )}
                           </div>
                           
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <h3 className={cn(
-                                "font-medium truncate",
-                                conversation.unreadCount > 0 ? "text-white" : "text-white/80"
+                                "font-normal truncate text-sm",
+                                conversation.unreadCount > 0 ? "text-white font-medium" : "text-white/80"
                               )}>
                                 {conversation.otherParticipant.username}
                               </h3>
@@ -443,7 +438,7 @@ export function MessagingPanel({
                             
                             <div className="flex items-center gap-2">
                               <p className={cn(
-                                "text-sm truncate flex-1",
+                                "text-xs truncate flex-1",
                                 conversation.unreadCount > 0 ? "text-white/90" : "text-white/60"
                               )}>
                                 {conversation.lastMessage ? (
@@ -470,7 +465,7 @@ export function MessagingPanel({
                               {conversation.unreadCount > 0 && (
                                 <Badge 
                                   variant="default" 
-                                  className="bg-blue-500 text-white min-w-[20px] h-5 text-xs flex items-center justify-center"
+                                  className="bg-red-500 border-none rounded-full text-white min-w-[20px] h-5 text-xs flex items-center justify-center"
                                 >
                                   {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
                                 </Badge>

@@ -8,6 +8,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { UserAvatar } from "../UserAvatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
 
@@ -336,24 +337,93 @@ export function ConversationView({
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
+  const formatFullTimestamp = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString([], {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
   // Helper function to determine message clustering
   const getMessagePosition = (
     currentMessage: Message | OptimisticMessage,
     previousMessage: Message | OptimisticMessage | null,
-    nextMessage: Message | OptimisticMessage | null
+    nextMessage: Message | OptimisticMessage | null,
+    hasTimeDividerBefore: boolean = false,
+    hasTimeDividerAfter: boolean = false
   ): 'single' | 'first' | 'middle' | 'last' => {
     const currentSender = currentMessage.senderId;
     const prevSender = previousMessage?.senderId;
     const nextSender = nextMessage?.senderId;
 
-    const isFromSameSenderAsPrev = prevSender === currentSender;
-    const isFromSameSenderAsNext = nextSender === currentSender;
+    // If there's a time divider before or after, break the streak
+    const isFromSameSenderAsPrev = prevSender === currentSender && !hasTimeDividerBefore;
+    const isFromSameSenderAsNext = nextSender === currentSender && !hasTimeDividerAfter;
 
     if (!isFromSameSenderAsPrev && !isFromSameSenderAsNext) return 'single';
     if (!isFromSameSenderAsPrev && isFromSameSenderAsNext) return 'first';
     if (isFromSameSenderAsPrev && isFromSameSenderAsNext) return 'middle';
     if (isFromSameSenderAsPrev && !isFromSameSenderAsNext) return 'last';
     return 'single';
+  };
+
+  // Helper function to check if we need a time divider
+  const needsTimeDivider = (currentMessage: Message | OptimisticMessage, previousMessage: Message | OptimisticMessage | null): boolean => {
+    if (!previousMessage) return false;
+    
+    const getCurrentTimestamp = (msg: Message | OptimisticMessage) => {
+      if ('isOptimistic' in msg) {
+        return msg._creationTime;
+      }
+      return msg.timestamp;
+    };
+
+    const currentTime = getCurrentTimestamp(currentMessage);
+    const previousTime = getCurrentTimestamp(previousMessage);
+    
+    return (currentTime - previousTime) > 10 * 60 * 1000; // 10 minutes in milliseconds
+  };
+
+  const renderTimeDivider = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    const isYesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000).toDateString() === date.toDateString();
+    
+    let dateText;
+    if (isToday) {
+      dateText = "Today";
+    } else if (isYesterday) {
+      dateText = "Yesterday";
+    } else {
+      dateText = date.toLocaleDateString([], { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    }
+    
+    const timeText = date.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    return (
+      <div className="flex items-center justify-center my-6">
+        <div className="flex-1 h-px bg-white/20"></div>
+        <div className="px-3 py-1 mx-4 text-xs text-white/60">
+          {dateText} at {timeText}
+        </div>
+        <div className="flex-1 h-px bg-white/20"></div>
+      </div>
+    );
   };
 
   const renderMessage = (message: Message | OptimisticMessage, isOwn: boolean, messagePosition: 'single' | 'first' | 'middle' | 'last', isOptimistic = false) => {
@@ -402,7 +472,7 @@ export function ConversationView({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className={cn(
-          "flex gap-2",
+          "flex gap-2 items-end",
           marginBottom,
           isOwn ? "justify-end" : "justify-start"
         )}
@@ -415,7 +485,7 @@ export function ConversationView({
                 avatarUrl={otherUserProfile?.avatarUrl}
                 rank={otherUserProfile?.rank}
                 size="sm"
-                className="mt-1"
+                className="mb-1"
               />
             ) : (
               <div className="w-8 h-8"></div>
@@ -423,102 +493,101 @@ export function ConversationView({
           </div>
         )}
         
-        <div className={cn(
-          "max-w-[70%] space-y-1",
-          isOwn ? "items-end" : "items-start"
-        )}>
-          {/* Message bubble */}
-          <div className={cn(
-            "px-4 py-2 shadow-sm relative",
-            getBorderRadius(),
-            isOwn 
-              ? "bg-blue-600 text-white"
-              : "bg-white/10 text-white",
-            message.messageType !== "text" && "border border-white/20",
-            isOptimistic && "opacity-70"
-          )}>
-            {message.messageType === "lobby_invite" ? (
-              <LobbyInviteMessage 
-                message={message}
-                onNavigateToLobby={onNavigateToLobby}
-                copyLobbyCode={(code) => void copyLobbyCode(code)}
-                currentUserId={currentUserProfile?.userId}
-                onJoinLobby={(lobbyId) => void handleJoinLobby(lobbyId)}
-              />
-            ) : message.messageType === "game_invite" ? (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <ExternalLink className="w-4 h-4 text-purple-400" />
-                    <span>Game Invite</span>
-                  </div>
-                  {message.gameId && onNavigateToGame && (
-                    <Button
-                      size="sm"
-                      onClick={() => onNavigateToGame(message.gameId!)}
-                      className="h-6 px-3 text-xs bg-purple-600 hover:bg-purple-700"
-                    >
-                      Watch
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-            )}
-            
-            {/* Timestamp and status inline with message */}
-            {showTimestamp && (
-              <div className={cn(
-                "flex items-center gap-1 text-xs text-white/50 mt-1",
-                isOwn ? "justify-end" : "justify-start"
-              )}>
-                <span>{formatTime(('timestamp' in message ? message.timestamp : message._creationTime) || Date.now())}</span>
-                {isOwn && !isOptimistic && (
-                  <div className="flex items-center ml-1">
-                    {message.readAt ? (
-                      <CheckCheck className="w-3 h-3 text-blue-400" />
-                    ) : message.deliveredAt ? (
-                      <Check className="w-3 h-3" />
-                    ) : (
-                      <AlertCircle className="w-3 h-3 text-yellow-400" />
-                    )}
-                  </div>
+                {/* Timestamp and status for own messages (left side) */}
+        {isOwn && showTimestamp && (
+          <div className="flex gap-1 flex-row items-end justify-end mb-1 min-w-0">
+            <div className="text-xs text-white/50">
+              {formatTime('isOptimistic' in message ? message._creationTime : message.timestamp)}
+            </div>
+            {!isOptimistic && (
+              <div className="flex items-center mt-0.5">
+                {message.readAt ? (
+                  <CheckCheck className="w-3 h-3 text-blue-400" />
+                ) : message.deliveredAt ? (
+                  <Check className="w-3 h-3 text-white/50" />
+                ) : (
+                  <AlertCircle className="w-3 h-3 text-yellow-400" />
                 )}
-                {isOptimistic && 'status' in message && (
-                  <div className="flex items-center gap-1">
-                    {message.status === "sending" ? (
-                      <div className="w-3 h-3 border border-white/30 border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-4 px-1 text-xs text-red-400 hover:text-red-300"
-                        onClick={() => void retryFailedMessage(message._id, message.content)}
-                      >
-                        Retry
-                      </Button>
-                    )}
-                  </div>
+              </div>
+            )}
+            {isOptimistic && 'status' in message && (
+              <div className="flex items-center mt-0.5">
+                {message.status === "sending" ? (
+                  <div className="w-3 h-3 border border-white/30 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-4 px-1 text-xs text-red-400 hover:text-red-300"
+                    onClick={() => void retryFailedMessage(message._id, message.content)}
+                  >
+                    Retry
+                  </Button>
                 )}
               </div>
             )}
           </div>
+        )}
+        
+        <div className={cn(
+          "max-w-[70%]",
+          isOwn ? "items-end" : "items-start"
+        )}>
+          {/* Message bubble with tooltip */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={cn(
+                "px-4 py-2 shadow-sm relative",
+                getBorderRadius(),
+                isOwn 
+                  ? "bg-blue-600 text-white"
+                  : "bg-white/10 text-white",
+                message.messageType !== "text" && "border border-white/20",
+                isOptimistic && "opacity-70"
+              )}>
+                {message.messageType === "lobby_invite" ? (
+                  <LobbyInviteMessage 
+                    message={message}
+                    onNavigateToLobby={onNavigateToLobby}
+                    copyLobbyCode={(code) => void copyLobbyCode(code)}
+                    currentUserId={currentUserProfile?.userId}
+                    onJoinLobby={(lobbyId) => void handleJoinLobby(lobbyId)}
+                  />
+                ) : message.messageType === "game_invite" ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <ExternalLink className="w-4 h-4 text-purple-400" />
+                        <span>Game Invite</span>
+                      </div>
+                      {message.gameId && onNavigateToGame && (
+                        <Button
+                          size="sm"
+                          onClick={() => onNavigateToGame(message.gameId!)}
+                          className="h-6 px-3 text-xs bg-purple-600 hover:bg-purple-700"
+                        >
+                          Watch
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                )}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="backdrop-blur-xl py-1 bg-black/40 text-xs text-white/80 rounded-xl p-2">
+              <p className="text-xs">{formatFullTimestamp('isOptimistic' in message ? message._creationTime : message.timestamp)}</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
         
-        {isOwn && (
-          <div className="w-8 flex flex-col justify-start">
-            {showAvatar ? (
-              <UserAvatar
-                username={message.senderUsername || currentUserProfile?.username || ""}
-                avatarUrl={currentUserProfile?.avatarUrl}
-                rank={currentUserProfile?.rank}
-                size="sm"
-                className="mt-1"
-              />
-            ) : (
-              <div className="w-8 h-8"></div>
-            )}
+        {/* Timestamp for other user messages (right side) */}
+        {!isOwn && showTimestamp && (
+          <div className="flex flex-col items-start justify-end mb-1 min-w-0">
+            <div className="text-xs text-white/50">
+              {formatTime('isOptimistic' in message ? message._creationTime : message.timestamp)}
+            </div>
           </div>
         )}
       </motion.div>
@@ -534,100 +603,112 @@ export function ConversationView({
   }
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-slate-800/50 to-slate-900/50">
-      {/* Chat Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-slate-900/50">
-        {onBack && (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={onBack}
-            className="p-2 text-white/80 hover:text-white hover:bg-white/10"
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-        )}
-        <UserAvatar
-          username={otherUserProfile.username}
-          avatarUrl={otherUserProfile.avatarUrl}
-          size="md"
-          className="ring-1 ring-white/20"
-        />
-        <div>
-          <h3 className="font-medium text-white">{otherUserProfile.username}</h3>
-          <p className="text-sm text-white/60">
-            {otherUserProfile.rank && `${otherUserProfile.rank} • `}
-            {otherUserProfile.wins}W {otherUserProfile.losses}L
-          </p>
-        </div>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messagesLoading ? (
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex gap-2 animate-pulse">
-                <div className="w-8 h-8 rounded-full bg-white/10" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-white/10 rounded w-3/4" />
-                  <div className="h-4 bg-white/10 rounded w-1/2" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-white/40" />
-              </div>
-              <p className="text-white/60 mb-2">No messages yet</p>
-              <p className="text-sm text-white/40">
-                Start the conversation with {otherUserProfile.username}!
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {messages.map((message: Message | OptimisticMessage, index) => {
-              const isOptimistic = 'isOptimistic' in message;
-              const isOwn = isOptimistic || message.senderId === currentUserProfile?.userId;
-              
-              // Determine message position for clustering
-              const previousMessage = index > 0 ? messages[index - 1] : null;
-              const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
-              const messagePosition = getMessagePosition(message, previousMessage, nextMessage);
-              
-              return renderMessage(message, isOwn, messagePosition, isOptimistic);
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Message Input */}
-      <div className="p-4 border-t border-white/10 bg-slate-900/50">
-        <div className="flex gap-2">
-          <Input
-            placeholder={`Message ${otherUserProfile.username}...`}
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            disabled={isLoading}
-            className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
+    <TooltipProvider>
+      <div className="h-full flex flex-col bg-gradient-to-b from-slate-800/50 to-slate-900/50">
+        {/* Chat Header */}
+        <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-slate-900/50">
+          {onBack && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onBack}
+              className="p-2 text-white/80 hover:text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+          )}
+          <UserAvatar
+            username={otherUserProfile.username}
+            avatarUrl={otherUserProfile.avatarUrl}
+            size="md"
+            className="ring-1 ring-white/20"
           />
-          <Button
-            onClick={() => void handleSendMessage()}
-            disabled={!newMessage.trim() || isLoading}
-            size="sm"
-            variant='gradient'
-            className="disabled:opacity-50 rounded-full"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+          <div>
+            <h3 className="font-medium text-white">{otherUserProfile.username}</h3>
+            <p className="text-sm text-white/60">
+              {otherUserProfile.rank && `${otherUserProfile.rank} • `}
+              {otherUserProfile.wins}W {otherUserProfile.losses}L
+            </p>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messagesLoading ? (
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex gap-2 animate-pulse">
+                  <div className="w-8 h-8 rounded-full bg-white/10" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-white/10 rounded w-3/4" />
+                    <div className="h-4 bg-white/10 rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-white/40" />
+                </div>
+                <p className="text-white/60 mb-2">No messages yet</p>
+                <p className="text-sm text-white/40">
+                  Start the conversation with {otherUserProfile.username}!
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {messages.map((message: Message | OptimisticMessage, index) => {
+                const isOptimistic = 'isOptimistic' in message;
+                const isOwn = isOptimistic || message.senderId === currentUserProfile?.userId;
+                
+                // Determine message position for clustering
+                const previousMessage = index > 0 ? messages[index - 1] : null;
+                const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
+                
+                // Check if we need time dividers
+                const showTimeDividerBefore = needsTimeDivider(message, previousMessage);
+                const showTimeDividerAfter = index < messages.length - 1 ? needsTimeDivider(messages[index + 1], message) : false;
+                
+                const messagePosition = getMessagePosition(message, previousMessage, nextMessage, showTimeDividerBefore, showTimeDividerAfter);
+                
+                return (
+                  <div key={message._id}>
+                    {showTimeDividerBefore && renderTimeDivider('isOptimistic' in message ? message._creationTime : message.timestamp)}
+                    {renderMessage(message, isOwn, messagePosition, isOptimistic)}
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Message Input */}
+        <div className="p-4 border-t border-white/10 bg-slate-900/50">
+          <div className="flex gap-2">
+            <Input
+              placeholder={`Message ${otherUserProfile.username}...`}
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              disabled={isLoading}
+              className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
+            />
+            <Button
+              onClick={() => void handleSendMessage()}
+              disabled={!newMessage.trim() || isLoading}
+              size="sm"
+              variant='gradient'
+              className="disabled:opacity-50 rounded-full"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 }

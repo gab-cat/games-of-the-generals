@@ -11,7 +11,7 @@ export function MatchHistoryHeader({ totalMatches }: MatchHistoryHeaderProps) {
     <motion.div 
       initial={{ x: -20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="flex items-center gap-2 sm:gap-4 mb-4 sm:mb-6"
+      className="flex items-center gap-2 sm:gap-4"
     >
       {/* Battle Chronicles Icon Section */}
       <motion.div
@@ -37,9 +37,11 @@ export function MatchHistoryHeader({ totalMatches }: MatchHistoryHeaderProps) {
           className="flex items-center gap-2 flex-wrap"
         >
           <h3 className="text-base sm:text-lg font-semibold text-white/90 truncate">Battle Chronicles</h3>
-          <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
-            {totalMatches} battles
-          </Badge>
+          {totalMatches > 0 && (
+            <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
+              {totalMatches} on page
+            </Badge>
+          )}
         </motion.div>
         <motion.div 
           initial={{ scaleX: 0 }}
