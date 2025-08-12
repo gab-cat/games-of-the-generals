@@ -9,7 +9,8 @@
     "dev:backend": "convex dev",
     "preview": "vite preview",
     "icons": "node ./scripts/generate-pwa-icons.mjs",
-    "build": "npm run icons && vite build",
+    "sitemap": "node ./scripts/generate-sitemap.mjs",
+    "build": "npm run icons && npm run sitemap && vite build",
     "lint": "tsc -p convex -noEmit --pretty false && tsc -p . -noEmit --pretty false && convex dev --once && vite build"
   },
   "dependencies": {
