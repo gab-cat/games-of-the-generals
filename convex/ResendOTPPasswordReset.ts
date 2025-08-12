@@ -18,7 +18,7 @@ export const ResendOTPPasswordReset = Resend({
   async sendVerificationRequest({ identifier: email, provider, token }) {
     const resend = new ResendAPI(provider.apiKey);
     const { error } = await resend.emails.send({
-      from: "Games of the Generals <noreply@csguild.tech>",
+      from: "Games of the Generals <noreply@generalsonline.app>",
       to: [email],
       subject: "Reset your password - Games of the Generals",
       html: `

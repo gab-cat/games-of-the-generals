@@ -16,7 +16,7 @@ export const sendPushForMessage = internalAction({
 
     const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
     const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-    const contactEmail = process.env.VAPID_CONTACT_EMAIL || "mailto:noreply@csguild.tech";
+    const contactEmail = process.env.VAPID_CONTACT_EMAIL || "mailto:noreply@generalsonline.app";
 
     if (!vapidPublicKey || !vapidPrivateKey) {
       console.warn("VAPID keys not configured; skipping web push send");
@@ -73,7 +73,7 @@ export const sendTestNotification = action({
 
     const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
     const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-    const contactEmail = process.env.VAPID_CONTACT_EMAIL || "mailto:noreply@csguild.tech";
+    const contactEmail = process.env.VAPID_CONTACT_EMAIL || "mailto:noreply@generalsonline.app";
 
     if (!vapidPublicKey || !vapidPrivateKey) {
       throw new Error("VAPID keys not configured on server");

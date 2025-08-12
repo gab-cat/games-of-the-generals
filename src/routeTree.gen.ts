@@ -9,10 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SpectateRouteImport } from './routes/spectate'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReplayRouteImport } from './routes/replay'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as MatchHistoryRouteImport } from './routes/match-history'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GameRouteImport } from './routes/game'
@@ -22,6 +24,11 @@ import { Route as AchievementsRouteImport } from './routes/achievements'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SpectateRoute = SpectateRouteImport.update({
   id: '/spectate',
   path: '/spectate',
@@ -40,6 +47,11 @@ const ReplayRoute = ReplayRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MatchHistoryRoute = MatchHistoryRouteImport.update({
@@ -92,10 +104,12 @@ export interface FileRoutesByFullPath {
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/match-history': typeof MatchHistoryRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/replay': typeof ReplayRoute
   '/settings': typeof SettingsRoute
   '/spectate': typeof SpectateRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -106,10 +120,12 @@ export interface FileRoutesByTo {
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/match-history': typeof MatchHistoryRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/replay': typeof ReplayRoute
   '/settings': typeof SettingsRoute
   '/spectate': typeof SpectateRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -121,10 +137,12 @@ export interface FileRoutesById {
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/match-history': typeof MatchHistoryRoute
+  '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/replay': typeof ReplayRoute
   '/settings': typeof SettingsRoute
   '/spectate': typeof SpectateRoute
+  '/terms': typeof TermsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,10 +155,12 @@ export interface FileRouteTypes {
     | '/game'
     | '/leaderboard'
     | '/match-history'
+    | '/privacy'
     | '/profile'
     | '/replay'
     | '/settings'
     | '/spectate'
+    | '/terms'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -151,10 +171,12 @@ export interface FileRouteTypes {
     | '/game'
     | '/leaderboard'
     | '/match-history'
+    | '/privacy'
     | '/profile'
     | '/replay'
     | '/settings'
     | '/spectate'
+    | '/terms'
   id:
     | '__root__'
     | '/'
@@ -165,10 +187,12 @@ export interface FileRouteTypes {
     | '/game'
     | '/leaderboard'
     | '/match-history'
+    | '/privacy'
     | '/profile'
     | '/replay'
     | '/settings'
     | '/spectate'
+    | '/terms'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -180,14 +204,23 @@ export interface RootRouteChildren {
   GameRoute: typeof GameRoute
   LeaderboardRoute: typeof LeaderboardRoute
   MatchHistoryRoute: typeof MatchHistoryRoute
+  PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ReplayRoute: typeof ReplayRoute
   SettingsRoute: typeof SettingsRoute
   SpectateRoute: typeof SpectateRoute
+  TermsRoute: typeof TermsRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/spectate': {
       id: '/spectate'
       path: '/spectate'
@@ -214,6 +247,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/match-history': {
@@ -284,10 +324,12 @@ const rootRouteChildren: RootRouteChildren = {
   GameRoute: GameRoute,
   LeaderboardRoute: LeaderboardRoute,
   MatchHistoryRoute: MatchHistoryRoute,
+  PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ReplayRoute: ReplayRoute,
   SettingsRoute: SettingsRoute,
   SpectateRoute: SpectateRoute,
+  TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

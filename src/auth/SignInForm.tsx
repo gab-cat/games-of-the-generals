@@ -353,6 +353,26 @@ export function SignInForm() {
                 <Separator className="flex-1 bg-white/20" />
               </div>
 
+              {/* OAuth Sign In */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
+                  onClick={() => authMutation.mutate({ provider: "google" })}
+                  disabled={authMutation.isPending}
+                >
+                  Continue with Google
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
+                  onClick={() => authMutation.mutate({ provider: "github" })}
+                  disabled={authMutation.isPending}
+                >
+                  Continue with GitHub
+                </Button>
+              </div>
+
               {/* Anonymous Sign In */}
               <Button 
                 variant="outline" 

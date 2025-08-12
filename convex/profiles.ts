@@ -117,6 +117,9 @@ export const createOrUpdateProfile = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
+    const authUser = await ctx.db.get(userId);
+    const oauthImageUrl = authUser?.image;
+
     // Check if username is already taken
     const existingProfile = await ctx.db
       .query("profiles")
@@ -135,9 +138,11 @@ export const createOrUpdateProfile = mutation({
 
     if (currentProfile) {
       // Update existing profile
-      await ctx.db.patch(currentProfile._id, {
-        username: args.username,
-      });
+      const patchData: any = { username: args.username };
+      if (!currentProfile.avatarUrl && oauthImageUrl) {
+        patchData.avatarUrl = oauthImageUrl;
+      }
+      await ctx.db.patch(currentProfile._id, patchData);
       return currentProfile._id;
     } else {
       // Create new profile
@@ -149,6 +154,7 @@ export const createOrUpdateProfile = mutation({
         gamesPlayed: 0,
         rank: "Private",
         createdAt: Date.now(),
+        avatarUrl: oauthImageUrl || undefined,
         totalPlayTime: 0,
         winStreak: 0,
         bestWinStreak: 0,

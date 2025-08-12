@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useConvex, useMutation } from "convex/react";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -170,23 +170,27 @@ export function ConversationView({
   const [isLoading, setIsLoading] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const newestTimestampRef = useRef<number>(0);
 
   const sendMessage = useMutation(api.messages.sendMessage);
   const markAsRead = useMutation(api.messages.markMessagesAsRead);
   const joinLobby = useMutation(api.lobbies.joinLobby);
   const setTyping = useMutation(api.messages.setTyping);
 
-  // Load messages with pagination support
-  const { data: messagesData, isLoading: messagesLoading } = useConvexQuery(
+  const convex = useConvex();
+  // Load latest messages (single page)
+  const { data: latestData, isLoading: messagesLoading } = useConvexQuery(
     api.messages.getConversationMessages,
-    { otherUserId }
+    { otherUserId, paginationOpts: { numItems: 20 } }
   );
+  const serverMessages = latestData?.page || [];
+  // Manual pagination state for older messages
+  const [olderMessages, setOlderMessages] = useState<Message[]>([]);
+  const [hasMoreOlder, setHasMoreOlder] = useState<boolean>(false);
+  const [isFetchingOlder, setIsFetchingOlder] = useState<boolean>(false);
 
-  // Extract messages from paginated response
-  const serverMessages = messagesData?.page || [];
-
-  // Merge server messages with optimistic messages
-  const messages = [...serverMessages, ...optimisticMessages].sort((a, b) => {
+  // Merge older + server messages with optimistic messages
+  const messages = [...olderMessages, ...serverMessages, ...optimisticMessages].sort((a, b) => {
     const aTime = 'timestamp' in a ? (a.timestamp ?? 0) : a._creationTime;
     const bTime = 'timestamp' in b ? (b.timestamp ?? 0) : b._creationTime;
     return aTime - bTime;
@@ -209,10 +213,74 @@ export function ConversationView({
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive (but not when loading older pages)
+  const loadingOlderRef = useRef(false);
+  const loadOlderMessages = async () => {
+    if (isFetchingOlder) return;
+    // Compute earliest timestamp from currently loaded messages
+    const allLoaded: Array<Message | OptimisticMessage> = [...olderMessages, ...serverMessages];
+    if (allLoaded.length === 0) return;
+    const earliest = allLoaded.reduce((min, msg: any) => {
+      const t = 'timestamp' in msg ? msg.timestamp : msg._creationTime;
+      return Math.min(min, t ?? Number.POSITIVE_INFINITY);
+    }, Number.POSITIVE_INFINITY);
+    if (!isFinite(earliest)) return;
+    setIsFetchingOlder(true);
+    loadingOlderRef.current = true;
+    try {
+      const resp: any = await convex.query(api.messages.getConversationMessages, {
+        otherUserId: otherUserId as Id<"users">,
+        beforeTimestamp: earliest,
+        paginationOpts: { numItems: 20 },
+      });
+      const newPage: Message[] = resp?.page ?? [];
+      if (newPage.length === 0) {
+        setHasMoreOlder(false);
+      } else {
+        setOlderMessages((prev) => {
+          const map = new Map<string, Message>();
+          for (const m of [...prev, ...newPage]) map.set((m as any)._id, m);
+          return Array.from(map.values());
+        });
+        setHasMoreOlder(!(resp?.isDone ?? true));
+      }
+    } catch (err) {
+      console.error("Failed to load older messages:", err);
+    } finally {
+      setIsFetchingOlder(false);
+    }
+  };
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    // Determine newest message timestamp across loaded lists
+    const newestTimestamp = messages.reduce((max, msg: any) => {
+      const t = 'timestamp' in msg ? msg.timestamp : msg._creationTime;
+      return Math.max(max, t ?? 0);
+    }, 0);
+
+    const isNewer = newestTimestamp > (newestTimestampRef.current || 0);
+    if (isNewer && !loadingOlderRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    newestTimestampRef.current = newestTimestamp;
+
+    if (!isFetchingOlder) {
+      loadingOlderRef.current = false;
+    }
+  }, [messages, isFetchingOlder]);
+
+  // Determine if there are older messages after first load
+  useEffect(() => {
+    if (olderMessages.length === 0 && latestData) {
+      setHasMoreOlder(!(latestData.isDone ?? true));
+    }
+  }, [latestData, olderMessages.length]);
+
+  // Reset manual pagination when switching conversations
+  useEffect(() => {
+    setOlderMessages([]);
+    setHasMoreOlder(false);
+    setIsFetchingOlder(false);
+  }, [otherUserId]);
 
   // Mark messages as read when conversation is opened
   useEffect(() => {
@@ -665,8 +733,16 @@ export function ConversationView({
           </div>
         </div>
 
+        {/* Retention notice */}
+        <div className="px-4 py-2 border-b border-white/10 bg-gray-900/30">
+          <div className="flex items-center gap-2 text-xs text-white/60">
+            <AlertCircle className="w-4 h-4 text-yellow-400" />
+            <span>Messages older than 7 days are automatically deleted.</span>
+          </div>
+        </div>
+
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4">
           {messagesLoading ? (
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
@@ -693,6 +769,19 @@ export function ConversationView({
             </div>
           ) : (
             <div className="space-y-1">
+              {hasMoreOlder && (
+                <div className="flex justify-center">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => void loadOlderMessages()}
+                    disabled={isFetchingOlder}
+                    className="h-6 px-3 text-xs text-white/80 hover:text-white hover:bg-white/10"
+                  >
+                    {isFetchingOlder ? "Loading…" : "Load previous messages"}
+                  </Button>
+                </div>
+              )}
               {messages.map((message: Message | OptimisticMessage, index) => {
                 const isOptimistic = 'isOptimistic' in message;
                 const isOwn = isOptimistic || message.senderId === currentUserProfile?.userId;

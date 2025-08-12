@@ -25,7 +25,7 @@ export const sendEmailChangeVerification = internalAction({
     const verificationCode = generateRandomString(random, alphabet, length);
 
     await resend.sendEmail(ctx, {
-      from: "Games of the Generals <noreply@csguild.tech>",
+      from: "Games of the Generals <noreply@generalsonline.app>",
       to: args.currentEmail,
       subject: "Email Change Verification - Games of the Generals",
       html: `

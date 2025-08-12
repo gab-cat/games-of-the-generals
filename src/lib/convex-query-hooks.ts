@@ -127,11 +127,14 @@ export function useAuthMutation(options?: {
       provider, 
       formData 
     }: { 
-      provider: "password" | "anonymous"; 
+      provider: "password" | "anonymous" | "google" | "github"; 
       formData?: FormData 
     }) => {
       if (provider === "anonymous") {
         return await signIn("anonymous");
+      }
+      if (provider === "google" || provider === "github") {
+        return await signIn(provider);
       }
       if (!formData) {
         throw new Error("Form data is required for password sign in");
