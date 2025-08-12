@@ -8,12 +8,12 @@ export function TermsAndConditionsPage() {
         animate={{ opacity: 1, y: 0 }}
         className="max-w-3xl mx-auto space-y-6 text-white/90"
       >
-        <h1 className="text-3xl font-display font-semibold">Terms &amp; Conditions</h1>
+        <h1 className="text-3xl font-display font-semibold">Terms of Service</h1>
         <p className="text-white/60 text-sm">Last updated: 2025-01-01</p>
 
         <div className="space-y-4 text-white/80">
           <p>
-            By using Games of the Generals, you agree to these terms. Please read
+            By using Generals Online, you agree to these terms. Please read
             them carefully.
           </p>
 

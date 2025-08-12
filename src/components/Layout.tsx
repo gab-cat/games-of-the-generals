@@ -369,6 +369,31 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               </DropdownMenu>
             </motion.div>
           )}
+          {!isAuthenticated && (
+            <motion.div
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex-1 flex justify-end items-center gap-1 sm:gap-2 min-w-0"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void navigate({ to: "/privacy" })}
+                className="text-white/80 hover:text-white"
+              >
+                Privacy Policy
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void navigate({ to: "/terms" })}
+                className="text-white/80 hover:text-white"
+              >
+                Terms of Service
+              </Button>
+            </motion.div>
+          )}
         </div>
       </motion.header>
 
