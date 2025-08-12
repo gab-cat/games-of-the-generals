@@ -16,7 +16,7 @@ export function AvatarSection({ username, currentAvatarUrl, rank }: AvatarSectio
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay: 0.1 }}
     >
-      <Card className="bg-gray-800/50 border-gray-700">
+      <Card className="rounded-xl border border-white/10 bg-black/30">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <Camera className="w-5 h-5" />

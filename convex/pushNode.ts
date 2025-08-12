@@ -30,8 +30,8 @@ export const sendPushForMessage = internalAction({
 
     const siteUrl = process.env.SITE_URL || "";
     const payload = JSON.stringify({
-      title: "New message",
-      body: `${message.senderUsername}: ${message.content}`.slice(0, 140),
+      title: message.senderUsername,
+      body: message.content.slice(0, 140),
       url: `${siteUrl}`,
       tag: `dm-${message.senderId}`,
       data: {

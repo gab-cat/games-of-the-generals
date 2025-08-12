@@ -9,22 +9,46 @@ import { EmailSection } from "./05.email-section";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { useMutation, useAction } from "convex/react";
-import { subscribeUserToPush, serializeSubscription } from "@/lib/push-client";
+import { useMutation } from "convex/react";
+import { unsubscribeFromPush } from "@/lib/push-client";
+
 
 export function SettingsList() {
   const { data: profile, isPending: isLoadingProfile, error: profileError } = useConvexQuery(api.profiles.getCurrentProfile);
   const { data: userSettings, isPending: isLoadingSettings } = useConvexQuery(api.settings.getUserSettings);
-  const { data: existingSubs } = useConvexQuery(api.push.getSubscriptionsForCurrentUser, {} as any);
-  const saveSubscription = useMutation(api.push.saveSubscription);
+  const { data: existingSubs = [] } = useConvexQuery(api.push.getSubscriptionsForCurrentUser, {} as any);
   const removeSubscriptionByEndpoint = useMutation(api.push.removeSubscriptionByEndpoint);
-  const sendTestNotification = useAction(api.pushNode.sendTestNotification);
-  const [isSubscribing, setIsSubscribing] = useState(false);
-  const [vapidKey, setVapidKey] = useState<string | null>(null);
+  const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
+  const [isRemovingEndpoint, setIsRemovingEndpoint] = useState<string | null>(null);
 
   useEffect(() => {
-    setVapidKey(import.meta.env.VITE_VAPID_PUBLIC_KEY || null);
+    void (async () => {
+      try {
+        if (!("serviceWorker" in navigator)) return;
+        const reg = await navigator.serviceWorker.getRegistration();
+        const sub = await reg?.pushManager.getSubscription();
+        setLocalEndpoint(sub?.endpoint ?? null);
+      } catch {
+        setLocalEndpoint(null);
+      }
+    })();
   }, []);
+
+  const handleRemoveSubscription = async (endpoint: string) => {
+    try {
+      setIsRemovingEndpoint(endpoint);
+      if (endpoint === localEndpoint) {
+        await unsubscribeFromPush();
+      }
+      await removeSubscriptionByEndpoint({ endpoint });
+      toast.success("Subscription removed");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to remove subscription");
+    } finally {
+      setIsRemovingEndpoint(null);
+    }
+  };
+  
 
   if (profileError) {
     return (
@@ -57,7 +81,7 @@ export function SettingsList() {
     return (
       <div className="space-y-6">
         <SettingsHeader />
-        <div className="flex justify-center">
+        <div className="flex justify-center px-4 sm:px-6">
           <div className="max-w-md w-full">
             <EmailSection currentEmail={userSettings?.email} />
           </div>
@@ -70,7 +94,7 @@ export function SettingsList() {
     <div className="space-y-6">
       <SettingsHeader />
       
-      <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 max-w-6xl mx-auto px-4 sm:px-6">
         <div className="space-y-6">
           <AvatarSection 
             username={profile.username}
@@ -78,77 +102,42 @@ export function SettingsList() {
             rank={profile.rank}
           />
           <UsernameSection currentUsername={profile.username} />
-
-          <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+          <div className="rounded-xl border border-white/10 bg-black/30 p-4 sm:p-5">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-white font-medium">Push Notifications</div>
-                <div className="text-white/60 text-sm">Get notified for new direct messages and invites</div>
+                <div className="text-white font-medium">Push Devices</div>
+                <div className="text-white/60 text-sm">Manage registered devices for push notifications</div>
               </div>
-              <div className="flex items-center gap-2">
-                {existingSubs && existingSubs.length > 0 ? (
-                  <Button
-                    variant="secondary"
-                    disabled={isSubscribing}
-                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                    onClick={async () => {
-                      setIsSubscribing(true);
-                      try {
-                        const reg = await navigator.serviceWorker.getRegistration();
-                        const sub = await reg?.pushManager.getSubscription();
-                        if (sub) {
-                          await sub.unsubscribe();
-                          await removeSubscriptionByEndpoint({ endpoint: sub.endpoint });
-                        }
-                        toast.success("Push notifications disabled");
-                      } catch (e:any) {
-                        toast.error(e?.message || "Failed to disable push");
-                      } finally {
-                        setIsSubscribing(false);
-                      }
-                    }}
-                  >Disable</Button>
-                ) : (
-                  <Button
-                    disabled={isSubscribing || !vapidKey}
-                    className="text-black"
-                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                    onClick={async () => {
-                      if (!vapidKey) {
-                        toast.error("Push is not configured");
-                        return;
-                      }
-                      setIsSubscribing(true);
-                      try {
-                        const sub = await subscribeUserToPush(vapidKey);
-                        if (!sub) {
-                          toast.error("Permission denied or subscription failed");
-                          return;
-                        }
-                        await saveSubscription({ subscription: serializeSubscription(sub) });
-                        toast.success("Push notifications enabled");
-                      } catch (e:any) {
-                        toast.error(e?.message || "Failed to enable push");
-                      } finally {
-                        setIsSubscribing(false);
-                      }
-                    }}
-                  >Enable</Button>
-                )}
-                <Button
-                  variant="ghost"
-                  disabled={!existingSubs || existingSubs.length === 0}
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                  onClick={async () => {
-                    try {
-                      await sendTestNotification({});
-                      toast.success("Test notification sent");
-                    } catch (e:any) {
-                      toast.error(e?.message || "Failed to send test");
-                    }
-                  }}
-                >Send Test</Button>
-              </div>
+            </div>
+            <div className="mt-4 space-y-2">
+              {existingSubs && existingSubs.length > 0 ? (
+                existingSubs.map((sub: any) => {
+                  const isThisDevice = sub.endpoint === localEndpoint;
+                  const ua: string = sub.userAgent || "Unknown device";
+                  const label = isThisDevice ? "This device" : ua;
+                  return (
+                    <div key={sub._id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 sm:p-4 rounded-lg bg-white/5">
+                      <div className="min-w-0">
+                        <div className="text-white/90 text-sm truncate break-words">{label}</div>
+                        <div className="text-white/50 text-xs mt-0.5">
+                          {sub.createdAt ? new Date(sub.createdAt).toLocaleString() : ""}
+                        </div>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={isRemovingEndpoint === sub.endpoint}
+                        onClick={() => { void handleRemoveSubscription(sub.endpoint); }}
+                        className="w-full sm:w-auto"
+                      >
+                        {isThisDevice ? (isRemovingEndpoint === sub.endpoint ? "Unregistering..." : "Unregister") : (isRemovingEndpoint === sub.endpoint ? "Removing..." : "Remove")}
+                      </Button>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="text-white/60 text-sm">No registered devices</div>
+              )}
             </div>
           </div>
         </div>

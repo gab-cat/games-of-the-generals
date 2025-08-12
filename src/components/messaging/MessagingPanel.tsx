@@ -12,6 +12,7 @@ import { cn } from "../../lib/utils";
 import { ConversationView } from "./ConversationView";
 import { toast } from "sonner";
 import { useDebounce } from "use-debounce";
+import { subscribeUserToPush, serializeSubscription } from "../../lib/push-client";
 import {
   Sheet,
   SheetContent,
@@ -30,6 +31,9 @@ interface MessagingPanelProps {
 interface NewMessageViewProps {
   inviteLobbyId?: string | null;
   onSelectUser: (userId: string, username?: string) => void;
+  shouldShowEnablePush: boolean;
+  isSubscribing: boolean;
+  onEnablePush: () => void;
 }
 
 interface SearchResult {
@@ -39,7 +43,7 @@ interface SearchResult {
   rank?: string;
 }
 
-function NewMessageView({ inviteLobbyId, onSelectUser }: NewMessageViewProps) {
+function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isSubscribing, onEnablePush }: NewMessageViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
@@ -67,7 +71,7 @@ function NewMessageView({ inviteLobbyId, onSelectUser }: NewMessageViewProps) {
   return (
     <div className="h-full flex flex-col">
       {/* Search */}
-      <div className="p-4 border-b border-white/10">
+      <div className="p-4 border-b border-white/10 space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
           <Input
@@ -78,6 +82,15 @@ function NewMessageView({ inviteLobbyId, onSelectUser }: NewMessageViewProps) {
             autoFocus
           />
         </div>
+        {shouldShowEnablePush && (
+          <Button
+            disabled={isSubscribing}
+            onClick={onEnablePush}
+            className="w-full bg-blue-600 hover:bg-blue-700"
+          >
+            Enable push notifications on this device
+          </Button>
+        )}
       </div>
 
       {/* Search Results */}
@@ -195,6 +208,11 @@ export function MessagingPanel({
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [vapidKey, setVapidKey] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
+  const [hasLocalSubscription, setHasLocalSubscription] = useState(false);
   
   // Debounce search term to avoid too many queries
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
@@ -232,6 +250,13 @@ export function MessagingPanel({
     isAuthenticated ? {} : "skip"
   );
 
+  const { data: existingSubs } = useConvexQuery(
+    api.push.getSubscriptionsForCurrentUser,
+    isAuthenticated ? {} : "skip"
+  );
+
+  const saveSubscription = useMutation(api.push.saveSubscription);
+
   const sendMessage = useMutation(api.messages.sendMessage);
 
   // Filter conversations based on debounced search term
@@ -253,6 +278,76 @@ export function MessagingPanel({
   const truncateMessage = (message: string, maxLength = 40) => {
     if (message.length <= maxLength) return message;
     return message.substring(0, maxLength) + "...";
+  };
+
+  // Setup env and mobile detection
+  useEffect(() => {
+    setVapidKey(import.meta.env.VITE_VAPID_PUBLIC_KEY || null);
+    if (typeof window !== "undefined" && "matchMedia" in window) {
+      const mq = window.matchMedia("(max-width: 768px)");
+      const update = () => setIsMobile(mq.matches);
+      update();
+      mq.addEventListener("change", update);
+      return () => mq.removeEventListener("change", update);
+    }
+  }, []);
+
+  // Check local push subscription
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!("serviceWorker" in navigator)) return;
+        const reg = await navigator.serviceWorker.getRegistration();
+        const sub = await reg?.pushManager.getSubscription();
+        const endpoint = sub?.endpoint || null;
+        setLocalEndpoint(endpoint);
+        setHasLocalSubscription(Boolean(sub));
+      } catch {
+        setLocalEndpoint(null);
+        setHasLocalSubscription(false);
+      }
+    })();
+  }, [isOpen]);
+
+  const isLocalEndpointSaved = Boolean(
+    localEndpoint && existingSubs?.some((s: any) => s.endpoint === localEndpoint)
+  );
+
+  const supportsPush = typeof window !== "undefined"
+    && "Notification" in window
+    && "serviceWorker" in navigator;
+
+  const shouldShowEnablePush = isMobile && supportsPush && isAuthenticated && !isLocalEndpointSaved;
+
+  const handleEnablePush = async () => {
+    try {
+      setIsSubscribing(true);
+      // If we already have a local subscription but it's not saved, just save it
+      if (hasLocalSubscription && localEndpoint && !isLocalEndpointSaved) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        const existing = await reg?.pushManager.getSubscription();
+        if (existing) {
+          await saveSubscription({ subscription: serializeSubscription(existing) });
+          toast.success("Push notifications enabled on this device");
+          return;
+        }
+      }
+      if (!vapidKey) {
+        toast.error("Push is not configured");
+        return;
+      }
+      const sub = await subscribeUserToPush(vapidKey);
+      if (!sub) {
+        toast.error("Permission denied or subscription failed");
+        return;
+      }
+      await saveSubscription({ subscription: serializeSubscription(sub) });
+      toast.success("Push notifications enabled on this device");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to enable push");
+    } finally {
+      setIsSubscribing(false);
+    }
   };
 
   if (!isAuthenticated) return null;
@@ -356,11 +451,14 @@ export function MessagingPanel({
               <NewMessageView
                 inviteLobbyId={inviteLobbyId}
                 onSelectUser={handleUserSelect}
+                shouldShowEnablePush={shouldShowEnablePush}
+                isSubscribing={isSubscribing}
+                onEnablePush={handleEnablePush}
               />
             ) : (
               <div className="h-full flex flex-col">
                 {/* Search */}
-                <div className="p-4">
+                <div className="p-4 space-y-3">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
                     <Input
@@ -370,6 +468,15 @@ export function MessagingPanel({
                       className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
                     />
                   </div>
+                  {shouldShowEnablePush && (
+                    <Button
+                      disabled={isSubscribing}
+                      onClick={handleEnablePush}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                    >
+                      Enable push notifications on this device
+                    </Button>
+                  )}
                 </div>
 
                 {/* Conversations List */}

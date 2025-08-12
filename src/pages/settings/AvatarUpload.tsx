@@ -205,7 +205,8 @@ export function AvatarUpload({
           <Button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="flex-1 bg-blue-600 hover:bg-blue-700"
+            className="flex-1"
+            variant="gradient"
           >
             {isUploading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

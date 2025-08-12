@@ -148,7 +148,7 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay: 0.4 }}
     >
-      <Card className="bg-gray-800/50 border-gray-700">
+      <Card className="rounded-xl border border-white/10 bg-black/30">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <Mail className="w-5 h-5" />
@@ -192,7 +192,8 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
               {!showConvertForm ? (
                 <Button
                   onClick={() => setShowConvertForm(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    className="w-full flex-1"
+                  variant="gradient"
                 >
                   Convert to Regular Account
                 </Button>
@@ -225,7 +226,8 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
                     <Button
                       onClick={handleConvertAccount}
                       disabled={isLoading}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                        className="flex-1"
+                      variant="gradient"
                     >
                       {isLoading ? "Converting..." : "Convert Account"}
                     </Button>
@@ -314,7 +316,8 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
                     <Button
                       onClick={handleRequestEmailChange}
                       disabled={isLoading}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                      className="flex-1"
+                      variant="gradient"
                     >
                       {isLoading ? "Sending..." : "Send Verification Code"}
                     </Button>
@@ -334,7 +337,8 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
               ) : (
                 <Button
                   onClick={() => setShowEmailChange(true)}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  className="w-full flex-1"
+                  variant="gradient"
                   disabled={!!pendingEmailChange}
                 >
                   Change Email Address

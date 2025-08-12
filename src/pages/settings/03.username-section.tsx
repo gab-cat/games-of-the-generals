@@ -45,7 +45,7 @@ export function UsernameSection({ currentUsername }: UsernameSectionProps) {
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay: 0.2 }}
     >
-      <Card className="bg-gray-800/50 border-gray-700">
+      <Card className="rounded-xl border border-white/10 bg-black/30">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
             <User className="w-5 h-5" />
@@ -78,7 +78,8 @@ export function UsernameSection({ currentUsername }: UsernameSectionProps) {
             <Button
               onClick={() => void handleUsernameUpdate()}
               disabled={updateUsernameMutation.isPending || username === currentUsername}
-              className="w-full bg-blue-600 hover:bg-blue-700"
+              className="w-full flex-1"
+              variant="gradient"
             >
               {updateUsernameMutation.isPending ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
