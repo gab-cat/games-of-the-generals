@@ -237,14 +237,17 @@ export function ConversationView({
         paginationOpts: { numItems: 20 },
       });
       const newPage: Message[] = resp?.page ?? [];
-      if (newPage.length === 0) {
-        setHasMoreOlder(false);
-      } else {
+      if (newPage.length > 0) {
         setOlderMessages((prev) => {
           const map = new Map<string, Message>();
           for (const m of [...prev, ...newPage]) map.set((m as any)._id, m);
           return Array.from(map.values());
         });
+      }
+      // Prefer server hasMore; fallback to isDone
+      if (typeof resp?.hasMore === "boolean") {
+        setHasMoreOlder(resp.hasMore);
+      } else {
         setHasMoreOlder(!(resp?.isDone ?? true));
       }
     } catch (err) {
@@ -271,19 +274,34 @@ export function ConversationView({
     }
   }, [messages, isFetchingOlder]);
 
-  // Determine if there are older messages after first load
-  useEffect(() => {
-    if (olderMessages.length === 0 && latestData) {
-      setHasMoreOlder(!(latestData.isDone ?? true));
-    }
-  }, [latestData, olderMessages.length]);
-
   // Reset manual pagination when switching conversations
   useEffect(() => {
     setOlderMessages([]);
     setHasMoreOlder(false);
     setIsFetchingOlder(false);
   }, [otherUserId]);
+
+  // Determine if there are older messages after first load or when switching conversations
+  useEffect(() => {
+    if (!latestData) return;
+    // Prefer server-provided hasMore when available; else fall back to isDone
+    if (typeof latestData === "object" && latestData !== null && "hasMore" in latestData) {
+      const hasMore = (latestData as { hasMore?: boolean }).hasMore;
+      if (typeof hasMore === "boolean") {
+        setHasMoreOlder(hasMore);
+        return;
+      }
+    }
+    if (typeof latestData === "object" && latestData !== null && "isDone" in latestData) {
+      const isDone = (latestData as { isDone?: boolean }).isDone;
+      setHasMoreOlder(Boolean(isDone === false));
+      return;
+    }
+    // Fallback: if older shape ever returns an array, infer via page size
+    if (Array.isArray(latestData)) {
+      setHasMoreOlder(latestData.length >= 20);
+    }
+  }, [otherUserId, latestData]);
 
   // Mark messages as read when there are unread incoming messages from the other user
   useEffect(() => {
@@ -856,7 +874,7 @@ export function ConversationView({
         </div>
 
         {/* Message Input */}
-        <div className="p-4 border-t border-white/10 bg-slate-900/50">
+        <div className="p-4 border-t bg-slate-900/50">
           <div className="flex gap-2">
             <Input
               placeholder={`Message ${otherUserProfile.username}...`}

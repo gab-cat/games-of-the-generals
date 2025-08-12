@@ -72,7 +72,19 @@ export function useConvexInfiniteQuery<
     },
     initialPageParam: options?.initialPageParam,
     getNextPageParam:
-      options?.getNextPageParam || ((lastPage: any) => lastPage?.continueTimestamp ?? undefined),
+      options?.getNextPageParam || ((lastPage: any) => {
+        // Respect explicit isDone/hasMore flags if provided by the server
+        if (lastPage && typeof lastPage === "object") {
+          if ("hasMore" in lastPage && typeof (lastPage as any).hasMore === "boolean") {
+            return (lastPage as any).hasMore ? (lastPage as any).continueTimestamp : undefined;
+          }
+          if ("isDone" in lastPage && typeof (lastPage as any).isDone === "boolean") {
+            return (lastPage as any).isDone ? undefined : (lastPage as any).continueTimestamp;
+          }
+        }
+        // Fallback to continueTimestamp presence
+        return lastPage?.continueTimestamp ?? undefined;
+      }),
     enabled: options?.enabled,
     retry: false,
     refetchOnWindowFocus: false,

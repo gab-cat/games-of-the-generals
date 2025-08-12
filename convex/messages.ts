@@ -316,9 +316,40 @@ export const getConversationMessages = query({
 
     const continueTs = combined.length > 0 ? combined[combined.length - 1].timestamp : undefined;
 
+    // More robust hasMore detection: if we returned a full page, we certainly have more.
+    // Otherwise, probe for any message older than the last timestamp in either direction.
+    let hasMore = combined.length >= limit;
+    if (!hasMore && continueTs != null) {
+      const [olderSent, olderReceived] = await Promise.all([
+        ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) =>
+            q
+              .eq("senderId", userId)
+              .eq("recipientId", args.otherUserId)
+              .lt("timestamp", continueTs)
+          )
+          .order("desc")
+          .take(1),
+        ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) =>
+            q
+              .eq("senderId", args.otherUserId)
+              .eq("recipientId", userId)
+              .lt("timestamp", continueTs)
+          )
+          .order("desc")
+          .take(1),
+      ]);
+      hasMore = olderSent.length > 0 || olderReceived.length > 0;
+    }
+
     return {
       page: combined,
-      isDone: combined.length < limit,
+      // Keep isDone for backward compatibility; reflect the more accurate hasMore
+      isDone: !hasMore,
+      hasMore,
       continueCursor: continueTs != null ? String(continueTs) : "",
       continueTimestamp: continueTs,
     } as any;
