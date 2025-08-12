@@ -83,3 +83,24 @@ self.addEventListener('notificationclick', (event) => {
     })()
   );
 });
+
+// --- Optional: proactively clean outdated caches and old clients on activate ---
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    try {
+      // Claim clients is already handled by clientsClaim(), but double ensure
+      await self.clients.claim();
+      // Trigger navigation preload if supported (can speed up reloads)
+      if ('navigationPreload' in self.registration) {
+        try { await (self.registration as any).navigationPreload.enable(); } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
+  })());
+});
+
+// When a new SW is installed and waiting, tell it to activate immediately
+self.addEventListener('install', () => {
+  // skipWaiting is already called at top, but some browsers require inside event
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  self.skipWaiting();
+});

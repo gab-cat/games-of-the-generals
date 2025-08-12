@@ -98,7 +98,7 @@ const TutorialBoardSquare = ({
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        "aspect-square border flex items-center justify-center cursor-pointer rounded-sm transition-all relative min-h-[32px] p-0.5",
+        "aspect-square border flex items-center justify-center cursor-pointer rounded-sm transition-all relative min-h-[24px] sm:min-h-[32px] p-0.5",
         "bg-muted/30 border-border hover:bg-muted/50",
         isHighlighted && "ring-2 ring-yellow-500 bg-yellow-500/20 border-yellow-500",
         isSelected && "ring-2 ring-blue-500 bg-blue-500/20 border-blue-500",
@@ -150,7 +150,7 @@ const TutorialBoard = ({
   onSquareClick?: (row: number, col: number) => void;
 }) => {
   return (
-    <div className="grid grid-cols-9 gap-1 max-w-lg mx-auto p-2 rounded-lg bg-muted/10 border border-white/10">
+    <div className="grid grid-cols-9 gap-0.5 sm:gap-1 w-full sm:max-w-lg mx-auto p-1 sm:p-2 rounded-lg bg-muted/10 border border-white/10">
       {board.map((row, rowIndex) =>
         row.map((cell, colIndex) => {
           const squareKey = `${rowIndex}-${colIndex}`;
@@ -667,8 +667,8 @@ export function TutorialModal({ isOpen, onClose, onComplete }: TutorialModalProp
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogOverlay className="bg-black/80 backdrop-blur-sm" />
-      <DialogContent className="max-w-4xl w-[95vw] max-h-[95vh] p-0 bg-gray-900/95 backdrop-blur-xl border border-white/20 shadow-2xl overflow-hidden">
-        <Card className="h-full bg-transparent border-0 shadow-none flex flex-col max-h-[95vh]">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[calc(100dvh-2rem)] sm:max-h-[95vh] p-0 bg-gray-900/95 backdrop-blur-xl border border-white/20 shadow-2xl overflow-hidden rounded-xl sm:rounded-2xl">
+        <Card className="h-full bg-transparent border-0 shadow-none flex flex-col max-h-[calc(100dvh-2rem)] sm:max-h-[95vh]">
           <CardHeader className="border-b border-white/10 p-3 sm:p-4 flex-shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -692,13 +692,6 @@ export function TutorialModal({ isOpen, onClose, onComplete }: TutorialModalProp
               </div>
               
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-                <Button
-                  variant="secondary"
-                  onClick={handleComplete}
-                  className="text-white/70 hover:text-white px-1 sm:px-2"
-                >
-                  I already know this game
-                </Button>
                 <Badge variant="outline" className="bg-white/10 border-white/20 text-white/70 text-xs">
                   {currentStep + 1}/{steps.length}
                 </Badge>
@@ -776,14 +769,23 @@ export function TutorialModal({ isOpen, onClose, onComplete }: TutorialModalProp
                   <span className="sm:hidden">Start!</span>
                 </Button>
               ) : (
-                <Button
-                  onClick={handleNext}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-xs sm:text-sm px-2 sm:px-4"
-                >
-                  <span className="hidden sm:inline">Next</span>
-                  <span className="sm:hidden">Next</span>
-                  <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
-                </Button>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleComplete}
+                    className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-xs sm:text-sm px-2 sm:px-4"
+                  >
+                    Skip
+                  </Button>
+                  <Button
+                    onClick={handleNext}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-xs sm:text-sm px-2 sm:px-4"
+                  >
+                    <span className="hidden sm:inline">Next</span>
+                    <span className="sm:hidden">Next</span>
+                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4 ml-1" />
+                  </Button>
+                </div>
               )}
             </div>
           </div>
