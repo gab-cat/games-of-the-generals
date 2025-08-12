@@ -24,6 +24,7 @@ export const batchGetProfiles = internalQuery({
       avatarStorageId: v.optional(v.id("_storage")),
       totalPlayTime: v.optional(v.number()),
       fastestWin: v.optional(v.number()),
+      fastestGame: v.optional(v.number()),
       longestGame: v.optional(v.number()),
       winStreak: v.optional(v.number()),
       bestWinStreak: v.optional(v.number()),
@@ -252,85 +253,75 @@ export const getConversationMessages = query({
       numItems: v.number(),
       cursor: v.optional(v.string()),
     })),
+    // New: support timestamp-based pagination for infinite scroll
+    beforeTimestamp: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) return { page: [], isDone: true, continueCursor: "" };
+    if (!userId) return { page: [], isDone: true, continueCursor: "", continueTimestamp: undefined } as any;
 
-    const { paginationOpts } = args;
+    const { paginationOpts, beforeTimestamp } = args;
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 50) : 20;
 
-    // FIXED: More efficient query strategy using the conversation timestamp indexes
-    // Query both directions and combine results more efficiently
-    let allMessages: any[] = [];
-
-    if (paginationOpts && paginationOpts.cursor) {
-      // For cursor-based pagination, use a more efficient approach
-      const [sentMessages, receivedMessages] = await Promise.all([
-        ctx.db
+    // Build queries for both directions
+    const [sentMessages, receivedMessages] = await Promise.all([
+      (async () => {
+        if (beforeTimestamp != null) {
+          return await ctx.db
+            .query("messages")
+            .withIndex("by_conversation_timestamp", (q) =>
+              q
+                .eq("senderId", userId)
+                .eq("recipientId", args.otherUserId)
+                .lt("timestamp", beforeTimestamp)
+            )
+            .order("desc")
+            .take(limit);
+        }
+        return await ctx.db
           .query("messages")
-          .withIndex("by_conversation_timestamp", (q) => 
+          .withIndex("by_conversation_timestamp", (q) =>
             q.eq("senderId", userId).eq("recipientId", args.otherUserId)
           )
           .order("desc")
-          .paginate({
-            numItems: Math.ceil(limit / 2),
-            cursor: paginationOpts.cursor,
-          }),
-        
-        ctx.db
+          .take(limit);
+      })(),
+      (async () => {
+        if (beforeTimestamp != null) {
+          return await ctx.db
+            .query("messages")
+            .withIndex("by_conversation_timestamp", (q) =>
+              q
+                .eq("senderId", args.otherUserId)
+                .eq("recipientId", userId)
+                .lt("timestamp", beforeTimestamp)
+            )
+            .order("desc")
+            .take(limit);
+        }
+        return await ctx.db
           .query("messages")
-          .withIndex("by_conversation_timestamp", (q) => 
+          .withIndex("by_conversation_timestamp", (q) =>
             q.eq("senderId", args.otherUserId).eq("recipientId", userId)
           )
           .order("desc")
-          .paginate({
-            numItems: Math.ceil(limit / 2),
-            cursor: paginationOpts.cursor,
-          })
-      ]);
+          .take(limit);
+      })(),
+    ]);
 
-      // Combine paginated results
-      allMessages = [...sentMessages.page, ...receivedMessages.page]
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, limit);
+    // Combine, sort by newest first, then trim to limit
+    const combined = [...sentMessages, ...receivedMessages]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
 
-      return {
-        page: allMessages,
-        isDone: sentMessages.isDone && receivedMessages.isDone,
-        continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
-      };
-    } else {
-      // Initial load - use optimized single query approach
-      const [sentMessages, receivedMessages] = await Promise.all([
-        ctx.db
-          .query("messages")
-          .withIndex("by_conversation_timestamp", (q) => 
-            q.eq("senderId", userId).eq("recipientId", args.otherUserId)
-          )
-          .order("desc")
-          .take(limit),
-        
-        ctx.db
-          .query("messages")
-          .withIndex("by_conversation_timestamp", (q) => 
-            q.eq("senderId", args.otherUserId).eq("recipientId", userId)
-          )
-          .order("desc")
-          .take(limit)
-      ]);
+    const continueTs = combined.length > 0 ? combined[combined.length - 1].timestamp : undefined;
 
-      // Combine and sort by timestamp
-      allMessages = [...sentMessages, ...receivedMessages]
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, limit);
-
-      return {
-        page: allMessages,
-        isDone: allMessages.length < limit,
-        continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
-      };
-    }
+    return {
+      page: combined,
+      isDone: combined.length < limit,
+      continueCursor: continueTs != null ? String(continueTs) : "",
+      continueTimestamp: continueTs,
+    } as any;
   },
 });
 

@@ -41,5 +41,10 @@ function ProfileComponent() {
 }
 
 export const Route = createFileRoute('/profile')({
+  validateSearch: (search: Record<string, unknown>): { u?: string } => {
+    return {
+      u: typeof search.u === 'string' ? search.u : undefined,
+    }
+  },
   component: ProfileComponent,
 })

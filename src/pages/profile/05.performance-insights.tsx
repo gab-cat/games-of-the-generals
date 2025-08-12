@@ -17,7 +17,7 @@ export function PerformanceInsights({ profileStats }: PerformanceInsightsProps) 
       initial={{ x: 20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ delay: 0.5 }}
-      className="bg-gray-800/25 backdrop-blur-xl rounded-xl p-6 border border-white/5"
+      className="rounded-xl border border-white/10 bg-black/30 p-6 mb-6"
     >
       <div className="flex items-center gap-2 mb-3">
         <Award className="w-5 h-5 text-yellow-400" />

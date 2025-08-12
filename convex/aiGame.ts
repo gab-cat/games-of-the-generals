@@ -73,7 +73,13 @@ function generateAISetup() {
 export const startAIGameSession = mutation({
   args: { 
     profileId: v.id("profiles"), 
-    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard"))
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    behavior: v.union(
+      v.literal("aggressive"),
+      v.literal("defensive"),
+      v.literal("passive"),
+      v.literal("balanced"),
+    ),
   },
   returns: v.object({ 
     sessionId: v.string(), 
@@ -103,6 +109,7 @@ export const startAIGameSession = mutation({
       sessionId,
       playerId: userId,
       playerUsername: profile.username,
+      behavior: args.behavior,
       difficulty: args.difficulty,
       status: "setup",
       currentTurn: "player1",
@@ -130,6 +137,12 @@ export const getAIGameSession = query({
     sessionId: v.string(),
     playerId: v.id("users"),
     playerUsername: v.string(),
+    behavior: v.union(
+      v.literal("aggressive"),
+      v.literal("defensive"),
+      v.literal("passive"),
+      v.literal("balanced"),
+    ),
     difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
     status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
     currentTurn: v.union(v.literal("player1"), v.literal("player2")),
@@ -467,8 +480,8 @@ export const generateAIMove = action({
       return null;
     }
 
-    // Simple AI logic based on difficulty
-    const aiPieces = [];
+    // Behavior- and difficulty-aware AI
+    const aiPieces: { row: number; col: number; piece: string }[] = [];
     
     // Find all AI pieces
     for (let row = 0; row < 8; row++) {
@@ -480,8 +493,28 @@ export const generateAIMove = action({
       }
     }
 
+    // Utility helpers
+    const getPieceRank = (name: string | undefined) => name ? PIECES[name as keyof typeof PIECES] : -1;
+    const inBounds = (r: number, c: number) => r >= 0 && r <= 7 && c >= 0 && c <= 8;
+    const canPlayerCaptureSquare = (row: number, col: number, aiPieceName: string): boolean => {
+      const dirs = [ {r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1} ];
+      for (const d of dirs) {
+        const rr = row + d.r; const cc = col + d.c;
+        if (!inBounds(rr, cc)) continue;
+        const p = session.board[rr][cc];
+        if (p && p.player === "player1") {
+          const outcome = resolveBattle(p.piece, aiPieceName);
+          if (outcome === "attacker") return true;
+        }
+      }
+      return false;
+    };
+
     // Get all possible moves for AI pieces
-    const possibleMoves = [];
+    const possibleMoves: Array<{
+      fromRow: number; fromCol: number; toRow: number; toCol: number; piece: string;
+      isAttack: boolean; targetPiece?: string; forwardDelta: number; isSafe: boolean; attackAdvantage: number;
+    }> = [];
     for (const aiPiece of aiPieces) {
       const directions = [
         { row: -1, col: 0 }, // up
@@ -502,6 +535,8 @@ export const generateAIMove = action({
         // Can't move to own piece
         if (targetPiece && targetPiece.player === "player2") continue;
 
+        const attackAdvantage = targetPiece ? (getPieceRank(aiPiece.piece) - getPieceRank(targetPiece.piece)) : 0;
+        const isSafe = !canPlayerCaptureSquare(newRow, newCol, aiPiece.piece);
         possibleMoves.push({
           fromRow: aiPiece.row,
           fromCol: aiPiece.col,
@@ -510,6 +545,9 @@ export const generateAIMove = action({
           piece: aiPiece.piece,
           isAttack: !!targetPiece,
           targetPiece: targetPiece?.piece,
+          forwardDelta: newRow - aiPiece.row,
+          isSafe,
+          attackAdvantage,
         });
       }
     }
@@ -518,74 +556,87 @@ export const generateAIMove = action({
       return null;
     }
 
-    let selectedMove;
+    // Score moves by behavior and difficulty
+    const behavior = session.behavior;
+    const difficulty = session.difficulty;
 
-    switch (session.difficulty) {
-      case "easy": {
-        // Random move
-        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-        break;
+    const scoreMove = (m: typeof possibleMoves[number]): number => {
+      let score = 0;
+      const myRank = getPieceRank(m.piece);
+      const targetRank = m.targetPiece ? getPieceRank(m.targetPiece) : -1;
+      const isFlagAttack = m.targetPiece === "Flag";
+      const spyGood = m.piece === "Spy" && !!m.targetPiece && m.targetPiece !== "Private" && m.targetPiece !== "Spy";
+      const privateVsSpy = m.piece === "Private" && m.targetPiece === "Spy";
+      const forwardBonus = m.forwardDelta > 0 ? 2 : m.forwardDelta < 0 ? -1 : 0;
+      const safety = m.isSafe ? 3 : -4;
+
+      switch (behavior) {
+        case "aggressive":
+          score += (m.isAttack ? 10 : 0) + m.attackAdvantage * 2;
+          if (isFlagAttack) score += 100;
+          if (spyGood) score += 8;
+          if (privateVsSpy) score += 6;
+          score += forwardBonus;
+          score += m.isSafe ? 1 : -1;
+          break;
+        case "defensive":
+          score += (m.isAttack ? 6 : 0) + m.attackAdvantage;
+          if (isFlagAttack) score += 100;
+          if (spyGood) score += 6;
+          if (privateVsSpy) score += 5;
+          score += safety * 2;
+          if (!m.isSafe && myRank >= PIECES["Captain"]) score -= 4;
+          break;
+        case "passive":
+          score += (m.isAttack ? -5 : 0);
+          score += safety * 2;
+          score += forwardBonus;
+          break;
+        case "balanced":
+        default:
+          score += (m.isAttack ? 8 : 0) + m.attackAdvantage;
+          if (isFlagAttack) score += 100;
+          if (spyGood) score += 7;
+          if (privateVsSpy) score += 5;
+          score += safety;
+          score += forwardBonus;
       }
-        
-      case "medium": {
-        // Prefer attacks, avoid suicidal moves
-        const attacks = possibleMoves.filter(move => move.isAttack);
-        if (attacks.length > 0) {
-          // Prefer attacking with stronger pieces or spy attacks
-          const goodAttacks = attacks.filter(move => 
-            move.piece === "Spy" || 
-            (move.targetPiece === "Flag") ||
-            (PIECES[move.piece as keyof typeof PIECES] > PIECES[move.targetPiece as keyof typeof PIECES])
-          );
-          selectedMove = goodAttacks.length > 0 
-            ? goodAttacks[Math.floor(Math.random() * goodAttacks.length)]
-            : attacks[Math.floor(Math.random() * attacks.length)];
-        } else {
-          // Move forward when possible
-          const forwardMoves = possibleMoves.filter(move => move.toRow > move.fromRow);
-          selectedMove = forwardMoves.length > 0
-            ? forwardMoves[Math.floor(Math.random() * forwardMoves.length)]
-            : possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-        }
-        break;
-      }
-        
-      case "hard": {
-        // More strategic: prioritize flag capture, good trades, positioning
-        let bestMoves = possibleMoves;
-        
-        // Highest priority: Flag attacks
-        const flagAttacks = possibleMoves.filter(move => move.targetPiece === "Flag");
-        if (flagAttacks.length > 0) {
-          bestMoves = flagAttacks;
-        } else {
-          // Good attacks (Spy attacks, or favorable rank battles)
-          const goodAttacks = possibleMoves.filter(move => 
-            move.isAttack && (
-              move.piece === "Spy" && move.targetPiece !== "Private" ||
-              move.piece === "Private" && move.targetPiece === "Spy" ||
-              (move.piece !== "Spy" && move.targetPiece !== "Spy" && 
-               PIECES[move.piece as keyof typeof PIECES] > PIECES[move.targetPiece as keyof typeof PIECES])
-            )
-          );
-          
-          if (goodAttacks.length > 0) {
-            bestMoves = goodAttacks;
-          } else {
-            // Advance pieces strategically
-            const advanceMoves = possibleMoves.filter(move => !move.isAttack && move.toRow > move.fromRow);
-            if (advanceMoves.length > 0) {
-              bestMoves = advanceMoves;
+
+      // Difficulty tuning
+      if (difficulty === "easy") {
+        score = score * 0.5 + (Math.random() * 10 - 5);
+      } else if (difficulty === "medium") {
+        score = score + (Math.random() * 4 - 2);
+      } else if (difficulty === "hard") {
+        if (!m.isSafe) {
+          const dirs = [ {r:-1,c:0},{r:1,c:0},{r:0,c:-1},{r:0,c:1} ];
+          for (const d of dirs) {
+            const rr = m.toRow + d.r, cc = m.toCol + d.c;
+            if (!inBounds(rr, cc)) continue;
+            const p = session.board[rr][cc];
+            if (p && p.player === "player1") {
+              const outcome = resolveBattle(p.piece, m.piece);
+              if (outcome === "attacker") {
+                score -= 8 + Math.max(0, getPieceRank(p.piece) - myRank);
+              }
             }
           }
         }
-        
-        selectedMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-        break;
+        const centerPenalty = Math.abs(m.toCol - 4) * 0.5;
+        score -= centerPenalty;
       }
-        
-      default:
-        selectedMove = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+
+      return score;
+    };
+
+    let selectedMove = possibleMoves[0];
+    let bestScore = -Infinity;
+    for (const m of possibleMoves) {
+      const s = scoreMove(m);
+      if (s > bestScore || (s === bestScore && Math.random() < 0.5)) {
+        bestScore = s;
+        selectedMove = m;
+      }
     }
 
     return {
@@ -773,6 +824,12 @@ export const getCurrentUserAIGame = query({
     sessionId: v.string(),
     playerId: v.id("users"),
     playerUsername: v.string(),
+    behavior: v.union(
+      v.literal("aggressive"),
+      v.literal("defensive"),
+      v.literal("passive"),
+      v.literal("balanced"),
+    ),
     difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
     status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
     currentTurn: v.union(v.literal("player1"), v.literal("player2")),

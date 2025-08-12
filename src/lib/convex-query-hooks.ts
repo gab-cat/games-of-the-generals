@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { convexQuery, useConvexMutation } from "@convex-dev/react-query";
 import { FunctionReference } from "convex/server";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -40,6 +40,40 @@ export function useConvexQueryWithOptions<
   return useQuery({
     ...convexQuery(query, args || {}),
     ...options,
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/**
+ * Custom infinite query hook for Convex queries using TanStack Query.
+ * Provide a function that maps pageParam -> query args. The pageParam should typically be a cursor or timestamp.
+ */
+export function useConvexInfiniteQuery<
+  Query extends FunctionReference<"query", "public", any, any>,
+>(
+  query: Query,
+  getArgsForPage: (pageParam: unknown) => any,
+  options?: {
+    initialPageParam?: unknown;
+    getNextPageParam?: (lastPage: any, allPages: any[]) => unknown;
+    enabled?: boolean;
+  }
+) {
+  // Create a stable base key from initial args (without pageParam)
+  const base = convexQuery(query, getArgsForPage(undefined));
+
+  return useInfiniteQuery({
+    queryKey: [...(base.queryKey as any), "infinite"],
+    queryFn: async ({ pageParam, signal, queryKey }) => {
+      const current = convexQuery(query, getArgsForPage(pageParam));
+      // Reuse the generated queryFn from convexQuery, passing expected context
+      return await (current.queryFn as any)({ queryKey: current.queryKey, signal });
+    },
+    initialPageParam: options?.initialPageParam,
+    getNextPageParam:
+      options?.getNextPageParam || ((lastPage: any) => lastPage?.continueTimestamp ?? undefined),
+    enabled: options?.enabled,
     retry: false,
     refetchOnWindowFocus: false,
   });

@@ -34,6 +34,65 @@ export const getProfileByUsername = query({
   },
 });
 
+// Search usernames (prefix match), returns up to 5
+export const searchUsernames = query({
+  args: {
+    q: v.string(),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const queryText = args.q.trim();
+    if (!queryText) return [];
+    const limit = Math.min(args.limit ?? 5, 10);
+
+    // Convex does not support full text; use by_active_players index to scan by username
+    // We'll filter in memory after a bounded scan. Fetch a bit more to account for filtering.
+    const PAGE = limit * 3;
+    const candidates = await ctx.db
+      .query("profiles")
+      .withIndex("by_active_players", (q) => q.gte("gamesPlayed", 0))
+      .take(PAGE);
+
+    const lower = queryText.toLowerCase();
+    const matches = candidates
+      .filter((p) => p.username.toLowerCase().startsWith(lower))
+      .slice(0, limit)
+      .map((p) => ({ username: p.username, avatarUrl: p.avatarUrl, rank: p.rank }));
+
+    // If not enough prefix matches, include contains matches
+    if (matches.length < limit) {
+      const extra = candidates
+        .filter((p) => !p.username.toLowerCase().startsWith(lower) && p.username.toLowerCase().includes(lower))
+        .slice(0, limit - matches.length)
+        .map((p) => ({ username: p.username, avatarUrl: p.avatarUrl, rank: p.rank }));
+      return [...matches, ...extra];
+    }
+    return matches;
+  },
+});
+
+// Update profile bio
+export const updateBio = mutation({
+  args: {
+    bio: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const currentProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (!currentProfile) throw new Error("Profile not found");
+
+    await ctx.db.patch(currentProfile._id, {
+      bio: args.bio?.trim() || undefined,
+    });
+    return { success: true };
+  },
+});
+
 // Get profile by user ID
 export const getProfileByUserId = query({
   args: {
@@ -235,6 +294,97 @@ export const getProfileStats = query({
       .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
       .slice(0, 5);
 
+    // Fallback compute for fastestWin if not yet stored (backfill-on-read)
+    let computedFastestWin = profile.fastestWin;
+    if (!computedFastestWin) {
+      const [allFinishedAsP1, allFinishedAsP2] = await Promise.all([
+        ctx.db
+          .query("games")
+          .withIndex("by_player1_finished", (q) =>
+            q.eq("player1Id", userId).eq("status", "finished")
+          )
+          .collect(),
+        ctx.db
+          .query("games")
+          .withIndex("by_player2_finished", (q) =>
+            q.eq("player2Id", userId).eq("status", "finished")
+          )
+          .collect(),
+      ]);
+
+      const wins = [
+        ...allFinishedAsP1.filter((g) => g.winner === "player1"),
+        ...allFinishedAsP2.filter((g) => g.winner === "player2"),
+      ];
+
+      let minDurationMs: number | undefined = undefined;
+      for (const g of wins) {
+        if (!g.finishedAt) continue;
+        const start = g.gameTimeStarted || g.createdAt;
+        const duration = g.finishedAt - start;
+        if (duration > 0 && (minDurationMs === undefined || duration < minDurationMs)) {
+          minDurationMs = duration;
+        }
+      }
+
+      computedFastestWin = minDurationMs;
+    }
+
+    return {
+      ...profile,
+      winRate,
+      avgGameTime,
+      recentGames,
+      fastestWin: computedFastestWin ?? profile.fastestWin,
+    };
+  },
+});
+
+// Get profile stats by username (for viewing other users' profiles)
+export const getProfileStatsByUsername = query({
+  args: {
+    username: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!args.username) return null;
+
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_username", (q) => q.eq("username", args.username))
+      .unique();
+
+    if (!profile) return null;
+
+    // Calculate additional stats
+    const winRate = profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
+    const avgGameTime = profile.totalPlayTime && profile.gamesPlayed > 0 
+      ? Math.round(profile.totalPlayTime / profile.gamesPlayed) 
+      : 0;
+
+    // Get recent games using the optimized indexes
+    const [recentGamesAsPlayer1, recentGamesAsPlayer2] = await Promise.all([
+      ctx.db
+        .query("games")
+        .withIndex("by_player1_finished", (q) => 
+          q.eq("player1Id", profile.userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(3),
+      
+      ctx.db
+        .query("games")
+        .withIndex("by_player2_finished", (q) => 
+          q.eq("player2Id", profile.userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(3)
+    ]);
+
+    // Combine and sort by finished time, take most recent 5
+    const recentGames = [...recentGamesAsPlayer1, ...recentGamesAsPlayer2]
+      .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
+      .slice(0, 5);
+
     return {
       ...profile,
       winRate,
@@ -326,12 +476,16 @@ export const updateProfileStats = mutation({
     }
 
     // Update other stats
-    const newTotalPlayTime = (profile.totalPlayTime || 0) + (args.gameTime || 0);
-    const newFastestWin = args.won && args.gameTime 
-      ? Math.min(profile.fastestWin || Infinity, args.gameTime)
+    const gameTimeMs = args.gameTime || 0;
+    const newTotalPlayTime = (profile.totalPlayTime || 0) + gameTimeMs;
+    const newFastestWin = args.won && gameTimeMs > 0
+      ? Math.min(profile.fastestWin ?? Infinity, gameTimeMs)
       : profile.fastestWin;
-    const newLongestGame = args.gameTime
-      ? Math.max(profile.longestGame || 0, args.gameTime)
+    const newFastestGame = gameTimeMs > 0
+      ? Math.min(profile.fastestGame ?? Infinity, gameTimeMs)
+      : profile.fastestGame;
+    const newLongestGame = gameTimeMs > 0
+      ? Math.max(profile.longestGame || 0, gameTimeMs)
       : profile.longestGame;
     const newCapturedFlags = (profile.capturedFlags || 0) + (args.flagCaptured ? 1 : 0);
     const newPiecesEliminated = (profile.piecesEliminated || 0) + (args.piecesEliminated || 0);
@@ -355,6 +509,7 @@ export const updateProfileStats = mutation({
       bestWinStreak: newBestWinStreak,
       totalPlayTime: newTotalPlayTime,
       fastestWin: newFastestWin === Infinity ? undefined : newFastestWin,
+      fastestGame: newFastestGame === Infinity ? undefined : newFastestGame,
       longestGame: newLongestGame,
       capturedFlags: newCapturedFlags,
       piecesEliminated: newPiecesEliminated,

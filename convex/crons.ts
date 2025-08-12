@@ -19,6 +19,14 @@ crons.cron(
   {}
 );
 
+// Run daily at 00:10 UTC to delete old messages (> 7 days)
+crons.cron(
+  "Delete messages older than 7 days (daily 00:10 UTC)",
+  "10 0 * * *",
+  internal.maintenance.deleteOldMessages,
+  {}
+);
+
 export default crons;
 
 

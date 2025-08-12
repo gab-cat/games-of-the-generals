@@ -965,7 +965,9 @@ export const getMatchResult = query({
       }
     }
 
-    const duration = game.finishedAt ? Math.floor((game.finishedAt - game.createdAt) / 1000) : 0;
+    // Duration should measure actual play time (exclude setup). Fallback to createdAt for legacy games.
+    const startedAt = game.gameTimeStarted || game.createdAt;
+    const duration = game.finishedAt ? Math.floor((game.finishedAt - startedAt) / 1000) : 0;
 
     return {
       winner: game.winner || "draw",
@@ -1095,7 +1097,10 @@ export const getMatchHistory = query({
           isWin,
           isDraw,
           reason: game.gameEndReason || "flag_captured",
-          duration: game.finishedAt ? Math.floor((game.finishedAt - game.createdAt) / 1000) : 0,
+          // Use gameTimeStarted to reflect actual play duration (exclude setup). Fallback for legacy games.
+          duration: game.finishedAt
+            ? Math.floor((game.finishedAt - (game.gameTimeStarted || game.createdAt)) / 1000)
+            : 0,
           moves: movesCount,
           createdAt: game.createdAt,
           rankAtTime: profile?.rank || "Recruit",

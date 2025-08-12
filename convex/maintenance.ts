@@ -76,4 +76,33 @@ export const cleanupFinishedLobbies = internalMutation({
   },
 });
 
+// Internal: Delete messages older than 7 days to enforce retention policy
+export const deleteOldMessages = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+    const cutoff = Date.now() - SEVEN_DAYS_MS;
+
+    let totalDeleted = 0;
+    // Delete in batches to avoid timeouts
+    // We use the by_timestamp index for efficient range scans
+    // Loop until no more old messages remain (bounded by Convex function time limits)
+    // If extremely large volumes, this will chip away daily via cron
+    // Batch size kept modest to stay under compute budget
+    while (true) {
+      const oldMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_timestamp", (q) => q.lt("timestamp", cutoff))
+        .take(200);
+
+      if (oldMessages.length === 0) break;
+
+      await Promise.all(oldMessages.map((m) => ctx.db.delete(m._id)));
+      totalDeleted += oldMessages.length;
+    }
+
+    return { deletedMessages: totalDeleted, cutoff };
+  },
+});
+
 

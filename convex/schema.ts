@@ -27,9 +27,11 @@ const applicationTables = {
     createdAt: v.number(),
     avatarUrl: v.optional(v.string()), // URL to compressed avatar image
     avatarStorageId: v.optional(v.id("_storage")), // Storage ID for deleting old avatars
+    bio: v.optional(v.string()),
     // Additional stats for achievements
     totalPlayTime: v.optional(v.number()), // in milliseconds
-    fastestWin: v.optional(v.number()), // in milliseconds
+    fastestWin: v.optional(v.number()), // in milliseconds (wins only)
+    fastestGame: v.optional(v.number()), // in milliseconds (win or loss)
     longestGame: v.optional(v.number()), // in milliseconds
     winStreak: v.optional(v.number()),
     bestWinStreak: v.optional(v.number()),
@@ -302,6 +304,12 @@ const applicationTables = {
     sessionId: v.string(),
     playerId: v.id("users"),
     playerUsername: v.string(),
+    behavior: v.union(
+      v.literal("aggressive"),
+      v.literal("defensive"),
+      v.literal("passive"),
+      v.literal("balanced"),
+    ),
     difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
     status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
     currentTurn: v.union(v.literal("player1"), v.literal("player2")),

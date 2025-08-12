@@ -97,23 +97,23 @@ export function AchievementsPage() {
         transition={{ delay: 0.1 }}
       >
         <Tabs defaultValue="all" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6 bg-gray-800/50">
-            <TabsTrigger value="all" className="data-[state=active]:bg-blue-600">
+          <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 bg-gray-800/50 p-1 rounded-lg">
+            <TabsTrigger value="all" className="w-full text-xs sm:text-sm py-2 data-[state=active]:bg-blue-600">
               All
             </TabsTrigger>
-            <TabsTrigger value="unlocked" className="data-[state=active]:bg-green-600">
+            <TabsTrigger value="unlocked" className="w-full text-xs sm:text-sm py-2 data-[state=active]:bg-green-600">
               Unlocked
             </TabsTrigger>
-            <TabsTrigger value="milestone" className="data-[state=active]:bg-purple-600">
+            <TabsTrigger value="milestone" className="w-full text-xs sm:text-sm py-2 data-[state=active]:bg-purple-600">
               Milestone
             </TabsTrigger>
-            <TabsTrigger value="rank" className="data-[state=active]:bg-yellow-600">
+            <TabsTrigger value="rank" className="w-full text-xs sm:text-sm py-2 data-[state=active]:bg-yellow-600">
               Rank
             </TabsTrigger>
-            <TabsTrigger value="streak" className="data-[state=active]:bg-orange-600">
+            <TabsTrigger value="streak" className="w-full text-xs sm:text-sm py-2 data-[state=active]:bg-orange-600">
               Streak
             </TabsTrigger>
-            <TabsTrigger value="special" className="data-[state=active]:bg-red-600">
+            <TabsTrigger value="special" className="w-full text-xs sm:text-sm py-2 data-[state=active]:bg-red-600">
               Special
             </TabsTrigger>
           </TabsList>
