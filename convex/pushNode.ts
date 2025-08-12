@@ -28,7 +28,7 @@ export const sendPushForMessage = internalAction({
     const subscriptions = await ctx.runQuery(internal.push.getSubscriptionsForUser, { userId: message.recipientId });
     if (subscriptions.length === 0) return;
 
-    const siteUrl = process.env.CONVEX_SITE_URL || "";
+    const siteUrl = process.env.SITE_URL || "";
     const payload = JSON.stringify({
       title: "New message",
       body: `${message.senderUsername}: ${message.content}`.slice(0, 140),
@@ -88,7 +88,7 @@ export const sendTestNotification = action({
     const payload = JSON.stringify({
       title: args.title || "Games of the Generals",
       body: args.body || "Push notifications are working!",
-      url: process.env.CONVEX_SITE_URL || "/",
+      url: process.env.SITE_URL || "/",
       tag: `test-${userId}`,
     });
 
