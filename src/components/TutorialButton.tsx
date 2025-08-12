@@ -66,9 +66,9 @@ export function TutorialButton({
       <>
         <Button
           variant="outline"
-          size="sm"
+          size="icon"
           onClick={handleOpenTutorial}
-          className={`${buttonSizeClass} bg-white/10 border-white/20 text-white/90 hover:bg-white/20 hover:text-white rounded-full p-0 ${className}`}
+          className={`${buttonSizeClass} bg-white/10 border-white/20 text-white/90 hover:bg-white/20 hover:text-white rounded-full p-0 aspect-square flex-shrink-0 ${className}`}
           title="View Tutorial"
         >
           <HelpCircle className={iconSizeClass} />

@@ -692,6 +692,13 @@ export function TutorialModal({ isOpen, onClose, onComplete }: TutorialModalProp
               </div>
               
               <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                <Button
+                  variant="secondary"
+                  onClick={handleComplete}
+                  className="text-white/70 hover:text-white px-1 sm:px-2"
+                >
+                  I already know this game
+                </Button>
                 <Badge variant="outline" className="bg-white/10 border-white/20 text-white/70 text-xs">
                   {currentStep + 1}/{steps.length}
                 </Badge>
