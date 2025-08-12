@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { toast } from "sonner";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "../components/ui/button";
+import { Github } from "lucide-react";
 import { Separator } from "../components/ui/separator";
 import ImageBackground from "../components/backgrounds/ImageBackground";
 import Squares from "../components/backgrounds/Squares/Squares";
@@ -15,7 +16,7 @@ export function SignInForm() {
   // Use the auth mutation hook for better error handling
   const authMutation = useAuthMutation({
     onSuccess: () => {
-      toast.success(`Successfully ${flow === "signIn" ? "signed in" : "signed up"}!`);
+      toast.success(`Signing in...`);
     },
     onError: (error: any) => {
       console.log(error)
@@ -63,7 +64,7 @@ export function SignInForm() {
         <div className="absolute inset-0 bg-gradient-to-r from-slate-900/90 via-gray-900/75 to-slate-900/60" />
         
         {/* Scrollable Content Container */}
-        <div className="relative pt-28 z-10 h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/20 hover:scrollbar-thumb-white/30">
+        <div className="relative pt-28 z-10 h-full overflow-y-auto overflow-x-hidden no-scrollbar">
           <div className="flex flex-col justify-center min-h-full px-4 sm:px-6 lg:px-12 max-w-2xl py-8 lg:py-12">
           <motion.div 
             className="space-y-6 lg:space-y-10 text-left"
@@ -247,169 +248,201 @@ export function SignInForm() {
         </div>
         
         <div className="w-full max-w-md px-4 sm:px-6 lg:px-8 py-8 lg:py-0 min-h-screen lg:min-h-full flex flex-col justify-center relative z-20">
-          {flow === "resetPassword" ? (
-            <PasswordResetForm onBack={() => setFlow("signIn")} />
-          ) : (
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6, duration: 0.6 }}
-              className="space-y-6 lg:space-y-8"
-            >
-              {/* Header */}
-              <div className="text-center space-y-2 lg:space-y-3">
-                <h2 className="text-2xl lg:text-3xl font-display font-bold text-white">
-                  {flow === "signIn" ? "Welcome Back" : "Join the Battle"}
-                </h2>
-                <p className="text-white/60 text-base lg:text-lg font-body">
-                  {flow === "signIn" 
-                    ? "Continue your strategic journey" 
-                    : "Create your commander profile"
-                  }
-                </p>
-              </div>
-
-              {/* Form */}
-              <form
-                className="space-y-5 lg:space-y-6"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const formData = new FormData(e.target as HTMLFormElement);
-                  formData.set("flow", flow);
-                  authMutation.mutate({
-                    provider: "password",
-                    formData
-                  });
-                }}
+          <AnimatePresence mode="wait" initial={false}>
+            {flow === "resetPassword" ? (
+              <motion.div
+                key="resetPassword"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
               >
-                <div className="space-y-4 lg:space-y-5">
-                  <div className="space-y-2">
-                    <label htmlFor="email" className="text-sm font-medium text-white/90 font-body">
-                      Email Address
-                    </label>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="commander@example.com"
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
+                <PasswordResetForm onBack={() => setFlow("signIn")} />
+              </motion.div>
+            ) : (
+              <motion.div
+                key={flow}
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -30 }}
+                transition={{ duration: 0.35, ease: "easeOut" }}
+                className="space-y-6 lg:space-y-8"
+              >
+                {/* Header */}
+                <div className="text-center space-y-2 lg:space-y-3">
+                  <h2 className="text-2xl lg:text-3xl font-display font-bold text-white">
+                    {flow === "signIn" ? "Welcome Back" : "Join the Battle"}
+                  </h2>
+                  <p className="text-white/60 text-base lg:text-lg font-body">
+                    {flow === "signIn" 
+                      ? "Continue your strategic journey" 
+                      : "Create your commander profile"}
+                  </p>
+                </div>
+
+                {/* Quick sign-in providers */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Button
+                    aria-label="Sign in with Google"
+                    variant="outline"
+                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base flex items-center justify-center gap-2"
+                    onClick={() => authMutation.mutate({ provider: "google" })}
+                    disabled={authMutation.isPending}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 48 48"
+                      className="w-5 h-5"
+                      aria-hidden="true"
+                    >
+                      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C33.523 6.053 28.973 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.651-.389-3.917z"/>
+                      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.814C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C33.523 6.053 28.973 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                      <path fill="#4CAF50" d="M24 44c4.905 0 9.353-1.875 12.73-4.941l-5.873-4.961C28.777 35.875 26.519 36.667 24 36.667c-5.199 0-9.611-3.317-11.273-7.96l-6.536 5.036C9.5 39.556 16.227 44 24 44z"/>
+                      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.793 2.238-2.231 4.166-4.173 5.556.001-.001 5.873 4.961 5.873 4.961C39.524 35.728 44 30.333 44 24c0-1.341-.138-2.651-.389-3.917z"/>
+                    </svg>
+                    <span>Google</span>
+                  </Button>
+                  <Button
+                    aria-label="Sign in with GitHub"
+                    variant="outline"
+                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base flex items-center justify-center gap-2"
+                    onClick={() => authMutation.mutate({ provider: "github" })}
+                    disabled={authMutation.isPending}
+                  >
+                    <Github className="w-5 h-5" />
+                    <span>GitHub</span>
+                  </Button>
+                </div>
+
+                {/* Anonymous Sign In */}
+                <Button 
+                  variant="outline" 
+                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
+                  onClick={() => authMutation.mutate({ provider: "anonymous" })}
+                  disabled={authMutation.isPending}
+                >
+                  Enter as Guest Commander
+                </Button>
+
+                {/* Divider */}
+                <div className="flex items-center">
+                  <Separator className="flex-1 bg-white/20" />
+                  <span className="mx-3 sm:mx-4 text-white/40 text-xs sm:text-sm font-medium font-mono">OR</span>
+                  <Separator className="flex-1 bg-white/20" />
+                </div>
+
+                {/* Email/password form */}
+                <form
+                  className="space-y-5 lg:space-y-6"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target as HTMLFormElement);
+                    formData.set("flow", flow);
+                    authMutation.mutate({
+                      provider: "password",
+                      formData
+                    });
+                  }}
+                >
+                  <div className="space-y-4 lg:space-y-5">
+                    <div className="space-y-2">
+                      <label htmlFor="email" className="text-sm font-medium text-white/90 font-body">
+                        Email Address
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="commander@example.com"
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
+                        required
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
                       <label htmlFor="password" className="text-sm font-medium text-white/90 font-body">
                         Password
                       </label>
+                      <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        placeholder={flow === "signIn" ? "Enter your password" : "Create a password"}
+                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
+                        required
+                      />
                       {flow === "signIn" && (
-                        <button
-                          type="button"
-                          onClick={() => setFlow("resetPassword")}
-                          className="text-xs underline sm:text-sm text-white/60 hover:text-white/90 transition-colors duration-200 hover:underline underline-offset-4 font-body"
-                        >
-                          Forgot password?
-                        </button>
+                        <div className="text-right">
+                          <button
+                            type="button"
+                            onClick={() => setFlow("resetPassword")}
+                            className="text-xs sm:text-sm text-white/60 hover:text-white/90 transition-colors duration-200 underline underline-offset-4 font-body"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
-                      required
-                    />
                   </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2.5 sm:py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm lg:text-base" 
+                    disabled={authMutation.isPending}
+                  >
+                    {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
+                  </Button>
+
+                  {/* Compliance: Terms & Privacy Links */}
+                  <p className="mt-3 text-center text-[11px] sm:text-xs text-white/60">
+                    By continuing, you agree to our
+                    <a href="/terms" className="mx-1 underline underline-offset-2 text-white/80 hover:text-white">Terms</a>
+                    and acknowledge our
+                    <a href="/privacy" className="ml-1 underline underline-offset-2 text-white/80 hover:text-white">Privacy Policy</a>.
+                  </p>
+                </form>
+
+                {/* Toggle Flow */}
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
+                    className="text-xs sm:text-sm text-white/60 underline hover:text-white/90 transition-colors duration-200 underline-offset-4 font-body"
+                  >
+                    {flow === "signIn" 
+                      ? "New to the battlefield? Create an account" 
+                      : "Already a commander? Sign in"}
+                  </button>
                 </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2.5 sm:py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm lg:text-base" 
-                  disabled={authMutation.isPending}
-                >
-                  {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
-                </Button>
-              </form>
-              
-              {/* Toggle Flow */}
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setFlow(flow === "signIn" ? "signUp" : "signIn")}
-                  className="text-xs sm:text-sm text-white/60 underline hover:text-white/90 transition-colors duration-200 hover:underline underline-offset-4 font-body"
-                >
-                  {flow === "signIn" 
-                    ? "New to the battlefield? Create an account" 
-                    : "Already a commander? Sign in"
-                  }
-                </button>
-              </div>
 
-              {/* Divider */}
-              <div className="flex items-center">
-                <Separator className="flex-1 bg-white/20" />
-                <span className="mx-3 sm:mx-4 text-white/40 text-xs sm:text-sm font-medium font-mono">OR</span>
-                <Separator className="flex-1 bg-white/20" />
-              </div>
-
-              {/* OAuth Sign In */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Button 
-                  variant="outline" 
-                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
-                  onClick={() => authMutation.mutate({ provider: "google" })}
-                  disabled={authMutation.isPending}
-                >
-                  Continue with Google
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
-                  onClick={() => authMutation.mutate({ provider: "github" })}
-                  disabled={authMutation.isPending}
-                >
-                  Continue with GitHub
-                </Button>
-              </div>
-
-              {/* Anonymous Sign In */}
-              <Button 
-                variant="outline" 
-                className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
-                onClick={() => authMutation.mutate({ provider: "anonymous" })}
-                disabled={authMutation.isPending}
-              >
-                Enter as Guest Commander
-              </Button>
-
-              {/* Credits */}
-              <div className="text-center space-y-2 pt-4 border-t border-white/10">
-                <p className="text-xs text-white/50 font-body">
-                  Created by{" "}
-                  <a 
-                    href="https://github.com/gab-cat" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-white/70 hover:text-white/90 transition-colors duration-200 underline underline-offset-2"
-                  >
-                    Gabriel Catimbang
-                  </a>
-                </p>
-                <p className="text-xs text-white/40 font-body">
-                  Open source •{" "}
-                  <a 
-                    href="https://github.com/gab-cat/games-of-the-generals" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-white/60 hover:text-white/80 transition-colors duration-200 underline underline-offset-2"
-                  >
-                    Contribute on GitHub
-                  </a>
-                </p>
-              </div>
-            </motion.div>
-          )}
+                {/* Credits */}
+                <div className="text-center space-y-2 pt-4 border-t border-white/10">
+                  <p className="text-xs text-white/50 font-body">
+                    Created by {""}
+                    <a 
+                      href="https://github.com/gab-cat" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-white/70 hover:text-white/90 transition-colors duration-200 underline underline-offset-2"
+                    >
+                      Gabriel Catimbang
+                    </a>
+                  </p>
+                  <p className="text-xs text-white/40 font-body">
+                    Open source • {""}
+                    <a 
+                      href="https://github.com/gab-cat/games-of-the-generals" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-white/60 hover:text-white/80 transition-colors duration-200 underline underline-offset-2"
+                    >
+                      Contribute on GitHub
+                    </a>
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </motion.div>
     </div>
