@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import "./index.css";
+import { registerSW } from 'virtual:pwa-register';
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
@@ -49,3 +50,8 @@ createRoot(document.getElementById("root")!).render(
     </ConvexAuthProvider>
   </ConvexProvider>,
 );
+
+// Register PWA update checker
+if (typeof window !== 'undefined') {
+  registerSW({ immediate: true, onNeedRefresh() {}, onOfflineReady() {} });
+}

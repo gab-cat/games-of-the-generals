@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="0" fill="#0f172a"/>
+  <g transform="translate(64,64)">
+    <rect x="0" y="0" width="384" height="384" rx="64" fill="url(#g)" stroke="rgba(255,255,255,0.2)"/>
+    <text x="192" y="232" text-anchor="middle" font-family="Inter, system-ui" font-weight="800" font-size="160" fill="#fff">GoG</text>
+  </g>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f2937"/>
+      <stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+

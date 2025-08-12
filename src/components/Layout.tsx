@@ -83,6 +83,25 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
     isAuthenticated ? {} : "skip"
   );
 
+  // Prompt user to enable push after first successful auth/profile load
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const shouldPrompt = localStorage.getItem('pushPrompted') !== 'yes';
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    if (shouldPrompt && vapidKey && 'Notification' in window && Notification.permission === 'default') {
+      // Non-blocking gentle prompt; user can also enable from Settings
+      setTimeout(() => {
+        try {
+          void Notification.requestPermission().finally(() => {
+            localStorage.setItem('pushPrompted', 'yes');
+          });
+        } catch {
+          // ignore
+        }
+      }, 3000);
+    }
+  }, [isAuthenticated]);
+
   const isActiveTab = (path: string) => {
     if (path === "/" && location.pathname === "/") return true;
     if (path !== "/" && location.pathname.startsWith(path)) return true;

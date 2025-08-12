@@ -263,6 +263,24 @@ const applicationTables = {
     .index("by_participant1_unread", ["participant1Id", "participant1UnreadCount"]) // For unread optimization
     .index("by_participant2_unread", ["participant2Id", "participant2UnreadCount"]), // For unread optimization
 
+  // Web Push Subscriptions per user
+  pushSubscriptions: defineTable({
+    userId: v.id("users"),
+    endpoint: v.string(),
+    keys: v.object({
+      p256dh: v.string(),
+      auth: v.string(),
+    }),
+    expirationTime: v.optional(v.number()),
+    userAgent: v.optional(v.string()),
+    createdAt: v.number(),
+    lastSuccessAt: v.optional(v.number()),
+    lastFailureAt: v.optional(v.number()),
+    failureReason: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"]) 
+    .index("by_endpoint", ["endpoint"]),
+
   // AI Game Sessions (ephemeral, not for replays/achievements)
   aiGameSessions: defineTable({
     sessionId: v.string(),

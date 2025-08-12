@@ -6,10 +6,25 @@ import { AvatarSection } from "./02.avatar-section";
 import { UsernameSection } from "./03.username-section";
 import { PasswordSection } from "./04.password-section";
 import { EmailSection } from "./05.email-section";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { useMutation, useAction } from "convex/react";
+import { subscribeUserToPush, serializeSubscription } from "@/lib/push-client";
 
 export function SettingsList() {
   const { data: profile, isPending: isLoadingProfile, error: profileError } = useConvexQuery(api.profiles.getCurrentProfile);
   const { data: userSettings, isPending: isLoadingSettings } = useConvexQuery(api.settings.getUserSettings);
+  const { data: existingSubs } = useConvexQuery(api.push.getSubscriptionsForCurrentUser, {} as any);
+  const saveSubscription = useMutation(api.push.saveSubscription);
+  const removeSubscriptionByEndpoint = useMutation(api.push.removeSubscriptionByEndpoint);
+  const sendTestNotification = useAction(api.pushNode.sendTestNotification);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [vapidKey, setVapidKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    setVapidKey(import.meta.env.VITE_VAPID_PUBLIC_KEY || null);
+  }, []);
 
   if (profileError) {
     return (
@@ -63,6 +78,79 @@ export function SettingsList() {
             rank={profile.rank}
           />
           <UsernameSection currentUsername={profile.username} />
+
+          <div className="rounded-xl border border-white/10 bg-black/30 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-white font-medium">Push Notifications</div>
+                <div className="text-white/60 text-sm">Get notified for new direct messages and invites</div>
+              </div>
+              <div className="flex items-center gap-2">
+                {existingSubs && existingSubs.length > 0 ? (
+                  <Button
+                    variant="secondary"
+                    disabled={isSubscribing}
+                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                    onClick={async () => {
+                      setIsSubscribing(true);
+                      try {
+                        const reg = await navigator.serviceWorker.getRegistration();
+                        const sub = await reg?.pushManager.getSubscription();
+                        if (sub) {
+                          await sub.unsubscribe();
+                          await removeSubscriptionByEndpoint({ endpoint: sub.endpoint });
+                        }
+                        toast.success("Push notifications disabled");
+                      } catch (e:any) {
+                        toast.error(e?.message || "Failed to disable push");
+                      } finally {
+                        setIsSubscribing(false);
+                      }
+                    }}
+                  >Disable</Button>
+                ) : (
+                  <Button
+                    disabled={isSubscribing || !vapidKey}
+                    className="text-black"
+                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                    onClick={async () => {
+                      if (!vapidKey) {
+                        toast.error("Push is not configured");
+                        return;
+                      }
+                      setIsSubscribing(true);
+                      try {
+                        const sub = await subscribeUserToPush(vapidKey);
+                        if (!sub) {
+                          toast.error("Permission denied or subscription failed");
+                          return;
+                        }
+                        await saveSubscription({ subscription: serializeSubscription(sub) });
+                        toast.success("Push notifications enabled");
+                      } catch (e:any) {
+                        toast.error(e?.message || "Failed to enable push");
+                      } finally {
+                        setIsSubscribing(false);
+                      }
+                    }}
+                  >Enable</Button>
+                )}
+                <Button
+                  variant="ghost"
+                  disabled={!existingSubs || existingSubs.length === 0}
+                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                  onClick={async () => {
+                    try {
+                      await sendTestNotification({});
+                      toast.success("Test notification sent");
+                    } catch (e:any) {
+                      toast.error(e?.message || "Failed to send test");
+                    }
+                  }}
+                >Send Test</Button>
+              </div>
+            </div>
+          </div>
         </div>
         
         <div className="space-y-6">

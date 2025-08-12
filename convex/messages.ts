@@ -124,6 +124,9 @@ export const sendMessage = mutation({
       timestamp,
     });
 
+    // Attempt to send a push notification to the recipient (async)
+    await ctx.scheduler.runAfter(0, internal.pushNode.sendPushForMessage, { messageId });
+
     return messageId;
   },
 });
@@ -595,9 +598,14 @@ export const sendMessageInternal = internalMutation({
       timestamp,
     });
 
+    // Attempt to send a push notification to the recipient (async)
+    await ctx.scheduler.runAfter(0, internal.pushNode.sendPushForMessage, { messageId });
+
     return messageId;
   },
 });
+
+// (push notification logic moved to convex/push.ts)
 
 // Internal mutation to update conversation
 export const updateConversation = internalMutation({
