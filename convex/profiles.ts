@@ -34,7 +34,7 @@ export const getProfileByUsername = query({
   },
 });
 
-// Search usernames (prefix match), returns up to 5
+// Search usernames (case-insensitive), returns up to configurable limit
 export const searchUsernames = query({
   args: {
     q: v.string(),
@@ -43,11 +43,11 @@ export const searchUsernames = query({
   handler: async (ctx, args) => {
     const queryText = args.q.trim();
     if (!queryText) return [];
-    const limit = Math.min(args.limit ?? 5, 10);
+    const limit = Math.min(args.limit ?? 10, 20);
 
     // Convex does not support full text; use by_active_players index to scan by username
     // We'll filter in memory after a bounded scan. Fetch a bit more to account for filtering.
-    const PAGE = limit * 3;
+    const PAGE = 150;
     const candidates = await ctx.db
       .query("profiles")
       .withIndex("by_active_players", (q) => q.gte("gamesPlayed", 0))

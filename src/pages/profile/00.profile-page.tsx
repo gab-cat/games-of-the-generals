@@ -25,7 +25,7 @@ export function ProfilePage() {
   // Username search + suggestions
   const [inputValue, setInputValue] = useReactState(usernameParam);
   const [debounced] = useDebounce(inputValue, 250);
-  const { data: suggestions } = useConvexQuery(api.profiles.searchUsernames, { q: debounced, limit: 5 });
+  const { data: suggestions } = useConvexQuery(api.profiles.searchUsernames, { q: debounced, limit: 20 });
 
   // Load current user's stats
   const { data: ownStats, isPending: isLoadingOwn, error: ownError } = useConvexQuery(
@@ -118,8 +118,8 @@ export function ProfilePage() {
               View
             </Button>
             {suggestions && suggestions.length > 0 && inputValue.trim() && (
-              <div className="absolute left-0 right-0 mt-2 rounded-lg border border-white/10 bg-black/80 backdrop-blur-md shadow-xl overflow-hidden z-50">
-                {suggestions.slice(0, 5).map((s: any) => (
+              <div className="absolute left-0 right-0 mt-2 rounded-lg border border-white/10 bg-black/80 backdrop-blur-md shadow-xl z-50 max-h-64 overflow-y-auto">
+                {suggestions.map((s: any) => (
                   <button
                     key={s.username}
                     className="w-full text-left px-3 py-2 hover:bg-white/10 flex items-center gap-2"

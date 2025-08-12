@@ -214,6 +214,7 @@ export function MessagingPanel({
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
   const [hasLocalSubscription, setHasLocalSubscription] = useState(false);
   
+  
   // Debounce search term to avoid too many queries
   const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
 
@@ -294,7 +295,7 @@ export function MessagingPanel({
 
   // Check local push subscription
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         if (!("serviceWorker" in navigator)) return;
         const reg = await navigator.serviceWorker.getRegistration();
@@ -317,7 +318,7 @@ export function MessagingPanel({
     && "Notification" in window
     && "serviceWorker" in navigator;
 
-  const shouldShowEnablePush = isMobile && supportsPush && isAuthenticated && !isLocalEndpointSaved;
+  const [shouldShowEnablePush, setShouldShowEnablePush] = useState(isMobile && supportsPush && isAuthenticated && !isLocalEndpointSaved);
 
   const handleEnablePush = async () => {
     try {
@@ -329,6 +330,7 @@ export function MessagingPanel({
         if (existing) {
           await saveSubscription({ subscription: serializeSubscription(existing) });
           toast.success("Push notifications enabled on this device");
+          setShouldShowEnablePush(false);
           return;
         }
       }
@@ -453,7 +455,7 @@ export function MessagingPanel({
                 onSelectUser={handleUserSelect}
                 shouldShowEnablePush={shouldShowEnablePush}
                 isSubscribing={isSubscribing}
-                onEnablePush={handleEnablePush}
+                onEnablePush={() => void handleEnablePush()}
               />
             ) : (
               <div className="h-full flex flex-col">
@@ -471,7 +473,7 @@ export function MessagingPanel({
                   {shouldShowEnablePush && (
                     <Button
                       disabled={isSubscribing}
-                      onClick={handleEnablePush}
+                      onClick={() => void handleEnablePush()}
                       className="w-full bg-blue-600 hover:bg-blue-700"
                     >
                       Enable push notifications on this device
