@@ -2,6 +2,7 @@ import { mutation, query, internalMutation, internalQuery } from "./_generated/s
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { profanity, CensorType } from "@2toad/profanity";
 
 // Helper function for batch profile fetching to eliminate N+1 queries
 export const batchGetProfiles = internalQuery({
@@ -98,13 +99,16 @@ export const sendMessage = mutation({
 
     const timestamp = Date.now();
 
+    // Profanity: fully censor any profanity
+    const fullyCensoredContent = profanity.censor(args.content, CensorType.Word);
+
     // Create the message
     const messageId = await ctx.db.insert("messages", {
       senderId: userId,
       senderUsername: senderProfile.username,
       recipientId: recipientProfile.userId,
       recipientUsername: args.recipientUsername,
-      content: args.content,
+      content: fullyCensoredContent,
       messageType: args.messageType,
       lobbyId: args.lobbyId,
       lobbyCode: args.lobbyCode,
@@ -572,13 +576,16 @@ export const sendMessageInternal = internalMutation({
 
     const timestamp = Date.now();
 
+    // Profanity: fully censor any profanity
+    const fullyCensoredContent = profanity.censor(args.content, CensorType.Word);
+
     // Create the message
     const messageId = await ctx.db.insert("messages", {
       senderId: args.senderId,
       senderUsername: senderProfile.username,
       recipientId: recipientProfile.userId,
       recipientUsername: args.recipientUsername,
-      content: args.content,
+      content: fullyCensoredContent,
       messageType: args.messageType,
       lobbyId: args.lobbyId,
       lobbyCode: args.lobbyCode,
@@ -647,6 +654,11 @@ export const updateConversation = internalMutation({
           ? { participant2UnreadCount: conversation.participant2UnreadCount + 1 }
           : { participant1UnreadCount: conversation.participant1UnreadCount + 1 }
         ),
+        // Clear typing indicator for sender upon sending
+        ...(isParticipant1Sender
+          ? { participant1TypingAt: undefined }
+          : { participant2TypingAt: undefined }
+        )
       });
     } else {
       // Create new conversation
@@ -660,8 +672,97 @@ export const updateConversation = internalMutation({
         participant1UnreadCount: 0,
         participant2UnreadCount: 1, // New message for participant2
         createdAt: args.timestamp,
+        participant1TypingAt: undefined,
+        participant2TypingAt: undefined,
       });
     }
+  },
+});
+
+// Mutation: update typing status for the current user in a conversation
+export const setTyping = mutation({
+  args: {
+    otherUserId: v.id("users"),
+    isTyping: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Find the conversation in either direction
+    let conversation = await ctx.db
+      .query("conversations")
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", userId).eq("participant2Id", args.otherUserId)
+      )
+      .unique();
+
+    if (!conversation) {
+      conversation = await ctx.db
+        .query("conversations")
+        .withIndex("by_participants", (q) =>
+          q.eq("participant1Id", args.otherUserId).eq("participant2Id", userId)
+        )
+        .unique();
+    }
+
+    const now = Date.now();
+    if (conversation) {
+      const isParticipant1 = conversation.participant1Id === userId;
+      await ctx.db.patch(conversation._id, {
+        ...(isParticipant1
+          ? { participant1TypingAt: args.isTyping ? now : undefined }
+          : { participant2TypingAt: args.isTyping ? now : undefined })
+      });
+    }
+
+    return null;
+  },
+});
+
+// Query: get typing status of the other user in a conversation
+export const getTypingStatus = query({
+  args: {
+    otherUserId: v.id("users"),
+  },
+  returns: v.object({
+    isTyping: v.boolean(),
+    lastActiveAt: v.optional(v.number()),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { isTyping: false } as any;
+
+    // Find conversation either direction
+    let conversation = await ctx.db
+      .query("conversations")
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", userId).eq("participant2Id", args.otherUserId)
+      )
+      .unique();
+
+    if (!conversation) {
+      conversation = await ctx.db
+        .query("conversations")
+        .withIndex("by_participants", (q) =>
+          q.eq("participant1Id", args.otherUserId).eq("participant2Id", userId)
+        )
+        .unique();
+    }
+
+    if (!conversation) return { isTyping: false } as any;
+
+    const isParticipant1 = conversation.participant1Id === userId;
+    const otherTypingAt = isParticipant1
+      ? conversation.participant2TypingAt
+      : conversation.participant1TypingAt;
+
+    if (!otherTypingAt) return { isTyping: false } as any;
+
+    const TYPING_TIMEOUT_MS = 5000; // consider typing if within last 5s
+    const isTyping = Date.now() - otherTypingAt < TYPING_TIMEOUT_MS;
+
+    return { isTyping, lastActiveAt: otherTypingAt } as any;
   },
 });
 

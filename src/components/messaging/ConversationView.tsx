@@ -11,6 +11,7 @@ import { UserAvatar } from "../UserAvatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
+import { profanity, CensorType } from "@2toad/profanity";
 
 interface OptimisticMessage {
   _id: string;
@@ -137,9 +138,9 @@ function LobbyInviteMessage({ message, onNavigateToLobby, copyLobbyCode, current
           </div>
         </div>
       ) : message.lobbyId ? (
-        <div className="text-xs text-white/50 flex items-center gap-1">
-          <div className="w-2 h-2 bg-white/30 rounded-full animate-pulse"></div>
-          Loading...
+        <div className="text-xs text-red-300/80 flex items-center gap-1">
+          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+          Invite expired • Lobby no longer exists
         </div>
       ) : (
         message.lobbyCode && (
@@ -173,6 +174,7 @@ export function ConversationView({
   const sendMessage = useMutation(api.messages.sendMessage);
   const markAsRead = useMutation(api.messages.markMessagesAsRead);
   const joinLobby = useMutation(api.lobbies.joinLobby);
+  const setTyping = useMutation(api.messages.setTyping);
 
   // Load messages with pagination support
   const { data: messagesData, isLoading: messagesLoading } = useConvexQuery(
@@ -197,6 +199,16 @@ export function ConversationView({
 
   const { data: currentUserProfile } = useConvexQuery(api.profiles.getCurrentProfile);
 
+  // Typing status of the other user
+  const { data: typingStatus } = useConvexQuery(
+    api.messages.getTypingStatus,
+    { otherUserId }
+  );
+
+  // Local typing state and idle timeout
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -213,12 +225,13 @@ export function ConversationView({
     if (!newMessage.trim() || isLoading) return;
 
     const messageText = newMessage.trim();
+    const censoredText = profanity.censor(messageText, CensorType.Word);
     const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
     
     // Create optimistic message
     const optimisticMessage: OptimisticMessage = {
       _id: optimisticId,
-      content: messageText,
+      content: censoredText,
       messageType: "text",
       senderId: currentUserProfile?.userId || "",
       _creationTime: Date.now(),
@@ -234,9 +247,14 @@ export function ConversationView({
     try {
       await sendMessage({
         recipientUsername: otherUserProfile?.username || "",
-        content: messageText,
+        content: censoredText,
         messageType: "text",
       });
+      // Stop typing once message sent
+      if (isTyping) {
+        setIsTyping(false);
+        void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: false });
+      }
       
       // Remove optimistic message on success (server message will replace it)
       setOptimisticMessages(prev => prev.filter(msg => msg._id !== optimisticId));
@@ -297,6 +315,21 @@ export function ConversationView({
       e.preventDefault();
       void handleSendMessage();
     }
+  };
+
+  // Handle typing signals
+  const signalTyping = () => {
+    // Send start typing on first keystroke
+    if (!isTyping) {
+      setIsTyping(true);
+      void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: true });
+    }
+    // Reset inactivity timer
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: false });
+    }, 3000);
   };
 
   const copyLobbyCode = async (code: string) => {
@@ -681,6 +714,28 @@ export function ConversationView({
                   </div>
                 );
               })}
+              {typingStatus?.isTyping && (
+                <div className="flex gap-2 items-end mb-4 justify-start">
+                  <div className="w-8 flex flex-col justify-start">
+                    <UserAvatar
+                      username={otherUserProfile.username}
+                      avatarUrl={otherUserProfile.avatarUrl}
+                      rank={otherUserProfile.rank}
+                      size="sm"
+                      className="mb-1"
+                    />
+                  </div>
+                  <div className="max-w-[70%] items-start">
+                    <div className="px-4 py-2 shadow-sm relative rounded-2xl rounded-bl-md bg-white/10 text-white">
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
+                        <span className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
+                        <span className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -692,7 +747,10 @@ export function ConversationView({
             <Input
               placeholder={`Message ${otherUserProfile.username}...`}
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                signalTyping();
+              }}
               onKeyPress={handleKeyPress}
               disabled={isLoading}
               className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"

@@ -3,6 +3,19 @@ import { v } from "convex/values";
 import { authTables } from "@convex-dev/auth/server";
 
 const applicationTables = {
+  // Override auth `users` to add an index on `isAnonymous`
+  users: defineTable({
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+  })
+    .index("email", ["email"]) // keep default indexes
+    .index("phone", ["phone"]) // keep default indexes
+    .index("by_isAnonymous", ["isAnonymous"]),
   // User profiles extending auth users
   profiles: defineTable({
     userId: v.id("users"),
@@ -250,6 +263,9 @@ const applicationTables = {
     lastMessageAt: v.number(),
     participant1LastRead: v.optional(v.number()),
     participant2LastRead: v.optional(v.number()),
+    // Typing indicators (timestamps of last typing activity)
+    participant1TypingAt: v.optional(v.number()),
+    participant2TypingAt: v.optional(v.number()),
     participant1UnreadCount: v.number(),
     participant2UnreadCount: v.number(),
     createdAt: v.number(),
