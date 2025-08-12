@@ -212,6 +212,9 @@ export function ConversationView({
   // Local typing state and idle timeout
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Prevent concurrent mark-as-read calls and reduce write conflicts
+  const isMarkingReadRef = useRef(false);
+  const lastMarkReadAtRef = useRef(0);
 
   // Auto-scroll to bottom when new messages arrive (but not when loading older pages)
   const loadingOlderRef = useRef(false);
@@ -282,12 +285,34 @@ export function ConversationView({
     setIsFetchingOlder(false);
   }, [otherUserId]);
 
-  // Mark messages as read when conversation is opened
+  // Mark messages as read when there are unread incoming messages from the other user
   useEffect(() => {
-    if (messages.length > 0) {
-      markAsRead({ otherUserId: otherUserId as Id<"users"> }).catch(console.error);
-    }
-  }, [messages.length, otherUserId, markAsRead]);
+    if (!currentUserProfile) return;
+
+    const hasUnreadIncoming = messages.some((m) => {
+      if ('isOptimistic' in m) return false;
+      const msg = m as Message;
+      return (
+        msg.senderId === otherUserId &&
+        msg.recipientId === currentUserProfile.userId &&
+        !msg.readAt
+      );
+    });
+
+    if (!hasUnreadIncoming) return;
+
+    const now = Date.now();
+    if (isMarkingReadRef.current) return;
+    if (now - (lastMarkReadAtRef.current || 0) < 1000) return; // throttle to 1s
+
+    isMarkingReadRef.current = true;
+    lastMarkReadAtRef.current = now;
+    markAsRead({ otherUserId: otherUserId as Id<"users"> })
+      .catch(console.error)
+      .finally(() => {
+        isMarkingReadRef.current = false;
+      });
+  }, [messages, otherUserId, currentUserProfile, markAsRead]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isLoading) return;

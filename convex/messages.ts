@@ -784,7 +784,15 @@ export const updateConversationReadStatus = internalMutation({
 
     if (conversation) {
       const isParticipant1 = conversation.participant1Id === args.userId;
-      
+      // Early exit if already up to date to avoid write conflicts
+      const alreadyUpToDate = isParticipant1
+        ? (conversation.participant1UnreadCount === 0 && (conversation.participant1LastRead || 0) >= args.readAt)
+        : (conversation.participant2UnreadCount === 0 && (conversation.participant2LastRead || 0) >= args.readAt);
+
+      if (alreadyUpToDate) {
+        return;
+      }
+
       await ctx.db.patch(conversation._id, {
         ...(isParticipant1 
           ? { 
