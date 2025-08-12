@@ -237,7 +237,7 @@ export function SignInForm() {
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
       >
         {/* Squares Background for Right Side */}
-        <div className="absolute inset-0 opacity-30">
+        <div className="absolute inset-0 opacity-20">
           <Squares 
             direction="diagonal"
             speed={0.5}
@@ -247,7 +247,7 @@ export function SignInForm() {
           />
         </div>
         
-        <div className="w-full max-w-md px-4 sm:px-6 lg:px-8 py-8 lg:py-0 min-h-screen lg:min-h-full flex flex-col justify-center relative z-20">
+        <div className="w-full max-w-md px-4 sm:px-5 lg:px-6 py-6 lg:py-0 min-h-screen lg:min-h-full flex flex-col justify-center relative z-20">
           <AnimatePresence mode="wait" initial={false}>
             {flow === "resetPassword" ? (
               <motion.div
@@ -266,14 +266,14 @@ export function SignInForm() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -30 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
-                className="space-y-6 lg:space-y-8"
+                className="space-y-5 lg:space-y-6"
               >
                 {/* Header */}
-                <div className="text-center space-y-2 lg:space-y-3">
-                  <h2 className="text-2xl lg:text-3xl font-display font-bold text-white">
+                <div className="text-center space-y-1.5 lg:space-y-2">
+                  <h2 className="text-xl lg:text-2xl font-display font-bold text-white">
                     {flow === "signIn" ? "Welcome Back" : "Join the Battle"}
                   </h2>
-                  <p className="text-white/60 text-base lg:text-lg font-body">
+                  <p className="text-white/60 text-sm lg:text-base font-body">
                     {flow === "signIn" 
                       ? "Continue your strategic journey" 
                       : "Create your commander profile"}
@@ -281,11 +281,11 @@ export function SignInForm() {
                 </div>
 
                 {/* Quick sign-in providers */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <Button
                     aria-label="Sign in with Google"
                     variant="outline"
-                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base flex items-center justify-center gap-2"
+                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2 sm:py-2.5 rounded-full font-medium font-body text-sm flex items-center justify-center gap-2"
                     onClick={() => authMutation.mutate({ provider: "google" })}
                     disabled={authMutation.isPending}
                   >
@@ -305,7 +305,7 @@ export function SignInForm() {
                   <Button
                     aria-label="Sign in with GitHub"
                     variant="outline"
-                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base flex items-center justify-center gap-2"
+                    className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2 sm:py-2.5 rounded-full font-medium font-body text-sm flex items-center justify-center gap-2"
                     onClick={() => authMutation.mutate({ provider: "github" })}
                     disabled={authMutation.isPending}
                   >
@@ -317,7 +317,7 @@ export function SignInForm() {
                 {/* Anonymous Sign In */}
                 <Button 
                   variant="outline" 
-                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2.5 sm:py-3 rounded-full font-medium font-body text-sm lg:text-base" 
+                  className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2 sm:py-2.5 rounded-full font-medium font-body text-sm" 
                   onClick={() => authMutation.mutate({ provider: "anonymous" })}
                   disabled={authMutation.isPending}
                 >
@@ -333,7 +333,7 @@ export function SignInForm() {
 
                 {/* Email/password form */}
                 <form
-                  className="space-y-5 lg:space-y-6"
+                  className="space-y-4 lg:space-y-5"
                   onSubmit={(e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target as HTMLFormElement);
@@ -344,7 +344,7 @@ export function SignInForm() {
                     });
                   }}
                 >
-                  <div className="space-y-4 lg:space-y-5">
+                  <div className="space-y-3 lg:space-y-4">
                     <div className="space-y-2">
                       <label htmlFor="email" className="text-sm font-medium text-white/90 font-body">
                         Email Address
@@ -354,7 +354,7 @@ export function SignInForm() {
                         name="email"
                         type="email"
                         placeholder="commander@example.com"
-                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm"
                         required
                       />
                     </div>
@@ -368,7 +368,7 @@ export function SignInForm() {
                         name="password"
                         type="password"
                         placeholder={flow === "signIn" ? "Enter your password" : "Create a password"}
-                        className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
+                        className="w-full px-3 sm:px-4 py-2 sm:py-2.5 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm"
                         required
                       />
                       {flow === "signIn" && (
@@ -387,7 +387,7 @@ export function SignInForm() {
                   
                   <Button 
                     type="submit" 
-                    className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2.5 sm:py-3 px-6 rounded-full transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm lg:text-base" 
+                    className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2 sm:py-2.5 px-5 rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm" 
                     disabled={authMutation.isPending}
                   >
                     {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
@@ -416,7 +416,7 @@ export function SignInForm() {
                 </div>
 
                 {/* Credits */}
-                <div className="text-center space-y-2 pt-4 border-t border-white/10">
+                <div className="text-center space-y-2 pt-3 border-t border-white/10">
                   <p className="text-xs text-white/50 font-body">
                     Created by {""}
                     <a 
