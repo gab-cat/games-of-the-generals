@@ -196,7 +196,7 @@ export function AvatarUpload({
             </button>
           </p>
           <p className="text-xs text-white/50 mt-1">
-            JPEG, PNG, WebP • Max 5MB • Will be resized to 250×250
+            JPEG, PNG, WebP • Max 5MB • Will be resized to 250×250 and converted to WebP
           </p>
         </div>
 

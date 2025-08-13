@@ -29,11 +29,42 @@ export async function compressImage(file: File, maxSize: number = 250): Promise<
       .crop({ x, y, w: size, h: size })
       .resize({ w: maxSize, h: maxSize });
     
-    // Convert to JPEG buffer
+    // Get a high-quality JPEG buffer from Jimp (WebP not supported in our Jimp types)
     const buffer = await processedImage.getBuffer('image/jpeg');
-    
-    // Return as blob (buffer should work directly)
-    return new Blob([buffer as any], { type: 'image/jpeg' });
+
+    // Convert JPEG blob to WebP using Canvas when available; fall back to JPEG
+    const jpegBlob = new Blob([buffer as any], { type: 'image/jpeg' });
+
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      const webpBlob = await new Promise<Blob | null>((resolve) => {
+        const img = new Image();
+        const url = URL.createObjectURL(jpegBlob);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          canvas.toBlob(
+            (blob) => {
+              URL.revokeObjectURL(url);
+              resolve(blob);
+            },
+            'image/webp',
+            0.9
+          );
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        };
+        img.src = url;
+      });
+
+      if (webpBlob) return webpBlob;
+    }
+
+    return jpegBlob;
     
   } catch (error) {
     console.error('Error compressing image:', error);
