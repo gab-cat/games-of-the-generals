@@ -116,20 +116,20 @@ export function AIGamePage() {
   if (currentSession && (currentSession.status === "setup" || currentSession.status === "playing")) {
     return (
       <div className="min-h-screen">
-        <div className="mx-auto max-w-7xl p-4 space-y-6">
+        <div className="mx-auto max-w-7xl p-3 sm:p-4 space-y-4 sm:space-y-6">
           {/* Game Header */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <Bot className="h-8 w-8 text-blue-400" />
                   <div>
                     <h1 className="text-2xl font-bold text-white">
                       VS AI Battle
                     </h1>
-                    <div className="flex items-center gap-3 mt-1">
-                      <Badge 
-                        variant="secondary" 
+                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                      <Badge
+                        variant="secondary"
                         className="bg-white/10 text-white/80 border-white/20"
                       >
                         {React.createElement(difficultyConfig[currentSession.difficulty].icon, { className: "h-4 w-4 mr-1" })}
@@ -145,11 +145,11 @@ export function AIGamePage() {
                     </div>
                   </div>
                 </div>
-                
+
                 <Button
                   variant="outline"
                   onClick={handleQuitGame}
-                  className="bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30 hover:text-red-300"
+                  className="bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30 hover:text-red-300 self-start sm:self-auto"
                 >
                   Quit Game
                 </Button>
@@ -160,11 +160,11 @@ export function AIGamePage() {
           {/* Game Status */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div className={cn(
-                  "flex items-center gap-3 px-4 py-2 rounded-lg",
-                  currentSession.currentTurn === "player1" 
-                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full" 
+                  "flex items-center gap-3 px-4 py-2 rounded-lg self-start",
+                  currentSession.currentTurn === "player1"
+                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full"
                     : "bg-red-500/20 text-red-400 border border-red-500/30"
                 )}>
                   {currentSession.currentTurn === "player1" ? (
@@ -179,8 +179,8 @@ export function AIGamePage() {
                     </>
                   )}
                 </div>
-                
-                <div className="text-white/60 text-sm">
+
+                <div className="text-white/60 text-sm self-start sm:self-auto">
                   {currentSession.status === "setup" ? "Setting up pieces..." : "Battle in progress"}
                 </div>
               </div>
@@ -202,7 +202,7 @@ export function AIGamePage() {
       transition={{ duration: 0.6 }}
       className="min-h-screen"
     >
-      <div className="mx-auto max-w-5xl p-4 space-y-6">
+      <div className="mx-auto max-w-5xl p-3 sm:p-4 space-y-4 sm:space-y-6">
 
         {/* Difficulty Selection */}
         <motion.div
@@ -215,22 +215,23 @@ export function AIGamePage() {
               <CardTitle className="text-xl font-bold text-white">Choose Your Challenge</CardTitle>
               <CardDescription className="text-white/60">Select the AI difficulty and behavior</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 p-4 sm:p-6">
               {/* Difficulty */}
               <div>
                 <div className="mb-3 text-sm uppercase tracking-wide text-white/60">Difficulty</div>
                 <Tabs value={selectedDifficulty} onValueChange={(value) => setSelectedDifficulty(value as Difficulty)}>
-                  <TabsList className="flex w-fit rounded-full  bg-white/5 backdrop-blur-sm border border-white/10 mb-6">
+                  <TabsList className="flex flex-wrap w-full h-full gap-1 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-6 px-1">
                     {(Object.entries(difficultyConfig) as [Difficulty, typeof difficultyConfig.easy][]).map(([key, config], index) => (
                       <motion.div
                         key={key}
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, delay: 0.3 + (index * 0.1) }}
+                        className="flex-1 min-w-0"
                       >
-                        <TabsTrigger 
+                        <TabsTrigger
                           value={key}
-                          className="data-[state=active]:bg-white/15 rounded-full data-[state=active]:text-white text-white/70 transition-all duration-200"
+                          className="w-full data-[state=active]:bg-white/15 rounded-full data-[state=active]:text-white text-white/70 transition-all duration-200 px-3 py-2 text-sm"
                         >
                           <config.icon className="mr-2 h-4 w-4" />
                           {config.label}
@@ -293,10 +294,10 @@ export function AIGamePage() {
               <div>
                 <div className="mb-3 text-sm uppercase tracking-wide text-white/60">AI Behavior</div>
                 <Tabs value={selectedBehavior} onValueChange={(v) => setSelectedBehavior(v as Behavior)}>
-                  <TabsList className="flex flex-wrap w-full rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-6">
+                  <TabsList className="flex flex-wrap w-full h-full gap-1 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-6 px-1">
                     {(Object.entries(behaviorConfig) as [Behavior, typeof behaviorConfig.balanced][]).map(([key, config], index) => (
-                      <motion.div key={key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 + (index * 0.1) }}>
-                        <TabsTrigger value={key} className="data-[state=active]:bg-white/15 rounded-full data-[state=active]:text-white text-white/70 transition-all duration-200">
+                      <motion.div key={key} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, delay: 0.3 + (index * 0.1) }} className="flex-1 min-w-0">
+                        <TabsTrigger value={key} className="w-full data-[state=active]:bg-white/15 rounded-full data-[state=active]:text-white text-white/70 transition-all duration-200 px-3 py-2 text-sm">
                           <config.icon className="mr-2 h-4 w-4" />
                           {config.label}
                         </TabsTrigger>
@@ -338,8 +339,8 @@ export function AIGamePage() {
                 Game Rules
               </CardTitle>
             </CardHeader>
-            <CardContent className="">
-              <div className="grid gap-4 md:grid-cols-2">
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2">
                 {[
                   { icon: "🎯", title: "Objective", description: "Capture the enemy flag or reach their back row with your flag." },
                   { icon: "⚡", title: "Quick Play", description: "Instant battles that don't affect your rankings." },
@@ -351,7 +352,7 @@ export function AIGamePage() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay: 0.5 + (index * 0.1) }}
-                    className="space-y-2 p-4 rounded-lg bg-white/5 border border-white/10"
+                    className="space-y-2 p-3 sm:p-4 rounded-lg bg-white/5 border border-white/10"
                   >
                     <h4 className="font-bold text-white flex items-center gap-2">
                       <span>{rule.icon}</span>
@@ -377,7 +378,7 @@ export function AIGamePage() {
             variant="gradient"
             onClick={handleStartGame}
             disabled={isStarting || !profile}
-            className="rounded-full text-white px-8 py-4  transition-all duration-200 transform hover:scale-105"
+            className="rounded-full text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg transition-all duration-200 transform hover:scale-105 min-h-[48px] w-full sm:w-auto"
           >
             {isStarting ? (
               <>

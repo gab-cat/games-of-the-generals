@@ -38,7 +38,26 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
     setBioValue(profileStats.bio || "");
   }, [profileStats.bio]);
   const formatDate = (timestamp: number) => {
-    return new Date(timestamp).toLocaleDateString();
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    // For very recent dates (less than 30 days), show full date
+    if (diffDays < 30) {
+      return date.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    // For older dates, show just month and year
+    else {
+      return date.toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric'
+      });
+    }
   };
 
   const getRankColor = (rank: string) => {

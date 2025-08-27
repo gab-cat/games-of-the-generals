@@ -531,9 +531,12 @@ export const generateAIMove = action({
         if (newRow < 0 || newRow > 7 || newCol < 0 || newCol > 8) continue;
 
         const targetPiece = session.board[newRow][newCol];
-        
+
         // Can't move to own piece
         if (targetPiece && targetPiece.player === "player2") continue;
+
+        // Flag cannot attack - only move to empty squares
+        if (aiPiece.piece === "Flag" && targetPiece) continue;
 
         const attackAdvantage = targetPiece ? (getPieceRank(aiPiece.piece) - getPieceRank(targetPiece.piece)) : 0;
         const isSafe = !canPlayerCaptureSquare(newRow, newCol, aiPiece.piece);

@@ -75,7 +75,6 @@ const INITIAL_PIECES = [
 
 // Constants for better performance
 const TOTAL_TIME_SECONDS = 15 * 60; // 15 minutes
-const ANIMATION_DURATION = 800;
 const BOARD_ROWS = 8;
 const BOARD_COLS = 9;
 
@@ -93,22 +92,19 @@ const flipBoardForDisplay = (board: any[][], shouldFlip: boolean) => {
 };
 
 // Memoized board square component for better performance
-const BoardSquare = memo(({ 
-  row, 
-  col, 
-  cell, 
-  isSelected, 
-  isValidMove, 
-  highlightType, 
-  isPendingMove, 
-  isPendingFromPosition, 
-  isLastMoveFrom, 
-  isAnimatingFromPosition, 
-  isAnimatingToPosition, 
-  isCurrentPlayer, 
-  animatingPiece, 
+const BoardSquare = memo(({
+  row,
+  col,
+  cell,
+  isSelected,
+  isValidMove,
+  highlightType,
+  isPendingMove,
+  isPendingFromPosition,
+  isLastMoveFrom,
+  isCurrentPlayer,
   ArrowComponent,
-  onClick 
+  onClick
 }: {
   row: number;
   col: number;
@@ -119,39 +115,23 @@ const BoardSquare = memo(({
   isPendingMove: boolean;
   isPendingFromPosition: boolean;
   isLastMoveFrom: boolean;
-  isAnimatingFromPosition: boolean;
-  isAnimatingToPosition: boolean;
   isCurrentPlayer: boolean;
-  animatingPiece: any;
   ArrowComponent: any;
   onClick: (row: number, col: number) => void;
 }) => {
   return (
     <motion.div
       key={`${row}-${col}`}
-      whileHover={isCurrentPlayer && !animatingPiece ? { scale: 1.00 } : {}}
-      whileTap={isCurrentPlayer && !animatingPiece ? { scale: 1 } : {}}
+      whileHover={isCurrentPlayer ? { scale: 1.00 } : {}}
+      whileTap={isCurrentPlayer ? { scale: 1 } : {}}
       animate={
-        isAnimatingToPosition ? {
-          scale: [1, 1.05, 1, 1.1, 1],
-          boxShadow: [
-            "0 0 0 0 rgba(34, 197, 94, 0.5)",
-            "0 0 0 4px rgba(34, 197, 94, 0.3)",
-            "0 0 0 8px rgba(34, 197, 94, 0.2)",
-            "0 0 0 12px rgba(34, 197, 94, 0.4)",
-            "0 0 0 0 rgba(34, 197, 94, 0)"
-          ]
-        } : isPendingMove ? {
+        isPendingMove ? {
           scale: [1, 1.02, 1],
           opacity: [0.75, 0.9, 0.75]
         } : {}
       }
       transition={
-        isAnimatingToPosition ? {
-          duration: 0.75,
-          ease: "easeInOut",
-          times: [0, 0.3, 0.5, 0.8, 1]
-        } : isPendingMove ? {
+        isPendingMove ? {
           duration: 1,
           repeat: Infinity,
           ease: "easeInOut"
@@ -164,12 +144,11 @@ const BoardSquare = memo(({
         ${isSelected ? 'ring-1 ring-primary bg-primary/20 border-primary' : ''}
         ${isValidMove ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}
         ${highlightType === 'last-move' ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
-        ${isPendingMove && !isAnimatingToPosition ? 'ring-1 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75' : ''}
-        ${isAnimatingToPosition ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}
-        ${isCurrentPlayer && !animatingPiece ? 'hover:bg-accent' : ''}
+        ${isPendingMove ? 'ring-1 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75' : ''}
+        ${isCurrentPlayer ? 'hover:bg-accent' : ''}
       `}
     >
-      {isPendingFromPosition && !isAnimatingFromPosition && (
+      {isPendingFromPosition && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
           <motion.div
             animate={{ rotate: 360 }}
@@ -178,16 +157,16 @@ const BoardSquare = memo(({
           />
         </div>
       )}
-      
-      {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && !isAnimatingFromPosition && (
+
+      {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && (
         <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
           <div className="rounded-full p-1">
             <ArrowComponent className="h-6 w-6 text-yellow-500" />
           </div>
         </div>
       )}
-      
-      {cell && !isAnimatingFromPosition && (
+
+      {cell && (
         <div className="text-center">
           <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
             {cell.piece === "Hidden" ? 
@@ -254,8 +233,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
       // Clear optimistic state when real data comes back
       setOptimisticBoard(null);
       setPendingMove(null);
-      setAnimatingPiece(null);
-      
+
       if (result.challengeResult) {
         // Don't reveal pieces in toast, just indicate if it was a win/loss
         const isCurrentPlayerWinner = result.challengeResult.winner === "attacker";
@@ -272,7 +250,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
       // Revert optimistic update on error
       setOptimisticBoard(null);
       setPendingMove(null);
-      setAnimatingPiece(null);
       toast.error(error instanceof Error ? error.message : "Invalid move");
     }
   });
@@ -326,15 +303,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   
-  // Animation states
-  const [animatingPiece, setAnimatingPiece] = useState<{
-    piece: any;
-    fromRow: number;
-    fromCol: number;
-    toRow: number;
-    toCol: number;
-    startTime: number;
-  } | null>(null);
   const [boardRect, setBoardRect] = useState<DOMRect | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -411,11 +379,11 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
   // Clear optimistic state when game updates from server
   useEffect(() => {
-    if (game && optimisticBoard && !pendingMove && !animatingPiece) {
-      // If we have optimistic state but no pending move or animation, clear it
+    if (game && optimisticBoard && !pendingMove) {
+      // If we have optimistic state but no pending move, clear it
       setOptimisticBoard(null);
     }
-  }, [game, optimisticBoard, pendingMove, animatingPiece]);
+  }, [game, optimisticBoard, pendingMove]);
 
   // Memoized helper functions
   const formatTime = useCallback((seconds: number) => {
@@ -618,10 +586,10 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
   // Optimistic state cleanup
   useEffect(() => {
-    if (game && optimisticBoard && !pendingMove && !animatingPiece) {
+    if (game && optimisticBoard && !pendingMove) {
       setOptimisticBoard(null);
     }
-  }, [game, optimisticBoard, pendingMove, animatingPiece]);
+  }, [game, optimisticBoard, pendingMove]);
 
   // Game result toast notification - separated for better performance
   useEffect(() => {
@@ -730,7 +698,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
   // Optimized game square click handler
   const handleGameSquareClick = useCallback((row: number, col: number) => {
-    if (!game || game.status !== "playing" || !isCurrentPlayer || isMakingMove || animatingPiece) return;
+    if (!game || game.status !== "playing" || !isCurrentPlayer || isMakingMove) return;
 
     if (selectedSquare) {
       if (selectedSquare.row === row && selectedSquare.col === col) {
@@ -747,21 +715,12 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
       const movingPiece = game.board[selectedSquare.row][selectedSquare.col];
       const targetPiece = game.board[row][col];
-      
+
       if (targetPiece && targetPiece.player === (isPlayer1 ? "player1" : "player2")) {
         toast.error("Cannot move to a square occupied by your own piece");
         setSelectedSquare(null);
         return;
       }
-
-      setAnimatingPiece({
-        piece: movingPiece,
-        fromRow: selectedSquare.row,
-        fromCol: selectedSquare.col,
-        toRow: row,
-        toCol: col,
-        startTime: Date.now()
-      });
 
       setPendingMove({
         fromRow: selectedSquare.row,
@@ -773,23 +732,20 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
       const fromSquare = selectedSquare;
       setSelectedSquare(null);
 
-      setTimeout(() => {
-        const newBoard = game.board.map(r => [...r]);
-        newBoard[row][col] = movingPiece;
-        newBoard[fromSquare.row][fromSquare.col] = null;
+      // Create optimistic board update
+      const newBoard = game.board.map(r => [...r]);
+      newBoard[row][col] = movingPiece;
+      newBoard[fromSquare.row][fromSquare.col] = null;
+      setOptimisticBoard(newBoard);
 
-        setOptimisticBoard(newBoard);
-
-        makeMove({
-          gameId,
-          fromRow: fromSquare.row,
-          fromCol: fromSquare.col,
-          toRow: row,
-          toCol: col,
-        });
-
-        setAnimatingPiece(null);
-      }, ANIMATION_DURATION);
+      // Make the move immediately
+      makeMove({
+        gameId,
+        fromRow: fromSquare.row,
+        fromCol: fromSquare.col,
+        toRow: row,
+        toCol: col,
+      });
 
     } else {
       const boardToUse = optimisticBoard || game.board;
@@ -798,7 +754,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
         setSelectedSquare({ row, col });
       }
     }
-  }, [game, isCurrentPlayer, isMakingMove, animatingPiece, selectedSquare, isPlayer1, optimisticBoard, makeMove, gameId]);
+  }, [game, isCurrentPlayer, isMakingMove, selectedSquare, isPlayer1, optimisticBoard, makeMove, gameId]);
 
   const handleSetupTimeout = useCallback(() => {
     toast.error("Setup time expired! Pieces will be placed randomly.");
@@ -841,17 +797,11 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
           ((pendingMove.fromRow === logicalRowIndex && pendingMove.fromCol === colIndex) ||
            (pendingMove.toRow === logicalRowIndex && pendingMove.toCol === colIndex));
         
-        const isPendingFromPosition = pendingMove && 
+        const isPendingFromPosition = pendingMove &&
           pendingMove.fromRow === logicalRowIndex && pendingMove.fromCol === colIndex;
-        
-        const isLastMoveFrom = game?.lastMoveFrom && 
+
+        const isLastMoveFrom = game?.lastMoveFrom &&
           game.lastMoveFrom.row === logicalRowIndex && game.lastMoveFrom.col === colIndex;
-        
-        const isAnimatingFromPosition = animatingPiece && 
-          animatingPiece.fromRow === logicalRowIndex && animatingPiece.fromCol === colIndex;
-        
-        const isAnimatingToPosition = animatingPiece && 
-          animatingPiece.toRow === logicalRowIndex && animatingPiece.toCol === colIndex;
         
         const ArrowComponent = isLastMoveFrom && game?.lastMoveFrom && game?.lastMoveTo 
           ? getArrowDirection(game.lastMoveFrom.row, game.lastMoveFrom.col, game.lastMoveTo.row, game.lastMoveTo.col, shouldFlipBoard)
@@ -869,10 +819,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
             isPendingMove={!!isPendingMove}
             isPendingFromPosition={!!isPendingFromPosition}
             isLastMoveFrom={!!isLastMoveFrom}
-            isAnimatingFromPosition={!!isAnimatingFromPosition}
-            isAnimatingToPosition={!!isAnimatingToPosition}
             isCurrentPlayer={isCurrentPlayer}
-            animatingPiece={animatingPiece}
             ArrowComponent={ArrowComponent}
             onClick={(row, col) => handleGameSquareClick(row, col)}
           />
@@ -884,7 +831,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     shouldFlipBoard,
     selectedSquare,
     pendingMove,
-    animatingPiece,
     game?.lastMoveFrom,
     game?.lastMoveTo,
     isCurrentPlayer,
@@ -1603,10 +1549,10 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   delay: 0.1
                 }}
                 className={`grid grid-cols-9 gap-0.5 sm:gap-2 max-w-3xl mx-auto p-1 sm:p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
-                  isCurrentPlayer 
-                    ? 'ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30' 
+                  isCurrentPlayer
+                    ? 'ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30'
                     : 'ring-muted/30 bg-muted/10 border-muted/30'
-                } ${isMakingMove || animatingPiece ? 'pointer-events-none' : ''}`}
+                } ${isMakingMove ? 'pointer-events-none' : ''}`}
               >
                 {/* Simple text indicator when making move */}
                 <AnimatePresence>
@@ -1658,82 +1604,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                 
                 {renderBoardSquares}
                 
-                {/* Animated piece overlay */}
-                {animatingPiece && boardRect && (
-                  <motion.div
-                    initial={{ 
-                      x: `${(animatingPiece.fromCol * (boardRect.width - 32) / 9) + 16}px`,
-                      y: `${(flipRowForDisplay(animatingPiece.fromRow, shouldFlipBoard) * (boardRect.height - 32) / 8) + 16}px`,
-                      scale: 1.2,
-                      zIndex: 100
-                    }}
-                    animate={{ 
-                      x: `${(animatingPiece.toCol * (boardRect.width - 32) / 9) + 16}px`,
-                      y: `${(flipRowForDisplay(animatingPiece.toRow, shouldFlipBoard) * (boardRect.height - 32) / 8) + 16}px`,
-                      scale: [1.2, 1.3, 1.2],
-                      rotate: [0, 5, -5, 0]
-                    }}
-                    transition={{
-                      duration: 0.75,
-                      ease: "easeInOut",
-                      scale: {
-                        duration: 0.75,
-                        ease: "easeInOut",
-                        times: [0, 0.5, 1]
-                      },
-                      rotate: {
-                        duration: 0.75,
-                        ease: "easeInOut",
-                        times: [0, 0.3, 0.7, 1]
-                      }
-                    }}
-                    className="absolute pointer-events-none z-50 size-20"
-                    style={{
-                      width: `${(boardRect.width - 32) / 9}px`,
-                      height: `${(boardRect.height - 32) / 8}px`,
-                    }}
-                  >
-                    <div className="w-full h-full flex items-center justify-center">
-                      <motion.div
-                        animate={{
-                          boxShadow: [
-                            "0 0 0 0 rgba(59, 130, 246, 0.7)",
-                            "0 0 15px 3px rgba(59, 130, 246, 0.4)",
-                            "0 0 10px 2px rgba(59, 130, 246, 0.6)"
-                          ]
-                        }}
-                        transition={{
-                          duration: 0.75,
-                          ease: "easeInOut"
-                        }}
-                        className={`text-center p-1 sm:p-2 rounded-lg bg-gradient-to-br from-white/20 to-white/5 backdrop-blur-sm border border-white/30 ${
-                          animatingPiece.piece.player === 'player1' ? 'text-blue-400' : 'text-red-400'
-                        }`}
-                      >
-                        <div className="transform scale-110 sm:scale-125">
-                          {animatingPiece.piece.piece === "Hidden" ? 
-                            getPieceDisplay(animatingPiece.piece.piece, { isOpponent: true, size: "small" }) : 
-                            <>
-                              {/* Mobile: No labels, small size */}
-                              <div className="block sm:hidden">
-                                {getPieceDisplay(animatingPiece.piece.piece, { showLabel: false, size: "small" })}
-                              </div>
-                              {/* Desktop: With labels, medium size */}
-                              <div className="hidden sm:block">
-                                {getPieceDisplay(animatingPiece.piece.piece, { showLabel: true, size: "medium" })}
-                              </div>
-                            </>
-                          }
-                        </div>
-                        {animatingPiece.piece.revealed && animatingPiece.piece.piece !== "Hidden" && (
-                          <div className="text-[10px] sm:text-xs font-bold mt-0.5 sm:mt-1 text-muted-foreground">
-                            {animatingPiece.piece.piece.split(' ').map((word: string) => word[0]).join('')}
-                          </div>
-                        )}
-                      </motion.div>
-                    </div>
-                  </motion.div>
-                )}
+
               </motion.div>
             </CardContent>
           </Card>

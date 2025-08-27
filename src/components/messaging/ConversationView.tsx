@@ -770,8 +770,12 @@ export function ConversationView({
           <div>
             <h3 className="font-sm text-white">{otherUserProfile.username}</h3>
             <p className="text-xs text-white/60">
-              {otherUserProfile.rank && `${otherUserProfile.rank} • `}
-              {otherUserProfile.wins}W {otherUserProfile.losses}L
+              {otherUserProfile.bio
+                ? otherUserProfile.bio.length > 50
+                  ? `${otherUserProfile.bio.substring(0, 50)}...`
+                  : otherUserProfile.bio
+                : `${otherUserProfile.rank && `${otherUserProfile.rank} • `}${otherUserProfile.wins}W ${otherUserProfile.losses}L`
+              }
             </p>
           </div>
         </div>

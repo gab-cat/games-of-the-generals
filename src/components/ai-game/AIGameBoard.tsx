@@ -22,6 +22,7 @@ import { motion } from "framer-motion";
 import { cn } from "../../lib/utils";
 import { getPieceDisplay } from "../../lib/piece-display";
 import { SetupPresets } from "../setup-presets/SetupPresets";
+import { AIGameResultModal } from "./AIGameResultModal";
 import { toast } from "sonner";
 
 const INITIAL_PIECES = [
@@ -63,17 +64,21 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
   // Game state
   const [selectedSquare, setSelectedSquare] = useState<{row: number, col: number} | null>(null);
   const [isProcessingMove, setIsProcessingMove] = useState(false);
+  const [isResultModalOpen, setIsResultModalOpen] = useState(false);
   
   // Mutations
   const setupPiecesMutation = useMutation(api.aiGame.setupAIGamePieces);
   const makeMove = useMutation(api.aiGame.makeAIGameMove);
   const executeAIMove = useMutation(api.aiGame.executeAIMove);
+  const startNewGame = useMutation(api.aiGame.startAIGameSession);
+  const cleanupSession = useMutation(api.aiGame.cleanupAIGameSession);
   
   // Actions
   const generateAIMove = useAction(api.aiGame.generateAIMove);
   
   // Queries
   const session = useQuery(api.aiGame.getAIGameSession, { sessionId });
+  const profile = useQuery(api.profiles.getCurrentProfile);
 
   // Valid rows for player placement (always bottom 3 rows for player)
   const validRows = useMemo(() => [5, 6, 7], []);
@@ -92,7 +97,7 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
     // Process AI moves
     if (session?.status === "playing" && session.currentTurn === "player2" && !isProcessingMove) {
       setIsProcessingMove(true);
-      
+
       // Generate and execute AI move
       generateAIMove({ sessionId })
         .then((aiMove) => {
@@ -114,6 +119,13 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
         });
     }
   }, [session?.status, session?.currentTurn, sessionId, generateAIMove, executeAIMove, isProcessingMove]);
+
+  // Open result modal when game finishes
+  useEffect(() => {
+    if (session?.status === "finished" && session.winner) {
+      setIsResultModalOpen(true);
+    }
+  }, [session?.status, session?.winner]);
 
   // Memoized game actions
   const randomizeSetup = useCallback(() => {
@@ -246,6 +258,52 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
       toast.error("Failed to setup pieces");
     }
   }, [availablePieces.length, setupBoard, setupPiecesMutation, sessionId]);
+
+  // Modal handlers
+  const handlePlayAgain = useCallback(async () => {
+    if (!profile || !session) return;
+
+    try {
+      // Close the modal first
+      setIsResultModalOpen(false);
+
+      // Start a new game with the same settings
+      await startNewGame({
+        profileId: profile._id,
+        difficulty: session.difficulty,
+        behavior: session.behavior,
+      });
+
+      // Reset local state
+      setSetupBoard(createEmptyBoard());
+      setAvailablePieces([...INITIAL_PIECES]);
+      setSelectedPiece(null);
+      setSelectedSetupSquare(null);
+      setIsSwapMode(false);
+      setSelectedSquare(null);
+      setIsProcessingMove(false);
+
+      toast.success("New game started!");
+    } catch (error) {
+      console.error("Failed to start new game:", error);
+      toast.error("Failed to start new game");
+    }
+  }, [profile, session, startNewGame]);
+
+  const handleReturnToLobby = useCallback(async () => {
+    try {
+      // Close the modal
+      setIsResultModalOpen(false);
+
+      // Cleanup the current session
+      await cleanupSession({ sessionId });
+
+      toast.success("Returned to lobby!");
+    } catch (error) {
+      console.error("Failed to return to lobby:", error);
+      toast.error("Failed to return to lobby");
+    }
+  }, [cleanupSession, sessionId]);
 
   // Helper function to get arrow direction for moves
   const getArrowDirection = useCallback((fromRow: number, fromCol: number, toRow: number, toCol: number) => {
@@ -689,33 +747,18 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
         </CardContent>
       </Card>
 
-      {/* Game Finished */}
-      {session.status === "finished" && session.winner && (
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardContent className="p-6 text-center">
-            <div className="space-y-4">
-              <div className={cn("text-2xl font-bold",
-                session.winner === "player1" ? "text-green-400" : "text-red-400"
-              )}>
-                {session.winner === "player1" ? (
-                  <>
-                    <Crown className="h-8 w-8 mx-auto mb-2" />
-                    <div className="text-white/90">Victory!</div>
-                  </>
-                ) : (
-                  <>
-                    <Bot className="h-8 w-8 mx-auto mb-2" />
-                    <div className="text-white/90">AI Wins!</div>
-                  </>
-                )}
-              </div>
-              <div className="text-white/60">
-                Reason: {session.gameEndReason?.replace("_", " ")}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Game Result Modal */}
+      <AIGameResultModal
+        isOpen={isResultModalOpen}
+        onClose={() => setIsResultModalOpen(false)}
+        winner={session.winner}
+        gameEndReason={session.gameEndReason}
+        difficulty={session.difficulty}
+        behavior={session.behavior}
+        moveCount={session.moveCount}
+        onPlayAgain={handlePlayAgain}
+        onReturnToLobby={handleReturnToLobby}
+      />
     </motion.div>
   );
 }

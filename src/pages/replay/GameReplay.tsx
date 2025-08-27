@@ -187,11 +187,11 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
+        className="space-y-4 lg:space-y-6 p-0 sm:p-4"
       >
       {/* Header */}
-      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-        <CardHeader>
+      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 mx-0 sm:mx-4">
+        <CardHeader className="p-3 sm:p-6">
           <div className="flex items-center justify-between">
             <motion.div 
               initial={{ x: -20, opacity: 0 }}
@@ -207,10 +207,10 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                 <Play className="h-6 w-6 text-purple-400" />
               </motion.div>
               <div>
-                <CardTitle className="text-2xl flex items-center gap-2 text-white/90">
+                <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-white/90">
                   Game Replay
                 </CardTitle>
-                <p className="text-white/60 mt-1">
+                <p className="text-white/60 mt-1 text-sm sm:text-base">
                   {replayData.player1Username} vs {replayData.player2Username}
                 </p>
               </div>
@@ -223,37 +223,38 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Game Board */}
-        <div className="lg:col-span-3">
+        <div className="xl:col-span-3 lg:col-span-2">
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
+              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
                 <div className="flex items-center gap-2">
-                  <Target className="h-5 w-5 text-blue-400" />
-                  <span className="text-white/90">Battle Replay</span>
+                  <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
+                  <span className="text-white/90 text-sm sm:text-base">Battle Replay</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => setShowAllPieces(!showAllPieces)}
-                    className="flex rounded-full items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20"
+                    className="flex rounded-full items-center gap-1 sm:gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-xs sm:text-sm px-2 sm:px-3"
                   >
-                    {showAllPieces ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    {showAllPieces ? 'Hide Pieces' : 'Show All Pieces'}
+                    {showAllPieces ? <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" /> : <Eye className="h-3 w-3 sm:h-4 sm:w-4" />}
+                    <span className="hidden sm:inline">{showAllPieces ? 'Hide Pieces' : 'Show All Pieces'}</span>
+                    <span className="sm:hidden">{showAllPieces ? 'Hide' : 'Show'}</span>
                   </Button>
-                  <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/30">
+                  <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
                     Move {currentMoveIndex + 1} of {replayData.moves.length}
                   </Badge>
                 </div>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0 sm:p-6">
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10"
+                className="grid grid-cols-9 gap-1 sm:gap-2 max-w-full sm:max-w-3xl mx-auto p-0 sm:p-4 rounded-lg bg-white/5 backdrop-blur-sm border sm:border border-white/10"
               >
                 {(currentBoard || replayData.initialBoard).map((row: any, rowIndex: number) =>
                   row.map((cell: any, colIndex: number) => {
@@ -295,8 +296,8 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                         {/* Directional arrow indicator for "from" position */}
                         {isLastMoveFrom && ArrowComponent && (
                           <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                            <div className="rounded-full p-1">
-                              <ArrowComponent className={cn("h-4 w-4", 
+                            <div className="rounded-full p-0.5 sm:p-1">
+                              <ArrowComponent className={cn("h-3 w-3 sm:h-4 sm:w-4",
                                 isChallenge ? "text-red-500" : "text-yellow-500"
                               )} />
                             </div>
@@ -308,10 +309,17 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                             <TooltipTrigger asChild>
                               <div className="text-center cursor-pointer">
                                 <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
-                                  {(showAllPieces || cell.revealed) ? getPieceDisplay(cell.piece, { showLabel: true, size: "medium" }) : (
+                                  {(showAllPieces || cell.revealed) ? (
                                     <div className="flex flex-col items-center justify-center">
-                                      <Square className="w-6 h-6" fill="currentColor" />
-                                      <div className="text-xs mt-1">Hidden</div>
+                                      <div className="flex items-center justify-center">
+                                        {getPieceDisplay(cell.piece, { showLabel: false, size: "small" })}
+                                      </div>
+                                      <div className="hidden sm:block text-center mt-0.5 text-xs">{cell.piece}</div>
+                                    </div>
+                                  ) : (
+                                    <div className="flex flex-col items-center justify-center">
+                                      <Square className="w-4 h-4 sm:w-6 sm:h-6" fill="currentColor" />
+                                      <div className="text-[10px] sm:text-xs mt-0.5 sm:mt-1">Hidden</div>
                                     </div>
                                   )}
                                 </div>
@@ -332,16 +340,16 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
         </div>
 
         {/* Controls and Info */}
-        <div className="space-y-6">
+        <div className="space-y-4 lg:space-y-6">
           {/* Playback Controls */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader>
+            <CardHeader className="p-3 sm:p-6">
               <CardTitle className="flex items-center gap-2 text-white/90">
                 <Play className="h-5 w-5 text-green-400" />
                 Playback Controls
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 p-3 sm:p-6">
               {/* Timeline Slider */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Move Timeline</label>
@@ -371,9 +379,9 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                     setCurrentMoveIndex(-1);
                     setIsPlaying(false);
                   }}
-                  className="bg-white/10 rounded-full px-4 border-white/20 text-white/90 hover:bg-white/20"
+                  className="bg-white/10 rounded-full px-3 sm:px-4 py-2 sm:py-3 border-white/20 text-white/90 hover:bg-white/20"
                 >
-                  <RotateCcw className="h-4 w-4" />
+                  <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   variant="outline"
@@ -383,16 +391,16 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                     setIsPlaying(false);
                   }}
                   disabled={currentMoveIndex <= -1}
-                  className="bg-white/10 rounded-full px-4 border-white/20 text-white/90 hover:bg-white/20 disabled:opacity-50"
+                  className="bg-white/10 rounded-full px-3 sm:px-4 py-2 sm:py-3 border-white/20 text-white/90 hover:bg-white/20 disabled:opacity-50"
                 >
-                  <SkipBack className="h-4 w-4" />
+                  <SkipBack className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
                 <Button
                   onClick={() => setIsPlaying(!isPlaying)}
                   disabled={currentMoveIndex >= replayData.moves.length - 1}
-                  className="px-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                  className="px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
                 >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                  {isPlaying ? <Pause className="h-3 w-3 sm:h-4 sm:w-4" /> : <Play className="h-3 w-3 sm:h-4 sm:w-4" />}
                 </Button>
                 <Button
                   variant="outline"
@@ -402,9 +410,9 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
                     setIsPlaying(false);
                   }}
                   disabled={currentMoveIndex >= replayData.moves.length - 1}
-                  className="bg-white/10 rounded-full px-4 border-white/20 text-white/90 hover:bg-white/20 disabled:opacity-50"
+                  className="bg-white/10 rounded-full px-3 sm:px-4 py-2 sm:py-3 border-white/20 text-white/90 hover:bg-white/20 disabled:opacity-50"
                 >
-                  <SkipForward className="h-4 w-4" />
+                  <SkipForward className="h-3 w-3 sm:h-4 sm:w-4" />
                 </Button>
               </div>
 
@@ -436,13 +444,13 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
           {/* Current Move Info */}
           {currentMove && (
             <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader>
+              <CardHeader className="p-3 sm:p-6">
                 <CardTitle className="flex items-center gap-2 text-white/90">
                   <Sword className="h-5 w-5 text-red-400" />
                   Current Move
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-white/60">Move #:</span>
@@ -547,13 +555,13 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
 
           {/* Players Info */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader>
+            <CardHeader className="p-3 sm:p-6">
               <CardTitle className="flex items-center gap-2 text-white/90">
                 <Crown className="h-5 w-5 text-yellow-400" />
                 Players
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 p-3 sm:p-6">
               <motion.div 
                 initial={{ x: -10, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}

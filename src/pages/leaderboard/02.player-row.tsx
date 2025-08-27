@@ -3,6 +3,7 @@ import { Trophy, Medal, Crown, Target } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { UserAvatar } from "../../components/UserAvatar";
+import { useNavigate } from "@tanstack/react-router";
 
 interface Player {
   _id: string;
@@ -22,6 +23,12 @@ interface PlayerRowProps {
 }
 
 export function PlayerRow({ player, index }: PlayerRowProps) {
+  const navigate = useNavigate();
+
+  const handleProfileClick = () => {
+    void navigate({ to: "/profile", search: { u: player.username } });
+  };
+
   const getRankIcon = (position: number) => {
     switch (position) {
       case 1:
@@ -54,7 +61,10 @@ export function PlayerRow({ player, index }: PlayerRowProps) {
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.1 }}
     >
-      <Card className={`${getRankColor(player.position)} hover:bg-white/10 transition-all duration-200`}>
+      <Card
+        className={`${getRankColor(player.position)} hover:bg-white/10 hover:scale-[1.02] cursor-pointer transition-all duration-200`}
+        onClick={handleProfileClick}
+      >
         <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 gap-3 sm:gap-4">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="flex items-center gap-2 min-w-[50px] sm:min-w-[60px] flex-shrink-0">

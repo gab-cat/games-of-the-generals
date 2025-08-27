@@ -31,11 +31,15 @@ interface BattleStatsProps {
 export function BattleStats({ profileStats }: BattleStatsProps) {
   const formatTime = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
     const hours = Math.floor(minutes / 60);
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m`;
     }
-    return `${minutes}m`;
+    if (minutes > 0) {
+      return `${minutes}m`;
+    }
+    return `${seconds}s`;
   };
 
   return (

@@ -210,6 +210,7 @@ export function MessagingPanel({
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [vapidKey, setVapidKey] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isMobile, setIsMobile] = useState(false);
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
   const [hasLocalSubscription, setHasLocalSubscription] = useState(false);

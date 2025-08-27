@@ -56,37 +56,38 @@ export function SpectateTab({ onSpectateGame, spectateByIdMutation }: SpectateTa
   return (
     <>
       {/* Spectate by ID Section */}
-      <div className="flex justify-between items-center">
-        <motion.div 
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 sm:gap-0">
+        <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
-          className="flex items-center gap-4"
+          className="flex items-center gap-3 sm:gap-4"
         >
           <div className="flex items-center gap-3">
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.1, type: "spring" }}
-              className="w-12 h-12 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-red-500/20 backdrop-blur-sm border border-purple-500/30 rounded-xl flex items-center justify-center shadow-lg"
+              className="w-12 h-12 sm:w-14 sm:h-14 bg-gradient-to-br from-purple-500/20 via-pink-500/20 to-red-500/20 backdrop-blur-sm border border-purple-500/30 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
             >
-              <Eye className="h-6 w-6 text-purple-400" />
+              <Eye className="h-6 w-6 sm:h-7 sm:w-7 text-purple-400" />
             </motion.div>
-            
-            <div className="flex flex-col">
-              <h2 className="text-xl font-bold text-white/90">Spectate Games</h2>
-              <p className="text-sm text-white/60">Watch ongoing battles in real-time</p>
+
+            <div className="flex flex-col text-center sm:text-left">
+              <h2 className="text-left text-lg sm:text-xl font-bold text-white/90">Spectate Games</h2>
+              <p className="text-xs sm:text-sm text-white/60">Watch ongoing battles in real-time</p>
             </div>
           </div>
         </motion.div>
-        
-        <motion.div 
+
+        <motion.div
           initial={{ x: 20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
+          className="flex justify-center sm:justify-end"
         >
           <Dialog open={showSpectateById} onOpenChange={setShowSpectateById}>
             <DialogTrigger asChild>
-              <Button variant='gradient' className="flex items-center gap-2 transition-all">
+              <Button variant='gradient' className="flex items-center gap-2 transition-all w-full sm:w-auto">
                 <Search className="h-4 w-4" />
                 Spectate by ID
               </Button>
@@ -168,22 +169,22 @@ export function SpectateTab({ onSpectateGame, spectateByIdMutation }: SpectateTa
               >
                 <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all hover:bg-white/10">
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-purple-500/20 rounded-lg backdrop-blur-sm">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
+                      <div className="flex items-center gap-3 sm:gap-4">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="p-2 bg-purple-500/20 rounded-lg backdrop-blur-sm flex-shrink-0">
                             <Users className="h-5 w-5 text-purple-300" />
                           </div>
-                          <div>
-                            <h3 className="font-semibold text-white/90">{game.lobbyName || "Battle Arena"}</h3>
-                            <div className="flex items-center gap-2 text-sm text-white/60">
-                              <span>{game.player1Username} vs {game.player2Username}</span>
-                              <Badge 
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-white/90 truncate">{game.lobbyName || "Battle Arena"}</h3>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm text-white/60">
+                              <span className="truncate text-xs sm:text-sm">{game.player1Username} vs {game.player2Username}</span>
+                              <Badge
                                 variant={game.status === "setup" ? "secondary" : "default"}
                                 className={
-                                  game.status === "setup" 
-                                    ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                                    : "bg-green-500/20 text-green-300 border-green-500/30"
+                                  game.status === "setup"
+                                    ? "bg-yellow-500/20 text-yellow-300 border-yellow-500/30 text-xs w-fit"
+                                    : "bg-green-500/20 text-green-300 border-green-500/30 text-xs w-fit"
                                 }
                               >
                                 {game.status === "setup" ? "Setting Up" : "Playing"}
@@ -191,12 +192,12 @@ export function SpectateTab({ onSpectateGame, spectateByIdMutation }: SpectateTa
                             </div>
                             <div className="flex items-center gap-2 text-xs text-white/50 mt-1">
                               <span>Game ID:</span>
-                              <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono">{game.gameId}</code>
+                              <code className="bg-white/10 px-1 sm:px-2 py-1 rounded text-xs font-mono truncate flex-1 min-w-0">{game.gameId}</code>
                               <Button
                                 onClick={() => copyGameId(game.gameId)}
                                 size="sm"
                                 variant="ghost"
-                                className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10"
+                                className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10 flex-shrink-0"
                               >
                                 <Copy className="h-3 w-3" />
                               </Button>
@@ -205,18 +206,18 @@ export function SpectateTab({ onSpectateGame, spectateByIdMutation }: SpectateTa
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 border-purple-500/30">
-                          <Users className="h-4 w-4 mr-1" />
-                          {game.spectatorCount || 0}{game.maxSpectators ? `/${game.maxSpectators}` : ""} watching
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-3">
+                        <Badge variant="secondary" className="bg-purple-500/20 text-purple-300 border-purple-500/30 w-fit mx-auto sm:mx-0">
+                          <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          <span className="text-xs sm:text-sm">{game.spectatorCount || 0}{game.maxSpectators ? `/${game.maxSpectators}` : ""} watching</span>
                         </Badge>
                         <Button
                           onClick={() => onSpectateGame(game._id)}
-                          className="bg-purple-500 hover:bg-purple-600 text-white"
+                          className="bg-purple-500 hover:bg-purple-600 text-white w-full sm:w-auto"
                           disabled={!!(game.maxSpectators && game.spectatorCount >= game.maxSpectators)}
                         >
                           <Eye className="h-4 w-4 mr-2" />
-                          {game.maxSpectators && game.spectatorCount >= game.maxSpectators ? "Full" : "Spectate"}
+                          <span className="text-sm">{game.maxSpectators && game.spectatorCount >= game.maxSpectators ? "Full" : "Spectate"}</span>
                         </Button>
                       </div>
                     </div>
