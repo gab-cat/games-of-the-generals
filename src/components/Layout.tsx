@@ -153,7 +153,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         className={cn(
-          "sticky top-0 z-50 transition-all duration-300",
+          "sticky top-2 z-50 transition-all duration-300 max-w-7xl mx-auto rounded-full border border-white/20",
           isScrolled 
             ? "bg-black/50 backdrop-blur-sm border-b border-white/20" 
             : "bg-black/40 backdrop-blur-sm border-b border-white/10"
@@ -199,7 +199,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
               whileHover={{ scale: 1.05 }}
-              className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200 flex-shrink-0"
+              className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200 flex-shrink-0"
             >
               <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-white/90 group-hover:text-white transition-colors" />
             </motion.div>
@@ -212,7 +212,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               className="flex flex-col cursor-pointer min-w-0"
               onClick={() => void navigate({ to: "/" })}
             >
-              <h1 className="text-base sm:text-xl font-display font-semibold text-white/95 tracking-tight hover:text-white transition-colors truncate">
+              <h1 className="text-base sm:text-lg font-body font-semibold text-white/95 tracking-tight hover:text-white transition-colors truncate">
                 <span className="hidden sm:inline">Games of the Generals</span>
                 <span className="sm:hidden">GoG</span>
               </h1>
