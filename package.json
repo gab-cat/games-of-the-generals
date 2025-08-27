@@ -37,6 +37,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.25.4",
+    "convex-helpers": "^0.1.104",
     "framer-motion": "^12.23.12",
     "jimp": "^1.6.0",
     "lucide-react": "^0.539.0",

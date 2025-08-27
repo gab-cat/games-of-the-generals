@@ -49,10 +49,10 @@ export function SignInForm() {
       </div>
 
       {/* Left Side - Premium Design Section */}
-      <motion.div 
+      <motion.div
         className="absolute top-0 left-0 w-full h-full lg:w-1/2 bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 overflow-hidden lg:block hidden"
-        initial={{ x: -100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut" }}
       >
         {/* Image Background */}
@@ -66,10 +66,10 @@ export function SignInForm() {
         {/* Scrollable Content Container */}
         <div className="relative pt-28 z-10 h-full overflow-y-auto overflow-x-hidden no-scrollbar">
           <div className="flex flex-col justify-center min-h-full px-4 sm:px-6 lg:px-12 max-w-2xl py-8 lg:py-12">
-          <motion.div 
+          <motion.div
             className="space-y-6 lg:space-y-10 text-left"
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={{ delay: 0.3, duration: 0.8 }}
           >
             
@@ -230,10 +230,10 @@ export function SignInForm() {
       </motion.div>
 
       {/* Right Side - Sign In Form */}
-      <motion.div 
+      <motion.div
         className="absolute top-0 left-0 w-full h-full lg:left-1/2 lg:w-1/2 flex items-center justify-center z-10 overflow-hidden"
-        initial={{ x: 100, opacity: 0 }}
-        animate={{ x: 0, opacity: 1 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
         transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
       >
         {/* Squares Background for Right Side */}
@@ -252,9 +252,9 @@ export function SignInForm() {
             {flow === "resetPassword" ? (
               <motion.div
                 key="resetPassword"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
               >
                 <PasswordResetForm onBack={() => setFlow("signIn")} />
@@ -262,9 +262,9 @@ export function SignInForm() {
             ) : (
               <motion.div
                 key={flow}
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -30 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.35, ease: "easeOut" }}
                 className="space-y-5 lg:space-y-6"
               >

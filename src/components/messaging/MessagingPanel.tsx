@@ -318,7 +318,16 @@ export function MessagingPanel({
     && "Notification" in window
     && "serviceWorker" in navigator;
 
-  const [shouldShowEnablePush, setShouldShowEnablePush] = useState(isMobile && supportsPush && isAuthenticated && !isLocalEndpointSaved);
+  const [shouldShowEnablePush, setShouldShowEnablePush] = useState(false);
+
+  // Update shouldShowEnablePush based on current conditions
+  useEffect(() => {
+    if (isAuthenticated && supportsPush && !isLocalEndpointSaved) {
+      setShouldShowEnablePush(true);
+    } else {
+      setShouldShowEnablePush(false);
+    }
+  }, [isAuthenticated, supportsPush, isLocalEndpointSaved]);
 
   const handleEnablePush = async () => {
     try {
@@ -345,6 +354,7 @@ export function MessagingPanel({
       }
       await saveSubscription({ subscription: serializeSubscription(sub) });
       toast.success("Push notifications enabled on this device");
+      setShouldShowEnablePush(false);
     } catch (e: any) {
       toast.error(e?.message || "Failed to enable push");
     } finally {

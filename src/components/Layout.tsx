@@ -147,16 +147,16 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 lg:pb-0">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 px-2 lg:pb-0">
       {/* Minimalist Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         className={cn(
-          "sticky top-2 z-50 transition-all duration-300 max-w-7xl mx-auto rounded-full border border-white/20",
+          "sticky top-2 z-50 backdrop-blur-md border-b  transition-all duration-300 max-w-7xl mx-auto rounded-full border border-white/10",
           isScrolled 
-            ? "bg-black/50 backdrop-blur-sm border-b border-white/20" 
-            : "bg-black/40 backdrop-blur-sm border-b border-white/10"
+            ? "bg-black/50" 
+            : "bg-black/40"
         )}
       >
         {/* Floating particles effect */}
@@ -209,14 +209,39 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               initial={{ y: -10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="flex flex-col cursor-pointer min-w-0"
+              className="flex flex-col cursor-pointer min-w-0 group"
               onClick={() => void navigate({ to: "/" })}
             >
-              <h1 className="text-base sm:text-lg font-body font-semibold text-white/95 tracking-tight hover:text-white transition-colors truncate">
-                <span className="hidden sm:inline">Games of the Generals</span>
-                <span className="sm:hidden">GoG</span>
-              </h1>
-              <div className="w-full h-px bg-white/20 mt-1"></div>
+              <motion.h1
+                whileHover={{
+                  scale: 1.02,
+                  textShadow: "0 0 8px rgba(255, 255, 255, 0.3)"
+                }}
+                transition={{ duration: 0.2 }}
+                className="text-lg sm:text-xl font-display font-semibold text-white/95 tracking-tight truncate relative group-hover:text-white transition-colors duration-200"
+              >
+                <motion.span
+                  className="hidden sm:inline relative"
+                  whileHover={{ scale: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  Games of the Generals
+                </motion.span>
+                <motion.span
+                  className="sm:hidden relative"
+                  whileHover={{ scale: 1 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  GoG
+                  {/* Animated underline for mobile */}
+                  <motion.div
+                    initial={{ scaleX: 0 }}
+                    whileHover={{ scaleX: 1 }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className="absolute -bottom-1 left-0 right-0 h-1 bg-white origin-left rounded-full"
+                  />
+                </motion.span>
+              </motion.h1>
             </motion.div>
           </motion.div>
 

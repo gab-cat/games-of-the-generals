@@ -7,6 +7,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import "./index.css";
 import { registerSW } from 'virtual:pwa-register';
+import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
@@ -42,11 +43,13 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById("root")!).render(
   <ConvexProvider client={convex}>
     <ConvexAuthProvider client={convex}>
+      <ConvexQueryCacheProvider>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
         {/* Add React Query DevTools for development only */}
         {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
+      </ConvexQueryCacheProvider>
     </ConvexAuthProvider>
   </ConvexProvider>,
 );
@@ -69,7 +72,6 @@ if (typeof window !== 'undefined') {
       }, 60 * 60 * 1000);
     },
     // Back-compat: some versions expose onRegisteredSW
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     onRegisteredSW(_swUrl: string, registration?: ServiceWorkerRegistration) {
       if (!registration) return;
       document.addEventListener('visibilitychange', () => {
