@@ -36,7 +36,7 @@
     "@tanstack/react-router": "^1.131.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "convex": "^1.25.4",
+    "convex": "^1.26.2",
     "convex-helpers": "^0.1.104",
     "framer-motion": "^12.23.12",
     "jimp": "^1.6.0",

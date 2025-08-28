@@ -7,7 +7,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import "./index.css";
 import { registerSW } from 'virtual:pwa-register';
-import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
+import { ConvexQueryCacheProvider } from "convex-helpers/react/cache/provider";
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';

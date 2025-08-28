@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MessageCircle, Users, ExternalLink } from "lucide-react";
 import { useConvexAuth } from "convex/react";
-import { useConvexQuery } from "../../lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../../convex/_generated/api";
 import { UserAvatar } from "../UserAvatar";
 import { Button } from "../ui/button";
@@ -38,16 +38,10 @@ export function MessageNotification({
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   
   // Get unread count for title updates
-  const { data: unreadCount = 0 } = useConvexQuery(
-    api.messages.getUnreadCount,
-    isAuthenticated ? {} : "skip"
-  );
+  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
 
   // Get recent conversations to detect new messages
-  const { data: conversationsData } = useConvexQuery(
-    api.messages.getConversations,
-    isAuthenticated ? {} : "skip"
-  );
+  const conversationsData = useQuery(api.messages.getConversations, {});
 
   const conversations = useMemo(() => {
     return Array.isArray(conversationsData) 

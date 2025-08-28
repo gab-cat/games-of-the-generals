@@ -2,79 +2,79 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>http://localhost:5173/</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>http://localhost:5173/achievements</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/ai-game</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/auth</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/game</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/leaderboard</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/match-history</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/privacy</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/profile</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/replay</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/settings</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/spectate</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/terms</loc>
-    <lastmod>2025-08-27T12:02:15.152Z</lastmod>
+    <lastmod>2025-08-28T04:17:01.470Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>

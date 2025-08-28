@@ -35,6 +35,37 @@ export const deleteAnonymousUsers = internalMutation({
         ctx.db.query("aiGameSessions").withIndex("by_player", (q) => q.eq("playerId", userId)).collect(),
       ]);
 
+      // Find conversations where user is participant1 or participant2
+      const [conversationsAsParticipant1, conversationsAsParticipant2] = await Promise.all([
+        ctx.db.query("conversations").withIndex("by_participant1", (q) => q.eq("participant1Id", userId)).collect(),
+        ctx.db.query("conversations").withIndex("by_participant2", (q) => q.eq("participant2Id", userId)).collect(),
+      ]);
+
+      const conversations = [...conversationsAsParticipant1, ...conversationsAsParticipant2];
+
+      // Delete messages from conversations this user is part of
+      for (const conversation of conversations) {
+        const otherParticipantId = conversation.participant1Id === userId ? conversation.participant2Id : conversation.participant1Id;
+
+        // Get all messages between these two users (in both directions)
+        const [messagesFromUser, messagesToUser] = await Promise.all([
+          ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", userId))
+            .filter((q) => q.eq(q.field("recipientId"), otherParticipantId)).collect(),
+          ctx.db.query("messages").withIndex("by_recipient", (q) => q.eq("recipientId", userId))
+            .filter((q) => q.eq(q.field("senderId"), otherParticipantId)).collect(),
+        ]);
+
+        const conversationMessages = [...messagesFromUser, ...messagesToUser];
+        for (const message of conversationMessages) {
+          await ctx.db.delete(message._id);
+        }
+      }
+
+      // Delete the conversations themselves
+      for (const conversation of conversations) {
+        await ctx.db.delete(conversation._id);
+      }
+
       for (const doc of [...presets, ...achievements, ...pushes, ...verifications, ...aiSessions]) {
         await ctx.db.delete(doc._id);
       }
@@ -105,4 +136,45 @@ export const deleteOldMessages = internalMutation({
   },
 });
 
+// Internal: Cleanup orphaned conversations where one or both participants no longer exist
+export const cleanupOrphanedConversations = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let deletedConversations = 0;
+    let deletedMessages = 0;
 
+    // Get all conversations
+    const allConversations = await ctx.db.query("conversations").collect();
+
+    for (const conversation of allConversations) {
+      // Check if both participants still exist
+      const [participant1Exists, participant2Exists] = await Promise.all([
+        ctx.db.get(conversation.participant1Id).then(user => !!user),
+        ctx.db.get(conversation.participant2Id).then(user => !!user),
+      ]);
+
+      // If either participant doesn't exist, delete the conversation and its messages
+      if (!participant1Exists || !participant2Exists) {
+        // Delete all messages in this conversation
+        const [messagesFromParticipant1, messagesFromParticipant2] = await Promise.all([
+          ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", conversation.participant1Id))
+            .filter((q) => q.eq(q.field("recipientId"), conversation.participant2Id)).collect(),
+          ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", conversation.participant2Id))
+            .filter((q) => q.eq(q.field("recipientId"), conversation.participant1Id)).collect(),
+        ]);
+
+        const conversationMessages = [...messagesFromParticipant1, ...messagesFromParticipant2];
+        for (const message of conversationMessages) {
+          await ctx.db.delete(message._id);
+          deletedMessages++;
+        }
+
+        // Delete the conversation itself
+        await ctx.db.delete(conversation._id);
+        deletedConversations++;
+      }
+    }
+
+    return { deletedConversations, deletedMessages };
+  },
+});

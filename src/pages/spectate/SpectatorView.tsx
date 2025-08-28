@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useConvexMutationWithQuery, useConvexQuery } from "@/lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { getPieceDisplay } from "@/lib/piece-display";
 
 import { Id } from "../../../convex/_generated/dataModel";
@@ -62,10 +63,8 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
   const [currentTime, setCurrentTime] = useState(Date.now());
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: game, isPending: isLoadingGame } = useConvexQuery(
-    api.games.getGame, 
-    { gameId }
-  );
+  const game = useQuery(api.games.getGame, { gameId });
+  const isLoadingGame = game === undefined;
 
   const { data: spectators } = useConvexQuery(
     api.spectate.getGameSpectators,
@@ -77,19 +76,16 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
     { gameId }
   );
 
-  const { data: moves } = useConvexQuery(
-    api.games.getGameMoves,
-    { gameId }
+  const moves = useQuery(api.games.getGameMoves, { gameId });
+
+  const player1Profile = useQuery(
+    api.profiles.getProfileByUsername,
+    game ? { username: game.player1Username } : "skip"
   );
 
-  const { data: player1Profile } = useConvexQuery(
-    api.profiles.getProfileByUsername, 
-    game ? { username: game.player1Username } : undefined
-  );
-  
-  const { data: player2Profile } = useConvexQuery(
-    api.profiles.getProfileByUsername, 
-    game ? { username: game.player2Username } : undefined
+  const player2Profile = useQuery(
+    api.profiles.getProfileByUsername,
+    game ? { username: game.player2Username } : "skip"
   );
 
   const { mutate: joinAsSpectator } = useConvexMutationWithQuery(api.spectate.joinAsSpectator, {
@@ -511,7 +507,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
 
                   {game.status === "playing" && (
                     <div className="text-sm text-white/60">
-                      Turn {Math.floor(((moves?.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
+                      Turn {Math.floor(((moves?.page?.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
                     </div>
                   )}
                 </div>
@@ -565,7 +561,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                           )}
                           
                           <div className="text-xs text-white/60">
-                            {moves?.length || 0} moves
+                            {moves?.page?.length || 0} moves
                           </div>
                         </div>
                       </div>
@@ -824,7 +820,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-white/60">Moves:</span>
-                  <span className="text-white/90">{moves?.length || 0}</span>
+                  <span className="text-white/90">{moves?.page?.length || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/60">Status:</span>

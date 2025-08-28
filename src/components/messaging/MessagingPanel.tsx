@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText } from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
-import { useConvexQuery } from "../../lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
@@ -19,6 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "../ui/sheet";
+import { useConvexQuery } from "@/lib/convex-query-hooks";
 
 interface MessagingPanelProps {
   isOpen: boolean;
@@ -52,14 +53,11 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
     debouncedSearchTerm.length >= 2 ? { searchTerm: debouncedSearchTerm } : "skip"
   );
 
-  const { data: recentConversationsData } = useConvexQuery(
-    api.messages.getConversations,
-    {} // Get recent conversations for suggestions
-  );
+  const recentConversationsData = useQuery(api.messages.getConversations, {});
 
   // Extract conversations from paginated response
-  const recentConversations = Array.isArray(recentConversationsData) 
-    ? recentConversationsData.slice(0, 5) 
+  const recentConversations = Array.isArray(recentConversationsData)
+    ? recentConversationsData.slice(0, 5)
     : recentConversationsData?.page?.slice(0, 5) || [];
 
   const handleSelectUser = (userId: string, username: string) => {
@@ -239,18 +237,13 @@ export function MessagingPanel({
     }
   }, [inviteLobbyId, isOpen]);
 
-  const { data: conversationsData, isLoading: conversationsLoading } = useConvexQuery(
-    api.messages.getConversations,
-    isAuthenticated ? {} : "skip"
-  );
+  const conversationsData = useQuery(api.messages.getConversations, {});
+  const conversationsLoading = !conversationsData;
 
-  // Extract conversations from paginated response  
+  // Extract conversations from paginated response
   const conversations = Array.isArray(conversationsData) ? conversationsData : conversationsData?.page || [];
 
-  const { data: unreadCount = 0 } = useConvexQuery(
-    api.messages.getUnreadCount,
-    isAuthenticated ? {} : "skip"
-  );
+  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
 
   const { data: existingSubs } = useConvexQuery(
     api.push.getSubscriptionsForCurrentUser,

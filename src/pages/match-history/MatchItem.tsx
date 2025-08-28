@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useConvexQuery } from "@/lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { motion } from "framer-motion";
 import { Target, Crown, Sword, Calendar, Clock, Trophy, Play, Swords } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -28,7 +28,7 @@ interface MatchItemProps {
 
 export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
   // Fetch opponent profile for avatar
-  const { data: opponentProfile } = useConvexQuery(api.profiles.getProfileByUsername, {
+  const opponentProfile = useQuery(api.profiles.getProfileByUsername, {
     username: match.opponentUsername
   });
 

@@ -118,9 +118,9 @@ export const getGame = query({
     
     if (!game) return null;
 
-    // Should not allow if not part of the game
+    // Should not allow if not part of the game - return null to hide game existence
     if (userId && ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)) {
-      throw new Error("Not a participant in this game");
+      return null;
     }
 
     // If game is finished, reveal all pieces

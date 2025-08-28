@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import { useConvex, useMutation } from "convex/react";
-import { useConvexQuery } from "../../lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
 import { profanity, CensorType } from "@2toad/profanity";
+import { useConvexQuery } from "@/lib/convex-query-hooks";
 
 interface OptimisticMessage {
   _id: string;
@@ -201,7 +202,7 @@ export function ConversationView({
     { userId: otherUserId }
   );
 
-  const { data: currentUserProfile } = useConvexQuery(api.profiles.getCurrentProfile);
+  const currentUserProfile = useQuery(api.profiles.getCurrentProfile);
 
   // Typing status of the other user
   const { data: typingStatus } = useConvexQuery(

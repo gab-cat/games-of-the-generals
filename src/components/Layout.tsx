@@ -5,7 +5,7 @@ import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot } f
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
-import { useConvexQuery } from "../lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import {
@@ -26,6 +26,7 @@ import { useState, useEffect } from "react";
 import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
+import { useConvexQuery } from "@/lib/convex-query-hooks";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -74,14 +75,8 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
     }
   }, [tutorialStatus, hasCheckedTutorial, isAuthenticated]);
   
-  const { data: profile, error: profileError } = useConvexQuery(
-    api.profiles.getCurrentProfile
-  );
-
-  const { data: unreadCount = 0 } = useConvexQuery(
-    api.messages.getUnreadCount,
-    isAuthenticated ? {} : "skip"
-  );
+  const profile = useQuery(api.profiles.getCurrentProfile);
+  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
 
   // Prompt user to enable push after first successful auth/profile load
   useEffect(() => {
@@ -130,12 +125,6 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       icon: History
     }
   ];
-
-  useEffect(() => {
-    if (profileError) {
-      console.error("Error loading profile:", profileError);
-    }
-  }, [profileError]);
 
   useEffect(() => {
     const handleScroll = () => {

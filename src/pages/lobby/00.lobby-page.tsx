@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { useConvexQuery, useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
+import { useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { motion } from "framer-motion";
 import { LobbyHeader } from "./01.lobby-header";
 import { LobbyTabs } from "./02.lobby-tabs";
+import { useQuery } from "convex-helpers/react/cache";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -27,7 +28,7 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
   const [activeTab, setActiveTab] = useState<"lobbies" | "spectate">("lobbies");
   const navigate = useNavigate();
 
-  const { data: activeGame } = useConvexQuery(api.games.getCurrentUserGame);
+  const activeGame = useQuery(api.games.getCurrentUserGame);
 
   const startGameMutation = useConvexMutationWithQuery(api.games.startGame, {
     onError: () => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
-import { useConvexQuery, useConvexMutationWithQuery } from "../lib/convex-query-hooks";
+import { useConvexMutationWithQuery } from "../lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
@@ -199,25 +200,18 @@ BoardSquare.displayName = 'BoardSquare';
 const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: GameBoardProps) {
   const navigate = useNavigate();
   
-  const { data: game, isPending: isLoadingGame } = useConvexQuery(
-    api.games.getGame, 
-    { gameId }
-  );
+  const game = useQuery(api.games.getGame, { gameId });
+  const isLoadingGame = game === undefined;
 
 
 
-  const { data: movesData, isPending: isLoadingMoves } = useConvexQuery(
-    api.games.getGameMoves, 
-    { gameId }
-  );
-  
+  const movesData = useQuery(api.games.getGameMoves, { gameId });
+  const isLoadingMoves = !movesData;
+
   // Extract moves from paginated response
   const moves = Array.isArray(movesData) ? movesData : movesData?.page || [];
   
-  const { data: matchResult } = useConvexQuery(
-    api.games.getMatchResult, 
-    { gameId }
-  );
+  const matchResult = useQuery(api.games.getMatchResult, { gameId });
 
   const { mutate: setupPieces, isPending: isSettingUpPieces } = useConvexMutationWithQuery(api.games.setupPieces, {
     onSuccess: () => {
@@ -279,15 +273,17 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   });
 
   // Get player profiles for avatars - conditional queries
-  const { data: player1Profile, isPending: isLoadingPlayer1 } = useConvexQuery(
-    api.profiles.getProfileByUsername, 
+  const player1Profile = useQuery(
+    api.profiles.getProfileByUsername,
     game?.player1Username ? { username: game.player1Username } : "skip"
   );
-  
-  const { data: player2Profile, isPending: isLoadingPlayer2 } = useConvexQuery(
-    api.profiles.getProfileByUsername, 
+  const isLoadingPlayer1 = game?.player1Username && !player1Profile;
+
+  const player2Profile = useQuery(
+    api.profiles.getProfileByUsername,
     game?.player2Username ? { username: game.player2Username } : "skip"
   );
+  const isLoadingPlayer2 = game?.player2Username && !player2Profile;
 
   // Optimized state initialization
   const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() => createEmptyBoard());
@@ -303,7 +299,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   
-  const [boardRect, setBoardRect] = useState<DOMRect | null>(null);
+  const [_, setBoardRect] = useState<DOMRect | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
   // Memoized computed values

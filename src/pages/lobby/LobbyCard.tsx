@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
-import { useConvexQuery } from "@/lib/convex-query-hooks";
+import { useQuery } from "convex-helpers/react/cache";
 import { motion } from "framer-motion";
 import { Users, MessageCircle } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
@@ -32,14 +32,14 @@ interface LobbyCardProps {
 
 export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInviteToLobby, isJoining, isLeaving }: LobbyCardProps) {
   // Fetch host profile for avatar
-  const { data: hostProfile } = useConvexQuery(api.profiles.getProfileByUsername, { 
-    username: lobby.hostUsername 
+  const hostProfile = useQuery(api.profiles.getProfileByUsername, {
+    username: lobby.hostUsername
   });
-  
+
   // Fetch player profile for avatar if there's a player
-  const { data: playerProfile } = useConvexQuery(
-    api.profiles.getProfileByUsername, 
-    lobby.playerUsername ? { username: lobby.playerUsername } : undefined
+  const playerProfile = useQuery(
+    api.profiles.getProfileByUsername,
+    lobby.playerUsername ? { username: lobby.playerUsername } : "skip"
   );
 
   return (

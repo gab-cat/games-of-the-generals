@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { Authenticated, Unauthenticated } from 'convex/react'
+import { Authenticated, Unauthenticated, useConvexAuth } from 'convex/react'
 import { SignInForm } from '../auth/SignInForm'
 import { SplashScreen } from '../components/SplashScreen'
 import { SetupPage } from '../pages/setup/00.setup-page'
 import { LobbyPage } from '../pages/lobby/00.lobby-page'
-import { useConvexQuery } from '../lib/convex-query-hooks'
+import { useQuery } from 'convex-helpers/react/cache'
 import { api } from '../../convex/_generated/api'
 import { motion } from 'framer-motion'
 import { Id } from '../../convex/_generated/dataModel'
@@ -16,9 +16,14 @@ type IndexSearch = {
 
 function IndexComponent() {
   const { lobbyId } = Route.useSearch()
-  const { isPending: isLoadingUser } = useConvexQuery(api.auth.loggedInUser)
-  const { data: profile, isPending: isLoadingProfile } = useConvexQuery(api.profiles.getCurrentProfile)
+  const { isAuthenticated, isLoading } = useConvexAuth()
   const [showSplash, setShowSplash] = useState(false)
+
+  // Query profile only when authenticated
+  const profile = useQuery(api.profiles.getCurrentProfile, 
+    isAuthenticated ? {} : "skip",
+  );
+  const profileLoaded = profile !== undefined;
 
   const handleOpenMessaging = (lobbyId?: Id<"lobbies">) => {
     if (typeof window !== 'undefined' && (window as any).openMessagingWithLobby) {
@@ -34,16 +39,17 @@ function IndexComponent() {
 
   // Check if user is unauthenticated and show splash screen
   useEffect(() => {
-    if (!isLoadingUser && !isLoadingProfile && !profile) {
+    if (!isLoading && !isAuthenticated) {
       setShowSplash(true)
     }
-  }, [isLoadingUser, isLoadingProfile, profile])
+  }, [isLoading, isAuthenticated])
 
   const handleSplashComplete = () => {
     setShowSplash(false)
   }
 
-  if (isLoadingUser || isLoadingProfile) {
+  // Show loading only when auth state is still being determined
+  if (isLoading || (isAuthenticated && !profileLoaded)) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
         <motion.div
@@ -66,7 +72,7 @@ function IndexComponent() {
       </Unauthenticated>
 
       <Authenticated>
-                {!profile ? (
+        {!profile ? (
           <SetupPage />
         ) : (
           <LobbyPage profile={profile} onOpenMessaging={handleOpenMessaging} />

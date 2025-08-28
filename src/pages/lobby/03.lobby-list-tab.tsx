@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useConvexQuery, useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
+import { useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -13,6 +13,7 @@ import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { GameStartCountdownModal } from "../../components/GameStartCountdownModal";
 import generateName from "@scaleway/random-name";
+import { useQuery } from "convex-helpers/react/cache";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -58,15 +59,15 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
 
   const LOBBIES_PER_PAGE = 10;
 
-  const { data: lobbiesQuery } = useConvexQuery(api.lobbies.getLobbies, {
+  const lobbiesQuery = useQuery(api.lobbies.getLobbies, {
     paginationOpts: {
       numItems: LOBBIES_PER_PAGE,
       cursor: lobbiesCursor || undefined,
     },
   });
 
-  const { data: activeLobby } = useConvexQuery(api.lobbies.getUserActiveLobby);
-  const { data: currentGame } = useConvexQuery(api.games.getCurrentUserGame);
+  const activeLobby = useQuery(api.lobbies.getUserActiveLobby);
+  const currentGame = useQuery(api.games.getCurrentUserGame);
 
   // Show countdown modal when lobby becomes full (for host)
   useEffect(() => {

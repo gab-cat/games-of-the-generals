@@ -2,7 +2,7 @@ import React, { useState, useEffect, memo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Dialog, DialogContent } from './ui/dialog';
 import { Sword } from 'lucide-react';
-import { useConvexQuery } from '../lib/convex-query-hooks';
+import { useQuery } from 'convex-helpers/react/cache';
 import { api } from '../../convex/_generated/api';
 import { UserAvatar } from './UserAvatar';
 
@@ -24,10 +24,10 @@ export const GameStartCountdownModal = memo(function GameStartCountdownModal({
   const [countdown, setCountdown] = useState(10);
 
   // Fetch profile data for both players to get avatarUrl and rank
-  const { data: player1Profile } = useConvexQuery(api.profiles.getProfileByUsername, {
+  const player1Profile = useQuery(api.profiles.getProfileByUsername, {
     username: player1Username || undefined
   });
-  const { data: player2Profile } = useConvexQuery(api.profiles.getProfileByUsername, {
+  const player2Profile = useQuery(api.profiles.getProfileByUsername, {
     username: player2Username || undefined
   });
 
