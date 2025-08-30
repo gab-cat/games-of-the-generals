@@ -1,11 +1,10 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
-import { useQuery } from "convex-helpers/react/cache";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import {
@@ -16,17 +15,22 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 import { UserAvatar } from "./UserAvatar";
-import { MessageButton } from "./messaging/MessageButton";
-import { MessagingPanel } from "./messaging/MessagingPanel";
-import { MessageNotification } from "./messaging/MessageNotification";
+
 import { TutorialButton } from "./TutorialButton";
 import { TutorialModal } from "./TutorialModal";
+import { GlobalChatPanel } from "./global-chat/GlobalChatPanel";
 import { cn } from "../lib/utils";
 import { useState, useEffect } from "react";
 import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
-import { useConvexQuery } from "@/lib/convex-query-hooks";
+import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
+import { useOnlineStatus } from "../lib/useOnlineStatus";
+import { useMobile } from "../lib/useMobile";
+import { MessageNotification } from "./messaging/MessageNotification";
+import { MessagingPanel } from "./messaging/MessagingPanel";
+import { MessageButton } from "./messaging/MessageButton";
+import { useQuery } from "convex-helpers/react/cache";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -44,26 +48,43 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMessagingOpen, setIsMessagingOpen] = useState(false);
   const [inviteLobbyId, setInviteLobbyId] = useState<Id<"lobbies"> | null>(null);
+
   const [showTutorial, setShowTutorial] = useState(false);
   const [hasCheckedTutorial, setHasCheckedTutorial] = useState(false);
+  const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
+  const isMobile = useMobile();
 
   const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
 
-  // Check tutorial status
-  const { data: tutorialStatus } = useConvexQuery(
-    api.profiles.checkTutorialStatus,
-    isAuthenticated ? {} : "skip"
+  // Profile data doesn't change frequently, cache it for longer
+  const { data: profile } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    {
+      staleTime: 120000, // 2 minutes - profile data changes infrequently
+      gcTime: 600000, // 10 minutes cache
+    }
   );
 
-  // Expose function to open messaging with lobby invite
-  useEffect(() => {
-    if (onOpenMessagingWithLobby) {
-      onOpenMessagingWithLobby((lobbyId: Id<"lobbies">) => {
-        setInviteLobbyId(lobbyId);
-        setIsMessagingOpen(true);
-      });
+  // Online status tracking - pass profile data to avoid querying it in the hook
+  const { markUserOffline } = useOnlineStatus({
+    currentPage: location.pathname,
+    userId: profile?.userId,
+    username: profile?.username,
+  });
+
+  // Check tutorial status - tutorial status doesn't change frequently
+  const { data: tutorialStatus } = useConvexQueryWithOptions(
+    api.profiles.checkTutorialStatus,
+    isAuthenticated ? {} : "skip",
+    {
+      enabled: !!isAuthenticated,
+      staleTime: 300000, // 5 minutes - tutorial status doesn't change often
+      gcTime: 600000, // 10 minutes cache
     }
-  }, [onOpenMessagingWithLobby]);
+  );
+
+
 
   // Check if tutorial should be shown on first login
   useEffect(() => {
@@ -74,9 +95,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       setHasCheckedTutorial(true);
     }
   }, [tutorialStatus, hasCheckedTutorial, isAuthenticated]);
-  
-  const profile = useQuery(api.profiles.getCurrentProfile);
-  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
+
 
   // Prompt user to enable push after first successful auth/profile load
   useEffect(() => {
@@ -135,8 +154,19 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (onOpenMessagingWithLobby) {
+      onOpenMessagingWithLobby((lobbyId: Id<"lobbies">) => {
+        setInviteLobbyId(lobbyId);
+        setIsMessagingOpen(true);
+      });
+    }
+  }, [onOpenMessagingWithLobby]);
+
+  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 px-2 lg:pb-0">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 px-2 lg:pb-0 no-scrollbar">
       {/* Minimalist Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -372,7 +402,13 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                   
                   <div className="py-1">
                     <DropdownMenuItem
-                      onClick={() => void signOut()}
+                      onClick={() => {
+                        // Mark user as offline before signing out
+                        void markUserOffline().catch((error) => {
+                          console.error("Failed to mark user offline:", error);
+                        });
+                        void signOut();
+                      }}
                       className="flex items-center gap-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 mx-1 rounded-md"
                     >
                       <LogOut className="h-4 w-4" />
@@ -416,6 +452,61 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
         {children}
       </main>
 
+      {/* Floating Global Chat Button - Desktop */}
+      {isAuthenticated && (
+        <motion.div
+          initial={isMobile ? { opacity: 0 } : { scale: 0.95, opacity: 0 }}
+          animate={isMobile ? { opacity: 1 } : { scale: 1, opacity: 1 }}
+          transition={isMobile ? { delay: 0.6, duration: 0.2 } : { delay: 0.6, type: "spring", stiffness: 300, damping: 25 }}
+          className="hidden lg:block fixed bottom-6 right-6 z-50"
+        >
+          <motion.div
+            whileHover={isMobile ? undefined : { scale: 1.02 }}
+            whileTap={isMobile ? undefined : { scale: 0.98 }}
+            transition={isMobile ? { duration: 0.2 } : {
+              scale: { type: "spring", stiffness: 400, damping: 25 }
+            }}
+          >
+            <Button
+              variant="ghost"
+              size="lg"
+              onClick={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
+              className={cn(
+                "backdrop-blur-lg border border-white/20 transition-all duration-300 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg hover:shadow-xl w-full h-full cursor-pointer",
+                isGlobalChatOpen
+                  ? "bg-white/15 hover:bg-white/20"
+                  : "bg-black/50 hover:bg-black/60"
+              )}
+            >
+              <motion.div
+                animate={isMobile ? undefined : {
+                  rotate: isGlobalChatOpen ? 180 : 0,
+                  scale: isGlobalChatOpen ? 1.05 : 1
+                }}
+                transition={isMobile ? { duration: 0.2 } : {
+                  rotate: { duration: 0.6, ease: "easeInOut" },
+                  scale: { duration: 0.4 }
+                }}
+              >
+                <MessageCircle className={cn(
+                  "w-5 h-5 transition-colors duration-300",
+                  isGlobalChatOpen ? "text-white" : "text-white/70"
+                )} />
+              </motion.div>
+              <motion.span
+                className="text-white/90 text-sm font-medium"
+                animate={isMobile ? undefined : {
+                  color: isGlobalChatOpen ? "#ffffff" : "rgba(255, 255, 255, 0.9)"
+                }}
+                transition={isMobile ? { duration: 0.2 } : { duration: 0.4 }}
+              >
+                Global Chat
+              </motion.span>
+            </Button>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Mobile Bottom Navigation */}
       {isAuthenticated && (
         <motion.nav
@@ -436,8 +527,8 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                   onClick={() => void navigate({ to: item.path })}
                   className={cn(
                     "flex flex-col items-center justify-center gap-1 px-2 py-5 transition-all duration-200 min-w-0 flex-1 max-w-20 sm:max-w-24 rounded-full",
-                    isActive 
-                      ? "bg-white/20 text-white" 
+                    isActive
+                      ? "bg-white/20 text-white"
                       : "text-white/70 hover:text-white hover:bg-white/10"
                   )}
                 >
@@ -448,11 +539,66 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                 </Button>
               );
             })}
+            {/* Global Chat Button */}
+            <motion.div
+              whileHover={isMobile ? undefined : { scale: 1.02 }}
+              whileTap={isMobile ? undefined : { scale: 0.98 }}
+              animate={isMobile ? undefined : {
+                backgroundColor: isGlobalChatOpen ? "rgba(255, 255, 255, 0.15)" : "rgba(0, 0, 0, 0.3)"
+              }}
+              transition={isMobile ? { duration: 0.2 } : {
+                backgroundColor: { duration: 0.4 },
+                scale: { type: "spring", stiffness: 400, damping: 25 }
+              }}
+              className="flex-1 max-w-20 sm:max-w-24 rounded-full"
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-1 px-2 py-5 transition-all duration-200 min-w-0 w-full h-full cursor-pointer",
+                  isGlobalChatOpen
+                    ? "text-white"
+                    : "text-white/70 hover:text-white"
+                )}
+              >
+                <motion.div
+                  animate={isMobile ? undefined : {
+                    rotate: isGlobalChatOpen ? 180 : 0,
+                    scale: isGlobalChatOpen ? 1.05 : 1
+                  }}
+                  transition={isMobile ? { duration: 0.2 } : {
+                    rotate: { duration: 0.6, ease: "easeInOut" },
+                    scale: { duration: 0.4 }
+                  }}
+                >
+                  <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                </motion.div>
+                <motion.span
+                  className="text-[10px] sm:text-xs text-white font-medium text-center leading-tight w-full"
+                  animate={isMobile ? undefined : {
+                    color: isGlobalChatOpen ? "#ffffff" : "rgba(255, 255, 255, 0.7)"
+                  }}
+                  transition={isMobile ? { duration: 0.2 } : { duration: 0.4 }}
+                >
+                  Chat
+                </motion.span>
+              </Button>
+            </motion.div>
           </div>
         </motion.nav>
       )}
 
-      {/* Messaging Panel */}
+
+
+      {/* Global Chat Panel */}
+      <GlobalChatPanel
+        isOpen={isGlobalChatOpen}
+        onToggle={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
+      />
+
+            {/* Messaging Panel */}
       <MessagingPanel
         isOpen={isMessagingOpen}
         onClose={() => {

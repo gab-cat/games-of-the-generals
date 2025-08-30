@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MessageCircle, Users, ExternalLink } from "lucide-react";
 import { useConvexAuth } from "convex/react";
-import { useQuery } from "convex-helpers/react/cache";
+import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { UserAvatar } from "../UserAvatar";
 import { Button } from "../ui/button";
@@ -37,11 +37,25 @@ export function MessageNotification({
   const [lastChecked, setLastChecked] = useState<number>(Date.now());
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   
-  // Get unread count for title updates
-  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
+  // Get unread count for title updates - unread count needs to be more current
+  const { data: unreadCount = 0 } = useConvexQueryWithOptions(
+    api.messages.getUnreadCount,
+    {},
+    {
+      staleTime: 10000, // 10 seconds - unread count should be relatively fresh
+      gcTime: 60000, // 1 minute cache
+    }
+  );
 
   // Get recent conversations to detect new messages
-  const conversationsData = useQuery(api.messages.getConversations, {});
+  const { data: conversationsData } = useConvexQueryWithOptions(
+    api.messages.getConversations,
+    {},
+    {
+      staleTime: 30000, // 30 seconds - conversations need moderate freshness
+      gcTime: 300000, // 5 minutes cache
+    }
+  );
 
   const conversations = useMemo(() => {
     return Array.isArray(conversationsData) 

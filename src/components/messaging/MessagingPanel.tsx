@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText } from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
-import { useQuery } from "convex-helpers/react/cache";
+import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
@@ -53,7 +53,14 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
     debouncedSearchTerm.length >= 2 ? { searchTerm: debouncedSearchTerm } : "skip"
   );
 
-  const recentConversationsData = useQuery(api.messages.getConversations, {});
+  const { data: recentConversationsData } = useConvexQueryWithOptions(
+    api.messages.getConversations,
+    {},
+    {
+      staleTime: 60000, // 1 minute - conversations update moderately frequently
+      gcTime: 300000, // 5 minutes cache
+    }
+  );
 
   // Extract conversations from paginated response
   const recentConversations = Array.isArray(recentConversationsData)
@@ -237,13 +244,26 @@ export function MessagingPanel({
     }
   }, [inviteLobbyId, isOpen]);
 
-  const conversationsData = useQuery(api.messages.getConversations, {});
-  const conversationsLoading = !conversationsData;
+  const { data: conversationsData, isLoading: conversationsLoading } = useConvexQueryWithOptions(
+    api.messages.getConversations,
+    {},
+    {
+      staleTime: 30000, // 30 seconds - conversations need moderate freshness
+      gcTime: 300000, // 5 minutes cache
+    }
+  );
 
   // Extract conversations from paginated response
   const conversations = Array.isArray(conversationsData) ? conversationsData : conversationsData?.page || [];
 
-  const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
+  const { data: unreadCount = 0 } = useConvexQueryWithOptions(
+    api.messages.getUnreadCount,
+    {},
+    {
+      staleTime: 10000, // 10 seconds - unread count should be fresh
+      gcTime: 60000, // 1 minute cache
+    }
+  );
 
   const { data: existingSubs } = useConvexQuery(
     api.push.getSubscriptionsForCurrentUser,

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { HelpCircle, BookOpen } from "lucide-react";
 import { Button } from "./ui/button";
 import { TutorialModal } from "./TutorialModal";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 
@@ -19,7 +20,15 @@ export function TutorialButton({
 }: TutorialButtonProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  const tutorialStatus = useQuery(api.profiles.checkTutorialStatus);
+  // Tutorial status doesn't change frequently, cache it for longer
+  const { data: tutorialStatus } = useConvexQueryWithOptions(
+    api.profiles.checkTutorialStatus,
+    {},
+    {
+      staleTime: 300000, // 5 minutes - tutorial status doesn't change often
+      gcTime: 600000, // 10 minutes cache
+    }
+  );
   const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
 
   // Automatically show tutorial if not completed

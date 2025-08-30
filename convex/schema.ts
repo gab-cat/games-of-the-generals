@@ -41,13 +41,24 @@ const applicationTables = {
     // Tutorial state
     hasSeenTutorial: v.optional(v.boolean()),
     tutorialCompletedAt: v.optional(v.number()),
+    // Online status tracking (merged from onlineUsers table)
+    isOnline: v.optional(v.boolean()),
+    lastSeenAt: v.optional(v.number()),
+    currentPage: v.optional(v.string()),
+    gameId: v.optional(v.id("games")),
+    lobbyId: v.optional(v.id("lobbies")),
+    // Admin/Moderator role
+    adminRole: v.optional(v.union(v.literal("moderator"), v.literal("admin"))),
   })
     .index("by_user", ["userId"])
     .index("by_wins", ["wins"])
     .index("by_username", ["username"])
     .index("by_games_wins", ["gamesPlayed", "wins"]) // Compound index for better leaderboard queries
     .index("by_rank_wins", ["rank", "wins"]) // Index for ranking within same rank
-    .index("by_active_players", ["gamesPlayed", "username"]), // For finding active players
+    .index("by_active_players", ["gamesPlayed", "username"]) // For finding active players
+    .index("by_online", ["isOnline"]) // For finding online users
+    .index("by_online_last_seen", ["isOnline", "lastSeenAt"]) // For finding recently active users
+    .index("by_admin_role", ["adminRole"]), // For finding admin/moderator users
 
   // User achievements
   achievements: defineTable({
@@ -345,6 +356,122 @@ const applicationTables = {
     .index("by_session_id", ["sessionId"])
     .index("by_player", ["playerId"])
     .index("by_player_status", ["playerId", "status"]),
+
+  // Global Chat Messages
+  globalChat: defineTable({
+    userId: v.optional(v.id("users")), // Optional for system messages
+    username: v.string(),
+    message: v.string(),
+    timestamp: v.number(),
+    // For mentions - array of userIds mentioned in this message
+    mentions: v.optional(v.array(v.id("users"))),
+    // Filtered/cleaned message (after profanity filtering)
+    filteredMessage: v.string(),
+    // Message metadata for spam detection
+    messageHash: v.optional(v.string()), // For duplicate detection
+    ipAddress: v.optional(v.string()), // For spam detection
+    // System messages (commands, notifications, etc.)
+    isSystemMessage: v.optional(v.boolean()), // For system-generated messages
+  })
+    .index("by_timestamp", ["timestamp"])
+    .index("by_user", ["userId"])
+    .index("by_user_timestamp", ["userId", "timestamp"])
+    .index("by_message_hash", ["messageHash"]),
+
+  // User Chat Settings and Preferences
+  userChatSettings: defineTable({
+    userId: v.id("users"),
+    // Username color (hex code)
+    usernameColor: v.optional(v.string()),
+    // Rules agreement
+    rulesAgreedAt: v.optional(v.number()),
+    rulesVersion: v.optional(v.string()),
+    // Chat preferences
+    showTimestamps: v.optional(v.boolean()),
+    enableSounds: v.optional(v.boolean()),
+    enableMentions: v.optional(v.boolean()),
+    // Spam/moderation settings
+    isMuted: v.optional(v.boolean()),
+    mutedUntil: v.optional(v.number()),
+    muteReason: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_muted_until", ["mutedUntil"]),
+
+
+
+  // Chat Mentions for Notifications
+  chatMentions: defineTable({
+    messageId: v.id("globalChat"),
+    mentionerId: v.id("users"),
+    mentionerUsername: v.string(),
+    mentionedUserId: v.id("users"),
+    mentionedUsername: v.string(),
+    timestamp: v.number(),
+    isRead: v.boolean(),
+    // The actual mention text (e.g. "@username")
+    mentionText: v.string(),
+  })
+    .index("by_mentioned_user", ["mentionedUserId"])
+    .index("by_mentioned_user_read", ["mentionedUserId", "isRead"])
+    .index("by_mentioned_user_timestamp", ["mentionedUserId", "timestamp"])
+    .index("by_message", ["messageId"]),
+
+  // Chat Rules and Agreements
+  chatRules: defineTable({
+    version: v.string(),
+    rulesText: v.string(),
+    createdAt: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_version", ["version"])
+    .index("by_active", ["isActive"]),
+
+  // Admin Users - for identifying moderators and administrators
+  adminUsers: defineTable({
+    userId: v.id("users"),
+    username: v.string(),
+    role: v.union(v.literal("moderator"), v.literal("admin")),
+    assignedBy: v.id("users"), // Who assigned this admin role
+    assignedAt: v.number(),
+    isActive: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_role", ["role"])
+    .index("by_active", ["isActive"]),
+
+  // User Moderation Actions (mutes, bans, etc.)
+  userModeration: defineTable({
+    targetUserId: v.id("users"),
+    targetUsername: v.string(),
+    moderatorId: v.id("users"),
+    moderatorUsername: v.string(),
+    action: v.union(v.literal("mute"), v.literal("ban"), v.literal("unmute"), v.literal("unban")),
+    reason: v.optional(v.string()),
+    duration: v.optional(v.number()), // Duration in milliseconds for temporary actions
+    expiresAt: v.optional(v.number()), // When temporary moderation expires
+    createdAt: v.number(),
+    isActive: v.boolean(), // Whether this moderation is still in effect
+  })
+    .index("by_target_user", ["targetUserId"])
+    .index("by_moderator", ["moderatorId"])
+    .index("by_action", ["action"])
+    .index("by_active", ["isActive"])
+    .index("by_expires_at", ["expiresAt"])
+    .index("by_target_active", ["targetUserId", "isActive"]),
+
+  // Message Moderation Actions (deletions, warnings, etc.)
+  messageModeration: defineTable({
+    messageId: v.id("globalChat"),
+    moderatorId: v.id("users"),
+    moderatorUsername: v.string(),
+    action: v.union(v.literal("delete"), v.literal("warn")),
+    reason: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_message", ["messageId"])
+    .index("by_moderator", ["moderatorId"])
+    .index("by_action", ["action"]),
 };
 
 export default defineSchema({

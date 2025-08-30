@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
-import { useConvexQuery } from "./convex-query-hooks";
+import { useConvexQueryWithOptions } from "./convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 
 export function useTutorial() {
   const [showTutorial, setShowTutorial] = useState(false);
   const [hasCheckedInitialState, setHasCheckedInitialState] = useState(false);
 
-  // Get tutorial status from the database
-  const { data: tutorialStatus, isLoading } = useConvexQuery(
+  // Get tutorial status from the database - tutorial status doesn't change frequently
+  const { data: tutorialStatus, isLoading } = useConvexQueryWithOptions(
     api.profiles.checkTutorialStatus,
-    {}
+    {},
+    {
+      staleTime: 300000, // 5 minutes - tutorial status doesn't change often
+      gcTime: 600000, // 10 minutes cache
+    }
   );
 
   // Show tutorial automatically on first login

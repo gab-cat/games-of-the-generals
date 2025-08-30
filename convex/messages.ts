@@ -132,6 +132,12 @@ export const sendMessage = mutation({
     // Attempt to send a push notification to the recipient (async)
     await ctx.scheduler.runAfter(0, internal.pushNode.sendPushForMessage, { messageId });
 
+    // Update user's last seen time (they performed a significant action)
+    await ctx.db.patch(senderProfile._id, {
+      lastSeenAt: timestamp,
+      isOnline: true,
+    });
+
     return messageId;
   },
 });

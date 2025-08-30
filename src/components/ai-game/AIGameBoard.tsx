@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useMutation, useQuery, useAction } from "convex/react";
+import { useMutation, useAction } from "convex/react";
+import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -8,7 +9,6 @@ import {
   Bot, 
   Shuffle, 
   CheckCircle, 
-  Crown,
   RefreshCw,
   ArrowRightLeft,
   Info,
@@ -19,7 +19,6 @@ import {
   ArrowDown
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { cn } from "../../lib/utils";
 import { getPieceDisplay } from "../../lib/piece-display";
 import { SetupPresets } from "../setup-presets/SetupPresets";
 import { AIGameResultModal } from "./AIGameResultModal";
@@ -77,8 +76,24 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
   const generateAIMove = useAction(api.aiGame.generateAIMove);
   
   // Queries
-  const session = useQuery(api.aiGame.getAIGameSession, { sessionId });
-  const profile = useQuery(api.profiles.getCurrentProfile);
+  const { data: session } = useConvexQueryWithOptions(
+    api.aiGame.getAIGameSession,
+    { sessionId },
+    {
+      staleTime: 10000, // 10 seconds - active game session needs to be fresh
+      gcTime: 300000, // 5 minutes cache
+    }
+  );
+
+  // Profile data changes infrequently
+  const { data: profile } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    {
+      staleTime: 120000, // 2 minutes - profile data changes infrequently
+      gcTime: 600000, // 10 minutes cache
+    }
+  );
 
   // Valid rows for player placement (always bottom 3 rows for player)
   const validRows = useMemo(() => [5, 6, 7], []);
@@ -657,8 +672,8 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
             transition={{ delay: 0.2 }}
             className="grid grid-cols-9 gap-0.5 sm:gap-2 max-w-lg mx-auto"
           >
-            {session.board.map((row, rowIndex) =>
-              row.map((cell, colIndex) => {
+            {session.board.map((row: any[], rowIndex: number) =>
+              row.map((cell: { player: string; piece: string; revealed: any; }, colIndex: number) => {
                 const isSelected = selectedSquare?.row === rowIndex && selectedSquare?.col === colIndex;
                 const isValidMove = selectedSquare && 
                   Math.abs(selectedSquare.row - rowIndex) + Math.abs(selectedSquare.col - colIndex) === 1;
@@ -756,8 +771,8 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
         difficulty={session.difficulty}
         behavior={session.behavior}
         moveCount={session.moveCount}
-        onPlayAgain={handlePlayAgain}
-        onReturnToLobby={handleReturnToLobby}
+        onPlayAgain={() => void handlePlayAgain()}
+        onReturnToLobby={() => void handleReturnToLobby()}
       />
     </motion.div>
   );

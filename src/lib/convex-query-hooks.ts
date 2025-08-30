@@ -18,6 +18,10 @@ export function useConvexQuery<
     // You can add any TanStack Query options here
     retry: false, // Convex handles retries automatically
     refetchOnWindowFocus: false, // Convex data is always up-to-date
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 300000, // Cache for 5 minutes (previously cacheTime)
+    refetchOnMount: false, // Don't refetch on mount if data is fresh
+    refetchOnReconnect: false, // Don't refetch on reconnect if data is fresh
   });
 }
 
@@ -34,6 +38,7 @@ export function useConvexQueryWithOptions<
     enabled?: boolean;
     initialData?: any;
     gcTime?: number;
+    staleTime?: number;
     select?: (data: any) => any;
   }
 ) {
@@ -42,6 +47,10 @@ export function useConvexQueryWithOptions<
     ...options,
     retry: false,
     refetchOnWindowFocus: false,
+    staleTime: options?.staleTime ?? 30000, // Default to 30 seconds if not specified
+    gcTime: options?.gcTime ?? 300000, // Default to 5 minutes if not specified
+    refetchOnMount: false, // Don't refetch on mount if data is fresh
+    refetchOnReconnect: false, // Don't refetch on reconnect if data is fresh
   });
 }
 
@@ -65,21 +74,21 @@ export function useConvexInfiniteQuery<
 
   return useInfiniteQuery({
     queryKey: [...(base.queryKey as any), "infinite"],
-    queryFn: async ({ pageParam, signal, queryKey }) => {
+    queryFn: async ({ pageParam, signal, queryKey: _queryKey }) => {
       const current = convexQuery(query, getArgsForPage(pageParam));
       // Reuse the generated queryFn from convexQuery, passing expected context
       return await (current.queryFn as any)({ queryKey: current.queryKey, signal });
     },
     initialPageParam: options?.initialPageParam,
     getNextPageParam:
-      options?.getNextPageParam || ((lastPage: any) => {
+      options?.getNextPageParam || ((lastPage) => {
         // Respect explicit isDone/hasMore flags if provided by the server
         if (lastPage && typeof lastPage === "object") {
-          if ("hasMore" in lastPage && typeof (lastPage as any).hasMore === "boolean") {
-            return (lastPage as any).hasMore ? (lastPage as any).continueTimestamp : undefined;
+          if ("hasMore" in lastPage && typeof lastPage.hasMore === "boolean") {
+            return lastPage.hasMore ? lastPage.continueTimestamp : undefined;
           }
-          if ("isDone" in lastPage && typeof (lastPage as any).isDone === "boolean") {
-            return (lastPage as any).isDone ? undefined : (lastPage as any).continueTimestamp;
+          if ("isDone" in lastPage && typeof lastPage.isDone === "boolean") {
+            return lastPage.isDone ? undefined : lastPage.continueTimestamp;
           }
         }
         // Fallback to continueTimestamp presence
@@ -88,6 +97,10 @@ export function useConvexInfiniteQuery<
     enabled: options?.enabled,
     retry: false,
     refetchOnWindowFocus: false,
+    staleTime: 30000, // Consider data fresh for 30 seconds
+    gcTime: 300000, // Cache for 5 minutes
+    refetchOnMount: false, // Don't refetch on mount if data is fresh
+    refetchOnReconnect: false, // Don't refetch on reconnect if data is fresh
   });
 }
 

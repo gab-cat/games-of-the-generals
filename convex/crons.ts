@@ -27,6 +27,30 @@ crons.cron(
   {}
 );
 
+// Run hourly to clean up old global chat messages (> 3 days)
+crons.cron(
+  "Cleanup old global chat messages (> 3 days)",
+  "0 * * * *", // Every hour
+  internal.globalChat.cleanupOldMessages,
+  {}
+);
+
+// Run every 5 minutes to mark inactive users as offline
+crons.cron(
+  "Mark inactive users as offline",
+  "*/5 * * * *", // Every 5 minutes
+  internal.globalChat.cleanupOfflineUsers,
+  {}
+);
+
+// Run every hour to clean up expired bans and mutes
+crons.cron(
+  "Cleanup expired moderation actions",
+  "0 * * * *", // Every hour
+  internal.globalChat.cleanupExpiredModeration,
+  {}
+);
+
 export default crons;
 
 

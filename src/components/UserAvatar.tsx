@@ -6,7 +6,7 @@ interface UserAvatarProps {
   avatarUrl?: string;
   className?: string;
   rank?: string;
-  size?: "sm" | "md" | "lg" | "xl";
+  size?: "xs" | "sm" | "md" | "lg" | "xl";
 }
 
 export function UserAvatar({ 
@@ -30,6 +30,7 @@ export function UserAvatar({
 
   const getSizeClasses = (size: string) => {
     switch (size) {
+      case "xs": return "h-6 w-6 text-xs";
       case "sm": return "h-8 w-8 text-xs";
       case "md": return "h-10 w-10 text-sm";
       case "lg": return "h-12 w-12 text-base";

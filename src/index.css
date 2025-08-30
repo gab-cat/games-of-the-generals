@@ -36,7 +36,7 @@
   * {
     @apply border-border;
   }
-  body {
+    body {
     @apply bg-background text-foreground;
     font-family:
       "Inter Variable",
@@ -55,7 +55,7 @@
       "Segoe UI Symbol",
       "Noto Color Emoji";
     /* Add subtle grain texture for depth */
-    background-image: 
+    background-image:
       radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0);
     background-size: 20px 20px;
   }

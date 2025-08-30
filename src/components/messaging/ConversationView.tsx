@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import { useConvex, useMutation } from "convex/react";
-import { useQuery } from "convex-helpers/react/cache";
+import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
@@ -202,7 +202,15 @@ export function ConversationView({
     { userId: otherUserId }
   );
 
-  const currentUserProfile = useQuery(api.profiles.getCurrentProfile);
+  // Current user profile - profile data changes infrequently
+  const { data: currentUserProfile } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    {
+      staleTime: 120000, // 2 minutes - profile data changes infrequently
+      gcTime: 600000, // 10 minutes cache
+    }
+  );
 
   // Typing status of the other user
   const { data: typingStatus } = useConvexQuery(

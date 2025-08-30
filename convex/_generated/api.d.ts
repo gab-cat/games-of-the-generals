@@ -16,6 +16,7 @@ import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as fileUpload from "../fileUpload.js";
 import type * as games from "../games.js";
+import type * as globalChat from "../globalChat.js";
 import type * as http from "../http.js";
 import type * as lobbies from "../lobbies.js";
 import type * as maintenance from "../maintenance.js";
@@ -54,6 +55,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   fileUpload: typeof fileUpload;
   games: typeof games;
+  globalChat: typeof globalChat;
   http: typeof http;
   lobbies: typeof lobbies;
   maintenance: typeof maintenance;

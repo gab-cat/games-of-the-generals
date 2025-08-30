@@ -88,6 +88,8 @@ export const updateBio = mutation({
 
     await ctx.db.patch(currentProfile._id, {
       bio: args.bio?.trim() || undefined,
+      lastSeenAt: Date.now(),
+      isOnline: true,
     });
     return { success: true };
   },

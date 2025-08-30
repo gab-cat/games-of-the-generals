@@ -94,6 +94,25 @@ export const getMessageById = internalQuery({
   },
 });
 
+// Internal helper: get global chat message by id
+export const getGlobalChatMessageById = internalQuery({
+  args: { messageId: v.id("globalChat") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.messageId);
+  },
+});
+
+// Internal helper: get mentions by message id
+export const getMentionsByMessage = internalQuery({
+  args: { messageId: v.id("globalChat") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("chatMentions")
+      .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
+      .collect();
+  },
+});
+
 // Internal mutations to mark push results
 export const markPushSuccess = internalMutation({
   args: { subscriptionId: v.id("pushSubscriptions") },

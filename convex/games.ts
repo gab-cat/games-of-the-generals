@@ -603,6 +603,19 @@ export const makeMove = mutation({
 
     await ctx.db.patch(args.gameId, updates);
 
+    // Update user's last seen time (they performed a significant action)
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (profile) {
+      await ctx.db.patch(profile._id, {
+        lastSeenAt: currentTime,
+        isOnline: true,
+      });
+    }
+
     return { success: true, challengeResult, winner: gameWinner };
   },
 });

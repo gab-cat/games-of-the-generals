@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -78,8 +79,24 @@ export function AIGamePage() {
   const cleanupSession = useMutation(api.aiGame.cleanupAIGameSession);
   
   // Queries
-  const currentSession = useQuery(api.aiGame.getCurrentUserAIGame);
-  const profile = useQuery(api.profiles.getCurrentProfile);
+  const { data: currentSession } = useConvexQueryWithOptions(
+    api.aiGame.getCurrentUserAIGame,
+    {},
+    {
+      staleTime: 30000, // 30 seconds - game session data needs moderate freshness
+      gcTime: 300000, // 5 minutes cache
+    }
+  );
+
+  // Profile data changes infrequently
+  const { data: profile } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    {
+      staleTime: 120000, // 2 minutes - profile data changes infrequently
+      gcTime: 600000, // 10 minutes cache
+    }
+  );
 
   // Check for existing session
   useEffect(() => {
@@ -132,12 +149,12 @@ export function AIGamePage() {
                         variant="secondary"
                         className="bg-white/10 text-white/80 border-white/20"
                       >
-                        {React.createElement(difficultyConfig[currentSession.difficulty].icon, { className: "h-4 w-4 mr-1" })}
-                        {difficultyConfig[currentSession.difficulty].label} AI
+                        {React.createElement(difficultyConfig[currentSession.difficulty as keyof typeof difficultyConfig].icon, { className: "h-4 w-4 mr-1" })}
+                        {difficultyConfig[currentSession.difficulty as keyof typeof difficultyConfig].label} AI
                       </Badge>
                       <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20">
-                        {React.createElement(behaviorConfig[currentSession.behavior].icon, { className: "h-4 w-4 mr-1" })}
-                        {behaviorConfig[currentSession.behavior].label}
+                        {React.createElement(behaviorConfig[currentSession.behavior as keyof typeof behaviorConfig].icon, { className: "h-4 w-4 mr-1" })}
+                        {behaviorConfig[currentSession.behavior as keyof typeof behaviorConfig].label}
                       </Badge>
                       <Badge variant="outline" className="bg-white/5 text-white/70 border-white/20">
                         Move {currentSession.moveCount}

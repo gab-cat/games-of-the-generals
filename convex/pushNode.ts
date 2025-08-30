@@ -105,4 +105,68 @@ export const sendTestNotification = action({
   },
 });
 
+// Internal action: send push notifications for chat mentions
+export const sendMentionPushNotifications = internalAction({
+  args: { messageId: v.id("globalChat") },
+  handler: async (ctx, args) => {
+    const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
+    const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+    const contactEmail = process.env.VAPID_CONTACT_EMAIL || "mailto:noreply@generalsonline.app";
+
+    if (!vapidPublicKey || !vapidPrivateKey) {
+      console.warn("VAPID keys not configured; skipping mention push notifications");
+      return;
+    }
+
+    webpush.setVapidDetails(contactEmail, vapidPublicKey, vapidPrivateKey);
+
+    const message = await ctx.runQuery(internal.push.getGlobalChatMessageById, { messageId: args.messageId });
+    if (!message) return;
+
+    const mentions = await ctx.runQuery(internal.push.getMentionsByMessage, { messageId: args.messageId });
+
+    const notificationPromises = mentions.map(async (mention: any) => {
+      const subscriptions = await ctx.runQuery(internal.push.getSubscriptionsForUser, { userId: mention.mentionedUserId });
+      if (subscriptions.length === 0) return;
+
+      const siteUrl = process.env.SITE_URL || "";
+      const payload = JSON.stringify({
+        title: "New Mention",
+        body: `${mention.mentionerUsername} mentioned you in chat`,
+        url: `${siteUrl}#chat`,
+        tag: `mention-${mention.messageId}`,
+        data: {
+          type: "mention",
+          messageId: mention.messageId,
+          mentionerUsername: mention.mentionerUsername,
+          mentionText: mention.mentionText,
+        },
+      });
+
+      await Promise.all(
+        subscriptions.map(async (sub: any) => {
+          const pushSub = {
+            endpoint: sub.endpoint,
+            expirationTime: sub.expirationTime ?? null,
+            keys: sub.keys,
+          } as webpush.PushSubscription;
+          try {
+            await webpush.sendNotification(pushSub, payload);
+            await ctx.runMutation(internal.push.markPushSuccess, { subscriptionId: sub._id as Id<"pushSubscriptions"> });
+          } catch (err) {
+            const reason = err instanceof Error ? err.message : "push_error";
+            await ctx.runMutation(internal.push.markPushFailure, { subscriptionId: sub._id as Id<"pushSubscriptions">, reason });
+            // Remove Gone subscriptions
+            if (typeof err === "object" && err && (err as any).statusCode === 410) {
+              await ctx.runMutation(internal.push.deleteSubscriptionById, { subscriptionId: sub._id as Id<"pushSubscriptions"> });
+            }
+          }
+        })
+      );
+    });
+
+    await Promise.all(notificationPromises);
+  },
+});
+
 

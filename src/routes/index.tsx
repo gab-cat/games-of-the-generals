@@ -4,7 +4,7 @@ import { SignInForm } from '../auth/SignInForm'
 import { SplashScreen } from '../components/SplashScreen'
 import { SetupPage } from '../pages/setup/00.setup-page'
 import { LobbyPage } from '../pages/lobby/00.lobby-page'
-import { useQuery } from 'convex-helpers/react/cache'
+import { useConvexQueryWithOptions } from '@/lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
 import { motion } from 'framer-motion'
 import { Id } from '../../convex/_generated/dataModel'
@@ -12,16 +12,22 @@ import { useEffect, useState } from 'react'
 
 type IndexSearch = {
   lobbyId?: string
-}
+} 
 
 function IndexComponent() {
   const { lobbyId } = Route.useSearch()
   const { isAuthenticated, isLoading } = useConvexAuth()
   const [showSplash, setShowSplash] = useState(false)
 
-  // Query profile only when authenticated
-  const profile = useQuery(api.profiles.getCurrentProfile, 
-    isAuthenticated ? {} : "skip",
+  // Query profile only when authenticated - profile data changes infrequently
+  const { data: profile } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    {
+      enabled: !!isAuthenticated,
+      staleTime: 120000, // 2 minutes - profile data changes infrequently
+      gcTime: 600000, // 10 minutes cache
+    }
   );
   const profileLoaded = profile !== undefined;
 
