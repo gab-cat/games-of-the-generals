@@ -56,4 +56,84 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          // React ecosystem
+          if (id.includes('react') && !id.includes('node_modules')) {
+            return 'react-vendor';
+          }
+          // Router and state management
+          if (id.includes('@tanstack/react-router') || id.includes('@tanstack/router')) {
+            return 'router';
+          }
+          // Query libraries
+          if (id.includes('@tanstack/react-query') || id.includes('@convex-dev/react-query')) {
+            return 'query';
+          }
+          // Convex backend
+          if (id.includes('convex') && !id.includes('@convex-dev/react-query')) {
+            return 'convex';
+          }
+          // UI components (Radix UI)
+          if (id.includes('@radix-ui')) {
+            return 'ui-components';
+          }
+          // Animation and graphics
+          if (id.includes('framer-motion')) {
+            return 'animations';
+          }
+          // Heavy libraries that should be dynamically imported
+          if (id.includes('jimp')) {
+            return 'image-processing';
+          }
+          // Utilities and smaller deps
+          if (id.includes('clsx') || id.includes('class-variance-authority') ||
+              id.includes('tailwind-merge') || id.includes('cmdk') ||
+              id.includes('sonner') || id.includes('use-debounce')) {
+            return 'utils';
+          }
+          // Icons
+          if (id.includes('lucide-react')) {
+            return 'icons';
+          }
+          // Email and other features
+          if (id.includes('@react-email') || id.includes('resend')) {
+            return 'email';
+          }
+          // Default chunk for other vendor libraries
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+        // Optimize chunk file names
+        chunkFileNames: (chunkInfo) => {
+          const facadeModuleId = chunkInfo.facadeModuleId
+            ? chunkInfo.facadeModuleId.split('/').pop()?.replace('.tsx', '').replace('.ts', '')
+            : 'chunk';
+          return `assets/${facadeModuleId}-[hash].js`;
+        },
+        // Optimize entry file names
+        entryFileNames: 'assets/[name]-[hash].js',
+        // Optimize asset file names
+        assetFileNames: (assetInfo) => {
+          if (assetInfo.name?.endsWith('.css')) {
+            return 'assets/[name]-[hash][extname]';
+          }
+          return 'assets/[name]-[hash][extname]';
+        }
+      }
+    },
+    // Enable source maps for debugging
+    sourcemap: mode === 'development',
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000,
+    // Enable minification
+    minify: 'esbuild',
+    // Optimize CSS
+    cssCodeSplit: true,
+    // Target modern browsers for better optimization
+    target: 'esnext'
+  },
 }));

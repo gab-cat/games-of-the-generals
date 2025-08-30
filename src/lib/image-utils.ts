@@ -1,7 +1,6 @@
-import { Jimp } from 'jimp';
-
 /**
  * Compresses an image file using Jimp to the specified size and returns as blob
+ * Uses dynamic import to load Jimp only when needed
  */
 export async function compressImage(file: File, maxSize: number = 250): Promise<Blob> {
   // Validate file type
@@ -10,25 +9,28 @@ export async function compressImage(file: File, maxSize: number = 250): Promise<
   }
 
   try {
+    // Dynamically import Jimp only when needed
+    const { Jimp } = await import('jimp');
+
     // Convert file to array buffer
     const arrayBuffer = await file.arrayBuffer();
-    
+
     // Read image with Jimp
     const image = await Jimp.read(arrayBuffer);
-    
+
     // Get original dimensions
     const { width, height } = image.bitmap;
-    
+
     // Calculate how to crop to square (center crop)
     const size = Math.min(width, height);
     const x = Math.floor((width - size) / 2);
     const y = Math.floor((height - size) / 2);
-    
+
     // Crop to square then resize
     const processedImage = image
       .crop({ x, y, w: size, h: size })
       .resize({ w: maxSize, h: maxSize });
-    
+
     // Get a high-quality JPEG buffer from Jimp (WebP not supported in our Jimp types)
     const buffer = await processedImage.getBuffer('image/jpeg');
 
@@ -65,7 +67,7 @@ export async function compressImage(file: File, maxSize: number = 250): Promise<
     }
 
     return jpegBlob;
-    
+
   } catch (error) {
     console.error('Error compressing image:', error);
     throw new Error('Failed to compress image');
