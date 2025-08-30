@@ -15,9 +15,13 @@ export default defineConfig(({ mode }) => ({
       srcDir: 'src',
       filename: 'sw.ts',
       registerType: 'autoUpdate',
+      minify: true,
       includeAssets: [
         'favicon.ico',
       ],
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
+      },
       manifest: {
         name: 'Games of the Generals',
         short_name: 'GoG',
