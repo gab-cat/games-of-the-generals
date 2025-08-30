@@ -59,11 +59,40 @@ export function MessageModerationMenu({
     setDialogOpen(true);
     setReason("");
     setDuration(undefined);
+    // Reset submitting states
+    setIsSubmitting(false);
+    setIsUnmuting(false);
+    setIsUnbanning(false);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      // Reset form state when dialog closes
+      setReason("");
+      setDuration(undefined);
+      setDialogType("delete");
+      setIsSubmitting(false);
+      setIsUnmuting(false);
+      setIsUnbanning(false);
+    }
   };
 
   const handleDialogConfirm = async () => {
+    if (isSubmitting) return; // Prevent double submission
+
     setIsSubmitting(true);
+    let timeoutId: NodeJS.Timeout | null = null;
+
     try {
+      // Set a timeout to force close the dialog after 30 seconds in case of network issues
+      timeoutId = setTimeout(() => {
+        console.warn(`Moderation action (${dialogType}) timed out, forcing dialog close`);
+        setDialogOpen(false);
+        setIsSubmitting(false);
+        toast.error(`Request timed out. Please try again.`);
+      }, 30000);
+
       switch (dialogType) {
         case "mute":
           await muteUser({
@@ -91,16 +120,36 @@ export function MessageModerationMenu({
           toast.success("Message deleted");
           break;
       }
+
+      // Clear timeout on success
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      // Always close dialog after successful action
       setDialogOpen(false);
+      // Reset form state
+      setReason("");
+      setDuration(undefined);
+      setDialogType("delete");
     } catch (error) {
-      toast.error(`Failed to ${dialogType} ${dialogType === "delete" ? "message" : "user"}`);
+      // Clear timeout on error
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+      toast.error(`Failed to ${dialogType} ${dialogType === "delete" ? "message" : "user"}: ${errorMessage}`);
       console.error(`${dialogType} error:`, error);
+      // Keep dialog open on error so user can try again
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleUnmuteUser = async () => {
+    if (isUnmuting) return; // Prevent double submission
+
     setIsUnmuting(true);
     try {
       await unmuteUser({
@@ -108,7 +157,10 @@ export function MessageModerationMenu({
         reason: "Unmute"
       });
       toast.success(`${username} has been unmuted`);
-      setDialogOpen(false);
+      // Close dialog if it's open
+      if (dialogOpen) {
+        setDialogOpen(false);
+      }
     } catch (error) {
       toast.error("Failed to unmute user");
       console.error("Unmute error:", error);
@@ -118,6 +170,8 @@ export function MessageModerationMenu({
   };
 
   const handleUnbanUser = async () => {
+    if (isUnbanning) return; // Prevent double submission
+
     setIsUnbanning(true);
     try {
       await unbanUser({
@@ -125,7 +179,10 @@ export function MessageModerationMenu({
         reason: "Unban"
       });
       toast.success(`${username} has been unbanned`);
-      setDialogOpen(false);
+      // Close dialog if it's open
+      if (dialogOpen) {
+        setDialogOpen(false);
+      }
     } catch (error) {
       toast.error("Failed to unban user");
       console.error("Unban error:", error);
@@ -202,8 +259,8 @@ export function MessageModerationMenu({
       </DropdownMenu>
 
       {/* Moderation Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20">
+      <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20 z-[110]">
           <DialogHeader>
             <DialogTitle>
               {dialogType === "mute"
@@ -273,7 +330,7 @@ export function MessageModerationMenu({
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setDialogOpen(false)}
+              onClick={() => handleDialogClose(false)}
               disabled={isSubmitting}
               className="bg-white/5 border-white/20 text-white hover:bg-white/10 disabled:opacity-50"
             >
