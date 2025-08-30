@@ -62,7 +62,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     closeRateLimitModal,
     closeSpamModal
   } = useChatProtection() as {
-    validateMessage: (message: string) => { allowed: boolean; type?: 'rateLimit' | 'spam'; reason?: string };
+    validateMessage: (message: string) => Promise<{ allowed: boolean; type?: 'rateLimit' | 'spam'; reason?: string }>;
     recordMessage: (message: string) => void;
     showRateLimitModal: boolean;
     showSpamModal: boolean;
@@ -176,7 +176,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     }
 
     // Validate message with rate limiting and spam filtering
-    const validation = validateMessage(messageText);
+    const validation = await validateMessage(messageText);
     console.log('📤 Validation result:', validation);
 
     if (!validation.allowed) {

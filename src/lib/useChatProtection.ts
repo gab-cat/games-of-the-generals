@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
-import { profanity } from '@2toad/profanity';
 
 interface MessageHistory {
   content: string;
@@ -54,11 +53,29 @@ export function useChatProtection() {
     minTimeBetweenMessages: 500 // 0.5 second minimum between messages (faster)
   }), []);
 
-  // Use the same profanity instance as the server
-  const profanityFilter = useMemo(() => {
-    console.log('🔧 Using shared profanity filter instance');
-    return profanity; // Use the same instance as server
-  }, []);
+  // Dynamic profanity loader
+  const [profanityFilter, setProfanityFilter] = useState<any>(null);
+  const [profanityLoading, setProfanityLoading] = useState(false);
+
+  const loadProfanityFilter = useCallback(async () => {
+    if (profanityFilter) return profanityFilter;
+    if (profanityLoading) return null;
+
+    console.log('🔧 Dynamically loading profanity filter...');
+    setProfanityLoading(true);
+
+    try {
+      const { profanity } = await import('@2toad/profanity');
+      console.log('✅ Profanity filter loaded successfully');
+      setProfanityFilter(profanity);
+      return profanity;
+    } catch (error) {
+      console.error('❌ Failed to load profanity filter:', error);
+      return null;
+    } finally {
+      setProfanityLoading(false);
+    }
+  }, [profanityFilter, profanityLoading]);
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -98,13 +115,23 @@ export function useChatProtection() {
     );
   }, [SPAM_CONFIG.repeatedMessageWindowMs]);
 
-  // Check for profanity in message
-  const detectProfanity = useCallback((message: string): { hasProfanity: boolean; word?: string } => {
+  // Check for profanity in message (async due to dynamic loading)
+  const detectProfanity = useCallback(async (message: string): Promise<{ hasProfanity: boolean; word?: string }> => {
     try {
       console.log('🔍 Client-side profanity check for:', message);
 
+      // Load profanity filter if not already loaded
+      let filter = profanityFilter;
+      if (!filter) {
+        filter = await loadProfanityFilter();
+        if (!filter) {
+          console.log('⚠️ Profanity filter not available, skipping check');
+          return { hasProfanity: false };
+        }
+      }
+
       // Use the profanity filter to check for bad words
-      const hasProfanity = profanityFilter.exists(message);
+      const hasProfanity = filter.exists(message);
 
       console.log('🔍 Profanity detected:', hasProfanity);
 
@@ -112,7 +139,7 @@ export function useChatProtection() {
         console.log('🚫 Profanity found in message:', message);
 
         // Try to find the specific profane word(s) detected
-        const censored = profanityFilter.censor(message);
+        const censored = filter.censor(message);
         const originalWords = message.split(/\s+/);
         const censoredWords = censored.split(/\s+/);
 
@@ -135,7 +162,7 @@ export function useChatProtection() {
       console.warn('Profanity detection error:', error);
       return { hasProfanity: false };
     }
-  }, [profanityFilter]);
+  }, [profanityFilter, loadProfanityFilter]);
 
   // Check rate limit
   const checkRateLimit = useCallback((): { allowed: boolean; remainingTime: number } => {
@@ -231,8 +258,8 @@ export function useChatProtection() {
     SPAM_CONFIG.repeatedMessageWindowMs
   ]);
 
-  // Main validation function
-  const validateMessage = useCallback((message: string): { allowed: boolean; type?: 'rateLimit' | 'spam'; reason?: string } => {
+  // Main validation function (async due to dynamic profanity loading)
+  const validateMessage = useCallback(async (message: string): Promise<{ allowed: boolean; type?: 'rateLimit' | 'spam'; reason?: string }> => {
     console.log('🚀 Starting message validation for:', message);
 
     // First check rate limit
@@ -244,8 +271,8 @@ export function useChatProtection() {
       return { allowed: false, type: 'rateLimit' };
     }
 
-    // Check for profanity first
-    const profanityCheck = detectProfanity(message);
+    // Check for profanity first (async)
+    const profanityCheck = await detectProfanity(message);
     if (profanityCheck.hasProfanity) {
       console.log('🚫 Profanity validation failed:', profanityCheck);
       setSpamType('profanity');
@@ -323,6 +350,7 @@ export function useChatProtection() {
     spamType,
     closeRateLimitModal,
     closeSpamModal,
-    resetRateLimit
+    resetRateLimit,
+    profanityLoading
   };
 }

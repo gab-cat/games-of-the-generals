@@ -11,7 +11,6 @@ import { UserAvatar } from "../UserAvatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
-import { profanity, CensorType } from "@2toad/profanity";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 
 interface OptimisticMessage {
@@ -172,6 +171,30 @@ export function ConversationView({
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const newestTimestampRef = useRef<number>(0);
+
+  // Dynamic profanity loader
+  const [profanityFilter, setProfanityFilter] = useState<any>(null);
+  const [profanityLoading, setProfanityLoading] = useState(false);
+
+  const loadProfanityFilter = async () => {
+    if (profanityFilter) return profanityFilter;
+    if (profanityLoading) return null;
+
+    console.log('🔧 Dynamically loading profanity filter for messaging...');
+    setProfanityLoading(true);
+
+    try {
+      const { profanity, CensorType } = await import('@2toad/profanity');
+      console.log('✅ Profanity filter loaded for messaging');
+      setProfanityFilter({ profanity, CensorType });
+      return { profanity, CensorType };
+    } catch (error) {
+      console.error('❌ Failed to load profanity filter for messaging:', error);
+      return null;
+    } finally {
+      setProfanityLoading(false);
+    }
+  };
 
   const sendMessage = useMutation(api.messages.sendMessage);
   const markAsRead = useMutation(api.messages.markMessagesAsRead);
@@ -345,9 +368,17 @@ export function ConversationView({
     if (!newMessage.trim() || isLoading) return;
 
     const messageText = newMessage.trim();
-    const censoredText = profanity.censor(messageText, CensorType.Word);
+
+    // Load profanity filter if needed
+    let filter = profanityFilter;
+    if (!filter) {
+      filter = await loadProfanityFilter();
+    }
+
+    // Apply censorship if filter is available
+    const censoredText = filter?.profanity?.censor(messageText, filter.CensorType?.Word) || messageText;
     const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
-    
+
     // Create optimistic message
     const optimisticMessage: OptimisticMessage = {
       _id: optimisticId,
