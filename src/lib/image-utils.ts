@@ -10,7 +10,7 @@ export async function compressImage(file: File, maxSize: number = 250): Promise<
 
   try {
     // Dynamically import Jimp only when needed
-    const { Jimp } = await import('jimp');
+    const { Jimp } = await import(/* webpackChunkName: "image-processing" */ 'jimp');
 
     // Convert file to array buffer
     const arrayBuffer = await file.arrayBuffer();

@@ -18,9 +18,10 @@ import { UserAvatar } from "./UserAvatar";
 
 import { TutorialButton } from "./TutorialButton";
 import { TutorialModal } from "./TutorialModal";
-import { GlobalChatPanel } from "./global-chat/GlobalChatPanel";
+// Lazy load GlobalChatPanel
+const GlobalChatPanel = lazy(() => import("./global-chat/GlobalChatPanel").then(module => ({ default: module.GlobalChatPanel })));
 import { cn } from "../lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
@@ -28,8 +29,9 @@ import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useMobile } from "../lib/useMobile";
 import { MessageNotification } from "./messaging/MessageNotification";
-import { MessagingPanel } from "./messaging/MessagingPanel";
-import { MessageButton } from "./messaging/MessageButton";
+// Lazy load heavy messaging components
+const MessagingPanel = lazy(() => import("./messaging/MessagingPanel").then(module => ({ default: module.MessagingPanel })));
+const MessageButton = lazy(() => import("./messaging/MessageButton").then(module => ({ default: module.MessageButton })));
 import { useQuery } from "convex-helpers/react/cache";
 
 interface LayoutProps {
@@ -309,11 +311,13 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               <TutorialButton variant="icon" size="md" />
 
               {/* Message Button */}
-              <MessageButton
-                unreadCount={unreadCount}
-                isActive={isMessagingOpen}
-                onClick={() => setIsMessagingOpen(!isMessagingOpen)}
-              />
+              <Suspense fallback={<div className="w-10 h-10 bg-white/10 rounded-full animate-pulse" />}>
+                <MessageButton
+                  unreadCount={unreadCount}
+                  isActive={isMessagingOpen}
+                  onClick={() => setIsMessagingOpen(!isMessagingOpen)}
+                />
+              </Suspense>
 
               {/* User Dropdown */}
               <DropdownMenu>
@@ -593,30 +597,34 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
 
 
       {/* Global Chat Panel */}
-      <GlobalChatPanel
-        isOpen={isGlobalChatOpen}
-        onToggle={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
-      />
+      <Suspense fallback={null}>
+        <GlobalChatPanel
+          isOpen={isGlobalChatOpen}
+          onToggle={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
+        />
+      </Suspense>
 
             {/* Messaging Panel */}
-      <MessagingPanel
-        isOpen={isMessagingOpen}
-        onClose={() => {
-          setIsMessagingOpen(false);
-          setInviteLobbyId(null); // Clear invite lobby ID when panel closes
-        }}
-        inviteLobbyId={inviteLobbyId}
-        onNavigateToLobby={(lobbyId) => {
-          setIsMessagingOpen(false);
-          setInviteLobbyId(null);
-          void navigate({ to: "/", search: { lobbyId } });
-        }}
-        onNavigateToGame={(gameId) => {
-          setIsMessagingOpen(false);
-          setInviteLobbyId(null);
-          void navigate({ to: "/game", search: { gameId } });
-        }}
-      />
+      <Suspense fallback={null}>
+        <MessagingPanel
+          isOpen={isMessagingOpen}
+          onClose={() => {
+            setIsMessagingOpen(false);
+            setInviteLobbyId(null); // Clear invite lobby ID when panel closes
+          }}
+          inviteLobbyId={inviteLobbyId}
+          onNavigateToLobby={(lobbyId) => {
+            setIsMessagingOpen(false);
+            setInviteLobbyId(null);
+            void navigate({ to: "/", search: { lobbyId } });
+          }}
+          onNavigateToGame={(gameId) => {
+            setIsMessagingOpen(false);
+            setInviteLobbyId(null);
+            void navigate({ to: "/game", search: { gameId } });
+          }}
+        />
+      </Suspense>
 
       {/* Message Notifications */}
       <MessageNotification

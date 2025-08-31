@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 
-import { compressImage, validateImageFile } from "@/lib/image-utils";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import { Camera, Upload, X, Loader2 } from "lucide-react";
@@ -38,17 +37,21 @@ export function AvatarUpload({
     }
   });
 
-  const handleFileSelect = async (file: File) => {
-    // Validate file
-    const validation = validateImageFile(file);
-    if (!validation.valid) {
-      toast.error(validation.error);
-      return;
-    }
-
+    const handleFileSelect = async (file: File) => {
     try {
       setIsUploading(true);
-      
+
+      // Dynamically import image utilities to load jimp only when needed
+      const { validateImageFile, compressImage } = await import("@/lib/image-utils");
+
+      // Validate file
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        toast.error(validation.error);
+        setIsUploading(false);
+        return;
+      }
+
       // Compress image to 250x250 using Jimp
       const compressedBlob = await compressImage(file, 250);
       

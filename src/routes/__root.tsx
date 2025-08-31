@@ -1,12 +1,14 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { Layout } from '../components/Layout'
+import { lazy, Suspense, useState, useCallback } from 'react'
 import { ConvertAnonymousPopup } from '../components/ConvertAnonymousPopup'
 import { Toaster } from 'sonner'
 import { useConvexQuery } from '../lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
-import { useState, useCallback } from 'react'
 import { Id } from '../../convex/_generated/dataModel'
+
+// Lazy load Layout component for better code splitting
+const Layout = lazy(() => import('../components/Layout').then(module => ({ default: module.Layout })))
 
 function RootComponent() {
   const { data: profile } = useConvexQuery(api.profiles.getCurrentProfile)
@@ -25,12 +27,20 @@ function RootComponent() {
   
   return (
     <div className="min-h-screen">
-      <Layout 
-        user={profile ? { username: profile.username } : undefined}
-        onOpenMessagingWithLobby={onOpenMessagingWithLobby}
+      <Suspense
+        fallback={
+          <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
+            <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
+          </div>
+        }
       >
-        <Outlet />
-      </Layout>
+        <Layout
+          user={profile ? { username: profile.username } : undefined}
+          onOpenMessagingWithLobby={onOpenMessagingWithLobby}
+        >
+          <Outlet />
+        </Layout>
+      </Suspense>
       <ConvertAnonymousPopup />
       <Toaster theme="dark" className="rounded-2xl" />
       {import.meta.env.DEV && <TanStackRouterDevtools />}

@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import react from '@vitejs/plugin-react-swc'
 import { TanStackRouterVite } from '@tanstack/router-vite-plugin';
 import { VitePWA } from 'vite-plugin-pwa';
+import { visualizer } from 'rollup-plugin-visualizer';
 import path from "path";
 import fs from "fs";
 
@@ -10,6 +11,14 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     TanStackRouterVite(),
+    // Bundle analyzer - run with ANALYZE=true bun run build
+    ...(process.env.ANALYZE ? [visualizer({
+      filename: 'dist/bundle-analysis.html',
+      open: true,
+      gzipSize: true,
+      brotliSize: true,
+      template: 'treemap' // 'sunburst' | 'treemap' | 'network'
+    })] : []),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
@@ -88,10 +97,7 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('@formkit/auto-animate')) {
             return 'formkit-animate';
           }
-          // Heavy libraries that should be dynamically imported
-          if (id.includes('jimp')) {
-            return 'image-processing';
-          }
+
           // Utilities and smaller deps
           if (id.includes('clsx') || id.includes('class-variance-authority') ||
               id.includes('tailwind-merge') || id.includes('cmdk') ||
