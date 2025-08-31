@@ -460,6 +460,24 @@ const applicationTables = {
     .index("by_expires_at", ["expiresAt"])
     .index("by_target_active", ["targetUserId", "isActive"]),
 
+  // Ban Appeals
+  banAppeals: defineTable({
+    userId: v.id("users"),
+    username: v.string(),
+    appealMessage: v.string(),
+    timestamp: v.number(),
+    status: v.union(v.literal("pending"), v.literal("reviewed"), v.literal("approved"), v.literal("denied")),
+    moderatorResponse: v.optional(v.string()),
+    respondedAt: v.optional(v.number()),
+    moderatorId: v.optional(v.id("users")),
+    moderatorUsername: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_timestamp", ["userId", "timestamp"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_status", ["status"])
+    .index("by_user_status", ["userId", "status"]),
+
   // Message Moderation Actions (deletions, warnings, etc.)
   messageModeration: defineTable({
     messageId: v.id("globalChat"),

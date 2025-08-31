@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
@@ -18,10 +19,8 @@ import { UserAvatar } from "./UserAvatar";
 
 import { TutorialButton } from "./TutorialButton";
 import { TutorialModal } from "./TutorialModal";
-// Lazy load GlobalChatPanel
-const GlobalChatPanel = lazy(() => import("./global-chat/GlobalChatPanel").then(module => ({ default: module.GlobalChatPanel })));
+import { BanScreen } from "./BanScreen";
 import { cn } from "../lib/utils";
-import { useState, useEffect, lazy, Suspense } from "react";
 import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
@@ -29,10 +28,13 @@ import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useMobile } from "../lib/useMobile";
 import { MessageNotification } from "./messaging/MessageNotification";
-// Lazy load heavy messaging components
+import { useQuery } from "convex-helpers/react/cache";
+
+// Lazy load components
+const GlobalChatPanel = lazy(() => import("./global-chat/GlobalChatPanel").then(module => ({ default: module.GlobalChatPanel })));
 const MessagingPanel = lazy(() => import("./messaging/MessagingPanel").then(module => ({ default: module.MessagingPanel })));
 const MessageButton = lazy(() => import("./messaging/MessageButton").then(module => ({ default: module.MessageButton })));
-import { useQuery } from "convex-helpers/react/cache";
+
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -83,6 +85,17 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       enabled: !!isAuthenticated,
       staleTime: 300000, // 5 minutes - tutorial status doesn't change often
       gcTime: 600000, // 10 minutes cache
+    }
+  );
+
+  // Check if user is banned
+  const { data: isBanned } = useConvexQueryWithOptions(
+    api.globalChat.isUserBanned,
+    isAuthenticated ? {} : "skip",
+    {
+      enabled: !!isAuthenticated,
+      staleTime: 30000, // 30 seconds - ban status can change
+      gcTime: 60000, // 1 minute cache
     }
   );
 
@@ -267,7 +280,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           </motion.div>
 
           {/* Middle Section - Navigation */}
-          {isAuthenticated && (
+          {isAuthenticated && !isBanned && (
             <motion.div
               initial={{ y: -10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -285,8 +298,8 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       onClick={() => void navigate({ to: item.path })}
                       className={cn(
                         "rounded-full px-4 py-2 text-white/70 transition-all duration-200 flex items-center gap-2",
-                        isActiveTab(item.path) 
-                          ? "bg-white/20 text-white hover:bg-white/25" 
+                        isActiveTab(item.path)
+                          ? "bg-white/20 text-white hover:bg-white/25"
                           : "bg-transparent hover:text-white"
                       )}
                     >
@@ -300,7 +313,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           )}
 
           {/* Right Section - Messages & User Profile */}
-          {isAuthenticated && user && (
+          {isAuthenticated && user && !isBanned && (
             <motion.div
               initial={{ x: 20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -326,8 +339,8 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                   >
-                    <Button 
-                      variant="ghost" 
+                    <Button
+                      variant="ghost"
                       className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2 rounded-full group h-10 sm:h-12 min-w-0"
                     >
                       <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -338,7 +351,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                             <span className="text-white/50 text-xs">Online</span>
                           </div>
                         </div>
-                        <UserAvatar 
+                        <UserAvatar
                           username={user.username}
                           avatarUrl={profile?.avatarUrl}
                           rank={profile?.rank}
@@ -350,15 +363,15 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     </Button>
                   </motion.div>
                 </DropdownMenuTrigger>
-                
-                <DropdownMenuContent 
-                  align="end" 
+
+                <DropdownMenuContent
+                  align="end"
                   className="w-56 bg-black/50 backdrop-blur-lg border border-white/20 shadow-2xl rounded-2xl mt-2"
                 >
                   {/* User Header */}
                   <div className="px-3 py-3 border-b border-white/10">
                     <div className="flex items-center gap-3">
-                      <UserAvatar 
+                      <UserAvatar
                         username={user.username}
                         avatarUrl={profile?.avatarUrl}
                         rank={profile?.rank}
@@ -374,26 +387,26 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Menu Items */}
                   <div className="py-1">
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={() => void navigate({ to: "/profile" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
                       <User className="h-4 w-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
-                    
-                    <DropdownMenuItem 
+
+                    <DropdownMenuItem
                       onClick={() => void navigate({ to: "/achievements" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
                       <Trophy className="h-4 w-4" />
                       <span>Achievements</span>
                     </DropdownMenuItem>
-                    
-                    <DropdownMenuItem 
+
+                    <DropdownMenuItem
                       onClick={() => void navigate({ to: "/settings" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
@@ -401,9 +414,9 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       <span>Settings</span>
                     </DropdownMenuItem>
                   </div>
-                  
+
                   <DropdownMenuSeparator className="bg-white/10" />
-                  
+
                   <div className="py-1">
                     <DropdownMenuItem
                       onClick={() => {
@@ -453,11 +466,11 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl mx-auto mt-4 sm:mt-8 px-3 sm:px-6">
-        {children}
+        {isAuthenticated && isBanned ? <BanScreen /> : children}
       </main>
 
       {/* Floating Global Chat Button - Desktop */}
-      {isAuthenticated && (
+      {isAuthenticated && !isBanned && (
         <motion.div
           initial={isMobile ? { opacity: 0 } : { scale: 0.95, opacity: 0 }}
           animate={isMobile ? { opacity: 1 } : { scale: 1, opacity: 1 }}
@@ -512,7 +525,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       )}
 
       {/* Mobile Bottom Navigation */}
-      {isAuthenticated && (
+      {isAuthenticated && !isBanned && (
         <motion.nav
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

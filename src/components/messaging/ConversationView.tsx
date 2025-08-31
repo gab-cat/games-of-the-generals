@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
 import { useConvex, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -160,12 +161,13 @@ function LobbyInviteMessage({ message, onNavigateToLobby, copyLobbyCode, current
   );
 }
 
-export function ConversationView({ 
-  otherUserId, 
+export function ConversationView({
+  otherUserId,
   onNavigateToLobby,
   onNavigateToGame,
   onBack
 }: ConversationViewProps) {
+  const navigate = useNavigate();
   const [newMessage, setNewMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
@@ -808,7 +810,14 @@ export function ConversationView({
             className="ring-1 ring-white/20"
           />
           <div>
-            <h3 className="font-sm text-white">{otherUserProfile.username}</h3>
+            <h3
+              className="font-sm text-white hover:text-blue-400 cursor-pointer transition-colors"
+              onClick={() => {
+                void navigate({ to: '/profile', search: { u: otherUserProfile.username } });
+              }}
+            >
+              {otherUserProfile.username}
+            </h3>
             <p className="text-xs text-white/60">
               {otherUserProfile.bio
                 ? otherUserProfile.bio.length > 50

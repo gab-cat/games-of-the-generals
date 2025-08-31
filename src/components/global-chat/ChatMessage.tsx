@@ -9,6 +9,7 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { Loader2, Shield, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageModerationMenu } from "./MessageModerationMenu";
+import { toast } from "sonner";
 
 interface ChatMessageProps {
   message: {
@@ -62,6 +63,16 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     }
   );
 
+  // Check if current user is banned
+  const { data: isCurrentUserBanned = false } = useConvexQueryWithOptions(
+    api.globalChat.isUserBanned,
+    isAuthenticated ? {} : "skip",
+    {
+      staleTime: 30000, // 30 seconds - ban status can change
+      gcTime: 60000, // 1 minute cache
+    }
+  );
+
   const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -80,7 +91,16 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
 
   const handleUsernameClick = () => {
     if (isAuthenticated && message.userId) {
-      void navigate({ to: "/profile", search: { u: message.userId } });
+      void navigate({ to: "/profile", search: { u: message.username } });
+    }
+  };
+
+  const handleMessageClick = () => {
+    if (isAuthenticated && isCurrentUserBanned) {
+      // For banned users, show a helpful message about contacting admin
+      toast.info("Use the 'Message Administrator' button in your ban screen to appeal your suspension", {
+        duration: 5000,
+      });
     }
   };
 
@@ -173,10 +193,15 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
         {/* Message Content */}
         <div className="flex min-w-0 items-start w-full">
           <div className="flex items-start gap-2 w-full">
-            <div className={cn(
-              "text-white/90 text-xs leading-tight break-words flex-1",
-              isOptimistic && "opacity-75"
-            )}>
+            <div
+              className={cn(
+                "text-white/90 text-xs leading-tight break-words flex-1",
+                isOptimistic && "opacity-75",
+                isCurrentUserBanned && "cursor-pointer hover:bg-white/10 rounded px-1 py-0.5 transition-colors"
+              )}
+              onClick={isCurrentUserBanned ? handleMessageClick : undefined}
+              title={isCurrentUserBanned ? "Click to message administrator" : undefined}
+            >
               {renderMessageWithMentions(message.filteredMessage)}
             </div>
 
@@ -199,6 +224,7 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
                 username={message.username}
                 isOwnMessage={currentUser?.userId === message.userId}
                 className="ml-auto"
+                size="md"
               />
             )}
           </div>

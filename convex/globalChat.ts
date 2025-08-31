@@ -3,7 +3,7 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { profanity, CensorType } from "@2toad/profanity";
-import { internal } from "./_generated/api";
+import { internal, api } from "./_generated/api";
 // Simple hash function to replace crypto for spam detection
 function simpleHash(str: string): string {
   let hash = 0;
@@ -1271,6 +1271,236 @@ export const isUserBanned = query({
     }
 
     return true;
+  },
+});
+
+// Get user's active ban details
+export const getUserBanDetails = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const activeBan = await ctx.db
+      .query("userModeration")
+      .withIndex("by_target_active", (q) =>
+        q.eq("targetUserId", userId).eq("isActive", true)
+      )
+      .filter((q) => q.eq(q.field("action"), "ban"))
+      .first();
+
+    if (!activeBan) return null;
+
+    // Check if ban has expired
+    if (activeBan.expiresAt && activeBan.expiresAt < Date.now()) {
+      return null;
+    }
+
+    return {
+      reason: activeBan.reason,
+      duration: activeBan.duration,
+      expiresAt: activeBan.expiresAt,
+      moderatorUsername: activeBan.moderatorUsername,
+      createdAt: activeBan.createdAt,
+    };
+  },
+});
+
+// Get user's moderation status (ban and mute) by userId
+export const getUserModerationStatus = query({
+  args: {
+    userId: v.id("users"),
+  },
+  handler: async (ctx, args) => {
+    // Check for active ban
+    const activeBan = await ctx.db
+      .query("userModeration")
+      .withIndex("by_target_active", (q) =>
+        q.eq("targetUserId", args.userId).eq("isActive", true)
+      )
+      .filter((q) => q.eq(q.field("action"), "ban"))
+      .first();
+
+    let banStatus = null;
+    if (activeBan) {
+      // Check if ban has expired
+      if (activeBan.expiresAt && activeBan.expiresAt < Date.now()) {
+        // Ban has expired - don't return it as active
+        banStatus = null;
+      } else {
+        // Ban is still active
+        banStatus = {
+          reason: activeBan.reason,
+          duration: activeBan.duration,
+          expiresAt: activeBan.expiresAt,
+          moderatorUsername: activeBan.moderatorUsername,
+          createdAt: activeBan.createdAt,
+        };
+      }
+    }
+
+    // Check for mute status
+    const chatSettings = await ctx.db
+      .query("userChatSettings")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    let muteStatus = null;
+    if (chatSettings?.isMuted && chatSettings.mutedUntil && chatSettings.mutedUntil > Date.now()) {
+      muteStatus = {
+        mutedUntil: chatSettings.mutedUntil,
+        reason: chatSettings.muteReason || "No reason provided",
+      };
+    }
+
+    return {
+      banStatus,
+      muteStatus,
+    };
+  },
+});
+
+// Get all active admin/moderator users
+export const getActiveAdmins = query({
+  args: {},
+  handler: async (ctx) => {
+    // Use index to efficiently find admin/moderator users
+    // Query for moderators
+    const moderators = await ctx.db
+      .query("profiles")
+      .withIndex("by_admin_role", (q) => q.eq("adminRole", "moderator"))
+      .take(25);
+
+    // Query for admins
+    const admins = await ctx.db
+      .query("profiles")
+      .withIndex("by_admin_role", (q) => q.eq("adminRole", "admin"))
+      .take(25);
+
+    // Combine and map the results
+    const allAdmins = [...moderators, ...admins];
+
+    return allAdmins.map(admin => ({
+      userId: admin.userId,
+      username: admin.username,
+      role: admin.adminRole!,
+    }));
+  },
+});
+
+// Check if user has already sent an appeal message
+export const hasUserSentAppeal = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return false;
+
+    const now = Date.now();
+    const oneDayAgo = now - (24 * 60 * 60 * 1000); // 24 hours ago
+
+    // Look for appeals sent in the last 24 hours
+    const recentAppeals = await ctx.db
+      .query("banAppeals")
+      .withIndex("by_user_timestamp", (q) =>
+        q.eq("userId", userId).gte("timestamp", oneDayAgo)
+      )
+      .take(1);
+
+    return recentAppeals.length > 0;
+  },
+});
+
+// Get the timestamp of the user's last appeal
+export const getLastAppealTimestamp = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    // Get the most recent appeal from this user
+    const lastAppeal = await ctx.db
+      .query("banAppeals")
+      .withIndex("by_user_timestamp", (q) =>
+        q.eq("userId", userId)
+      )
+      .order("desc")
+      .first();
+
+    return lastAppeal ? lastAppeal.timestamp : null;
+  },
+});
+
+// Send appeal message to all active admins
+export const sendAppealToAdmins = mutation({
+  args: {
+    appealMessage: v.string(),
+  },
+  handler: async (ctx, args): Promise<{success: boolean, messageCount: number, message: string}> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    // Get user profile
+    const userProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (!userProfile) throw new Error("User profile not found");
+
+    // Check if user has already sent an appeal recently
+    const hasSentAppeal = await ctx.runQuery(api.globalChat.hasUserSentAppeal);
+    if (hasSentAppeal) {
+      throw new Error("You have already sent an appeal message in the last 24 hours. Please wait before sending another.");
+    }
+
+    // Get all active admins
+    const admins: Array<{userId: string, username: string, role: string}> = await ctx.runQuery(api.globalChat.getActiveAdmins);
+    if (admins.length === 0) {
+      throw new Error("No administrators are currently available. Please try again later.");
+    }
+
+    // Validate appeal message
+    if (args.appealMessage.length < 50) {
+      throw new Error("Appeal message must be at least 50 characters long.");
+    }
+    if (args.appealMessage.length > 1000) {
+      throw new Error("Appeal message must be less than 1000 characters.");
+    }
+
+    const timestamp = Date.now();
+    const appealContent = `BAN APPEAL: ${args.appealMessage}`;
+
+    // Insert appeal into banAppeals table
+    await ctx.db.insert("banAppeals", {
+      userId,
+      username: userProfile.username,
+      appealMessage: args.appealMessage,
+      timestamp,
+      status: "pending",
+    });
+
+    // Send message to all admins
+    const messagePromises: Array<Promise<string>> = admins.map((admin: {userId: string, username: string, role: string}) =>
+      ctx.runMutation(internal.messages.sendMessageInternal, {
+        senderId: userId,
+        recipientUsername: admin.username,
+        content: appealContent,
+        messageType: "text",
+      })
+    );
+
+    const messageIds: Array<string> = await Promise.all(messagePromises);
+
+    // Update user's last seen time
+    await ctx.db.patch(userProfile._id, {
+      lastSeenAt: timestamp,
+      isOnline: true,
+    });
+
+    return {
+      success: true,
+      messageCount: messageIds.length,
+      message: "Your appeal has been sent to all administrators. You will receive a response via direct message.",
+    };
   },
 });
 

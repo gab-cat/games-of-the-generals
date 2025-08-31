@@ -24,20 +24,28 @@ import {
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import { cn } from "@/lib/utils";
 
 interface MessageModerationMenuProps {
-  messageId: string;
+  messageId?: string;
   userId: Id<"users">;
   username: string;
   isOwnMessage?: boolean;
   className?: string;
+  size?: "sm" | "md" | "lg";
+  showText?: boolean;
+  text?: string;
 }
 
 export function MessageModerationMenu({
   messageId,
   userId,
   username,
-  className = ""
+  isOwnMessage: _isOwnMessage = false,
+  className = "",
+  size = "sm",
+  showText = false,
+  text = "Actions"
 }: MessageModerationMenuProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState<"mute" | "ban" | "delete">("delete");
@@ -128,6 +136,10 @@ export function MessageModerationMenu({
           break;
 
         case "delete":
+          if (!messageId) {
+            toast.error("Cannot delete message: invalid message ID");
+            return;
+          }
           await deleteMessage({
             messageId: messageId as Id<"globalChat">,
             reason: reason || "No reason provided",
@@ -220,11 +232,24 @@ export function MessageModerationMenu({
         <DropdownMenuTrigger asChild>
           <Button
             ref={triggerRef}
-            variant="ghost"
+            variant={showText ? "outline" : "ghost"}
             size="sm"
-            className="h-3 w-3 my-0 p-0 text-white/40 hover:text-white/80 hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+            className={cn(
+              "my-0 transition-opacity",
+              showText ? "bg-red-600/20 border-red-500/50 text-red-300 hover:bg-red-600/30 hover:border-red-400/70 flex items-center gap-1.5 px-2 py-1 text-xs font-medium" :
+              "p-0 text-white/40 hover:text-white/80 hover:bg-white/10 opacity-0 group-hover:opacity-100",
+              size === "sm" && (showText ? "h-auto" : "h-3 w-3"),
+              size === "md" && (showText ? "h-auto" : "h-5 w-5 p-0.5"),
+              size === "lg" && (showText ? "h-auto" : "h-6 w-6 p-1")
+            )}
           >
-            <MoreVertical className="w-3 h-3 my-0" />
+            <MoreVertical className={cn(
+              "my-0",
+              size === "sm" && "w-3 h-3",
+              size === "md" && "w-4 h-4",
+              size === "lg" && "w-5 h-5"
+            )} />
+            {showText && <span>{text}</span>}
           </Button>
         </DropdownMenuTrigger>
 
@@ -233,16 +258,19 @@ export function MessageModerationMenu({
           side="top"
           className="z-[300] font-body font-medium min-w-48 text-sm rounded-2xl bg-gray-950/90 backdrop-blur-sm p-1"
         >
-          {/* Message Actions */}
-          <DropdownMenuItem
-            onClick={() => handleShowDialog("delete")}
-            className="text-red-400 focus:text-red-300 focus:bg-red-500/10 text-xs"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete Message
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator />
+          {/* Message Actions - only show if messageId is provided */}
+          {messageId !== "profile-moderation" && (
+            <>
+              <DropdownMenuItem
+                onClick={() => handleShowDialog("delete")}
+                className="text-red-400 focus:text-red-300 focus:bg-red-500/10 text-xs"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete Message
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
 
           {/* User Actions */}
           <DropdownMenuItem

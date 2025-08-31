@@ -141,8 +141,11 @@ export function ProfilePage() {
           </div>
         </div>
 
-        <ProfileHeader 
-          profileStats={profileStats}
+        <ProfileHeader
+          profileStats={{
+            ...profileStats,
+            userId: isViewingOther ? otherStats?.userId : ownStats?.userId
+          }}
           onAvatarSettingsToggle={() => setShowAvatarUpload(!showAvatarUpload)}
           isOwnProfile={!isViewingOther}
         />

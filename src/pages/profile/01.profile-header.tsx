@@ -1,11 +1,14 @@
 import { motion } from "framer-motion";
 import { Badge } from "../../components/ui/badge";
 import { UserAvatar } from "../../components/UserAvatar";
-import { Settings } from "lucide-react";
+import { Settings, Ban, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
-import { useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
+import { useConvexMutationWithQuery, useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
+import { MessageModerationMenu } from "../../components/global-chat/MessageModerationMenu";
+import { Id } from "../../../convex/_generated/dataModel";
+import { useConvexAuth } from "convex/react";
 
 interface ProfileStats {
   username: string;
@@ -17,6 +20,7 @@ interface ProfileStats {
   gamesPlayed: number;
   winRate: number;
   bio?: string;
+  userId?: Id<"users">;
 }
 
 interface ProfileHeaderProps {
@@ -26,6 +30,7 @@ interface ProfileHeaderProps {
 }
 
 export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfile = true }: ProfileHeaderProps) {
+  const { isAuthenticated } = useConvexAuth();
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioValue, setBioValue] = useState(profileStats.bio || "");
   const updateBio = useConvexMutationWithQuery(api.profiles.updateBio, {
@@ -34,9 +39,40 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
     },
   });
 
+  // Check if current user is admin/moderator
+  const { data: adminRole } = useConvexQueryWithOptions(
+    api.globalChat.getUserAdminRole,
+    isAuthenticated && !isOwnProfile ? {} : "skip", // Only check admin status when authenticated and viewing others' profiles
+    {
+      staleTime: 300000, // 5 minutes - admin status doesn't change often
+      gcTime: 600000, // 10 minutes cache
+    }
+  );
+
+  // Get user's moderation status (ban/mute)
+  const { data: moderationStatus } = useConvexQueryWithOptions(
+    api.globalChat.getUserModerationStatus,
+    profileStats.userId ? { userId: profileStats.userId } : "skip",
+    {
+      staleTime: 60000, // 1 minute - moderation status can change
+      gcTime: 300000, // 5 minutes cache
+    }
+  );
+
+  // Debug logging (remove in production)
+  console.log("Profile Header Debug:", {
+    isAuthenticated,
+    isOwnProfile,
+    adminRole,
+    userId: profileStats.userId,
+    username: profileStats.username,
+    moderationStatus
+  });
+
   useEffect(() => {
     setBioValue(profileStats.bio || "");
   }, [profileStats.bio]);
+
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -57,6 +93,28 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
         month: 'long',
         year: 'numeric'
       });
+    }
+  };
+
+  const formatRemainingTime = (expiresAt: number) => {
+    const now = Date.now();
+    const remainingMs = expiresAt - now;
+
+    if (remainingMs <= 0) return "Expired";
+
+    const seconds = Math.floor(remainingMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days} day${days > 1 ? 's' : ''}`;
+    } else if (hours > 0) {
+      return `${hours} hour${hours > 1 ? 's' : ''}`;
+    } else if (minutes > 0) {
+      return `${minutes} minute${minutes > 1 ? 's' : ''}`;
+    } else {
+      return `${seconds} second${seconds > 1 ? 's' : ''}`;
     }
   };
 
@@ -82,7 +140,7 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
         {/* Left side - Avatar and Info */}
         <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
           <div className="relative">
-            <UserAvatar 
+            <UserAvatar
               username={profileStats.username}
               avatarUrl={profileStats.avatarUrl}
               rank={profileStats.rank}
@@ -98,6 +156,7 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
                 <Settings className="w-4 h-4 text-white" />
               </button>
             )}
+
           </div>
         
           <div>
@@ -108,7 +167,35 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
               <Badge variant="outline" className={`text-xs px-2 py-0.5 bg-gradient-to-r ${getRankColor(profileStats.rank)} text-white border-0 font-medium`}>
                 {profileStats.rank}
               </Badge>
+
+              {/* Moderation Status Badges */}
+              {moderationStatus?.banStatus && (
+                <Badge variant="destructive" className="text-xs px-2 py-0.5 bg-red-600/20 border-red-500/50 text-red-300 border font-medium">
+                  <Ban className="w-3 h-3 mr-1" />
+                  Banned {moderationStatus.banStatus.expiresAt ? `for ${formatRemainingTime(moderationStatus.banStatus.expiresAt)}` : 'permanently'}
+                </Badge>
+              )}
+
+              {moderationStatus?.muteStatus && (
+                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-orange-600/20 border-orange-500/50 text-orange-300 border font-medium">
+                  <VolumeX className="w-3 h-3 mr-1" />
+                  Muted for {formatRemainingTime(moderationStatus.muteStatus.mutedUntil)}
+                </Badge>
+              )}
+
               <div className="text-gray-500 text-xs">Member since {formatDate(profileStats.createdAt)}</div>
+
+              {/* Moderation Menu for Admins/Moderators */}
+              {isAuthenticated && !isOwnProfile && adminRole && (adminRole === "admin" || adminRole === "moderator") && profileStats.userId && (
+                <MessageModerationMenu
+                  messageId="profile-moderation"
+                  userId={profileStats.userId}
+                  username={profileStats.username}
+                  size="md"
+                  showText={true}
+                  text="Actions"
+                />
+              )}
             </div>
 
             {/* Bio inline below name/date */}
