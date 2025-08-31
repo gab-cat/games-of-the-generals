@@ -987,6 +987,23 @@ export const muteUser = mutation({
       });
     }
 
+    // Send email notification (don't fail the moderation if email fails)
+    try {
+      const targetUser = await ctx.db.get(args.targetUserId);
+      if (targetUser?.email) {
+        await ctx.scheduler.runAfter(0, internal.sendEmails.sendMuteEmail, {
+          targetEmail: targetUser.email,
+          targetUsername: targetProfile.username,
+          moderatorUsername: profile.username,
+          reason: args.reason,
+          duration: args.duration,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send mute email notification:", error);
+      // Don't fail the moderation action if email fails
+    }
+
     return { success: true };
   },
 });
@@ -1043,6 +1060,22 @@ export const unmuteUser = mutation({
       });
     }
 
+    // Send email notification (don't fail the moderation if email fails)
+    try {
+      const targetUser = await ctx.db.get(args.targetUserId);
+      if (targetUser?.email) {
+        await ctx.scheduler.runAfter(0, internal.sendEmails.sendUnmuteEmail, {
+          targetEmail: targetUser.email,
+          targetUsername: targetProfile.username,
+          moderatorUsername: profile.username,
+          reason: args.reason,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send unmute email notification:", error);
+      // Don't fail the moderation action if email fails
+    }
+
     return { success: true };
   },
 });
@@ -1088,6 +1121,23 @@ export const banUser = mutation({
       createdAt: timestamp,
       isActive: true,
     });
+
+    // Send email notification (don't fail the moderation if email fails)
+    try {
+      const targetUser = await ctx.db.get(args.targetUserId);
+      if (targetUser?.email) {
+        await ctx.scheduler.runAfter(0, internal.sendEmails.sendBanEmail, {
+          targetEmail: targetUser.email,
+          targetUsername: targetProfile.username,
+          moderatorUsername: profile.username,
+          reason: args.reason,
+          duration: args.duration,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send game ban email notification:", error);
+      // Don't fail the moderation action if email fails
+    }
 
     return { success: true };
   },
@@ -1142,6 +1192,22 @@ export const unbanUser = mutation({
 
     if (activeBan) {
       await ctx.db.patch(activeBan._id, { isActive: false });
+    }
+
+    // Send email notification (don't fail the moderation if email fails)
+    try {
+      const targetUser = await ctx.db.get(args.targetUserId);
+      if (targetUser?.email) {
+        await ctx.scheduler.runAfter(0, internal.sendEmails.sendUnbanEmail, {
+          targetEmail: targetUser.email,
+          targetUsername: targetProfile.username,
+          moderatorUsername: profile.username,
+          reason: args.reason,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to send game unban email notification:", error);
+      // Don't fail the moderation action if email fails
     }
 
     return { success: true };
