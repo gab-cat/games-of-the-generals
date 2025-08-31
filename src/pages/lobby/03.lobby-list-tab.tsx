@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { GameStartCountdownModal } from "../../components/GameStartCountdownModal";
 import generateName from "@scaleway/random-name";
 import { useQuery } from "convex-helpers/react/cache";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -33,6 +34,7 @@ interface LobbyListTabProps {
 }
 
 export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMutation, onOpenMessaging }: LobbyListTabProps) {
+  const listRef = useAutoAnimate();
   const [showCreateLobby, setShowCreateLobby] = useState(false);
   const [showJoinByCode, setShowJoinByCode] = useState(false);
   const [lobbyName, setLobbyName] = useState("");
@@ -592,7 +594,7 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
       </div>
 
       {/* Lobbies List */}
-      <div className="space-y-3">
+      <div ref={listRef} className="space-y-3">
         {lobbiesQuery === undefined ? (
           <div className="flex justify-center py-8">
             <motion.div

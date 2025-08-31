@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
 import { Button } from "../ui/button";
 import { Id } from "../../../convex/_generated/dataModel";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 interface OnlineUser {
   userId: Id<"users">;
@@ -57,6 +58,7 @@ const rankColors = {
 };
 
 export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
+  const usersListRef = useAutoAnimate();
   const navigate = useNavigate();
 
   const handleUserClick = (username: string) => {
@@ -114,7 +116,7 @@ export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
             No players online
           </div>
         ) : (
-          <div className="p-2 space-y-1">
+          <div ref={usersListRef} className="p-2 space-y-1">
             {users.map((user) => {
               const RankIcon = rankIcons[user.rank as keyof typeof rankIcons] || Shield;
               const rankColor = rankColors[user.rank as keyof typeof rankColors] || "text-gray-400";

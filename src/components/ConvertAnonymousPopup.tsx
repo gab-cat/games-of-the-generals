@@ -93,7 +93,7 @@ export function ConvertAnonymousPopup() {
           exit={{ x: -100, opacity: 0 }}
           className="fixed z-50 sm:bottom-6 sm:left-6 sm:right-auto sm:top-auto left-3 right-3 top-20"
         >
-          <div className="relative bg-white/5 backdrop-blur-md border border-gray-600 rounded-2xl shadow-lg p-3 sm:p-4 flex items-start gap-3 w-auto sm:w-[360px]">
+          <div className="relative bg-gray-950/40 border border-white/10 backdrop-blur-sm border-gray-600 rounded-2xl shadow-lg p-3 sm:p-4 flex items-start gap-3 w-auto sm:w-[360px]">
             <button
               onClick={handleDismiss}
               aria-label="Dismiss"

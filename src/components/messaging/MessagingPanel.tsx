@@ -46,7 +46,7 @@ interface SearchResult {
 
 function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isSubscribing, onEnablePush }: NewMessageViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
   const { data: searchResults = [], isLoading: searchLoading } = useConvexQuery(
     api.messages.searchUsers,
@@ -222,7 +222,7 @@ export function MessagingPanel({
   
   
   // Debounce search term to avoid too many queries
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
   // Reset state when panel closes
   useEffect(() => {

@@ -6,8 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Trophy, Award, CheckCircle } from "lucide-react";
 import { AchievementsHeader } from "./01.achievements-header";
 import { AchievementCard } from "./02.achievement-card";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 export function AchievementsPage() {
+  const categoryGridRef = useAutoAnimate();
+  const unlockedGridRef = useAutoAnimate();
+  const recentUnlocksRef = useAutoAnimate();
   const { data: achievements, isPending: isLoadingAchievements, error: achievementsError } = useConvexQuery(
     api.achievements.getAllAchievements
   );
@@ -74,7 +78,7 @@ export function AchievementsPage() {
         <Award className="w-5 h-5 text-yellow-400" />
         {title}
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div ref={categoryGridRef} className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {achievements.map((achievement) => (
           <AchievementCard key={achievement.id} achievement={achievement} />
         ))}
@@ -127,7 +131,7 @@ export function AchievementsPage() {
 
           <TabsContent value="unlocked" className="space-y-6">
             {unlockedAchievements.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div ref={unlockedGridRef} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {unlockedAchievements
                   .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0))
                   .map((achievement) => (
@@ -176,7 +180,7 @@ export function AchievementsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              <div ref={recentUnlocksRef} className="space-y-3">
                 {unlockedAchievements
                   .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0))
                   .slice(0, 5)

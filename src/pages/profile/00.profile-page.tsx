@@ -24,7 +24,7 @@ export function ProfilePage() {
 
   // Username search + suggestions
   const [inputValue, setInputValue] = useReactState(usernameParam);
-  const [debounced] = useDebounce(inputValue, 250);
+  const [debounced] = useDebounce(inputValue, 500);
   const { data: suggestions } = useConvexQuery(api.profiles.searchUsernames, { q: debounced, limit: 20 });
 
   // Load current user's stats

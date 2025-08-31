@@ -5,9 +5,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { Button } from "../ui/button";
-import { X, AtSign, MessageCircle, Check } from "lucide-react";
+import { AtSign, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 interface Mention {
   _id: string;
@@ -16,9 +16,11 @@ interface Mention {
   mentionedUsername: string;
   timestamp: number;
   mentionText: string;
+  isExiting?: boolean;
 }
 
 export function MentionNotification() {
+  const mentionsRef = useAutoAnimate();
   const [visibleMentions, setVisibleMentions] = useState<Mention[]>([]);
   const [dismissedMentions, setDismissedMentions] = useState<Set<string>>(new Set());
   const prevMentionsRef = useRef<string>('');
@@ -73,7 +75,9 @@ export function MentionNotification() {
 
       setVisibleMentions(prev => {
         // Combine existing mentions with new ones, avoiding duplicates
+        // Also filter out mentions that are already exiting to prevent them from reappearing
         const existingIds = new Set(prev.map(m => m._id));
+        const activeMentions = prev.filter(m => !m.isExiting);
         const uniqueNewMentions = newMentions.filter((m: { _id: string; }) => !existingIds.has(m._id));
 
         // Play sound notification for new mentions
@@ -81,49 +85,80 @@ export function MentionNotification() {
           playMentionSound();
         }
 
-        return [...prev, ...uniqueNewMentions].slice(-3); // Keep max 3 notifications
+        return [...activeMentions, ...uniqueNewMentions].slice(-3); // Keep max 3 notifications
       });
     }
   }, [recentMentions, dismissedMentions, playMentionSound]);
 
-  const dismissMention = (mentionId: string) => {
-    setDismissedMentions(prev => new Set([...prev, mentionId]));
-    setVisibleMentions(prev => prev.filter(m => m._id !== mentionId));
-  };
-
-  const handleMarkAllRead = async () => {
-    try {
-      await markMentionsAsRead();
-      setVisibleMentions([]);
-      setDismissedMentions(new Set());
-    } catch (error) {
-      console.error("Failed to mark mentions as read:", error);
+  // Auto-mark mentions as read when they appear on screen
+  useEffect(() => {
+    if (visibleMentions.length > 0) {
+      markMentionsAsRead().catch((error) => {
+        console.error("Failed to mark mentions as read:", error);
+      });
     }
-  };
+  }, [visibleMentions.length, markMentionsAsRead]);
+
+  // Auto-dismiss mentions after 5 seconds
+  useEffect(() => {
+    if (visibleMentions.length === 0) return;
+
+    const timers = visibleMentions
+      .filter(mention => !mention.isExiting)
+      .map(mention => {
+        return setTimeout(() => {
+          setVisibleMentions(prev =>
+            prev.map(m => m._id === mention._id ? { ...m, isExiting: true } : m)
+          );
+          // Remove after animation completes
+          setTimeout(() => {
+            setVisibleMentions(prev => prev.filter(m => m._id !== mention._id));
+          }, 350);
+        }, 5000); // 5 seconds
+      });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [visibleMentions]);
+
+  const dismissMention = useCallback((mentionId: string) => {
+    setDismissedMentions(prev => new Set([...prev, mentionId]));
+    setVisibleMentions(prev =>
+      prev.map(m => m._id === mentionId ? { ...m, isExiting: true } : m)
+    );
+    // Remove after animation completes
+    setTimeout(() => {
+      setVisibleMentions(prev => prev.filter(m => m._id !== mentionId));
+    }, 350); // Slightly longer than animation duration
+  }, []);
 
   if (visibleMentions.length === 0) {
     return null;
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div ref={mentionsRef} className="fixed top-4 right-4 z-50 space-y-2">
       <AnimatePresence>
-        {visibleMentions.map((mention, index) => (
+        {visibleMentions
+          .filter(mention => !mention.isExiting)
+          .map((mention, index) => (
           <motion.div
             key={mention._id}
             initial={{ opacity: 0, x: 300, scale: 0.8 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 300, scale: 0.8 }}
             transition={{
-              type: "spring",
-              stiffness: 300,
-              damping: 30,
+              opacity: { duration: 0.3 },
+              x: { duration: 0.3 },
+              scale: { duration: 0.3 },
               delay: index * 0.1
             }}
             className={cn(
               "bg-gray-950/80 backdrop-blur-sm border border-white/10 rounded-2xl shadow-2xl",
-              "p-4 min-w-80 max-w-sm"
+              "p-4 min-w-80 max-w-sm cursor-pointer hover:bg-gray-900/80 transition-colors"
             )}
+            onClick={() => dismissMention(mention._id)}
           >
             <div className="flex items-start gap-3">
               {/* Mention Icon */}
@@ -155,31 +190,10 @@ export function MentionNotification() {
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-end">
                   <span className="text-white/50 text-xs">
                     {new Date(mention.timestamp).toLocaleTimeString()}
                   </span>
-
-                  <div className="flex gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void handleMarkAllRead()}
-                      className="h-6 px-2 text-xs text-blue-300 hover:text-blue-200 hover:bg-blue-500/10"
-                    >
-                      <Check className="w-3 h-3" />
-                      Mark Read
-                    </Button>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => dismissMention(mention._id)}
-                      className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </div>
                 </div>
               </div>
             </div>

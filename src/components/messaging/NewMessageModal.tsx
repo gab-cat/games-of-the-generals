@@ -28,7 +28,7 @@ export function NewMessageModal({ isOpen, onClose, onSelectUser, inviteLobbyId }
   const [selectedUser, setSelectedUser] = useState<{userId: string, username: string} | null>(null);
   
   // Debounce search term to avoid too many queries
-  const [debouncedSearchTerm] = useDebounce(searchTerm, 300);
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
   const { data: searchResults = [], isLoading: searchLoading } = useConvexQuery(
     api.messages.searchUsers,

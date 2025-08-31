@@ -10,6 +10,7 @@ import { LoadingSpinner } from "./04.loading-spinner";
 import { ErrorMessage } from "./05.error-message";
 import { MatchItem } from "./MatchItem";
 import { Button } from "../../components/ui/button";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 interface MatchListProps {
   userId: Id<"users">;
@@ -17,6 +18,7 @@ interface MatchListProps {
 }
 
 export function MatchList({ userId, onViewReplay }: MatchListProps) {
+  const listRef = useAutoAnimate();
   const [currentPage, setCurrentPage] = useState(0);
   const [cursors, setCursors] = useState<{[page: number]: string | undefined}>({ 0: undefined });
   const [hasMorePages, setHasMorePages] = useState<{[page: number]: boolean}>({});
@@ -162,7 +164,7 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
         )}
       </div>
       
-      <div className="space-y-2 sm:space-y-3">
+      <div ref={listRef} className="space-y-2 sm:space-y-3">
         {matchHistory?.page?.map((match, index: number) => (
           <MatchItem
             key={match._id}

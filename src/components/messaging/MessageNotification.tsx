@@ -4,7 +4,6 @@ import { X, MessageCircle, Users, ExternalLink } from "lucide-react";
 import { useConvexAuth } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { UserAvatar } from "../UserAvatar";
 import { Button } from "../ui/button";
 
 interface Message {
@@ -19,6 +18,7 @@ interface Message {
   lobbyId?: string;
   lobbyName?: string;
   gameId?: string;
+  isExiting?: boolean;
 }
 
 interface MessageNotificationProps {
@@ -201,6 +201,7 @@ export function MessageNotification({
       setNotifications(prev => {
         // Only add messages that aren't already in notifications
         const existingIds = new Set(prev.map(n => n._id));
+        const activeNotifications = prev.filter(n => !n.isExiting);
         const uniqueNewMessages = newMessages.filter(msg => !existingIds.has(msg._id));
         
         // Show notifications and play sound for new messages
@@ -211,7 +212,7 @@ export function MessageNotification({
           uniqueNewMessages.forEach(showBrowserNotification);
         }
         
-        return [...prev, ...uniqueNewMessages];
+        return [...activeNotifications, ...uniqueNewMessages];
       });
     }
 
@@ -219,8 +220,39 @@ export function MessageNotification({
   }, [conversations, lastChecked, isAuthenticated, playNotificationSound, showBrowserNotification, handleNotificationClick]);
 
   const removeNotification = (messageId: string) => {
-    setNotifications(prev => prev.filter(n => n._id !== messageId));
+    setNotifications(prev =>
+      prev.map(n => n._id === messageId ? { ...n, isExiting: true } : n)
+    );
+    // Remove after animation completes
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n._id !== messageId));
+    }, 350); // Slightly longer than animation duration
   };
+
+
+
+  // Auto-dismiss notifications after 5 seconds
+  useEffect(() => {
+    if (notifications.length === 0) return;
+
+    const timers = notifications
+      .filter(notification => !notification.isExiting)
+      .map(notification => {
+        return setTimeout(() => {
+          setNotifications(prev =>
+            prev.map(n => n._id === notification._id ? { ...n, isExiting: true } : n)
+          );
+          // Remove after animation completes
+          setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n._id !== notification._id));
+          }, 350);
+        }, 5000); // 5 seconds
+      });
+
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, [notifications]);
 
   const getNotificationIcon = (messageType: string) => {
     switch (messageType) {
@@ -247,86 +279,82 @@ export function MessageNotification({
   if (!isAuthenticated) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
+    <div className="fixed top-4 right-4 z-50 space-y-2">
       <AnimatePresence>
-        {notifications.map((message) => (
+        {notifications.map((message, index) => (
           <motion.div
             key={message._id}
             initial={{ opacity: 0, x: 300, scale: 0.8 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 300, scale: 0.8 }}
-            transition={{ 
-              type: "spring", 
-              stiffness: 300, 
-              damping: 25 
+            transition={{
+              opacity: { duration: 0.3 },
+              x: { duration: 0.3 },
+              scale: { duration: 0.3 },
+              delay: index * 0.1
             }}
-            className="bg-black/40 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden"
+            className="bg-gray-950/80 backdrop-blur-sm border border-white/10 rounded-2xl shadow-2xl p-4 min-w-80 max-w-sm"
           >
-            <div className="p-4">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+            <div className="flex items-start gap-3">
+              {/* Message Icon */}
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
                   {getNotificationIcon(message.messageType)}
-                  <span className="text-sm font-medium text-white">
-                    {getNotificationTitle(message.messageType)}
-                  </span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeNotification(message._id)}
-                  className="p-1 h-6 w-6 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
-                >
-                  <X className="w-3 h-3" />
-                </Button>
               </div>
 
               {/* Content */}
-              <div 
-                onClick={() => handleNotificationClick(message)}
-                className="cursor-pointer group"
-              >
-                <div className="flex items-start gap-3">
-                  <UserAvatar
-                    username={message.senderUsername}
-                    avatarUrl={message.senderAvatarUrl}
-                    size="sm"
-                    className="ring-1 ring-white/20 flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white/90 mb-1">
-                      {message.senderUsername}
-                    </p>
-                    <p className="text-sm text-white/70 line-clamp-2 group-hover:text-white/90 transition-colors">
-                      {message.messageType === "lobby_invite" && message.lobbyName
-                        ? `Invited you to lobby: ${message.lobbyName}`
-                        : message.content}
-                    </p>
-                    <p className="text-xs text-white/50 mt-1">
-                      {new Date(message.timestamp).toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </p>
-                  </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <MessageCircle className="w-4 h-4 text-green-400" />
+                  <span className="text-white/90 text-xs font-medium">
+                    {getNotificationTitle(message.messageType)}
+                  </span>
                 </div>
 
-                {/* Action hint */}
-                <div className="mt-3 text-xs text-white/40 text-center border-t border-white/10 pt-2">
-                  Click to {message.messageType === "lobby_invite" ? "join lobby" : 
-                           message.messageType === "game_invite" ? "watch game" : "view message"}
+                <p className="text-white/80 text-xs mb-2">
+                  <span className="font-medium text-green-300">
+                    {message.senderUsername}
+                  </span>{" "}
+                  sent you a message
+                </p>
+
+                <div className="bg-white/10 rounded-lg p-1 mb-3">
+                  <p className="text-white/70 text-xs line-clamp-2">
+                    {message.messageType === "lobby_invite" && message.lobbyName
+                      ? `Invited you to lobby: ${message.lobbyName}`
+                      : message.content}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-white/50 text-xs">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </span>
+
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleNotificationClick(message)}
+                      className="h-6 px-2 text-xs text-green-300 hover:text-green-200 hover:bg-green-500/10"
+                    >
+                      <MessageCircle className="w-3 h-3" />
+                      Open
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeNotification(message._id)}
+                      className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {/* Animated progress bar for auto-dismiss */}
-            <motion.div
-              initial={{ width: "100%" }}
-              animate={{ width: "0%" }}
-              transition={{ duration: 8, ease: "linear" }}
-              className="h-0.5 bg-gradient-to-r from-blue-500 to-purple-500"
-              onAnimationComplete={() => removeNotification(message._id)}
-            />
           </motion.div>
         ))}
       </AnimatePresence>

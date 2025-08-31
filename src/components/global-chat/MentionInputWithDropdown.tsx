@@ -2,6 +2,7 @@
 
 import { forwardRef, useState, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "convex/react";
+import { useDebounce } from "use-debounce";
 import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
@@ -56,9 +57,12 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
       {} // Always query for online users
     )?.filter((user): user is NonNullable<typeof user> => user !== null) || [];
 
-    // Filter users based on query
+    // Debounce the mention query for 500ms
+    const [debouncedMentionQuery] = useDebounce(mentionQuery, 500);
+
+    // Filter users based on debounced query
     const filteredUsers = onlineUsers.filter((user) =>
-      user.username.toLowerCase().includes(mentionQuery.toLowerCase())
+      user.username.toLowerCase().includes(debouncedMentionQuery.toLowerCase())
     );
 
     // Filter commands based on query
@@ -271,9 +275,9 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
           <div className="absolute bottom-full left-0 right-0 z-50 w-64 max-h-48 overflow-y-auto rounded-2xl bg-gray-950/80 backdrop-blur-xl border border-white/20 p-1 mb-2 shadow-lg no-scrollbar">
             {dropdownType === 'mention' ? (
               <>
-                {filteredUsers.length === 0 && mentionQuery ? (
+                {filteredUsers.length === 0 && debouncedMentionQuery ? (
                   <div className="text-center text-white/60 text-sm py-4 px-2">
-                    No users found matching "{mentionQuery}"
+                    No users found matching "{debouncedMentionQuery}"
                   </div>
                 ) : (
                   <>

@@ -19,6 +19,8 @@ import { Id } from "../../../convex/_generated/dataModel";
 import { toast } from "sonner";
 import { useChatProtection } from "../../lib/useChatProtection";
 import { useMobile } from "../../lib/useMobile";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
+import { useIP } from "../../lib/useIPStore";
 
 interface GlobalChatPanelProps {
   isOpen: boolean;
@@ -37,6 +39,7 @@ interface OptimisticMessage {
 }
 
 export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
+  const messagesRef = useAutoAnimate();
   const { isAuthenticated } = useConvexAuth();
   const isMobile = useMobile();
   const [message, setMessage] = useState("");
@@ -72,6 +75,9 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     closeRateLimitModal: () => void;
     closeSpamModal: () => void;
   };
+
+  // IP address hook - fetches and stores IP once per session
+  const { ipAddress } = useIP();
 
   // Queries - chat settings change infrequently
   const { data: chatSettings } = useConvexQueryWithOptions(
@@ -125,6 +131,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
   // Mutations
   const sendMessage = useMutation(api.globalChat.sendMessage);
   const markMentionsAsRead = useMutation(api.globalChat.markMentionsAsRead);
+  const agreeToRules = useMutation(api.globalChat.agreeToChatRules);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -162,6 +169,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
 
     const messageText = message.trim();
     console.log('📤 Attempting to send message:', messageText);
+    console.log('📍 IP Address:', ipAddress || 'Not available yet');
 
     // Handle /clear command client-side
     if (messageText.toLowerCase() === '/clear') {
@@ -201,7 +209,10 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     setOptimisticMessages(prev => [...prev, optimisticMessage]);
     setMessage("");
 
-    const result = await sendMessage({ message: messageText });
+    const result = await sendMessage({
+      message: messageText,
+      ipAddress: ipAddress || undefined
+    });
 
     if (result.success) {
       // Message sent successfully
@@ -371,7 +382,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
                     className="flex-1 flex flex-col min-h-0 overflow-hidden"
                   >
                     {/* Messages */}
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0 scroll-m-0 no-scrollbar">
+                    <div ref={messagesRef} className="flex-1 overflow-y-auto p-2 space-y-1 min-h-0 scroll-m-0 no-scrollbar">
                       {chatHistory.includes('cleared') ? (
                         <div className="text-center text-white/60 text-sm py-8">
                           Chat history cleared. New messages will appear here.
@@ -510,8 +521,16 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
         isOpen={showRules}
         onClose={() => setShowRules(false)}
         onAgree={() => {
-          setShowRules(false);
-          // Settings will be updated automatically via the mutation
+          void (async () => {
+            try {
+              await agreeToRules({});
+              setShowRules(false);
+              toast.success("Rules accepted! You can now participate in the chat.");
+            } catch (error) {
+              console.error("Failed to agree to rules:", error);
+              toast.error("Failed to accept rules. Please try again.");
+            }
+          })();
         }}
       />
 

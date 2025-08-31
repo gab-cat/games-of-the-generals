@@ -193,6 +193,7 @@ async function handleChatCommand(ctx: any, args: { message: string }, userId: Id
 export const sendMessage = mutation({
   args: {
     message: v.string(),
+    ipAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     try {
@@ -336,6 +337,7 @@ export const sendMessage = mutation({
         timestamp,
         mentions: mentionedUserIds.length > 0 ? mentionedUserIds : undefined,
         messageHash,
+        ipAddress: args.ipAddress,
       });
 
       // Update user's online status
@@ -718,7 +720,7 @@ export const sendMentionNotifications = internalMutation({
           mentionedUsername: mentionedProfile.username,
           timestamp: args.timestamp,
           isRead: false,
-          mentionText: `@${mentionedProfile.username}`,
+          mentionText: message.filteredMessage || message.message,
         });
 
         // Get the mentioned user's chat settings to check if they want mention notifications

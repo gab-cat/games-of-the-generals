@@ -620,11 +620,11 @@ export function ConversationView({
     // Adjust border radius based on message position and owner
     const getBorderRadius = () => {
       const baseRadius = 'rounded-2xl';
-      
+
       if (isOwn) {
         switch (messagePosition) {
           case 'single':
-            return 'rounded-2xl rounded-br-md';
+            return 'rounded-2xl'; // Single messages should have fully equal edges
           case 'first':
             return 'rounded-2xl rounded-br-md';
           case 'middle':
@@ -637,7 +637,7 @@ export function ConversationView({
       } else {
         switch (messagePosition) {
           case 'single':
-            return 'rounded-2xl rounded-bl-md';
+            return 'rounded-2xl'; // Single messages should have fully equal edges
           case 'first':
             return 'rounded-2xl rounded-bl-md';
           case 'middle':

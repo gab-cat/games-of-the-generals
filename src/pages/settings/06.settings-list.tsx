@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { unsubscribeFromPush } from "@/lib/push-client";
+import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 
 export function SettingsList() {
+  const pushSubsRef = useAutoAnimate();
   const { data: profile, isPending: isLoadingProfile, error: profileError } = useConvexQuery(api.profiles.getCurrentProfile);
   const { data: userSettings, isPending: isLoadingSettings } = useConvexQuery(api.settings.getUserSettings);
   const { data: existingSubs = [] } = useConvexQuery(api.push.getSubscriptionsForCurrentUser, {} as any);
@@ -109,7 +111,7 @@ export function SettingsList() {
                 <div className="text-white/60 text-sm">Manage registered devices for push notifications</div>
               </div>
             </div>
-            <div className="mt-4 space-y-2">
+            <div ref={pushSubsRef} className="mt-4 space-y-2">
               {existingSubs && existingSubs.length > 0 ? (
                 existingSubs.map((sub: any) => {
                   const isThisDevice = sub.endpoint === localEndpoint;
