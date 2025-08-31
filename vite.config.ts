@@ -97,7 +97,10 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('@formkit/auto-animate')) {
             return 'formkit-animate';
           }
-
+          // Heavy libraries that should be dynamically imported
+          if (id.includes('jimp') || id.includes('node_modules/jimp')) {
+            return 'image-processing';
+          }
           // Utilities and smaller deps
           if (id.includes('clsx') || id.includes('class-variance-authority') ||
               id.includes('tailwind-merge') || id.includes('cmdk') ||
