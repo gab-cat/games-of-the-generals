@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { MoreVertical, Shield, Ban, VolumeX, Volume2, Trash2 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -46,6 +46,10 @@ export function MessageModerationMenu({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUnmuting, setIsUnmuting] = useState(false);
   const [isUnbanning, setIsUnbanning] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  // Refs for focus management
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   // Moderation mutations
   const muteUser = useMutation(api.globalChat.muteUser);
@@ -57,6 +61,7 @@ export function MessageModerationMenu({
   const handleShowDialog = (type: "mute" | "ban" | "delete") => {
     setDialogType(type);
     setDialogOpen(true);
+    setDropdownOpen(false); // Close dropdown when opening dialog
     setReason("");
     setDuration(undefined);
     // Reset submitting states
@@ -75,6 +80,13 @@ export function MessageModerationMenu({
       setIsSubmitting(false);
       setIsUnmuting(false);
       setIsUnbanning(false);
+
+      // Restore focus to trigger button after dialog closes
+      setTimeout(() => {
+        if (triggerRef.current) {
+          triggerRef.current.focus();
+        }
+      }, 0);
     }
   };
 
@@ -83,14 +95,17 @@ export function MessageModerationMenu({
 
     setIsSubmitting(true);
     let timeoutId: NodeJS.Timeout | null = null;
+    let isCompleted = false;
 
     try {
       // Set a timeout to force close the dialog after 30 seconds in case of network issues
       timeoutId = setTimeout(() => {
-        console.warn(`Moderation action (${dialogType}) timed out, forcing dialog close`);
-        setDialogOpen(false);
-        setIsSubmitting(false);
-        toast.error(`Request timed out. Please try again.`);
+        if (!isCompleted) {
+          console.warn(`Moderation action (${dialogType}) timed out, forcing dialog close`);
+          setDialogOpen(false);
+          setIsSubmitting(false);
+          toast.error(`Request timed out. Please try again.`);
+        }
       }, 30000);
 
       switch (dialogType) {
@@ -121,9 +136,12 @@ export function MessageModerationMenu({
           break;
       }
 
+      isCompleted = true;
+
       // Clear timeout on success
       if (timeoutId) {
         clearTimeout(timeoutId);
+        timeoutId = null;
       }
 
       // Always close dialog after successful action
@@ -133,9 +151,12 @@ export function MessageModerationMenu({
       setDuration(undefined);
       setDialogType("delete");
     } catch (error) {
+      isCompleted = true;
+
       // Clear timeout on error
       if (timeoutId) {
         clearTimeout(timeoutId);
+        timeoutId = null;
       }
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
@@ -143,7 +164,9 @@ export function MessageModerationMenu({
       console.error(`${dialogType} error:`, error);
       // Keep dialog open on error so user can try again
     } finally {
-      setIsSubmitting(false);
+      if (!isCompleted) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -193,9 +216,10 @@ export function MessageModerationMenu({
 
   return (
     <div className={className}>
-      <DropdownMenu>
+      <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button
+            ref={triggerRef}
             variant="ghost"
             size="sm"
             className="h-3 w-3 my-0 p-0 text-white/40 hover:text-white/80 hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -260,7 +284,7 @@ export function MessageModerationMenu({
 
       {/* Moderation Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20 z-[110]">
+        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20">
           <DialogHeader>
             <DialogTitle>
               {dialogType === "mute"
