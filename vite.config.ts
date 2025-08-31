@@ -84,6 +84,10 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('framer-motion')) {
             return 'animations';
           }
+          // FormKit auto-animate
+          if (id.includes('@formkit/auto-animate')) {
+            return 'formkit-animate';
+          }
           // Heavy libraries that should be dynamically imported
           if (id.includes('jimp')) {
             return 'image-processing';
