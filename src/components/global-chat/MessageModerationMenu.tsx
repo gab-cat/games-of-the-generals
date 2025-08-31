@@ -260,7 +260,7 @@ export function MessageModerationMenu({
 
       {/* Moderation Dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20 z-[110]">
+        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20">
           <DialogHeader>
             <DialogTitle>
               {dialogType === "mute"
