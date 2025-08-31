@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { MoreVertical, Shield, Ban, VolumeX, Volume2, Trash2 } from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -47,6 +47,18 @@ export function MessageModerationMenu({
   const [isUnmuting, setIsUnmuting] = useState(false);
   const [isUnbanning, setIsUnbanning] = useState(false);
 
+  // Ref to track the current timeout for cleanup
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
   // Moderation mutations
   const muteUser = useMutation(api.globalChat.muteUser);
   const unmuteUser = useMutation(api.globalChat.unmuteUser);
@@ -68,6 +80,12 @@ export function MessageModerationMenu({
   const handleDialogClose = (open: boolean) => {
     setDialogOpen(open);
     if (!open) {
+      // Clear any pending timeout when dialog closes
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
       // Reset form state when dialog closes
       setReason("");
       setDuration(undefined);
@@ -82,15 +100,17 @@ export function MessageModerationMenu({
     if (isSubmitting) return; // Prevent double submission
 
     setIsSubmitting(true);
-    let timeoutId: NodeJS.Timeout | null = null;
 
     try {
       // Set a timeout to force close the dialog after 30 seconds in case of network issues
-      timeoutId = setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         console.warn(`Moderation action (${dialogType}) timed out, forcing dialog close`);
-        setDialogOpen(false);
-        setIsSubmitting(false);
-        toast.error(`Request timed out. Please try again.`);
+        // Only execute if dialog is still open (prevent interference after manual close)
+        if (dialogOpen) {
+          setDialogOpen(false);
+          setIsSubmitting(false);
+          toast.error(`Request timed out. Please try again.`);
+        }
       }, 30000);
 
       switch (dialogType) {
@@ -122,8 +142,9 @@ export function MessageModerationMenu({
       }
 
       // Clear timeout on success
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
 
       // Always close dialog after successful action
@@ -134,8 +155,9 @@ export function MessageModerationMenu({
       setDialogType("delete");
     } catch (error) {
       // Clear timeout on error
-      if (timeoutId) {
-        clearTimeout(timeoutId);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
       }
 
       const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
