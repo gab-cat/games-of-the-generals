@@ -115,11 +115,83 @@ export const deleteOldMessages = internalMutation({
     const cutoff = Date.now() - SEVEN_DAYS_MS;
 
     let totalDeleted = 0;
+    let unreadCountAdjustments = 0;
+
+    // First pass: Handle unread count adjustments for old unread messages
+    // Process in batches to avoid timeouts
+    while (true) {
+      const oldUnreadMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_timestamp", (q) => q.lt("timestamp", cutoff))
+        .filter((q) => q.eq(q.field("readAt"), undefined))
+        .take(100); // Smaller batch for unread processing
+
+      if (oldUnreadMessages.length === 0) break;
+
+      // Group messages by conversation to batch unread count updates
+      const conversationUpdates = new Map();
+
+      for (const message of oldUnreadMessages) {
+        // Find the conversation for this message
+        let conversation = await ctx.db
+          .query("conversations")
+          .withIndex("by_participants", (q) =>
+            q.eq("participant1Id", message.senderId).eq("participant2Id", message.recipientId)
+          )
+          .unique();
+
+        if (!conversation) {
+          conversation = await ctx.db
+            .query("conversations")
+            .withIndex("by_participants", (q) =>
+              q.eq("participant1Id", message.recipientId).eq("participant2Id", message.senderId)
+            )
+            .unique();
+        }
+
+        if (conversation) {
+          const conversationId = conversation._id;
+          const isParticipant1Recipient = conversation.participant1Id === message.recipientId;
+
+          if (!conversationUpdates.has(conversationId)) {
+            conversationUpdates.set(conversationId, {
+              conversation,
+              unreadDecrement: 0,
+            });
+          }
+
+          const update = conversationUpdates.get(conversationId)!;
+          update.unreadDecrement += 1;
+
+          // Store which participant needs the decrement
+          if (!update.participantToUpdate) {
+            update.participantToUpdate = isParticipant1Recipient ? 'participant1' : 'participant2';
+          }
+        }
+      }
+
+      // Apply unread count adjustments in batches
+      for (const [conversationId, update] of conversationUpdates) {
+        const { conversation, unreadDecrement, participantToUpdate } = update;
+
+        if (participantToUpdate === 'participant1') {
+          const newCount = Math.max(0, conversation.participant1UnreadCount - unreadDecrement);
+          await ctx.db.patch(conversationId, {
+            participant1UnreadCount: newCount
+          });
+        } else {
+          const newCount = Math.max(0, conversation.participant2UnreadCount - unreadDecrement);
+          await ctx.db.patch(conversationId, {
+            participant2UnreadCount: newCount
+          });
+        }
+
+        unreadCountAdjustments += unreadDecrement;
+      }
+    }
+
+    // Second pass: Delete all old messages (both read and unread)
     // Delete in batches to avoid timeouts
-    // We use the by_timestamp index for efficient range scans
-    // Loop until no more old messages remain (bounded by Convex function time limits)
-    // If extremely large volumes, this will chip away daily via cron
-    // Batch size kept modest to stay under compute budget
     while (true) {
       const oldMessages = await ctx.db
         .query("messages")
@@ -132,7 +204,80 @@ export const deleteOldMessages = internalMutation({
       totalDeleted += oldMessages.length;
     }
 
-    return { deletedMessages: totalDeleted, cutoff };
+    return {
+      deletedMessages: totalDeleted,
+      unreadCountAdjustments,
+      cutoff
+    };
+  },
+});
+
+// Internal: Migration to fix incorrect unread counts caused by old deletion process
+// This fixes conversations where unread counts don't match actual unread messages
+export const fixUnreadCounts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let conversationsProcessed = 0;
+    let conversationsFixed = 0;
+    let totalAdjustments = 0;
+
+    // Get all conversations in batches to avoid timeouts
+    const allConversations = await ctx.db.query("conversations").collect();
+
+    for (const conversation of allConversations) {
+      conversationsProcessed++;
+
+      // Count actual unread messages for participant1 (messages sent to them that they haven't read)
+      const participant1UnreadMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_recipient_read", (q) =>
+          q.eq("recipientId", conversation.participant1Id)
+            .eq("readAt", undefined)
+        )
+        .filter((q) => q.eq(q.field("senderId"), conversation.participant2Id))
+        .collect();
+
+      // Count actual unread messages for participant2 (messages sent to them that they haven't read)
+      const participant2UnreadMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_recipient_read", (q) =>
+          q.eq("recipientId", conversation.participant2Id)
+            .eq("readAt", undefined)
+        )
+        .filter((q) => q.eq(q.field("senderId"), conversation.participant1Id))
+        .collect();
+
+      const actualParticipant1UnreadCount = participant1UnreadMessages.length;
+      const actualParticipant2UnreadCount = participant2UnreadMessages.length;
+
+      // Check if counts need to be fixed
+      const participant1NeedsFix = conversation.participant1UnreadCount !== actualParticipant1UnreadCount;
+      const participant2NeedsFix = conversation.participant2UnreadCount !== actualParticipant2UnreadCount;
+
+      if (participant1NeedsFix || participant2NeedsFix) {
+        conversationsFixed++;
+
+        const updateData: any = {};
+
+        if (participant1NeedsFix) {
+          updateData.participant1UnreadCount = actualParticipant1UnreadCount;
+          totalAdjustments += Math.abs(conversation.participant1UnreadCount - actualParticipant1UnreadCount);
+        }
+
+        if (participant2NeedsFix) {
+          updateData.participant2UnreadCount = actualParticipant2UnreadCount;
+          totalAdjustments += Math.abs(conversation.participant2UnreadCount - actualParticipant2UnreadCount);
+        }
+
+        await ctx.db.patch(conversation._id, updateData);
+      }
+    }
+
+    return {
+      conversationsProcessed,
+      conversationsFixed,
+      totalAdjustments
+    };
   },
 });
 
