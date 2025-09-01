@@ -34,7 +34,7 @@ export const getProfileByUsername = query({
   },
 });
 
-// Search usernames (case-insensitive), returns up to configurable limit
+// Search usernames (case-insensitive), returns up to configurable limit - OPTIMIZED
 export const searchUsernames = query({
   args: {
     q: v.string(),
@@ -45,23 +45,26 @@ export const searchUsernames = query({
     if (!queryText) return [];
     const limit = Math.min(args.limit ?? 10, 20);
 
-    // Convex does not support full text; use by_active_players index to scan by username
-    // We'll filter in memory after a bounded scan. Fetch a bit more to account for filtering.
-    const PAGE = 150;
-    const candidates = await ctx.db
-      .query("profiles")
-      .withIndex("by_active_players", (q) => q.gte("gamesPlayed", 0))
-      .take(PAGE);
-
+    // Use the new optimized by_username_games index for better performance
+    // First, get exact prefix matches (most relevant)
     const lower = queryText.toLowerCase();
-    const matches = candidates
+    const upper = queryText.toUpperCase();
+
+    // Get all profiles and filter in memory for case-insensitive search
+    // This is more efficient than scanning active players only
+    const allProfiles = await ctx.db
+      .query("profiles")
+      .withIndex("by_username_games", (q) => q.gte("username", lower).lte("username", upper + '\uffff'))
+      .take(100); // Reasonable limit to avoid excessive data transfer
+
+    const matches = allProfiles
       .filter((p) => p.username.toLowerCase().startsWith(lower))
       .slice(0, limit)
       .map((p) => ({ username: p.username, avatarUrl: p.avatarUrl, rank: p.rank }));
 
     // If not enough prefix matches, include contains matches
     if (matches.length < limit) {
-      const extra = candidates
+      const extra = allProfiles
         .filter((p) => !p.username.toLowerCase().startsWith(lower) && p.username.toLowerCase().includes(lower))
         .slice(0, limit - matches.length)
         .map((p) => ({ username: p.username, avatarUrl: p.avatarUrl, rank: p.rank }));
@@ -402,49 +405,85 @@ export const getProfileStatsByUsername = query({
   },
 });
 
-// Get leaderboard with optimized cursor-based pagination using new indexes
+// Get leaderboard with optimized cursor-based pagination using new indexes - ENHANCED
 export const getLeaderboard = query({
   args: {
     paginationOpts: v.optional(v.object({
       numItems: v.number(),
       cursor: v.optional(v.string()),
     })),
+    sortBy: v.optional(v.union(v.literal("wins"), v.literal("gamesPlayed"), v.literal("winRate"))),
   },
   handler: async (ctx, args) => {
-    const { paginationOpts } = args;
+    const { paginationOpts, sortBy = "wins" } = args;
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 25) : 20;
 
-    // Use the optimized wins_desc index for better descending order performance
-    const queryBuilder = ctx.db
-      .query("profiles")
-      .withIndex("by_wins", (q) => q.gte("wins", 0))
-      .order("desc");
+    // Use different indexes based on sort criteria for optimal performance
+    let queryBuilder;
+    if (sortBy === "gamesPlayed") {
+      // Use compound index for gamesPlayed + wins (ties broken by wins)
+      queryBuilder = ctx.db
+        .query("profiles")
+        .withIndex("by_games_wins", (q) => q.gte("gamesPlayed", 0))
+        .order("desc");
+    } else if (sortBy === "winRate") {
+      // For win rate, we need to sort in memory after fetching
+      queryBuilder = ctx.db
+        .query("profiles")
+        .withIndex("by_games_wins", (q) => q.gte("gamesPlayed", 1)) // Only include players with games
+        .order("desc");
+    } else {
+      // Default: sort by wins using the optimized wins index
+      queryBuilder = ctx.db
+        .query("profiles")
+        .withIndex("by_wins", (q) => q.gte("wins", 0))
+        .order("desc");
+    }
+
+    let profiles;
+    let result;
 
     if (paginationOpts && paginationOpts.cursor) {
-      const result = await queryBuilder.paginate({
+      result = await queryBuilder.paginate({
         numItems: limit,
         cursor: paginationOpts.cursor,
       });
+      profiles = result.page;
+    } else {
+      // Initial load with position calculation
+      profiles = await queryBuilder.take(limit);
+    }
 
+    // Calculate win rates and handle winRate sorting
+    const profilesWithStats = profiles.map((profile) => ({
+      ...profile,
+      winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
+    }));
+
+    // Sort by winRate if requested (requires in-memory sorting)
+    if (sortBy === "winRate") {
+      profilesWithStats.sort((a, b) => {
+        const rateDiff = b.winRate - a.winRate;
+        if (rateDiff !== 0) return rateDiff;
+        // Tiebreaker: sort by games played
+        return b.gamesPlayed - a.gamesPlayed;
+      });
+    }
+
+    if (paginationOpts && paginationOpts.cursor) {
       return {
         ...result,
-        page: result.page.map((profile) => ({
-          ...profile,
-          winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
-        })),
+        page: profilesWithStats,
       };
     } else {
       // Initial load with position calculation
-      const profiles = await queryBuilder.take(limit);
-      
       return {
-        page: profiles.map((profile, index) => ({
+        page: profilesWithStats.map((profile, index) => ({
           ...profile,
           position: index + 1,
-          winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
         })),
-        isDone: profiles.length < limit,
-        continueCursor: profiles.length > 0 ? profiles[profiles.length - 1]._id : "",
+        isDone: profilesWithStats.length < limit,
+        continueCursor: profilesWithStats.length > 0 ? profilesWithStats[profilesWithStats.length - 1]._id : "",
       };
     }
   },

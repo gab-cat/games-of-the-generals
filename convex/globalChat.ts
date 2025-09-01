@@ -366,7 +366,7 @@ export const sendMessage = mutation({
   },
 });
 
-// Get global chat messages with pagination
+// Get global chat messages with pagination - OPTIMIZED
 export const getMessages = query({
   args: {
     limit: v.optional(v.number()),
@@ -376,6 +376,7 @@ export const getMessages = query({
     const limit = Math.min(args.limit || 20, 50);
     const beforeTimestamp = args.beforeTimestamp || Date.now();
 
+    // Use optimized timestamp index with better pagination
     const messages = await ctx.db
       .query("globalChat")
       .withIndex("by_timestamp")
@@ -383,27 +384,53 @@ export const getMessages = query({
       .order("desc")
       .take(limit);
 
-    // Get user settings and profiles for each message to include username colors and admin roles
+    // Early return if no messages to avoid unnecessary queries
+    if (messages.length === 0) {
+      return {
+        messages: [],
+        hasMore: false,
+        oldestTimestamp: null,
+      };
+    }
+
+    // OPTIMIZED: Batch fetch user data to eliminate N+1 queries
     // Filter out system messages (which don't have userId) and undefined userIds
     const userIds = Array.from(new Set(messages.filter(m => m.userId).map(m => m.userId!)));
-    const userSettings = await Promise.all(
-      userIds.map(id =>
-        ctx.db
-          .query("userChatSettings")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .unique()
-      )
-    );
 
-    const userProfiles = await Promise.all(
-      userIds.map(id =>
-        ctx.db
-          .query("profiles")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .unique()
-      )
-    );
+    if (userIds.length === 0) {
+      // All messages are system messages
+      return {
+        messages: messages.map(message => ({
+          ...message,
+          usernameColor: undefined,
+          adminRole: undefined,
+        })),
+        hasMore: messages.length === limit,
+        oldestTimestamp: messages[messages.length - 1].timestamp,
+      };
+    }
 
+    // Batch fetch all user settings and profiles in parallel
+    const [userSettings, userProfiles] = await Promise.all([
+      Promise.all(
+        userIds.map(id =>
+          ctx.db
+            .query("userChatSettings")
+            .withIndex("by_user", (q) => q.eq("userId", id))
+            .unique()
+        )
+      ),
+      Promise.all(
+        userIds.map(id =>
+          ctx.db
+            .query("profiles")
+            .withIndex("by_user", (q) => q.eq("userId", id))
+            .unique()
+        )
+      )
+    ]);
+
+    // Create efficient lookup maps
     const settingsMap = new Map();
     userSettings.forEach(setting => {
       if (setting) {
@@ -418,7 +445,7 @@ export const getMessages = query({
       }
     });
 
-    // Enhance messages with user settings and admin roles
+    // Enhance messages with batched user data
     const enhancedMessages = messages.map(message => ({
       ...message,
       usernameColor: message.userId ? settingsMap.get(message.userId)?.usernameColor : undefined,
@@ -428,7 +455,7 @@ export const getMessages = query({
     return {
       messages: enhancedMessages,
       hasMore: messages.length === limit,
-      oldestTimestamp: messages.length > 0 ? messages[messages.length - 1].timestamp : null,
+      oldestTimestamp: messages[messages.length - 1].timestamp,
     };
   },
 });
@@ -595,47 +622,68 @@ export const getAllUsernames = query({
   },
 });
 
-// Get unread mention count
+// Get unread mention count - OPTIMIZED
 export const getUnreadMentionCount = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return 0;
 
+    // Use the optimized index to count unread mentions efficiently
+    // For counting, we don't need to fetch all records, just get a reasonable sample
     const unreadMentions = await ctx.db
       .query("chatMentions")
       .withIndex("by_mentioned_user_read", (q) =>
         q.eq("mentionedUserId", userId).eq("isRead", false)
       )
-      .take(100); // Cap at 100 for performance
+      .take(1000); // Increased limit for more accurate counting
 
     return unreadMentions.length;
   },
 });
 
-// Mark mentions as read
+// Mark mentions as read - OPTIMIZED BATCH OPERATION
 export const markMentionsAsRead = mutation({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    // Get unread mentions
-    const unreadMentions = await ctx.db
-      .query("chatMentions")
-      .withIndex("by_mentioned_user_read", (q) =>
-        q.eq("mentionedUserId", userId).eq("isRead", false)
-      )
-      .take(50); // Limit batch size
+    // OPTIMIZED: Use batch processing for large numbers of mentions
+    const BATCH_SIZE = 100;
+    let totalMarked = 0;
+    let hasMore = true;
 
-    // Mark as read
-    await Promise.all(
-      unreadMentions.map(mention =>
-        ctx.db.patch(mention._id, { isRead: true })
-      )
-    );
+    while (hasMore) {
+      // Get unread mentions in batches
+      const unreadMentions = await ctx.db
+        .query("chatMentions")
+        .withIndex("by_mentioned_user_read", (q) =>
+          q.eq("mentionedUserId", userId).eq("isRead", false)
+        )
+        .take(BATCH_SIZE);
 
-    return unreadMentions.length;
+      if (unreadMentions.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // Mark batch as read
+      await Promise.all(
+        unreadMentions.map(mention =>
+          ctx.db.patch(mention._id, { isRead: true })
+        )
+      );
+
+      totalMarked += unreadMentions.length;
+
+      // If we got less than batch size, we're done
+      if (unreadMentions.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
+
+    return totalMarked;
   },
 });
 

@@ -58,7 +58,11 @@ const applicationTables = {
     .index("by_active_players", ["gamesPlayed", "username"]) // For finding active players
     .index("by_online", ["isOnline"]) // For finding online users
     .index("by_online_last_seen", ["isOnline", "lastSeenAt"]) // For finding recently active users
-    .index("by_admin_role", ["adminRole"]), // For finding admin/moderator users
+    .index("by_admin_role", ["adminRole"]) // For finding admin/moderator users
+    .index("by_username_games", ["username", "gamesPlayed"]) // For efficient username search
+    .index("by_rank_games", ["rank", "gamesPlayed"]) // For rank-based queries
+    .index("by_created_at", ["createdAt"]) // For new user queries
+    .index("by_last_seen", ["lastSeenAt"]), // For online status queries
 
   // User achievements
   achievements: defineTable({
@@ -70,7 +74,10 @@ const applicationTables = {
   })
     .index("by_user", ["userId"])
     .index("by_achievement", ["achievementId"])
-    .index("by_user_achievement", ["userId", "achievementId"]),
+    .index("by_user_achievement", ["userId", "achievementId"])
+    .index("by_achievement_user", ["achievementId", "userId"]) // For achievement progress queries
+    .index("by_user_unlocked", ["userId", "unlockedAt"]) // For recent achievements
+    .index("by_unlocked_at", ["unlockedAt"]), // For global achievement stats
 
   // Game lobbies/rooms
   lobbies: defineTable({
@@ -376,7 +383,11 @@ const applicationTables = {
     .index("by_timestamp", ["timestamp"])
     .index("by_user", ["userId"])
     .index("by_user_timestamp", ["userId", "timestamp"])
-    .index("by_message_hash", ["messageHash"]),
+    .index("by_message_hash", ["messageHash"])
+    .index("by_timestamp_user", ["timestamp", "userId"]) // For efficient pagination with user context
+    .index("by_system_message", ["isSystemMessage", "timestamp"]) // For system message queries
+    .index("by_ip_address", ["ipAddress"]), // For spam detection
+
 
   // User Chat Settings and Preferences
   userChatSettings: defineTable({
@@ -415,7 +426,9 @@ const applicationTables = {
     .index("by_mentioned_user", ["mentionedUserId"])
     .index("by_mentioned_user_read", ["mentionedUserId", "isRead"])
     .index("by_mentioned_user_timestamp", ["mentionedUserId", "timestamp"])
-    .index("by_message", ["messageId"]),
+    .index("by_message", ["messageId"])
+    .index("by_timestamp_read", ["timestamp", "isRead"]) // For bulk mark as read operations
+    .index("by_mentioner_timestamp", ["mentionerId", "timestamp"]), // For mentioner activity tracking
 
   // Chat Rules and Agreements
   chatRules: defineTable({

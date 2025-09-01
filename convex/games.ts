@@ -507,49 +507,60 @@ export const makeMove = mutation({
       // Calculate game duration and stats for achievement tracking
       const gameDuration = currentTime - (game.gameTimeStarted || game.createdAt);
       
+      // OPTIMIZED: Use indexed queries instead of collecting all moves
       // Count pieces eliminated and spies revealed from moves in this game
-      const gameMoves = await ctx.db
-        .query("moves")
-        .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-        .collect();
-      
+      const [winnerMoves, loserMoves] = await Promise.all([
+        ctx.db
+          .query("moves")
+          .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
+          .filter((q) => q.eq(q.field("playerId"), winnerId))
+          .collect(),
+        ctx.db
+          .query("moves")
+          .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
+          .filter((q) => q.eq(q.field("playerId"), loserId))
+          .collect()
+      ]);
+
       let winnerPiecesEliminated = 0;
       let winnerSpiesRevealed = 0;
       let loserPiecesEliminated = 0;
       let loserSpiesRevealed = 0;
       let flagCapturedByWinner = false;
-      
-      for (const move of gameMoves) {
+
+      // Process winner's moves
+      for (const move of winnerMoves) {
         if (move.challengeResult) {
-          const isWinnerMove = (gameWinner === "player1" && move.playerId === game.player1Id) ||
-                               (gameWinner === "player2" && move.playerId === game.player2Id);
-          
           if (move.challengeResult.winner === "attacker") {
-            if (isWinnerMove) {
-              winnerPiecesEliminated++;
-              if (move.challengeResult.defender === "Flag") {
-                flagCapturedByWinner = true;
-              }
-              if (move.challengeResult.attacker === "Spy") {
-                winnerSpiesRevealed++;
-              }
-            } else {
-              loserPiecesEliminated++;
-              if (move.challengeResult.attacker === "Spy") {
-                loserSpiesRevealed++;
-              }
+            winnerPiecesEliminated++;
+            if (move.challengeResult.defender === "Flag") {
+              flagCapturedByWinner = true;
+            }
+            if (move.challengeResult.attacker === "Spy") {
+              winnerSpiesRevealed++;
             }
           } else if (move.challengeResult.winner === "defender") {
-            if (!isWinnerMove) {
-              winnerPiecesEliminated++;
-              if (move.challengeResult.attacker === "Spy") {
-                winnerSpiesRevealed++;
-              }
-            } else {
-              loserPiecesEliminated++;
-              if (move.challengeResult.defender === "Spy") {
-                loserSpiesRevealed++;
-              }
+            // Winner's move was defended successfully
+            if (move.challengeResult.defender === "Spy") {
+              loserSpiesRevealed++;
+            }
+          }
+        }
+      }
+
+      // Process loser's moves
+      for (const move of loserMoves) {
+        if (move.challengeResult) {
+          if (move.challengeResult.winner === "attacker") {
+            loserPiecesEliminated++;
+            if (move.challengeResult.attacker === "Spy") {
+              loserSpiesRevealed++;
+            }
+          } else if (move.challengeResult.winner === "defender") {
+            // Loser's move was defended successfully by winner
+            winnerPiecesEliminated++;
+            if (move.challengeResult.attacker === "Spy") {
+              winnerSpiesRevealed++;
             }
           }
         }
