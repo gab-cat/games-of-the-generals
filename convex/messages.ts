@@ -666,6 +666,57 @@ export const getUnreadCount = query({
   },
 });
 
+// Get recent unread messages for notification detection
+export const getRecentUnreadMessages = query({
+  args: {
+    sinceTimestamp: v.optional(v.number()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+
+    const limit = args.limit || 10;
+    const sinceTimestamp = args.sinceTimestamp || (Date.now() - 5 * 60 * 1000); // Default to last 5 minutes
+
+    // Get recent unread messages for the current user
+    const unreadMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_unread_messages", (q) => 
+        q.eq("recipientId", userId).eq("readAt", undefined)
+      )
+      .filter((q) => q.gte(q.field("timestamp"), sinceTimestamp))
+      .order("desc")
+      .take(limit);
+
+    // Enhance messages with sender profile information for notifications
+    const enhanced = await Promise.all(
+      unreadMessages.map(async (message) => {
+        const senderProfile = await ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", message.senderId))
+          .unique();
+
+        return {
+          _id: message._id,
+          senderId: message.senderId,
+          senderUsername: message.senderUsername,
+          senderAvatarUrl: senderProfile?.avatarUrl,
+          content: message.content,
+          messageType: message.messageType,
+          timestamp: message.timestamp,
+          readAt: message.readAt,
+          lobbyId: message.lobbyId,
+          lobbyName: message.lobbyName,
+          gameId: message.gameId,
+        };
+      })
+    );
+
+    return enhanced;
+  },
+});
+
 // Get unread count for a specific conversation using sharded counter
 export const getConversationUnreadCount = query({
   args: {

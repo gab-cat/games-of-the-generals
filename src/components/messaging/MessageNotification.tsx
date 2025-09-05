@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, MessageCircle, Users, ExternalLink } from "lucide-react";
 import { useConvexAuth } from "convex/react";
-import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
+import { useQuery } from "convex-helpers/react/cache";
 
 interface Message {
   _id: string;
@@ -34,36 +34,48 @@ export function MessageNotification({
 }: MessageNotificationProps) {
   const { isAuthenticated } = useConvexAuth();
   const [notifications, setNotifications] = useState<Message[]>([]);
-  const [lastChecked, setLastChecked] = useState<number>(Date.now());
+  const [lastChecked, setLastChecked] = useState<number>(Date.now() - 5 * 60 * 1000); // Start 5 minutes ago to catch recent messages
   const [hasPermission, setHasPermission] = useState<boolean>(false);
+  const [_audioContextReady, setAudioContextReady] = useState<boolean>(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const [audioContextInitialized, setAudioContextInitialized] = useState<boolean>(false);
   
   // Get unread count for title updates - unread count needs to be more current
-  const { data: unreadCount = 0 } = useConvexQueryWithOptions(
-    api.messages.getUnreadCount,
-    {},
-    {
-      staleTime: 10000, // 10 seconds - unread count should be relatively fresh
-      gcTime: 60000, // 1 minute cache
+  const unreadCount = useQuery(api.messages.getUnreadCount, {}) ?? 0;
+
+  // Get recent unread messages to detect new messages
+  const recentUnreadMessages = useQuery(api.messages.getRecentUnreadMessages, {
+    sinceTimestamp: lastChecked,
+    limit: 10 
+  });
+
+  // Initialize audio context immediately (will be suspended until user interaction)
+  const initializeAudioContext = useCallback(() => {
+    if (!audioContextRef.current && !audioContextInitialized) {
+      try {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        setAudioContextInitialized(true);
+      } catch (error) {
+        console.warn("Could not create AudioContext:", error);
+      }
     }
-  );
+  }, [audioContextInitialized]);
 
-  // Get recent conversations to detect new messages
-  const { data: conversationsData } = useConvexQueryWithOptions(
-    api.messages.getConversations,
-    {},
-    {
-      staleTime: 30000, // 30 seconds - conversations need moderate freshness
-      gcTime: 300000, // 5 minutes cache
+  // Resume audio context on user interaction
+  const resumeAudioContext = useCallback(async () => {
+    if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+      try {
+        await audioContextRef.current.resume();
+        setAudioContextReady(true);
+      } catch (error) {
+        console.warn("Could not resume AudioContext:", error);
+      }
+    } else if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      setAudioContextReady(true);
     }
-  );
+  }, []);
 
-  const conversations = useMemo(() => {
-    return Array.isArray(conversationsData) 
-      ? conversationsData 
-      : conversationsData?.page || [];
-  }, [conversationsData]);
-
-  // Request notification permission on mount
+  // Request notification permission on mount and initialize audio context
   useEffect(() => {
     if ("Notification" in window) {
       if (Notification.permission === "granted") {
@@ -74,6 +86,38 @@ export function MessageNotification({
         });
       }
     }
+
+    // Initialize audio context immediately (will be suspended)
+    initializeAudioContext();
+
+    // Set up audio context resumption on first user interaction
+    const handleUserInteraction = () => {
+      void resumeAudioContext();
+      // Remove listeners after first interaction
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+
+    document.addEventListener('click', handleUserInteraction);
+    document.addEventListener('keydown', handleUserInteraction);
+    document.addEventListener('touchstart', handleUserInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleUserInteraction);
+      document.removeEventListener('keydown', handleUserInteraction);
+      document.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [initializeAudioContext, resumeAudioContext]);
+
+  // Cleanup audio context on unmount
+  useEffect(() => {
+    return () => {
+      if (audioContextRef.current) {
+        void audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+    };
   }, []);
 
   const handleNotificationClick = useCallback((message: Message) => {
@@ -88,10 +132,27 @@ export function MessageNotification({
   }, [onNavigateToLobby, onNavigateToGame, onOpenMessaging]);
 
   // Play notification sound
-  const playNotificationSound = useCallback(() => {
+  const playNotificationSound = useCallback(async () => {
+    if (!audioContextRef.current) {
+      console.warn("AudioContext not initialized, skipping sound");
+      return;
+    }
+
     try {
-      // Create a simple beep sound using Web Audio API
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = audioContextRef.current;
+      
+      // Resume the audio context if it's suspended
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+        setAudioContextReady(true);
+      }
+      
+      // Check if audio context is ready to play
+      if (audioContext.state !== 'running') {
+        console.warn("AudioContext not running, current state:", audioContext.state);
+        return;
+      }
+      
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -106,6 +167,7 @@ export function MessageNotification({
       
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
+      
     } catch (error) {
       console.warn("Could not play notification sound:", error);
     }
@@ -167,35 +229,14 @@ export function MessageNotification({
 
   // Listen for new messages and show notifications
   useEffect(() => {
-    if (!isAuthenticated || conversations.length === 0) return;
+    if (!isAuthenticated || recentUnreadMessages?.length === 0) return;
 
     const now = Date.now();
-    const newMessages: Message[] = [];
-
-    conversations.forEach((conversation: any) => {
-      // Check if there's a new message since last check
-      if (conversation.lastMessage && 
-          conversation.lastMessage.timestamp > lastChecked &&
-          !conversation.lastMessage.readAt &&
-          conversation.unreadCount > 0) {
-        
-        // For notifications, we can use the otherParticipant data from the conversation
-        // which already includes the avatar URL
-        newMessages.push({
-          _id: conversation.lastMessage._id,
-          senderId: conversation.lastMessage.senderId,
-          senderUsername: conversation.lastMessage.senderUsername,
-          senderAvatarUrl: conversation.otherParticipant?.avatarUrl,
-          content: conversation.lastMessage.content,
-          messageType: conversation.lastMessage.messageType,
-          timestamp: conversation.lastMessage.timestamp,
-          readAt: conversation.lastMessage.readAt,
-          lobbyId: conversation.lastMessage.lobbyId,
-          lobbyName: conversation.lastMessage.lobbyName,
-          gameId: conversation.lastMessage.gameId,
-        });
-      }
-    });
+    
+    // Filter messages that are actually new (newer than lastChecked)
+    const newMessages: Message[] = recentUnreadMessages 
+      ? recentUnreadMessages.filter((message: any) => message.timestamp > lastChecked)
+      : [];
 
     if (newMessages.length > 0) {
       setNotifications(prev => {
@@ -206,7 +247,7 @@ export function MessageNotification({
         
         // Show notifications and play sound for new messages
         if (uniqueNewMessages.length > 0) {
-          playNotificationSound();
+          void playNotificationSound();
           
           // Show browser notifications for each new message
           uniqueNewMessages.forEach(showBrowserNotification);
@@ -217,7 +258,7 @@ export function MessageNotification({
     }
 
     setLastChecked(now);
-  }, [conversations, lastChecked, isAuthenticated, playNotificationSound, showBrowserNotification, handleNotificationClick]);
+  }, [recentUnreadMessages, lastChecked, isAuthenticated, playNotificationSound, showBrowserNotification, handleNotificationClick]);
 
   const removeNotification = (messageId: string) => {
     setNotifications(prev =>

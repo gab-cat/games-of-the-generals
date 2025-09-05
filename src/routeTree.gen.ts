@@ -15,6 +15,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReplayRouteImport } from './routes/replay'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as MatchHistoryRouteImport } from './routes/match-history'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GameRouteImport } from './routes/game'
@@ -52,6 +53,11 @@ const ProfileRoute = ProfileRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MatchHistoryRoute = MatchHistoryRouteImport.update({
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/match-history': typeof MatchHistoryRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/replay': typeof ReplayRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/match-history': typeof MatchHistoryRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/replay': typeof ReplayRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/match-history': typeof MatchHistoryRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/replay': typeof ReplayRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/game'
     | '/leaderboard'
     | '/match-history'
+    | '/pricing'
     | '/privacy'
     | '/profile'
     | '/replay'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/game'
     | '/leaderboard'
     | '/match-history'
+    | '/pricing'
     | '/privacy'
     | '/profile'
     | '/replay'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/game'
     | '/leaderboard'
     | '/match-history'
+    | '/pricing'
     | '/privacy'
     | '/profile'
     | '/replay'
@@ -204,6 +216,7 @@ export interface RootRouteChildren {
   GameRoute: typeof GameRoute
   LeaderboardRoute: typeof LeaderboardRoute
   MatchHistoryRoute: typeof MatchHistoryRoute
+  PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   ReplayRoute: typeof ReplayRoute
@@ -254,6 +267,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/match-history': {
@@ -324,6 +344,7 @@ const rootRouteChildren: RootRouteChildren = {
   GameRoute: GameRoute,
   LeaderboardRoute: LeaderboardRoute,
   MatchHistoryRoute: MatchHistoryRoute,
+  PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   ReplayRoute: ReplayRoute,

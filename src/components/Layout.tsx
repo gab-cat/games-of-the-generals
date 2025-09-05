@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, Crown } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -157,6 +157,11 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       path: "/match-history",
       label: "Match History",
       icon: History
+    },
+    {
+      path: "/pricing",
+      label: "Pricing",
+      icon: Crown
     }
   ];
 
