@@ -841,7 +841,7 @@ export const cleanupOldMessages = internalMutation({
   },
 });
 
-// Internal: Update user online status (heartbeat)
+// Legacy heartbeat - now uses presence component
 export const heartbeat = mutation({
   args: {
     userId: v.id("users"),
@@ -851,6 +851,7 @@ export const heartbeat = mutation({
     lobbyId: v.optional(v.id("lobbies")),
   },
   handler: async (ctx, args) => {
+    // Update the legacy online status for backward compatibility
     await ctx.runMutation(internal.globalChat.updateOnlineStatus, {
       userId: args.userId,
       username: args.username,

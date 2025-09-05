@@ -7,6 +7,7 @@ import { useMutation } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
+import usePresence from "@convex-dev/presence/react";
 import { Button } from "../ui/button";
 import ReactMarkdown from "react-markdown";
 
@@ -106,6 +107,14 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     return chatHistory.includes('cleared') ? [] : serverMessages;
   }, [chatHistory, serverMessages]);
 
+  // Use presence system for online users
+  const presenceState = usePresence(
+    api.presence,
+    "global",
+    "Anonymous" // This will be overridden by the actual username from the presence system
+  );
+
+  // Get user profiles for presence users
   const { data: onlineUsersData = [] } = useConvexQueryWithOptions(
     api.globalChat.getOnlineUsers,
     isOpen && showUsers ? {} : "skip",
@@ -116,7 +125,16 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     }
   );
 
-  const onlineUsers = onlineUsersData?.filter((user: null): user is NonNullable<typeof user> => user !== null) || [];
+  // Combine presence data with profile data
+  const onlineUsers = useMemo(() => {
+    if (!presenceState || presenceState.length === 0) {
+      return onlineUsersData?.filter((user: null): user is NonNullable<typeof user> => user !== null) || [];
+    }
+    
+    // For now, use the legacy system as fallback
+    // TODO: Enhance this to merge presence data with profile data
+    return onlineUsersData?.filter((user: null): user is NonNullable<typeof user> => user !== null) || [];
+  }, [presenceState, onlineUsersData]);
 
   const { data: unreadMentionCount = 0 } = useConvexQueryWithOptions(
     api.globalChat.getUnreadMentionCount,

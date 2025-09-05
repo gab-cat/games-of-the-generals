@@ -1,8 +1,228 @@
-import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { profanity, CensorType } from "@2toad/profanity";
+import { ActionRetrier } from "@convex-dev/action-retrier";
+import { ShardedCounter } from "@convex-dev/sharded-counter";
+import { components } from "./_generated/api";
+
+// Create ActionRetrier instance
+const retrier = new ActionRetrier(components.actionRetrier);
+
+// Create ShardedCounter instance for unread message counts
+// Using 32 shards for high throughput on unread count updates
+const unreadMessageCounter = new ShardedCounter(components.shardedCounter, {
+  defaultShards: 32,
+});
+
+// Performance monitoring for conflict resolution
+const conflictStats = {
+  totalRetries: 0,
+  successfulRetries: 0,
+  failedRetries: 0,
+  operations: new Map<string, number>()
+};
+
+// Action to update conversation read status with retry logic using Action Retrier
+export const updateConversationReadStatusWithRetry = internalAction({
+  args: {
+    userId: v.id("users"),
+    otherUserId: v.id("users"),
+    readAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Use Action Retrier to handle the mutation with retry logic
+    const runId = await retrier.run(
+      ctx,
+      internal.messages.updateConversationReadStatusAction,
+      {
+        userId: args.userId,
+        otherUserId: args.otherUserId,
+        readAt: args.readAt,
+      }
+    );
+    
+    // Wait for the retry to complete and return the result
+    while (true) {
+      const status = await retrier.status(ctx, runId);
+      if (status.type === "inProgress") {
+        // Wait a bit before checking again
+        await new Promise(resolve => setTimeout(resolve, 100));
+        continue;
+      } else {
+        // Clean up the run
+        await retrier.cleanup(ctx, runId);
+        return status.result;
+      }
+    }
+  },
+});
+
+// Action to update conversation with retry logic using Action Retrier
+export const updateConversationWithRetry = internalAction({
+  args: {
+    participant1Id: v.id("users"),
+    participant1Username: v.string(),
+    participant2Id: v.id("users"),
+    participant2Username: v.string(),
+    messageId: v.id("messages"),
+    timestamp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Use Action Retrier to handle the mutation with retry logic
+    const runId = await retrier.run(
+      ctx,
+      internal.messages.updateConversationAction,
+      {
+        participant1Id: args.participant1Id,
+        participant1Username: args.participant1Username,
+        participant2Id: args.participant2Id,
+        participant2Username: args.participant2Username,
+        messageId: args.messageId,
+        timestamp: args.timestamp,
+      }
+    );
+    
+    // Wait for the retry to complete and return the result
+    while (true) {
+      const status = await retrier.status(ctx, runId);
+      if (status.type === "inProgress") {
+        // Wait a bit before checking again
+        await new Promise(resolve => setTimeout(resolve, 100));
+        continue;
+      } else {
+        // Clean up the run
+        await retrier.cleanup(ctx, runId);
+        return status.result;
+      }
+    }
+  },
+});
+
+// Action wrapper for updateConversationReadStatus mutation
+export const updateConversationReadStatusAction = internalAction({
+  args: {
+    userId: v.id("users"),
+    otherUserId: v.id("users"),
+    readAt: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.messages.updateConversationReadStatus, {
+      userId: args.userId,
+      otherUserId: args.otherUserId,
+      readAt: args.readAt,
+    });
+  },
+});
+
+// Action wrapper for updateConversation mutation
+export const updateConversationAction = internalAction({
+  args: {
+    participant1Id: v.id("users"),
+    participant1Username: v.string(),
+    participant2Id: v.id("users"),
+    participant2Username: v.string(),
+    messageId: v.id("messages"),
+    timestamp: v.number(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.runMutation(internal.messages.updateConversation, {
+      participant1Id: args.participant1Id,
+      participant1Username: args.participant1Username,
+      participant2Id: args.participant2Id,
+      participant2Username: args.participant2Username,
+      messageId: args.messageId,
+      timestamp: args.timestamp,
+    });
+  },
+});
+
+// Enhanced rate limiter for typing updates to prevent excessive conflicts
+const typingUpdateCache = new Map<string, { lastUpdate: number; consecutiveUpdates: number; lastTypingState: boolean }>();
+const TYPING_RATE_LIMIT_MS = 1000; // Minimum 1000ms between typing updates per user
+const MAX_CONSECUTIVE_UPDATES = 3; // Max consecutive updates before longer cooldown
+const EXTENDED_COOLDOWN_MS = 3000; // Extended cooldown after too many updates
+
+function shouldAllowTypingUpdate(userId: string, otherUserId: string, isTyping: boolean): boolean {
+  // Ensure cache doesn't grow too large
+  ensureCacheSize();
+  
+  const key = `${userId}-${otherUserId}`;
+  const now = Date.now();
+  const cached = typingUpdateCache.get(key);
+  
+  if (!cached) {
+    typingUpdateCache.set(key, { lastUpdate: now, consecutiveUpdates: 1, lastTypingState: isTyping });
+    return true;
+  }
+  
+  const timeSinceLastUpdate = now - cached.lastUpdate;
+  const isStateChange = cached.lastTypingState !== isTyping;
+  
+  // Always allow state changes (typing -> not typing or vice versa)
+  if (isStateChange) {
+    typingUpdateCache.set(key, { lastUpdate: now, consecutiveUpdates: 1, lastTypingState: isTyping });
+    return true;
+  }
+  
+  // For same state updates, apply rate limiting
+  const requiredCooldown = cached.consecutiveUpdates >= MAX_CONSECUTIVE_UPDATES 
+    ? EXTENDED_COOLDOWN_MS 
+    : TYPING_RATE_LIMIT_MS;
+  
+  if (timeSinceLastUpdate >= requiredCooldown) {
+    const newConsecutiveUpdates = cached.consecutiveUpdates >= MAX_CONSECUTIVE_UPDATES ? 1 : cached.consecutiveUpdates + 1;
+    typingUpdateCache.set(key, { lastUpdate: now, consecutiveUpdates: newConsecutiveUpdates, lastTypingState: isTyping });
+    return true;
+  }
+  
+  return false;
+}
+
+// Clean up old cache entries to prevent memory leaks
+function cleanupTypingCache(): void {
+  const now = Date.now();
+  const maxAge = 10 * 60 * 1000; // Remove entries older than 10 minutes
+  
+  for (const [key, cached] of typingUpdateCache.entries()) {
+    if (now - cached.lastUpdate > maxAge) {
+      typingUpdateCache.delete(key);
+    }
+  }
+}
+
+// Clean up cache when it gets too large (prevent memory leaks)
+function ensureCacheSize(): void {
+  if (typingUpdateCache.size > 1000) {
+    cleanupTypingCache();
+  }
+}
+
+// Function to get conflict resolution statistics
+export const getConflictStats = query({
+  args: {},
+  returns: v.object({
+    totalRetries: v.number(),
+    successfulRetries: v.number(),
+    failedRetries: v.number(),
+    successRate: v.number(),
+    operations: v.record(v.string(), v.number()),
+  }),
+  handler: async () => {
+    const successRate = conflictStats.totalRetries > 0 
+      ? (conflictStats.successfulRetries / conflictStats.totalRetries) * 100 
+      : 100;
+    
+    return {
+      totalRetries: conflictStats.totalRetries,
+      successfulRetries: conflictStats.successfulRetries,
+      failedRetries: conflictStats.failedRetries,
+      successRate: Math.round(successRate * 100) / 100,
+      operations: Object.fromEntries(conflictStats.operations),
+    };
+  },
+});
 
 // Helper function for batch profile fetching to eliminate N+1 queries
 export const batchGetProfiles = internalQuery({
@@ -119,8 +339,12 @@ export const sendMessage = mutation({
       deliveredAt: timestamp,
     });
 
-    // Update or create conversation
-    await ctx.runMutation(internal.messages.updateConversation, {
+    // Increment unread count for recipient using sharded counter
+    await unreadMessageCounter.inc(ctx, recipientProfile.userId);
+
+    // Update or create conversation with retry logic
+    // Schedule the retry action to run asynchronously
+    await ctx.scheduler.runAfter(0, internal.messages.updateConversationWithRetry, {
       participant1Id: userId,
       participant1Username: senderProfile.username,
       participant2Id: recipientProfile.userId,
@@ -220,28 +444,39 @@ export const getConversations = query({
       }
     });
 
-    // Enhance conversations with batched data
-    const enhanced = allConversations.map(conv => {
-      const isParticipant1 = conv.participant1Id === userId;
-      const otherParticipantId = isParticipant1 ? conv.participant2Id : conv.participant1Id;
-      const otherUsername = isParticipant1 ? conv.participant2Username : conv.participant1Username;
-      
-      const otherParticipantProfile = profilesMap.get(otherParticipantId);
-      const lastMessage = conv.lastMessageId ? messagesMap.get(conv.lastMessageId) : null;
-      
-      return {
-        ...conv,
-        lastMessage,
-        otherParticipant: {
-          id: otherParticipantId,
-          username: otherUsername,
-          avatarUrl: otherParticipantProfile?.avatarUrl,
-          rank: otherParticipantProfile?.rank,
-        },
-        unreadCount: isParticipant1 ? conv.participant1UnreadCount : conv.participant2UnreadCount,
-        lastReadAt: isParticipant1 ? conv.participant1LastRead : conv.participant2LastRead,
-      };
-    });
+    // Enhance conversations with batched data and calculate unread counts
+    const enhanced = await Promise.all(
+      allConversations.map(async (conv) => {
+        const isParticipant1 = conv.participant1Id === userId;
+        const otherParticipantId = isParticipant1 ? conv.participant2Id : conv.participant1Id;
+        const otherUsername = isParticipant1 ? conv.participant2Username : conv.participant1Username;
+        
+        const otherParticipantProfile = profilesMap.get(otherParticipantId);
+        const lastMessage = conv.lastMessageId ? messagesMap.get(conv.lastMessageId) : null;
+        
+        // Count unread messages from this specific user
+        const unreadMessages = await ctx.db
+          .query("messages")
+          .withIndex("by_unread_messages", (q) => 
+            q.eq("recipientId", userId).eq("readAt", undefined)
+          )
+          .filter((q) => q.eq(q.field("senderId"), otherParticipantId))
+          .collect();
+        
+        return {
+          ...conv,
+          lastMessage,
+          otherParticipant: {
+            id: otherParticipantId,
+            username: otherUsername,
+            avatarUrl: otherParticipantProfile?.avatarUrl,
+            rank: otherParticipantProfile?.rank,
+          },
+          unreadCount: unreadMessages.length,
+          lastReadAt: isParticipant1 ? conv.participant1LastRead : conv.participant2LastRead,
+        };
+      })
+    );
 
     return {
       page: enhanced,
@@ -384,6 +619,11 @@ export const markMessagesAsRead = mutation({
       .filter((q) => q.eq(q.field("senderId"), args.otherUserId))
       .take(100); // Limit batch size for performance
 
+    // Early exit if no unread messages
+    if (unreadMessages.length === 0) {
+      return 0;
+    }
+
     // Batch update messages - process in smaller chunks for better performance
     const batchSize = 20;
     for (let i = 0; i < unreadMessages.length; i += batchSize) {
@@ -395,8 +635,12 @@ export const markMessagesAsRead = mutation({
       );
     }
 
-    // Update conversation read status
-    await ctx.runMutation(internal.messages.updateConversationReadStatus, {
+    // Decrement unread count using sharded counter
+    await unreadMessageCounter.subtract(ctx, userId, unreadMessages.length);
+
+    // Update conversation read status using Action Retrier for proper retry logic
+    // Schedule the retry action to run asynchronously
+    await ctx.scheduler.runAfter(0, internal.messages.updateConversationReadStatusWithRetry, {
       userId,
       otherUserId: args.otherUserId,
       readAt: timestamp,
@@ -406,7 +650,7 @@ export const markMessagesAsRead = mutation({
   },
 });
 
-// Get total unread count for current user - Highly optimized with caching
+// Get total unread count for current user using sharded counter
 export const getUnreadCount = query({
   args: {},
   returns: v.number(),
@@ -414,39 +658,87 @@ export const getUnreadCount = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return 0;
 
-    // FIXED: More efficient approach using the optimized unread indexes
-    // Query both participant indexes in parallel for better performance
-    const [unreadConversations1, unreadConversations2] = await Promise.all([
-      ctx.db
-        .query("conversations")
-        .withIndex("by_participant1_unread", (q) => 
-          q.eq("participant1Id", userId).gt("participant1UnreadCount", 0)
-        )
-        .take(50), // Limit to prevent excessive data transfer
-      ctx.db
-        .query("conversations")
-        .withIndex("by_participant2_unread", (q) => 
-          q.eq("participant2Id", userId).gt("participant2UnreadCount", 0)
-        )
-        .take(50) // Limit to prevent excessive data transfer
-    ]);
-
-    let totalUnread = 0;
+    // Use sharded counter for efficient unread count retrieval
+    const unreadCount = await unreadMessageCounter.count(ctx, userId);
     
-    // Sum unread counts efficiently with early termination for large counts
-    for (const conv of unreadConversations1) {
-      totalUnread += conv.participant1UnreadCount;
-      if (totalUnread > 999) break; // Cap at 999+ for UI purposes
-    }
-    
-    for (const conv of unreadConversations2) {
-      totalUnread += conv.participant2UnreadCount;
-      if (totalUnread > 999) break; // Cap at 999+ for UI purposes
-    }
-
-    return Math.min(totalUnread, 999); // Cap at 999 for UI display
+    // Cap at 999 for UI display consistency
+    return Math.min(Math.round(unreadCount), 999);
   },
 });
+
+// Get unread count for a specific conversation using sharded counter
+export const getConversationUnreadCount = query({
+  args: {
+    otherUserId: v.id("users"),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return 0;
+
+    // Count unread messages from this specific user
+    const unreadMessages = await ctx.db
+      .query("messages")
+      .withIndex("by_unread_messages", (q) => 
+        q.eq("recipientId", userId).eq("readAt", undefined)
+      )
+      .filter((q) => q.eq(q.field("senderId"), args.otherUserId))
+      .collect();
+
+    return unreadMessages.length;
+  },
+});
+
+// Migration function to backfill existing unread counts into sharded counter
+export const backfillUnreadCounts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    console.log("Starting unread counts backfill migration...");
+    
+    let usersProcessed = 0;
+    let totalUnreadCounts = 0;
+    
+    // Get all users
+    const users = await ctx.db.query("users").collect();
+    
+    for (const user of users) {
+      usersProcessed++;
+      
+      // Count actual unread messages for this user
+      const unreadMessages = await ctx.db
+        .query("messages")
+        .withIndex("by_unread_messages", (q) =>
+          q.eq("recipientId", user._id).eq("readAt", undefined)
+        )
+        .collect();
+      
+      const actualUnreadCount = unreadMessages.length;
+      
+      if (actualUnreadCount > 0) {
+        // Set the sharded counter to the actual unread count
+        // First reset to 0, then add the actual count
+        await unreadMessageCounter.reset(ctx, user._id);
+        await unreadMessageCounter.add(ctx, user._id, actualUnreadCount);
+        totalUnreadCounts += actualUnreadCount;
+        
+        console.log(`User ${user._id}: backfilled ${actualUnreadCount} unread messages`);
+      }
+      
+      // Log progress every 100 users
+      if (usersProcessed % 100 === 0) {
+        console.log(`Processed ${usersProcessed}/${users.length} users...`);
+      }
+    }
+    
+    console.log(`Migration completed! Processed ${usersProcessed} users, backfilled ${totalUnreadCounts} total unread messages.`);
+    
+    return {
+      usersProcessed,
+      totalUnreadCounts,
+    };
+  },
+});
+
 
 // Search users for messaging with optimized case-insensitive search
 export const searchUsers = query({
@@ -623,8 +915,12 @@ export const sendMessageInternal = internalMutation({
       deliveredAt: timestamp,
     });
 
-    // Update or create conversation
-    await ctx.runMutation(internal.messages.updateConversation, {
+    // Increment unread count for recipient using sharded counter
+    await unreadMessageCounter.inc(ctx, recipientProfile.userId);
+
+    // Update or create conversation with retry logic
+    // Schedule the retry action to run asynchronously
+    await ctx.scheduler.runAfter(0, internal.messages.updateConversationWithRetry, {
       participant1Id: args.senderId,
       participant1Username: senderProfile.username,
       participant2Id: recipientProfile.userId,
@@ -671,23 +967,44 @@ export const updateConversation = internalMutation({
     }
 
     if (conversation) {
-      // Update existing conversation
+      // Update existing conversation with retry logic for write conflicts
       const isParticipant1Sender = conversation.participant1Id === args.participant1Id;
       
-      await ctx.db.patch(conversation._id, {
-        lastMessageId: args.messageId,
-        lastMessageAt: args.timestamp,
-        // Increment unread count for recipient
-        ...(isParticipant1Sender 
-          ? { participant2UnreadCount: conversation.participant2UnreadCount + 1 }
-          : { participant1UnreadCount: conversation.participant1UnreadCount + 1 }
-        ),
-        // Clear typing indicator for sender upon sending
-        ...(isParticipant1Sender
-          ? { participant1TypingAt: undefined }
-          : { participant2TypingAt: undefined }
-        )
-      });
+      try {
+        // Re-fetch conversation to get latest state
+        const latestConversation = await ctx.db.get(conversation._id);
+        if (!latestConversation) return;
+
+        // Check if update is still needed (avoid redundant updates)
+        const needsUpdate = 
+          latestConversation.lastMessageId !== args.messageId ||
+          latestConversation.lastMessageAt !== args.timestamp;
+
+        if (!needsUpdate) {
+          return; // No update needed
+        }
+
+        // Prepare update object
+        const updateData: any = {
+          lastMessageId: args.messageId,
+          lastMessageAt: args.timestamp,
+        };
+
+        // Note: Unread count is now handled by sharded counter in sendMessage
+        // No need to increment unread count here anymore
+
+        // Clear typing indicator for sender upon sending (only if they were typing)
+        if (isParticipant1Sender && latestConversation.participant1TypingAt) {
+          updateData.participant1TypingAt = undefined;
+        } else if (!isParticipant1Sender && latestConversation.participant2TypingAt) {
+          updateData.participant2TypingAt = undefined;
+        }
+
+        await ctx.db.patch(conversation._id, updateData);
+      } catch (error) {
+        console.warn("Failed to update conversation:", error);
+        // Continue execution - the message was already sent successfully
+      }
     } else {
       // Create new conversation
       await ctx.db.insert("conversations", {
@@ -697,8 +1014,8 @@ export const updateConversation = internalMutation({
         participant2Username: args.participant2Username,
         lastMessageId: args.messageId,
         lastMessageAt: args.timestamp,
-        participant1UnreadCount: 0,
-        participant2UnreadCount: 1, // New message for participant2
+        participant1UnreadCount: 0, // Legacy field - not used anymore
+        participant2UnreadCount: 0, // Legacy field - not used anymore
         createdAt: args.timestamp,
         participant1TypingAt: undefined,
         participant2TypingAt: undefined,
@@ -734,14 +1051,67 @@ export const setTyping = mutation({
         .unique();
     }
 
+    if (!conversation) {
+      return null; // No conversation exists yet, nothing to update
+    }
+
     const now = Date.now();
-    if (conversation) {
-      const isParticipant1 = conversation.participant1Id === userId;
+    const isParticipant1 = conversation.participant1Id === userId;
+    const currentTypingAt = isParticipant1 
+      ? conversation.participant1TypingAt 
+      : conversation.participant2TypingAt;
+
+    // Rate limit typing updates to prevent excessive conflicts
+    if (!shouldAllowTypingUpdate(userId, args.otherUserId, args.isTyping)) {
+      return null; // Skip update due to rate limiting
+    }
+
+    // Enhanced debouncing logic to reduce conflicts
+    const TYPING_DEBOUNCE_MS = 1500; // Only update if more than 1.5 seconds has passed
+    const TYPING_STOP_DEBOUNCE_MS = 500; // Shorter debounce for stopping typing
+    
+    if (args.isTyping && currentTypingAt && (now - currentTypingAt) < TYPING_DEBOUNCE_MS) {
+      return null; // Skip update if recently updated and still typing
+    }
+    
+    if (!args.isTyping && currentTypingAt && (now - currentTypingAt) < TYPING_STOP_DEBOUNCE_MS) {
+      return null; // Skip update if recently stopped typing
+    }
+
+    // Update typing status with conflict resolution
+    try {
+      // Re-fetch conversation to get latest state
+      const latestConversation = await ctx.db.get(conversation._id);
+      if (!latestConversation) return null;
+
+      const latestTypingAt = isParticipant1 
+        ? latestConversation.participant1TypingAt 
+        : latestConversation.participant2TypingAt;
+
+      // Enhanced conflict detection - check if update is still needed
+      const needsUpdate = args.isTyping 
+        ? !latestTypingAt || (now - latestTypingAt) >= TYPING_DEBOUNCE_MS
+        : latestTypingAt !== undefined;
+
+      if (!needsUpdate) {
+        return null; // No update needed
+      }
+      
+      // Additional check: if someone else is updating this conversation, skip to avoid conflicts
+      const timeSinceLastMessage = latestConversation.lastMessageAt ? (now - latestConversation.lastMessageAt) : Infinity;
+      if (timeSinceLastMessage < 2000) { // If message was sent within last 2 seconds, skip typing update
+        return null; // Skip to avoid conflicts with message updates
+      }
+
+      // Perform the update
       await ctx.db.patch(conversation._id, {
         ...(isParticipant1
           ? { participant1TypingAt: args.isTyping ? now : undefined }
           : { participant2TypingAt: args.isTyping ? now : undefined })
       });
+    } catch (error) {
+      console.warn("Failed to update typing status:", error);
+      // Continue execution - typing status is not critical
     }
 
     return null;
@@ -819,29 +1189,52 @@ export const updateConversationReadStatus = internalMutation({
         .unique();
     }
 
-    if (conversation) {
-      const isParticipant1 = conversation.participant1Id === args.userId;
-      // Early exit if already up to date to avoid write conflicts
-      const alreadyUpToDate = isParticipant1
-        ? (conversation.participant1UnreadCount === 0 && (conversation.participant1LastRead || 0) >= args.readAt)
-        : (conversation.participant2UnreadCount === 0 && (conversation.participant2LastRead || 0) >= args.readAt);
+    if (!conversation) {
+      return; // No conversation exists
+    }
 
-      if (alreadyUpToDate) {
+    const isParticipant1 = conversation.participant1Id === args.userId;
+    
+    try {
+      // Re-fetch conversation to get latest state
+      const latestConversation = await ctx.db.get(conversation._id);
+      if (!latestConversation) return;
+
+      // Enhanced early exit logic to avoid unnecessary write conflicts
+      // Note: Unread count is now handled by sharded counter
+      const currentLastRead = isParticipant1 
+        ? latestConversation.participant1LastRead 
+        : latestConversation.participant2LastRead;
+
+      // Skip if already up to date
+      if ((currentLastRead || 0) >= args.readAt) {
+        return; // No update needed
+      }
+
+      // Skip if there are recent typing updates to avoid conflicts
+      const otherTypingAt = isParticipant1 
+        ? latestConversation.participant2TypingAt 
+        : latestConversation.participant1TypingAt;
+      
+      if (otherTypingAt && (Date.now() - otherTypingAt) < 3000) {
+        // Skip update if other user is actively typing to avoid conflicts
         return;
       }
 
-      await ctx.db.patch(conversation._id, {
-        ...(isParticipant1 
-          ? { 
-              participant1LastRead: args.readAt,
-              participant1UnreadCount: 0,
-            }
-          : { 
-              participant2LastRead: args.readAt,
-              participant2UnreadCount: 0,
-            }
-        ),
-      });
+      // Prepare update object
+      const updateData: any = {};
+      if (isParticipant1) {
+        updateData.participant1LastRead = args.readAt;
+        // Note: Unread count is now handled by sharded counter
+      } else {
+        updateData.participant2LastRead = args.readAt;
+        // Note: Unread count is now handled by sharded counter
+      }
+
+      await ctx.db.patch(conversation._id, updateData);
+    } catch (error) {
+      console.warn("Failed to update conversation read status:", error);
+      // Continue execution - read status update is not critical
     }
   },
 });

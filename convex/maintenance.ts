@@ -108,6 +108,13 @@ export const cleanupFinishedLobbies = internalMutation({
 });
 
 // Internal: Delete messages older than 7 days to enforce retention policy
+// Optimized to avoid 32K document read limit by using smaller batches and simpler logic
+// 
+// Key optimizations:
+// 1. Reduced batch size from 200 to 50 messages to stay well under document read limits
+// 2. Removed complex unread count adjustment logic that was reading too many documents
+// 3. Let the existing fixUnreadCounts function handle any unread count discrepancies
+// 4. Uses efficient timestamp index for finding old messages
 export const deleteOldMessages = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -115,99 +122,31 @@ export const deleteOldMessages = internalMutation({
     const cutoff = Date.now() - SEVEN_DAYS_MS;
 
     let totalDeleted = 0;
-    let unreadCountAdjustments = 0;
+    const BATCH_SIZE = 50; // Smaller batch size to avoid document read limits
 
-    // First pass: Handle unread count adjustments for old unread messages
-    // Process in batches to avoid timeouts
+    // Delete old messages in small batches to avoid hitting document read limits
+    // We don't try to adjust unread counts here - let the fixUnreadCounts function handle any discrepancies
     while (true) {
-      const oldUnreadMessages = await ctx.db
-        .query("messages")
-        .withIndex("by_timestamp", (q) => q.lt("timestamp", cutoff))
-        .filter((q) => q.eq(q.field("readAt"), undefined))
-        .take(100); // Smaller batch for unread processing
-
-      if (oldUnreadMessages.length === 0) break;
-
-      // Group messages by conversation to batch unread count updates
-      const conversationUpdates = new Map();
-
-      for (const message of oldUnreadMessages) {
-        // Find the conversation for this message
-        let conversation = await ctx.db
-          .query("conversations")
-          .withIndex("by_participants", (q) =>
-            q.eq("participant1Id", message.senderId).eq("participant2Id", message.recipientId)
-          )
-          .unique();
-
-        if (!conversation) {
-          conversation = await ctx.db
-            .query("conversations")
-            .withIndex("by_participants", (q) =>
-              q.eq("participant1Id", message.recipientId).eq("participant2Id", message.senderId)
-            )
-            .unique();
-        }
-
-        if (conversation) {
-          const conversationId = conversation._id;
-          const isParticipant1Recipient = conversation.participant1Id === message.recipientId;
-
-          if (!conversationUpdates.has(conversationId)) {
-            conversationUpdates.set(conversationId, {
-              conversation,
-              unreadDecrement: 0,
-            });
-          }
-
-          const update = conversationUpdates.get(conversationId)!;
-          update.unreadDecrement += 1;
-
-          // Store which participant needs the decrement
-          if (!update.participantToUpdate) {
-            update.participantToUpdate = isParticipant1Recipient ? 'participant1' : 'participant2';
-          }
-        }
-      }
-
-      // Apply unread count adjustments in batches
-      for (const [conversationId, update] of conversationUpdates) {
-        const { conversation, unreadDecrement, participantToUpdate } = update;
-
-        if (participantToUpdate === 'participant1') {
-          const newCount = Math.max(0, conversation.participant1UnreadCount - unreadDecrement);
-          await ctx.db.patch(conversationId, {
-            participant1UnreadCount: newCount
-          });
-        } else {
-          const newCount = Math.max(0, conversation.participant2UnreadCount - unreadDecrement);
-          await ctx.db.patch(conversationId, {
-            participant2UnreadCount: newCount
-          });
-        }
-
-        unreadCountAdjustments += unreadDecrement;
-      }
-    }
-
-    // Second pass: Delete all old messages (both read and unread)
-    // Delete in batches to avoid timeouts
-    while (true) {
+      // Use the timestamp index to efficiently find old messages
       const oldMessages = await ctx.db
         .query("messages")
         .withIndex("by_timestamp", (q) => q.lt("timestamp", cutoff))
-        .take(200);
+        .take(BATCH_SIZE);
 
       if (oldMessages.length === 0) break;
 
-      await Promise.all(oldMessages.map((m) => ctx.db.delete(m._id)));
+      // Delete messages in parallel for better performance
+      await Promise.all(oldMessages.map((message) => ctx.db.delete(message._id)));
       totalDeleted += oldMessages.length;
+
+      // If we got fewer messages than the batch size, we're done
+      if (oldMessages.length < BATCH_SIZE) break;
     }
 
     return {
       deletedMessages: totalDeleted,
-      unreadCountAdjustments,
-      cutoff
+      cutoff,
+      batchSize: BATCH_SIZE
     };
   },
 });

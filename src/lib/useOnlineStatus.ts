@@ -3,6 +3,7 @@ import { useMutation } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
+import usePresence from "@convex-dev/presence/react";
 
 interface UseOnlineStatusOptions {
   currentPage?: string;
@@ -28,9 +29,27 @@ export function useOnlineStatus(options: UseOnlineStatusOptions = {}) {
     username,
   } = options;
 
+  // Determine room ID based on context
+  const getRoomId = useCallback(() => {
+    if (gameId) return `game-${gameId}`;
+    if (lobbyId) return `lobby-${lobbyId}`;
+    return "global";
+  }, [gameId, lobbyId]);
+
+  const roomId = getRoomId();
+  
+  // Refs for legacy heartbeat system
   const heartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const visibilityRef = useRef<boolean>(true);
+  
+  // Use presence hook for the main room
+  const presenceState = usePresence(
+    api.presence, 
+    roomId, 
+    username || "Anonymous"
+  );
 
+  // Legacy functions for backward compatibility
   const markUserOnline = useCallback(async () => {
     if (!isAuthenticated) return;
 
@@ -145,5 +164,10 @@ export function useOnlineStatus(options: UseOnlineStatusOptions = {}) {
     markUserOnline,
     markUserOffline,
     sendHeartbeat,
+    // New presence-based functions
+    presenceState,
+    roomId,
+    isOnline: presenceState?.some(user => user.userId === userId) || false,
+    onlineUsers: presenceState || [],
   };
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
@@ -13,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
+import { useDebouncedCallback } from "use-debounce";
 
 interface OptimisticMessage {
   _id: string;
@@ -243,9 +244,10 @@ export function ConversationView({
     { otherUserId }
   );
 
-  // Local typing state and idle timeout
+  // Local typing state and idle timeout with enhanced debouncing
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTypingSignalRef = useRef<number>(0);
   // Prevent concurrent mark-as-read calls and reduce write conflicts
   const isMarkingReadRef = useRef(false);
   const lastMarkReadAtRef = useRef(0);
@@ -470,20 +472,39 @@ export function ConversationView({
     }
   };
 
-  // Handle typing signals
-  const signalTyping = () => {
-    // Send start typing on first keystroke
-    if (!isTyping) {
-      setIsTyping(true);
-      void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: true });
-    }
-    // Reset inactivity timer
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-      void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: false });
-    }, 3000);
-  };
+  // Enhanced typing signals with proper debouncing using use-debounce
+  const debouncedSignalTyping = useDebouncedCallback(
+    useCallback(() => {
+      const now = Date.now();
+      
+      // Only send typing signal if enough time has passed since last signal
+      const timeSinceLastSignal = now - lastTypingSignalRef.current;
+      const TYPING_DEBOUNCE_MS = 1000; // Minimum 1 second between typing signals
+      
+      if (timeSinceLastSignal >= TYPING_DEBOUNCE_MS) {
+        // Send start typing on first keystroke
+        if (!isTyping) {
+          setIsTyping(true);
+          void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: true });
+          lastTypingSignalRef.current = now;
+        }
+      }
+      
+      // Reset inactivity timer
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: false });
+        lastTypingSignalRef.current = now;
+      }, 3000);
+    }, [isTyping, otherUserId, setTyping]),
+    500, // Wait 500ms before processing typing signal
+    { leading: false, trailing: true }
+  );
+
+  const signalTyping = useCallback(() => {
+    debouncedSignalTyping();
+  }, [debouncedSignalTyping]);
 
   const copyLobbyCode = async (code: string) => {
     try {
@@ -650,9 +671,9 @@ export function ConversationView({
             return baseRadius;
         }
       }
-    };
+      };
 
-    return (
+  return (
       <motion.div
         key={message._id}
         initial={{ opacity: 0, y: 10 }}
@@ -779,6 +800,14 @@ export function ConversationView({
       </motion.div>
     );
   };
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      debouncedSignalTyping.cancel(); // Cancel any pending debounced calls
+    };
+  }, [debouncedSignalTyping]);
 
   if (!otherUserProfile) {
     return (

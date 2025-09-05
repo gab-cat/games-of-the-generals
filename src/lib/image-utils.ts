@@ -2,7 +2,7 @@
  * Compresses an image file using Jimp to the specified size and returns as blob
  * Uses dynamic import to load Jimp only when needed
  */
-export async function compressImage(file: File, maxSize: number = 250): Promise<Blob> {
+export async function compressImage(file: File, maxSize: number = 250, quality: number = 0.8): Promise<Blob> {
   // Validate file type
   if (!file.type.startsWith('image/')) {
     throw new Error('File must be an image');
@@ -53,7 +53,7 @@ export async function compressImage(file: File, maxSize: number = 250): Promise<
               resolve(blob);
             },
             'image/webp',
-            0.9
+            quality
           );
         };
         img.onerror = () => {

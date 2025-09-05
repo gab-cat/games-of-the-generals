@@ -19,10 +19,10 @@ crons.cron(
   {}
 );
 
-// Run daily at 00:10 UTC to delete old messages (> 7 days)
+// Run 4 times daily to delete old messages (> 7 days) - every 6 hours
 crons.cron(
-  "Delete messages older than 7 days (daily 00:10 UTC)",
-  "10 0 * * *",
+  "Delete messages older than 7 days (every 6 hours)",
+  "10 */6 * * *",
   internal.maintenance.deleteOldMessages,
   {}
 );
@@ -35,10 +35,10 @@ crons.cron(
   {}
 );
 
-// Run every 5 minutes to mark inactive users as offline
+// Run every 10 minutes to mark inactive users as offline
 crons.cron(
   "Mark inactive users as offline",
-  "*/5 * * * *", // Every 5 minutes
+  "*/10 * * * *", // Every 10 minute
   internal.globalChat.cleanupOfflineUsers,
   {}
 );
@@ -48,6 +48,14 @@ crons.cron(
   "Cleanup expired moderation actions",
   "0 * * * *", // Every hour
   internal.globalChat.cleanupExpiredModeration,
+  {}
+);
+
+// Run every hour to delete inactive waiting lobbies (>30 minutes)
+crons.cron(
+  "Delete inactive waiting lobbies (>30 minutes)",
+  "0 * * * *", // Every hour
+  internal.lobbies.deleteInactiveLobbies,
   {}
 );
 

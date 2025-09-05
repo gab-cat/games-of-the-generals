@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { LobbyCard } from "./LobbyCard";
 import { motion } from "framer-motion";
-import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle } from "lucide-react";
+import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -566,6 +566,14 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
                       className="bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
                     />
                   )}
+
+                  {/* Warning about auto-deletion */}
+                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    <Clock className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs text-amber-200">
+                      <strong>Note:</strong> Waiting lobbies that are inactive for more than 30 minutes are automatically deleted to keep the server clean.
+                    </p>
+                  </div>
 
                   <div className="flex justify-end gap-2">
                     <Button type="button" variant="outline" onClick={() => setShowCreateLobby(false)} className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20">

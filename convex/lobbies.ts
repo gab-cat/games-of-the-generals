@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -323,5 +323,32 @@ export const spectateGameById = mutation({
     });
 
     return game._id;
+  },
+});
+
+// Internal function to delete inactive waiting lobbies (waiting for more than 30 minutes)
+export const deleteInactiveLobbies = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000); // 30 minutes in milliseconds
+    
+    // Find waiting lobbies created more than 30 minutes ago using index
+    const inactiveLobbies = await ctx.db
+      .query("lobbies")
+      .withIndex("by_status_created", (q) => 
+        q.eq("status", "waiting").lt("createdAt", thirtyMinutesAgo)
+      )
+      .collect();
+
+    let deletedCount = 0;
+    
+    // Delete each inactive lobby
+    for (const lobby of inactiveLobbies) {
+      await ctx.db.delete(lobby._id);
+      deletedCount++;
+    }
+
+    console.log(`Deleted ${deletedCount} inactive waiting lobbies`);
+    return { deletedCount };
   },
 });
