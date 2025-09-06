@@ -335,7 +335,10 @@ export function ConversationView({
     }
     // Fallback: if older shape ever returns an array, infer via page size
     if (Array.isArray(latestData)) {
-      setHasMoreOlder(latestData.length >= 20);
+      setHasMoreOlder((latestData as any[]).length >= 20);
+    } else if (typeof latestData === "object" && latestData !== null && "page" in latestData) {
+      const page = (latestData as { page?: any[] }).page;
+      setHasMoreOlder(Array.isArray(page) && page.length >= 20);
     }
   }, [otherUserId, latestData]);
 

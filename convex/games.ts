@@ -95,6 +95,7 @@ export const startGame = mutation({
       player1TimeUsed: 0,
       player2TimeUsed: 0,
       moveCount: 0, // Initialize move count
+      disconnectionGracePeriod: 120 * 1000, // 120 seconds in milliseconds
     });
 
     // Update lobby with game reference and change status to playing
@@ -875,6 +876,188 @@ export const timeoutGame = mutation({
     });
 
     return { success: true, winner };
+  },
+});
+
+// Check for disconnections and handle grace period
+export const checkDisconnections = mutation({
+  args: { gameId: v.id("games") },
+  handler: async (ctx, { gameId }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game || game.status !== "playing") return;
+
+    const now = Date.now();
+    const gracePeriod = game.disconnectionGracePeriod || (120 * 1000); // Default 120 seconds
+    
+    // Get presence data for this game
+    const presenceData = await ctx.runQuery(api.presence.listGameUsers, { gameId });
+    const onlineUserIds = presenceData?.map(user => user.userId) || [];
+    
+    console.log(`checkDisconnections for game ${gameId}: online users:`, onlineUserIds);
+    
+    // Check both players and handle disconnection timestamps
+    const updates: any = {};
+    
+    // Check player 1
+    if (game.player1Id) {
+      const isPlayer1Online = onlineUserIds.includes(game.player1Id);
+      if (isPlayer1Online && game.player1DisconnectedAt) {
+        // Player 1 is back online, immediately clear disconnection timestamp
+        updates.player1DisconnectedAt = undefined;
+        console.log(`Player 1 (${game.player1Id}) reconnected, clearing disconnection timestamp`);
+      } else if (!isPlayer1Online && !game.player1DisconnectedAt) {
+        // Player 1 just disconnected, set fresh timestamp
+        updates.player1DisconnectedAt = now;
+        console.log(`Player 1 (${game.player1Id}) detected as disconnected, setting timestamp: ${now}`);
+      }
+    }
+    
+    // Check player 2
+    if (game.player2Id) {
+      const isPlayer2Online = onlineUserIds.includes(game.player2Id);
+      if (isPlayer2Online && game.player2DisconnectedAt) {
+        // Player 2 is back online, immediately clear disconnection timestamp
+        updates.player2DisconnectedAt = undefined;
+        console.log(`Player 2 (${game.player2Id}) reconnected, clearing disconnection timestamp`);
+      } else if (!isPlayer2Online && !game.player2DisconnectedAt) {
+        // Player 2 just disconnected, set fresh timestamp
+        updates.player2DisconnectedAt = now;
+        console.log(`Player 2 (${game.player2Id}) detected as disconnected, setting timestamp: ${now}`);
+      }
+    }
+    
+    // Apply updates if any
+    if (Object.keys(updates).length > 0) {
+      await ctx.db.patch(gameId, updates);
+      console.log(`Applied disconnection updates to game ${gameId}:`, updates);
+    }
+    
+    // Check if any player has exceeded grace period - prioritize current turn player
+    const currentPlayerId = game.currentTurn === "player1" ? game.player1Id : game.player2Id;
+    const otherPlayerId = game.currentTurn === "player1" ? game.player2Id : game.player1Id;
+    const isCurrentPlayerOnline = onlineUserIds.includes(currentPlayerId);
+    const isOtherPlayerOnline = onlineUserIds.includes(otherPlayerId);
+    
+    // Check current player first (they lose if disconnected too long)
+    if (!isCurrentPlayerOnline) {
+      const isPlayer1Turn = game.currentTurn === "player1";
+      const disconnectionField = isPlayer1Turn ? "player1DisconnectedAt" : "player2DisconnectedAt";
+      const disconnectedAt = updates[disconnectionField] !== undefined ? updates[disconnectionField] : game[disconnectionField];
+      
+      if (disconnectedAt) {
+        const timeDisconnected = now - disconnectedAt;
+        console.log(`Current player ${currentPlayerId} disconnected for ${timeDisconnected}ms, grace period: ${gracePeriod}ms`);
+        
+        if (timeDisconnected >= gracePeriod) {
+          console.log(`Grace period expired for current player ${currentPlayerId}, forfeiting game`);
+          // Grace period expired for current turn player, they forfeit
+          await ctx.runMutation(api.games.forfeitGame, { 
+            gameId, 
+            reason: "disconnection_timeout" 
+          });
+          return;
+        }
+      }
+    }
+    
+    // Check other player (they also lose if disconnected too long)
+    if (!isOtherPlayerOnline) {
+      const isPlayer1Other = otherPlayerId === game.player1Id;
+      const disconnectionField = isPlayer1Other ? "player1DisconnectedAt" : "player2DisconnectedAt";
+      const disconnectedAt = updates[disconnectionField] !== undefined ? updates[disconnectionField] : game[disconnectionField];
+      
+      if (disconnectedAt) {
+        const timeDisconnected = now - disconnectedAt;
+        console.log(`Other player ${otherPlayerId} disconnected for ${timeDisconnected}ms, grace period: ${gracePeriod}ms`);
+        
+        if (timeDisconnected >= gracePeriod) {
+          console.log(`Grace period expired for other player ${otherPlayerId}, forfeiting game`);
+          // Grace period expired for non-turn player, they forfeit
+          await ctx.runMutation(api.games.forfeitGame, { 
+            gameId, 
+            reason: "disconnection_timeout" 
+          });
+          return;
+        }
+      }
+    }
+  },
+});
+
+// Handle game forfeit due to disconnection
+export const forfeitGame = mutation({
+  args: { 
+    gameId: v.id("games"),
+    reason: v.union(v.literal("disconnection_timeout"), v.literal("manual"))
+  },
+  handler: async (ctx, { gameId, reason }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game || game.status !== "playing") {
+      throw new Error("Game not found or not in playing state");
+    }
+
+    // Determine winner (the player who didn't disconnect)
+    const winner = game.currentTurn === "player1" ? "player2" : "player1";
+    const winnerId = game.currentTurn === "player1" ? game.player2Id : game.player1Id;
+    const loserId = game.currentTurn === "player1" ? game.player1Id : game.player2Id;
+
+    // Update game status
+    await ctx.db.patch(gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: reason === "disconnection_timeout" ? "timeout" : "surrender",
+    });
+
+    // Update lobby status
+    const lobby = await ctx.db.get(game.lobbyId);
+    if (lobby) {
+      await ctx.db.patch(game.lobbyId, { status: "finished" });
+    }
+
+    // Update player profiles
+    const [winnerProfile, loserProfile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", winnerId))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", loserId))
+        .unique(),
+    ]);
+
+    if (winnerProfile) {
+      await ctx.db.patch(winnerProfile._id, {
+        wins: winnerProfile.wins + 1,
+        gamesPlayed: winnerProfile.gamesPlayed + 1,
+        winStreak: (winnerProfile.winStreak || 0) + 1,
+        bestWinStreak: Math.max(winnerProfile.bestWinStreak || 0, (winnerProfile.winStreak || 0) + 1),
+      });
+    }
+
+    if (loserProfile) {
+      await ctx.db.patch(loserProfile._id, {
+        losses: loserProfile.losses + 1,
+        gamesPlayed: loserProfile.gamesPlayed + 1,
+        winStreak: 0,
+      });
+    }
+
+    // Check achievements
+    if (winnerProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+    }
+    if (loserProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+    }
+
+    // Check game-specific achievements
+    await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+      gameId,
+      winnerId,
+      loserId,
+    });
   },
 });
 

@@ -254,7 +254,7 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
               <motion.div
                 initial={{ scale: 0.95, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="grid grid-cols-9 gap-1 sm:gap-2 max-w-full sm:max-w-3xl mx-auto p-0 sm:p-4 rounded-lg bg-white/5 backdrop-blur-sm border sm:border border-white/10"
+                className="grid grid-cols-9 gap-1 sm:gap-2 w-full max-w-2xl mx-auto p-0 sm:p-4 rounded-lg bg-white/5 backdrop-blur-sm border sm:border border-white/10 overflow-hidden"
               >
                 {(currentBoard || replayData.initialBoard).map((row: any, rowIndex: number) =>
                   row.map((cell: any, colIndex: number) => {

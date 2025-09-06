@@ -34,18 +34,19 @@ export function MessageNotification({
 }: MessageNotificationProps) {
   const { isAuthenticated } = useConvexAuth();
   const [notifications, setNotifications] = useState<Message[]>([]);
-  const [lastChecked, setLastChecked] = useState<number>(Date.now() - 5 * 60 * 1000); // Start 5 minutes ago to catch recent messages
   const [hasPermission, setHasPermission] = useState<boolean>(false);
   const [_audioContextReady, setAudioContextReady] = useState<boolean>(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const [audioContextInitialized, setAudioContextInitialized] = useState<boolean>(false);
+  const lastProcessedTimestampRef = useRef<number>(Date.now() - 5 * 60 * 1000);
+  const stableTimestamp = useRef<number>(Date.now() - 5 * 60 * 1000);
   
   // Get unread count for title updates - unread count needs to be more current
   const unreadCount = useQuery(api.messages.getUnreadCount, {}) ?? 0;
 
-  // Get recent unread messages to detect new messages
+  // Get recent unread messages to detect new messages - use a stable timestamp to avoid infinite re-queries
   const recentUnreadMessages = useQuery(api.messages.getRecentUnreadMessages, {
-    sinceTimestamp: lastChecked,
+    sinceTimestamp: stableTimestamp.current,
     limit: 10 
   });
 
@@ -207,13 +208,14 @@ export function MessageNotification({
   // Update document title based on unread count
   useEffect(() => {
     const originalTitle = "Games of the Generals";
+    const currentUnreadCount = unreadCount ?? 0;
     
-    if (unreadCount > 0) {
-      document.title = `(${unreadCount}) ${originalTitle}`;
+    if (currentUnreadCount > 0) {
+      document.title = `(${currentUnreadCount}) ${originalTitle}`;
       
       // Add favicon badge effect by updating the favicon
       const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-      if (favicon && unreadCount > 0) {
+      if (favicon && currentUnreadCount > 0) {
         // You could implement a dynamic favicon with a red dot here
         // For now, just ensure the title shows the count
       }
@@ -227,25 +229,28 @@ export function MessageNotification({
     };
   }, [unreadCount]);
 
-  // Listen for new messages and show notifications
+  // OPTIMIZATION: Listen for new messages and show notifications
+  // Uses stable timestamp + reactive queries instead of polling for better performance
   useEffect(() => {
-    if (!isAuthenticated || recentUnreadMessages?.length === 0) return;
-
-    const now = Date.now();
+    if (!isAuthenticated || !recentUnreadMessages || recentUnreadMessages.length === 0) return;
     
-    // Filter messages that are actually new (newer than lastChecked)
-    const newMessages: Message[] = recentUnreadMessages 
-      ? recentUnreadMessages.filter((message: any) => message.timestamp > lastChecked)
-      : [];
+    // Filter messages that are actually new (newer than last processed timestamp)
+    const newMessages: Message[] = recentUnreadMessages.filter(
+      (message: any) => message.timestamp > lastProcessedTimestampRef.current
+    );
 
     if (newMessages.length > 0) {
+      // Update the last processed timestamp to the newest message
+      const newestTimestamp = Math.max(...newMessages.map(msg => msg.timestamp));
+      lastProcessedTimestampRef.current = newestTimestamp;
+
       setNotifications(prev => {
         // Only add messages that aren't already in notifications
         const existingIds = new Set(prev.map(n => n._id));
         const activeNotifications = prev.filter(n => !n.isExiting);
         const uniqueNewMessages = newMessages.filter(msg => !existingIds.has(msg._id));
         
-        // Show notifications and play sound for new messages
+        // Show notifications and play sound for new messages only
         if (uniqueNewMessages.length > 0) {
           void playNotificationSound();
           
@@ -256,9 +261,7 @@ export function MessageNotification({
         return [...activeNotifications, ...uniqueNewMessages];
       });
     }
-
-    setLastChecked(now);
-  }, [recentUnreadMessages, lastChecked, isAuthenticated, playNotificationSound, showBrowserNotification, handleNotificationClick]);
+  }, [recentUnreadMessages, isAuthenticated, playNotificationSound, showBrowserNotification]);
 
   const removeNotification = (messageId: string) => {
     setNotifications(prev =>

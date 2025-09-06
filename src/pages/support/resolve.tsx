@@ -204,37 +204,37 @@ export function SupportResolvePage() {
                   />
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 items-center">
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] bg-white/5 border border-white/10 text-white">
+                  <SelectTrigger className="w-full sm:w-[140px] rounded-full bg-white/5 border border-white/10 text-white">
                     <Filter className="w-4 h-4 mr-2" />
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-900/95 backdrop-blur-lg border-white/20">
-                    <SelectItem value="all" className="text-white hover:bg-white/10">All Status</SelectItem>
-                    <SelectItem value="open" className="text-white hover:bg-white/10">Open</SelectItem>
-                    <SelectItem value="in_progress" className="text-white hover:bg-white/10">In Progress</SelectItem>
-                    <SelectItem value="resolved" className="text-white hover:bg-white/10">Resolved</SelectItem>
-                    <SelectItem value="closed" className="text-white hover:bg-white/10">Closed</SelectItem>
+                  <SelectContent className="bg-gray-900/95 rounded-3xl backdrop-blur-lg border-white/20">
+                    <SelectItem value="all" className="text-white rounded-2xl hover:bg-white/10">All Status</SelectItem>
+                    <SelectItem value="open" className="text-white rounded-2xl hover:bg-white/10">Open</SelectItem>
+                    <SelectItem value="in_progress" className="text-white rounded-2xl hover:bg-white/10">In Progress</SelectItem>
+                    <SelectItem value="resolved" className="text-white rounded-2xl hover:bg-white/10">Resolved</SelectItem>
+                    <SelectItem value="closed" className="text-white rounded-2xl hover:bg-white/10">Closed</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={priorityFilter} onValueChange={setPriorityFilter}>
-                  <SelectTrigger className="w-full sm:w-[140px] bg-white/5 border border-white/10 text-white">
+                  <SelectTrigger className="w-full sm:w-[140px] rounded-full bg-white/5 border border-white/10 text-white">
                     <SelectValue placeholder="Priority" />
                   </SelectTrigger>
-                  <SelectContent className="bg-gray-900/95 backdrop-blur-lg border-white/20">
-                    <SelectItem value="all" className="text-white hover:bg-white/10">All Priority</SelectItem>
+                  <SelectContent className="bg-gray-900/95 rounded-3xl backdrop-blur-lg border-white/20">
+                    <SelectItem value="all" className="text-white rounded-2xl hover:bg-white/10">All Priority</SelectItem>
                     <SelectItem value="urgent" className="text-white hover:bg-white/10">Urgent</SelectItem>
-                    <SelectItem value="high" className="text-white hover:bg-white/10">High</SelectItem>
-                    <SelectItem value="medium" className="text-white hover:bg-white/10">Medium</SelectItem>
-                    <SelectItem value="low" className="text-white hover:bg-white/10">Low</SelectItem>
+                    <SelectItem value="high" className="text-white rounded-2xl hover:bg-white/10">High</SelectItem>
+                    <SelectItem value="medium" className="text-white rounded-2xl hover:bg-white/10">Medium</SelectItem>
+                    <SelectItem value="low" className="text-white rounded-2xl hover:bg-white/10">Low</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowResolved(!showResolved)}
-                  className="bg-white/5 border border-white/10 text-white hover:bg-white/10"
+                  className="bg-white/5 border h-full border-white/10 text-white hover:bg-white/10"
                 >
                   {showResolved ? <EyeOff className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
                   {showResolved ? "Hide Resolved" : "Show Resolved"}

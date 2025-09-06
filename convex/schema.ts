@@ -154,6 +154,10 @@ const applicationTables = {
     player2TimeUsed: v.optional(v.number()),
     player1ResultAcknowledged: v.optional(v.boolean()),
     player2ResultAcknowledged: v.optional(v.boolean()),
+    // Disconnection tracking
+    player1DisconnectedAt: v.optional(v.number()),
+    player2DisconnectedAt: v.optional(v.number()),
+    disconnectionGracePeriod: v.optional(v.number()), // Default 2 minutes in milliseconds
     moveCount: v.optional(v.number()), // Cache move count to avoid querying moves table
   })
     .index("by_lobby", ["lobbyId"])

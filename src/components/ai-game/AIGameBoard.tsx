@@ -477,7 +477,7 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
                   initial={{ scale: 1, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2 }}
-                  className="grid grid-cols-9 gap-0.5 sm:gap-2 max-w-lg mx-auto"
+                  className="grid grid-cols-9 gap-0.5 sm:gap-2 w-full max-w-lg mx-auto overflow-hidden"
                 >
                   {setupBoard.map((row, rowIndex) =>
                     row.map((cell, colIndex) => {
@@ -492,7 +492,7 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
                           whileTap={isValidArea ? { scale: 0.95 } : {}}
                           onClick={() => handleSetupSquareClick(rowIndex, colIndex)}
                           className={`
-                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[38px] sm:min-h-0 p-0.5 sm:p-1
+                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[32px] sm:min-h-0 p-0.5 sm:p-1
                             ${isValidArea 
                               ? 'border-primary/50 bg-primary/10 hover:bg-primary/20' 
                               : 'border-muted bg-muted/20'
@@ -670,7 +670,7 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
             initial={{ scale: 1, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="grid grid-cols-9 gap-0.5 sm:gap-2 max-w-lg mx-auto"
+            className="grid grid-cols-9 gap-0.5 sm:gap-2 w-full max-w-lg mx-auto overflow-hidden"
           >
             {session.board.map((row: any[], rowIndex: number) =>
               row.map((cell: { player: string; piece: string; revealed: any; }, colIndex: number) => {
@@ -696,7 +696,7 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
                     whileTap={session.status === "playing" && session.currentTurn === "player1" && !isProcessingMove ? { scale: 0.98 } : {}}
                     onClick={() => handleGameSquareClick(rowIndex, colIndex)}
                     className={`
-                      aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[38px] sm:min-h-0 p-0.5 sm:p-1 relative
+                      aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[32px] sm:min-h-0 p-0.5 sm:p-1 relative
                       bg-muted/30 border-border hover:bg-muted/50
                       ${isSelected ? 'ring-1 ring-primary bg-primary/20 border-primary' : ''}
                       ${isValidMove ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}

@@ -398,13 +398,13 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 lg:gap-6">
         {/* Game Board */}
-        <div className="lg:col-span-3">
+        <div className="xl:col-span-3 order-1">
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
+            <CardHeader className="pb-4">
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 lg:gap-6 w-full lg:w-auto">
                   {/* Player 1 */}
                   <div className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
                     game.status === "finished" 
@@ -490,7 +490,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full lg:w-auto">
                   <Badge 
                     variant={game.status === "setup" ? "secondary" : game.status === "playing" ? "default" : "outline"}
                     className={
@@ -602,7 +602,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                     initial={{ scale: 0.95, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ delay: 0.1 }}
-                    className="grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg ring-1 ring-muted bg-muted/10 border border-muted/30"
+                    className="grid grid-cols-9 gap-1 sm:gap-2 w-full max-w-2xl mx-auto p-2 sm:p-4 rounded-lg ring-1 ring-muted bg-muted/10 border border-muted/30 overflow-hidden"
                   >
                     {game.board.map((row, rowIndex) =>
                       row.map((cell, colIndex) => {
@@ -617,8 +617,8 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                           <div
                             key={`${rowIndex}-${colIndex}`}
                             className={`
-                              aspect-square border flex items-center justify-center rounded-lg transition-all relative
-                              bg-muted/30 border-border
+                              aspect-square border flex items-center justify-center rounded-sm sm:rounded-lg transition-all relative
+                              bg-muted/30 border-border min-h-[32px] sm:min-h-0
                               ${isLastMove ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
                             `}
                           >
@@ -644,7 +644,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.1 }}
-                  className="grid grid-cols-9 gap-2 max-w-3xl mx-auto p-4 rounded-lg ring-1 ring-muted bg-muted/10 border border-muted/30"
+                  className="grid grid-cols-9 gap-1 sm:gap-2 w-full max-w-2xl mx-auto p-2 sm:p-4 rounded-lg ring-1 ring-muted bg-muted/10 border border-muted/30 overflow-hidden"
                 >
                   {game.board.map((row, rowIndex) =>
                     row.map((cell, colIndex) => {
@@ -659,8 +659,8 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                         <div
                           key={`${rowIndex}-${colIndex}`}
                           className={`
-                            aspect-square border flex items-center justify-center rounded-lg transition-all relative
-                            bg-muted/30 border-border
+                            aspect-square border flex items-center justify-center rounded-sm sm:rounded-lg transition-all relative
+                            bg-muted/30 border-border min-h-[32px] sm:min-h-0
                             ${isLastMove ? 'ring-1 ring-yellow-500 border-yellow-500' : ''}
                           `}
                         >
@@ -686,7 +686,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="space-y-4 lg:space-y-6 order-2 xl:order-2">
           {/* Spectators List */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardHeader>
