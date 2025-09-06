@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "../components/ui/button";
-import { Github } from "lucide-react";
+import { Github, Linkedin } from "lucide-react";
 import { Separator } from "../components/ui/separator";
 import ImageBackground from "../components/backgrounds/ImageBackground";
 import Squares from "../components/backgrounds/Squares/Squares";
@@ -161,6 +161,18 @@ export function SignInForm() {
                       Gabriel Catimbang
                     </a>
                     {" "}to preserve and modernize the beloved Filipino strategy game of Game of the Generals.
+                  </p>
+                  <p className="text-white/60 text-xs lg:text-sm">
+                    Connect with Gabriel:{" "}
+                    <a 
+                      href="https://www.linkedin.com/in/gabrielcatimbang/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-white/80 hover:text-white transition-colors duration-200 underline underline-offset-2 font-medium inline-flex items-center gap-1"
+                    >
+                      <Linkedin className="w-3 h-3" />
+                      Visit my LinkedIn
+                    </a>
                   </p>
                   <p className="text-white/60 text-xs lg:text-sm">
                     Born from a desire to bring this tactical masterpiece to the digital age, 
@@ -429,7 +441,17 @@ export function SignInForm() {
                     </a>
                   </p>
                   <p className="text-xs text-white/40 font-body">
-                    Open source • {""}
+                    Connect: {""}
+                    <a 
+                      href="https://www.linkedin.com/in/gabrielcatimbang/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-white/60 hover:text-white/80 transition-colors duration-200 underline underline-offset-2 inline-flex items-center gap-1"
+                    >
+                      <Linkedin className="w-3 h-3" />
+                      LinkedIn
+                    </a>
+                    {" • "}
                     <a 
                       href="https://github.com/gab-cat/games-of-the-generals" 
                       target="_blank" 
