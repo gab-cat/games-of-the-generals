@@ -216,7 +216,7 @@ export function ProfileSetup() {
                     id="username"
                     type="text"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => setUsername(e.target.value.replace(/\s/g, ''))}
                     className="w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 backdrop-blur-sm border border-white/20 rounded-full text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-slate-500/50 focus:border-slate-500/50 transition-all duration-200 hover:bg-white/10 font-body text-sm lg:text-base"
                     placeholder="Enter your battle name"
                     required
@@ -224,7 +224,7 @@ export function ProfileSetup() {
                     maxLength={20}
                   />
                   <p className="text-xs text-white/50 font-mono">
-                    3-20 characters. This will be your identity on the battlefield.
+                    3-20 characters, no spaces. This will be your identity on the battlefield.
                   </p>
                 </div>
               </div>
