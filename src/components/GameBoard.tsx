@@ -5,7 +5,7 @@ import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
 import { useNavigate } from "@tanstack/react-router";
-import { 
+import {
   Shuffle,
   RefreshCw,
   ArrowRightLeft,
@@ -25,6 +25,7 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
+  AlertTriangle,
   ChevronUp,
   ChevronDown
 } from "lucide-react";
@@ -38,6 +39,7 @@ import { AchievementNotification } from "../pages/achievements/AchievementNotifi
 import { UserAvatar } from "./UserAvatar";
 import { getPieceDisplay } from "../lib/piece-display";
 import { SetupPresets } from "./setup-presets/SetupPresets";
+import usePresence from "@convex-dev/presence/react";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -203,7 +205,13 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const game = useQuery(api.games.getGame, { gameId });
   const isLoadingGame = game === undefined;
 
+  const presenceState = usePresence(api.gamePresence, gameId, profile.username);
 
+  // Helper function to get online status for a player
+  const getPlayerPresence = useCallback((username: string) => {
+    if (!presenceState || !Array.isArray(presenceState)) return null;
+    return presenceState.find(presence => presence.userId === username);
+  }, [presenceState]);
 
   const movesData = useQuery(api.games.getGameMoves, { gameId });
   const isLoadingMoves = !movesData;
@@ -390,18 +398,44 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
   // Memoized timeout handlers
   const handlePlayer1Timeout = useCallback(() => {
-    if (isPlayer1 && game?.currentTurn === "player1") {
-      toast.error("Your time expired! You lose the game.");
+    if (!game) return;
+
+    // Allow current user to handle timeout if either:
+    // 1. They are player1 whose time ran out, OR
+    // 2. Player1's time ran out but player1 is offline
+    const player1Presence = getPlayerPresence(game.player1Username);
+    const canHandlePlayer1Timeout = (isPlayer1 && game.currentTurn === "player1") ||
+                                   (game.currentTurn === "player1" && (!player1Presence || !player1Presence.online));
+
+    if (canHandlePlayer1Timeout) {
+      if (isPlayer1) {
+        toast.error("Your time expired! You lose the game.");
+      } else {
+        toast.info("Opponent's time expired! You win the game.");
+      }
       timeoutGame({ gameId });
     }
-  }, [isPlayer1, game?.currentTurn, timeoutGame, gameId]);
+  }, [isPlayer1, game, timeoutGame, gameId, getPlayerPresence]);
 
   const handlePlayer2Timeout = useCallback(() => {
-    if (isPlayer2 && game?.currentTurn === "player2") {
-      toast.error("Your time expired! You lose the game.");
+    if (!game) return;
+
+    // Allow current user to handle timeout if either:
+    // 1. They are player2 whose time ran out, OR
+    // 2. Player2's time ran out but player2 is offline
+    const player2Presence = getPlayerPresence(game.player2Username);
+    const canHandlePlayer2Timeout = (isPlayer2 && game.currentTurn === "player2") ||
+                                   (game.currentTurn === "player2" && (!player2Presence || !player2Presence.online));
+
+    if (canHandlePlayer2Timeout) {
+      if (isPlayer2) {
+        toast.error("Your time expired! You lose the game.");
+      } else {
+        toast.info("Opponent's time expired! You win the game.");
+      }
       timeoutGame({ gameId });
     }
-  }, [isPlayer2, game?.currentTurn, timeoutGame, gameId]);
+  }, [isPlayer2, game, timeoutGame, gameId, getPlayerPresence]);
 
   // Optimized getPlayerTime function with timeout handling
   const getPlayerTime = useCallback((isPlayerParam: boolean) => {
@@ -434,16 +468,16 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     
     // Check for timeout condition - only trigger once per timeout
     if (remaining <= 0 && isCurrentTurn && game.status === "playing") {
-      // Trigger timeout for the current player (only the player whose time ran out)
-      if (game.currentTurn === "player1" && isPlayerParam && isPlayer1) {
+      // Allow timeout handling for any player when it's their turn and time runs out
+      if (game.currentTurn === "player1") {
         setTimeout(() => handlePlayer1Timeout(), 100);
-      } else if (game.currentTurn === "player2" && !isPlayerParam && isPlayer2) {
+      } else if (game.currentTurn === "player2") {
         setTimeout(() => handlePlayer2Timeout(), 100);
       }
     }
     
     return formatTime(remaining);
-  }, [game, currentTime, formatTime, handlePlayer1Timeout, handlePlayer2Timeout, isPlayer1, isPlayer2]);
+  }, [game, currentTime, formatTime, handlePlayer1Timeout, handlePlayer2Timeout]);
 
   // Memoized valid rows calculation - logical positions (not display positions)
   const validRows = useMemo(() => isPlayer1 ? [5, 6, 7] : [0, 1, 2], [isPlayer1]);
@@ -513,6 +547,8 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
   const handleAcknowledgeResult = useCallback(() => {
     acknowledgeGameResult({ gameId });
+    // Clean up presence room when game is acknowledged as finished
+    // Note: removeRoom is an internal function, cleanup happens automatically
   }, [acknowledgeGameResult, gameId]);
 
   const handleViewReplay = useCallback((gameId: Id<"games">) => {
@@ -1397,6 +1433,22 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white/90 text-sm sm:text-base truncate">{game.player1Username}</span>
+                    {(() => {
+                      const player1Presence = getPlayerPresence(game.player1Username);
+                      return player1Presence ? (
+                        player1Presence.online ? (
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
+                            title="Online"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded-full border border-orange-400/50 bg-orange-400/10" title="Disconnected">
+                            <AlertTriangle className="w-3 h-3 text-orange-400" />
+                            <span className="text-xs text-orange-400 font-medium">Disconnected</span>
+                          </div>
+                        )
+                      ) : null;
+                    })()}
                     {game.status === "finished" && game.winner === "player1" && (
                       <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                     )}
@@ -1442,6 +1494,22 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white/90 text-sm sm:text-base truncate">{game.player2Username}</span>
+                    {(() => {
+                      const player2Presence = getPlayerPresence(game.player2Username);
+                      return player2Presence ? (
+                        player2Presence.online ? (
+                          <div
+                            className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
+                            title="Online"
+                          />
+                        ) : (
+                          <div className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded-full border border-orange-400/50 bg-orange-400/10" title="Disconnected">
+                            <AlertTriangle className="w-3 h-3 text-orange-400" />
+                            <span className="text-xs text-orange-400 font-medium">Disconnected</span>
+                          </div>
+                        )
+                      ) : null;
+                    })()}
                     {game.status === "finished" && game.winner === "player2" && (
                       <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
                     )}
@@ -1636,7 +1704,25 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   )}
                   <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50 flex-shrink-0"></div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-blue-400 text-sm sm:text-base truncate">{game.player1Username}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-blue-400 text-sm sm:text-base truncate">{game.player1Username}</h3>
+                      {(() => {
+                        const player1Presence = getPlayerPresence(game.player1Username);
+                        return player1Presence ? (
+                          player1Presence.online ? (
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
+                              title="Online"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1 flex-shrink-0" title="Disconnected">
+                              <AlertTriangle className="w-3 h-3 text-orange-400" />
+                              <span className="text-xs text-orange-400 font-medium">Disconnected</span>
+                            </div>
+                          )
+                        ) : null;
+                      })()}
+                    </div>
                     <div className="text-blue-400/80 text-xs sm:text-sm">Blue Army</div>
                   </div>
                 </motion.div>
@@ -1669,7 +1755,25 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   )}
                   <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50 flex-shrink-0"></div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-red-400 text-sm sm:text-base truncate">{game.player2Username}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-red-400 text-sm sm:text-base truncate">{game.player2Username}</h3>
+                      {(() => {
+                        const player2Presence = getPlayerPresence(game.player2Username);
+                        return player2Presence ? (
+                          player2Presence.online ? (
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
+                              title="Online"
+                            />
+                          ) : (
+                            <div className="flex items-center gap-1 flex-shrink-0" title="Disconnected">
+                              <AlertTriangle className="w-3 h-3 text-orange-400" />
+                              <span className="text-xs text-orange-400 font-medium">Disconnected</span>
+                            </div>
+                          )
+                        ) : null;
+                      })()}
+                    </div>
                     <div className="text-red-400/80 text-xs sm:text-sm">Red Army</div>
                   </div>
                 </motion.div>

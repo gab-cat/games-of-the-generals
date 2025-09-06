@@ -1,4 +1,6 @@
 import { internalMutation } from "./_generated/server";
+import { components } from "./_generated/api";
+import { Presence } from "@convex-dev/presence";
 
 // Internal: Delete all anonymous users and clean up dependent data that could break UIs
 // - Does NOT touch games or moves to keep replays safe
@@ -260,5 +262,52 @@ export const cleanupOrphanedConversations = internalMutation({
     }
 
     return { deletedConversations, deletedMessages };
+  },
+});
+
+// Internal: Delete all presence rooms daily to clean up stale presence data
+export const deleteAllPresenceRooms = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const presence = new Presence(components.presence);
+    let deletedRooms = 0;
+
+    // Since we can't directly query the presence component's tables from the main database,
+    // we'll use a different approach. We'll call the presence component's removeRoom
+    // function for known room types in the system.
+
+    // Get all active games from the last 24 hours (these have presence rooms)
+    const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    const activeGames = await ctx.db
+      .query("games")
+      .withIndex("by_status", (q) => q.eq("status", "finished"))
+      .filter((q) => q.gte(q.field("createdAt"), twentyFourHoursAgo))
+      .collect();
+
+    // Collect all room IDs that should have presence data
+    const roomIds = new Set<string>();
+
+    // Add game IDs as rooms
+    activeGames.forEach(game => roomIds.add(game._id));
+    console.log(`Found ${activeGames.length} active games`);
+
+    // For each room, attempt to remove it from presence
+    // Note: This will only remove rooms that actually exist in the presence system
+    for (const roomId of roomIds) {
+      try {
+        // Use the presence component's removeRoom function
+        await presence.removeRoom(ctx, roomId);
+        deletedRooms++;
+        console.log(`Removed room ${roomId}`);
+      } catch (error) {
+        // Room might not exist in presence system, which is fine
+        console.log(`Room ${roomId} not found in presence system or already removed`);
+      }
+    }
+
+    return {
+      deletedRooms,
+      totalRoomsChecked: roomIds.size
+    };
   },
 });

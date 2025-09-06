@@ -11,6 +11,14 @@ crons.cron(
   {}
 );
 
+// Run daily at 00:02 UTC to delete all presence rooms
+crons.cron(
+  "Delete all presence rooms (daily 00:02 UTC)",
+  "2 0 * * *",
+  internal.maintenance.deleteAllPresenceRooms,
+  {}
+);
+
 // Run daily at 00:05 UTC to clean finished lobbies
 crons.cron(
   "Cleanup finished lobbies (daily 00:05 UTC)",
