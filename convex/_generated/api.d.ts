@@ -33,6 +33,7 @@ import type * as sendEmails from "../sendEmails.js";
 import type * as settings from "../settings.js";
 import type * as setupPresets from "../setupPresets.js";
 import type * as spectate from "../spectate.js";
+import type * as supportTickets from "../supportTickets.js";
 
 import type {
   ApiFromModules,
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   setupPresets: typeof setupPresets;
   spectate: typeof spectate;
+  supportTickets: typeof supportTickets;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

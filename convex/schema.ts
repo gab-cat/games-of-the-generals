@@ -503,6 +503,65 @@ const applicationTables = {
     .index("by_message", ["messageId"])
     .index("by_moderator", ["moderatorId"])
     .index("by_action", ["action"]),
+
+  // Support Tickets
+  supportTickets: defineTable({
+    userId: v.id("users"),
+    username: v.string(),
+    category: v.union(
+      v.literal("bug_report"),
+      v.literal("feature_request"),
+      v.literal("account_issue"),
+      v.literal("game_issue"),
+      v.literal("other")
+    ),
+    subject: v.string(),
+    description: v.string(),
+    status: v.union(
+      v.literal("open"),
+      v.literal("in_progress"),
+      v.literal("resolved"),
+      v.literal("closed")
+    ),
+    priority: v.union(
+      v.literal("low"),
+      v.literal("medium"),
+      v.literal("high"),
+      v.literal("urgent")
+    ),
+    attachmentUrl: v.optional(v.string()),
+    attachmentStorageId: v.optional(v.id("_storage")),
+    assignedToId: v.optional(v.id("users")),
+    assignedToUsername: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    closedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_category", ["category"])
+    .index("by_priority", ["priority"])
+    .index("by_user_status", ["userId", "status"])
+    .index("by_status_created", ["status", "createdAt"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_assigned", ["assignedToId"])
+    .index("by_status_priority", ["status", "priority"]),
+
+  // Support Ticket Updates/Comments
+  supportTicketUpdates: defineTable({
+    ticketId: v.id("supportTickets"),
+    userId: v.id("users"),
+    username: v.string(),
+    message: v.string(),
+    isAdminResponse: v.boolean(),
+    attachmentUrl: v.optional(v.string()),
+    attachmentStorageId: v.optional(v.id("_storage")),
+    timestamp: v.number(),
+  })
+    .index("by_ticket", ["ticketId"])
+    .index("by_ticket_timestamp", ["ticketId", "timestamp"])
+    .index("by_user", ["userId"])
+    .index("by_timestamp", ["timestamp"]),
 };
 
 export default defineSchema({

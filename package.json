@@ -1,7 +1,7 @@
 {
   "name": "flex-template",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.2.1",
   "type": "module",
   "scripts": {
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
@@ -49,6 +49,7 @@
     "cmdk": "^1.1.1",
     "convex": "^1.26.2",
     "convex-helpers": "^0.1.104",
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.23.12",
     "jimp": "^1.6.0",
     "lucide-react": "^0.539.0",

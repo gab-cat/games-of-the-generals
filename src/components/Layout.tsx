@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, Crown } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, HelpCircle, Shield } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -29,11 +29,13 @@ import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useMobile } from "../lib/useMobile";
 import { MessageNotification } from "./messaging/MessageNotification";
 import { useQuery } from "convex-helpers/react/cache";
+import packageJson from "../../package.json";
 
 // Lazy load components
 const GlobalChatPanel = lazy(() => import("./global-chat/GlobalChatPanel").then(module => ({ default: module.GlobalChatPanel })));
 const MessagingPanel = lazy(() => import("./messaging/MessagingPanel").then(module => ({ default: module.MessagingPanel })));
 const MessageButton = lazy(() => import("./messaging/MessageButton").then(module => ({ default: module.MessageButton })));
+const SupportDialog = lazy(() => import("./SupportDialog").then(module => ({ default: module.SupportDialog })));
 
 
 interface LayoutProps {
@@ -45,6 +47,7 @@ interface LayoutProps {
 }
 
 export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps) {
+  const version = packageJson.version;
   const { isAuthenticated } = useConvexAuth();
   const { signOut } = useAuthActions();
   const navigate = useNavigate();
@@ -56,6 +59,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const [showTutorial, setShowTutorial] = useState(false);
   const [hasCheckedTutorial, setHasCheckedTutorial] = useState(false);
   const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
+  const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
   const isMobile = useMobile();
 
   const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
@@ -158,11 +162,11 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       label: "Match History",
       icon: History
     },
-    {
-      path: "/pricing",
-      label: "Pricing",
-      icon: Crown
-    }
+    // {
+    //   path: "/pricing",
+    //   label: "Pricing",
+    //   icon: Crown
+    // }
   ];
 
   useEffect(() => {
@@ -279,6 +283,11 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                     className="absolute -bottom-1 left-0 right-0 h-1 bg-white origin-left rounded-full"
                   />
+                </motion.span>
+                <motion.span
+                  className="relative text-xs font-mono text-gray-400 ml-2"
+                >
+                  v{version}
                 </motion.span>
               </motion.h1>
             </motion.div>
@@ -418,6 +427,25 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       <Settings className="h-4 w-4" />
                       <span>Settings</span>
                     </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => void navigate({ to: "/support" })}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <HelpCircle className="h-4 w-4" />
+                      <span>Support</span>
+                    </DropdownMenuItem>
+
+                    {/* Admin Support Center - Only show for admins/mods */}
+                    {profile?.adminRole && (
+                      <DropdownMenuItem
+                        onClick={() => void navigate({ to: "/support-resolve" })}
+                        className="flex items-center gap-3 text-purple-400 hover:bg-purple-500/10 mx-1 rounded-md cursor-pointer"
+                      >
+                        <Shield className="h-4 w-4" />
+                        <span>Admin Support</span>
+                      </DropdownMenuItem>
+                    )}
                   </div>
 
                   <DropdownMenuSeparator className="bg-white/10" />
@@ -670,6 +698,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           setShowTutorial(false);
         }}
       />
+
+      {/* Support Dialog */}
+      <Suspense fallback={null}>
+        <SupportDialog
+          isOpen={isSupportDialogOpen}
+          onClose={() => setIsSupportDialogOpen(false)}
+        />
+      </Suspense>
     </div>
   );
 }

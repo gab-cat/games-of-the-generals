@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as SupportResolveRouteImport } from './routes/support-resolve'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as SpectateRouteImport } from './routes/spectate'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ReplayRouteImport } from './routes/replay'
@@ -28,6 +30,16 @@ import { Route as IndexRouteImport } from './routes/index'
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportResolveRoute = SupportResolveRouteImport.update({
+  id: '/support-resolve',
+  path: '/support-resolve',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SpectateRoute = SpectateRouteImport.update({
@@ -116,6 +128,8 @@ export interface FileRoutesByFullPath {
   '/replay': typeof ReplayRoute
   '/settings': typeof SettingsRoute
   '/spectate': typeof SpectateRoute
+  '/support': typeof SupportRoute
+  '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +147,8 @@ export interface FileRoutesByTo {
   '/replay': typeof ReplayRoute
   '/settings': typeof SettingsRoute
   '/spectate': typeof SpectateRoute
+  '/support': typeof SupportRoute
+  '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
 }
 export interface FileRoutesById {
@@ -151,6 +167,8 @@ export interface FileRoutesById {
   '/replay': typeof ReplayRoute
   '/settings': typeof SettingsRoute
   '/spectate': typeof SpectateRoute
+  '/support': typeof SupportRoute
+  '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
 }
 export interface FileRouteTypes {
@@ -170,6 +188,8 @@ export interface FileRouteTypes {
     | '/replay'
     | '/settings'
     | '/spectate'
+    | '/support'
+    | '/support-resolve'
     | '/terms'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -187,6 +207,8 @@ export interface FileRouteTypes {
     | '/replay'
     | '/settings'
     | '/spectate'
+    | '/support'
+    | '/support-resolve'
     | '/terms'
   id:
     | '__root__'
@@ -204,6 +226,8 @@ export interface FileRouteTypes {
     | '/replay'
     | '/settings'
     | '/spectate'
+    | '/support'
+    | '/support-resolve'
     | '/terms'
   fileRoutesById: FileRoutesById
 }
@@ -222,6 +246,8 @@ export interface RootRouteChildren {
   ReplayRoute: typeof ReplayRoute
   SettingsRoute: typeof SettingsRoute
   SpectateRoute: typeof SpectateRoute
+  SupportRoute: typeof SupportRoute
+  SupportResolveRoute: typeof SupportResolveRoute
   TermsRoute: typeof TermsRoute
 }
 
@@ -232,6 +258,20 @@ declare module '@tanstack/react-router' {
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support-resolve': {
+      id: '/support-resolve'
+      path: '/support-resolve'
+      fullPath: '/support-resolve'
+      preLoaderRoute: typeof SupportResolveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/spectate': {
@@ -350,6 +390,8 @@ const rootRouteChildren: RootRouteChildren = {
   ReplayRoute: ReplayRoute,
   SettingsRoute: SettingsRoute,
   SpectateRoute: SpectateRoute,
+  SupportRoute: SupportRoute,
+  SupportResolveRoute: SupportResolveRoute,
   TermsRoute: TermsRoute,
 }
 export const routeTree = rootRouteImport
