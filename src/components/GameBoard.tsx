@@ -205,7 +205,9 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const game = useQuery(api.games.getGame, { gameId });
   const isLoadingGame = game === undefined;
 
-  const presenceState = usePresence(api.gamePresence, gameId, profile.username);
+  // 60 seconds
+  const presenceState = usePresence(api.gamePresence, gameId, profile.username, 60000);
+  console.log(presenceState);
 
   // Helper function to get online status for a player
   const getPlayerPresence = useCallback((username: string) => {

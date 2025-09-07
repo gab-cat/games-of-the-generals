@@ -589,14 +589,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                 backgroundColor: { duration: 0.4 },
                 scale: { type: "spring", stiffness: 400, damping: 25 }
               }}
-              className="flex-1 max-w-20 sm:max-w-24 rounded-full"
+              className="flex max-w-20 sm:max-w-24 rounded-full"
             >
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-2 py-5 transition-all duration-200 min-w-0 w-full h-full cursor-pointer",
+                  "flex flex-col items-center justify-center gap-1 px-4 py-1 rounded-full transition-all duration-200 min-w-0 w-full h-full cursor-pointer",
                   isGlobalChatOpen
                     ? "text-white"
                     : "text-white/70 hover:text-white"

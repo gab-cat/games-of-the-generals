@@ -124,15 +124,15 @@ export const GameStartCountdownModal = memo(function GameStartCountdownModal({
           >
             {/* Player 1 */}
             <div className="text-center">
-              <div className="mb-3">
-                <UserAvatar 
+              <div className="mb-3 relative">
+                <UserAvatar
                   username={player1Username}
                   avatarUrl={player1Profile?.avatarUrl}
                   rank={player1Profile?.rank}
                   size="lg"
                   className={`mx-auto ${
-                    currentUsername === player1Username 
-                      ? 'ring-2 ring-blue-400' 
+                    currentUsername === player1Username
+                      ? 'ring-2 ring-blue-400'
                       : 'ring-1 ring-slate-600'
                   }`}
                 />

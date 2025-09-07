@@ -22,6 +22,7 @@ import { useChatProtection } from "../../lib/useChatProtection";
 import { useMobile } from "../../lib/useMobile";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
 import { useIP } from "../../lib/useIPStore";
+import { useOnlineUsers } from "@/lib/useOnlineUsers";
 
 
 interface GlobalChatPanelProps {
@@ -118,18 +119,8 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     return chatHistory.includes('cleared') ? [] : serverMessages;
   }, [chatHistory, serverMessages]);
 
-  // Use presence system for online users
-  const presenceState = usePresence(
-    api.presence,
-    "global",
-    currentUser?.username || "Anonymous" // This will be overridden by the actual username from the presence system
-  );
-  const filteredPresenceState = presenceState?.filter((user) => user.online !== false);
-
-
   // Fetch online users with profile data
-  const onlineUsers = useQuery(api.globalChat.getOnlineUsers, filteredPresenceState ? { users: filteredPresenceState } : "skip");
-  const filteredUsers = onlineUsers?.filter((user) => user.userId !== "Anonymous");
+  const { onlineUsers } = useOnlineUsers();
 
   const { data: unreadMentionCount = 0 } = useConvexQueryWithOptions(
     api.globalChat.getUnreadMentionCount,
@@ -501,7 +492,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
                   className="absolute bottom-0 right-80"
                 >
                   <OnlineUsersList
-                    users={filteredUsers}
+                    users={onlineUsers}
                     onClose={() => setShowUsers(false)}
                   />
                 </motion.div>
