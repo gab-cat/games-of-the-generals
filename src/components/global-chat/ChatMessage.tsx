@@ -84,6 +84,8 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
       return `${Math.floor(diff / 60000)}m`;
     } else if (diff < 86400000) { // Less than 1 day
       return `${Math.floor(diff / 3600000)}h`;
+    } else if (diff < 604800000) { // Less than 7 days
+      return `${Math.floor(diff / 86400000)}d`;
     } else {
       return date.toLocaleDateString();
     }

@@ -269,9 +269,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     onSuccess: () => {
       toast.error("Time expired! You lose the game.");
     },
-    onError: () => {
-      toast.error("Failed to process timeout");
-    }
   });
 
   const { mutate: acknowledgeGameResult } = useConvexMutationWithQuery(api.games.acknowledgeGameResult, {
