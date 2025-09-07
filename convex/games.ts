@@ -630,7 +630,6 @@ export const makeMove = mutation({
     if (profile) {
       await ctx.db.patch(profile._id, {
         lastSeenAt: currentTime,
-        isOnline: true,
       });
     }
 

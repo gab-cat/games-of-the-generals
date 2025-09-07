@@ -41,8 +41,7 @@ const applicationTables = {
     // Tutorial state
     hasSeenTutorial: v.optional(v.boolean()),
     tutorialCompletedAt: v.optional(v.number()),
-    // Online status tracking (merged from onlineUsers table)
-    isOnline: v.optional(v.boolean()),
+    // Online status tracking is now handled by presence system
     lastSeenAt: v.optional(v.number()),
     currentPage: v.optional(v.string()),
     gameId: v.optional(v.id("games")),
@@ -56,8 +55,6 @@ const applicationTables = {
     .index("by_games_wins", ["gamesPlayed", "wins"]) // Compound index for better leaderboard queries
     .index("by_rank_wins", ["rank", "wins"]) // Index for ranking within same rank
     .index("by_active_players", ["gamesPlayed", "username"]) // For finding active players
-    .index("by_online", ["isOnline"]) // For finding online users
-    .index("by_online_last_seen", ["isOnline", "lastSeenAt"]) // For finding recently active users
     .index("by_admin_role", ["adminRole"]) // For finding admin/moderator users
     .index("by_username_games", ["username", "gamesPlayed"]) // For efficient username search
     .index("by_rank_games", ["rank", "gamesPlayed"]) // For rank-based queries

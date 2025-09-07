@@ -75,14 +75,12 @@ function formatRemainingTime(remainingMs: number): string {
 async function getOnlineUsersInfo(ctx: any): Promise<any[]> {
   const fiveMinutesAgo = Date.now() - 5 * 60 * 1000; // 5 minutes ago
 
-  const onlineProfiles = await ctx.db
+  const recentProfiles = await ctx.db
     .query("profiles")
-    .withIndex("by_online_last_seen", (q: any) =>
-      q.eq("isOnline", true).gte("lastSeenAt", fiveMinutesAgo)
-    )
+    .withIndex("by_last_seen", (q: any) => q.gte("lastSeenAt", fiveMinutesAgo))
     .take(100);
 
-  return onlineProfiles;
+  return recentProfiles;
 }
 
 // Handle chat commands
@@ -460,22 +458,20 @@ export const getMessages = query({
   },
 });
 
-// Get online users
+// Get online users (recently active users within 5 minutes)
 export const getOnlineUsers = query({
   args: {},
   handler: async (ctx) => {
     const fiveMinutesAgo = Date.now() - 5 * 60 * 1000; // 5 minutes ago
 
-    const onlineProfiles = await ctx.db
+    const recentProfiles = await ctx.db
       .query("profiles")
-      .withIndex("by_online_last_seen", (q) =>
-        q.eq("isOnline", true).gte("lastSeenAt", fiveMinutesAgo)
-      )
+      .withIndex("by_last_seen", (q) => q.gte("lastSeenAt", fiveMinutesAgo))
       .order("desc")
       .take(100);
 
-    // Return the online users directly from profiles
-    return onlineProfiles.map(profile => ({
+    // Return the recently active users from profiles
+    return recentProfiles.map(profile => ({
       userId: profile.userId,
       username: profile.username,
       rank: profile.rank,
@@ -730,7 +726,6 @@ export const updateOnlineStatus = internalMutation({
     if (profile) {
       await ctx.db.patch(profile._id, {
         lastSeenAt: timestamp,
-        isOnline: true,
         currentPage: args.currentPage,
         gameId: args.gameId,
         lobbyId: args.lobbyId,
@@ -906,7 +901,6 @@ export const markUserOffline = mutation({
 
     if (profile) {
       await ctx.db.patch(profile._id, {
-        isOnline: false,
         lastSeenAt: Date.now(),
       });
     }
@@ -915,28 +909,6 @@ export const markUserOffline = mutation({
   },
 });
 
-// Internal: Mark users as offline (cleanup inactive users)
-export const cleanupOfflineUsers = internalMutation({
-  args: {},
-  handler: async (ctx, _args) => {
-    const tenMinutesAgo = Date.now() - 10 * 60 * 1000; // 10 minutes
-
-    const inactiveProfiles = await ctx.db
-      .query("profiles")
-      .withIndex("by_online_last_seen", (q) =>
-        q.eq("isOnline", true).lt("lastSeenAt", tenMinutesAgo)
-      )
-      .take(100);
-
-    await Promise.all(
-      inactiveProfiles.map(profile =>
-        ctx.db.patch(profile._id, { isOnline: false })
-      )
-    );
-
-    return inactiveProfiles.length;
-  },
-});
 
 // Check if current user is an admin or moderator
 export const isUserAdmin = query({
@@ -1608,7 +1580,6 @@ export const sendAppealToAdmins = mutation({
     // Update user's last seen time
     await ctx.db.patch(userProfile._id, {
       lastSeenAt: timestamp,
-      isOnline: true,
     });
 
     return {

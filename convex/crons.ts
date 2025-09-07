@@ -43,13 +43,6 @@ crons.cron(
   {}
 );
 
-// Run every 10 minutes to mark inactive users as offline
-crons.cron(
-  "Mark inactive users as offline",
-  "*/10 * * * *", // Every 10 minute
-  internal.globalChat.cleanupOfflineUsers,
-  {}
-);
 
 // Run every hour to clean up expired bans and mutes
 crons.cron(
