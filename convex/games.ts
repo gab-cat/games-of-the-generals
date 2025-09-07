@@ -105,6 +105,31 @@ export const startGame = mutation({
       status: "playing",
     });
 
+    // Update profiles for both players: set gameId and clear lobbyId
+    const hostProfile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", lobby.hostId))
+      .unique();
+
+    const playerProfile = lobby.playerId ? await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
+      .unique() : null;
+
+    if (hostProfile) {
+      await ctx.db.patch(hostProfile._id, {
+        gameId,
+        lobbyId: undefined,
+      });
+    }
+
+    if (playerProfile) {
+      await ctx.db.patch(playerProfile._id, {
+        gameId,
+        lobbyId: undefined,
+      });
+    }
+
     return gameId;
   },
 });
@@ -499,6 +524,30 @@ export const makeMove = mutation({
         status: "finished",
       });
 
+      // Clear gameId from both players' profiles
+      const [player1Profile, player2Profile] = await Promise.all([
+        ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", game.player1Id))
+          .unique(),
+        ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
+          .unique()
+      ]);
+
+      if (player1Profile) {
+        await ctx.db.patch(player1Profile._id, {
+          gameId: undefined,
+        });
+      }
+
+      if (player2Profile) {
+        await ctx.db.patch(player2Profile._id, {
+          gameId: undefined,
+        });
+      }
+
       // Clean up spectator chat when game ends
       await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
 
@@ -743,6 +792,30 @@ export const surrenderGame = mutation({
       status: "finished",
     });
 
+    // Clear gameId from both players' profiles
+    const [player1Profile, player2Profile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.player1Id))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
+        .unique()
+    ]);
+
+    if (player1Profile) {
+      await ctx.db.patch(player1Profile._id, {
+        gameId: undefined,
+      });
+    }
+
+    if (player2Profile) {
+      await ctx.db.patch(player2Profile._id, {
+        gameId: undefined,
+      });
+    }
+
     // Clean up presence room when game ends
     await presence.removeRoom(ctx, args.gameId);
 
@@ -926,6 +999,30 @@ export const forfeitGame = mutation({
       await ctx.db.patch(game.lobbyId, { status: "finished" });
     }
 
+    // Clear gameId from both players' profiles
+    const [player1Profile, player2Profile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.player1Id))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
+        .unique()
+    ]);
+
+    if (player1Profile) {
+      await ctx.db.patch(player1Profile._id, {
+        gameId: undefined,
+      });
+    }
+
+    if (player2Profile) {
+      await ctx.db.patch(player2Profile._id, {
+        gameId: undefined,
+      });
+    }
+
     // Clean up presence room when game ends
     await presence.removeRoom(ctx, gameId);
 
@@ -1078,16 +1175,40 @@ export const checkOpponentTimeout = mutation({
         gameEndReason: "timeout" as const,
       });
 
-      // Update lobby status
-      await ctx.db.patch(game.lobbyId, {
-        status: "finished",
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, {
+      status: "finished",
+    });
+
+    // Clear gameId from both players' profiles
+    const [player1Profile, player2Profile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.player1Id))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
+        .unique()
+    ]);
+
+    if (player1Profile) {
+      await ctx.db.patch(player1Profile._id, {
+        gameId: undefined,
       });
+    }
 
-      // Clean up presence room when game ends
-      await presence.removeRoom(ctx, args.gameId);
+    if (player2Profile) {
+      await ctx.db.patch(player2Profile._id, {
+        gameId: undefined,
+      });
+    }
 
-      // Clean up spectator chat when game ends
-      await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
+    // Clean up presence room when game ends
+    await presence.removeRoom(ctx, args.gameId);
+
+    // Clean up spectator chat when game ends
+    await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
 
       // Update player stats
       await ctx.runMutation(api.profiles.updateProfileStats, {

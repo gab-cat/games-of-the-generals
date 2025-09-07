@@ -107,7 +107,7 @@ export const createLobby = mutation({
       }
     }
 
-    return await ctx.db.insert("lobbies", {
+    const lobbyId = await ctx.db.insert("lobbies", {
       name: args.name,
       hostId: userId,
       hostUsername: profile.username,
@@ -118,6 +118,13 @@ export const createLobby = mutation({
       maxSpectators,
       createdAt: Date.now(),
     });
+
+    // Update profile with lobbyId
+    await ctx.db.patch(profile._id, {
+      lobbyId,
+    });
+
+    return lobbyId;
   },
 });
 
@@ -193,6 +200,11 @@ export const joinLobby = mutation({
       // Keep status as "waiting" until game actually starts
     });
 
+    // Update profile with lobbyId
+    await ctx.db.patch(profile._id, {
+      lobbyId: args.lobbyId,
+    });
+
     return args.lobbyId;
   },
 });
@@ -240,6 +252,11 @@ export const joinLobbyByCode = mutation({
       // Keep status as "waiting" until game actually starts
     });
 
+    // Update profile with lobbyId
+    await ctx.db.patch(profile._id, {
+      lobbyId: lobby._id,
+    });
+
     return lobby._id;
   },
 });
@@ -253,18 +270,50 @@ export const leaveLobby = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
+    // Get user profile
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (!profile) throw new Error("Profile not found");
+
     const lobby = await ctx.db.get(args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
     if (lobby.hostId === userId) {
-      // Host is leaving, delete the lobby
+      // Host is leaving, delete the lobby and clear lobbyId from both players' profiles
       await ctx.db.delete(args.lobbyId);
+
+      // Clear lobbyId from host's profile
+      await ctx.db.patch(profile._id, {
+        lobbyId: undefined,
+      });
+
+      // Clear lobbyId from player's profile if they exist
+      if (lobby.playerId) {
+        const playerProfile = await ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
+          .unique();
+
+        if (playerProfile) {
+          await ctx.db.patch(playerProfile._id, {
+            lobbyId: undefined,
+          });
+        }
+      }
     } else if (lobby.playerId === userId) {
-      // Player is leaving, reset lobby to waiting
+      // Player is leaving, reset lobby to waiting and clear lobbyId from player's profile
       await ctx.db.patch(args.lobbyId, {
         playerId: undefined,
         playerUsername: undefined,
         status: "waiting",
+      });
+
+      // Clear lobbyId from player's profile
+      await ctx.db.patch(profile._id, {
+        lobbyId: undefined,
       });
     }
   },
@@ -342,8 +391,34 @@ export const deleteInactiveLobbies = internalMutation({
 
     let deletedCount = 0;
     
-    // Delete each inactive lobby
+    // Delete each inactive lobby and clear lobbyId from associated profiles
     for (const lobby of inactiveLobbies) {
+      // Clear lobbyId from host's profile
+      const hostProfile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", lobby.hostId))
+        .unique();
+
+      if (hostProfile) {
+        await ctx.db.patch(hostProfile._id, {
+          lobbyId: undefined,
+        });
+      }
+
+      // Clear lobbyId from player's profile if they exist
+      if (lobby.playerId) {
+        const playerProfile = await ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
+          .unique();
+
+        if (playerProfile) {
+          await ctx.db.patch(playerProfile._id, {
+            lobbyId: undefined,
+          });
+        }
+      }
+
       await ctx.db.delete(lobby._id);
       deletedCount++;
     }
