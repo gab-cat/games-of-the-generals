@@ -25,7 +25,6 @@ import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
-import { useOnlineStatus } from "../lib/useOnlineStatus";
 import { useMobile } from "../lib/useMobile";
 import { MessageNotification } from "./messaging/MessageNotification";
 import { useQuery } from "convex-helpers/react/cache";
@@ -74,12 +73,6 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
     }
   );
 
-  // Online status tracking - pass profile data to avoid querying it in the hook
-  const { markUserOffline } = useOnlineStatus({
-    currentPage: location.pathname,
-    userId: profile?.userId,
-    username: profile?.username,
-  });
 
   // Check tutorial status - tutorial status doesn't change frequently
   const { data: tutorialStatus } = useConvexQueryWithOptions(
@@ -452,11 +445,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
 
                   <div className="py-1">
                     <DropdownMenuItem
-                      onClick={() => {
-                        // Mark user as offline before signing out
-                        void markUserOffline().catch((error) => {
-                          console.error("Failed to mark user offline:", error);
-                        });
+                      onClick={() => { 
                         void signOut();
                       }}
                       className="flex items-center gap-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 mx-1 rounded-md"
