@@ -3,7 +3,9 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { profanity, CensorType } from "@2toad/profanity";
-import { internal, api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+
+
 // Simple hash function to replace crypto for spam detection
 function simpleHash(str: string): string {
   let hash = 0;
@@ -460,26 +462,54 @@ export const getMessages = query({
 
 // Get online users (recently active users within 5 minutes)
 export const getOnlineUsers = query({
-  args: {},
-  handler: async (ctx) => {
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000; // 5 minutes ago
+  args: {
+    users: v.optional(v.array(v.object({
+      userId: v.string(),
+      online: v.boolean(),
+      lastDisconnected: v.number(),
+    }))),
+  },
+  handler: async (ctx, args) => {
+    const onlineUsers = args.users || [];
 
-    const recentProfiles = await ctx.db
-      .query("profiles")
-      .withIndex("by_last_seen", (q) => q.gte("lastSeenAt", fiveMinutesAgo))
-      .order("desc")
-      .take(100);
+    const onlineUsersWithProfile = await Promise.all(onlineUsers.map(async (user) => {
+      const profile = await ctx.db.query("profiles").withIndex("by_username", (q) => q.eq("username", user.userId)).unique();
+
+      // Check if user is in an AI game
+      let aiGameId = undefined;
+      if (profile?.userId) {
+        const aiGame = await ctx.db
+          .query("aiGameSessions")
+          .withIndex("by_player", (q) => q.eq("playerId", profile.userId))
+          .filter((q) => q.eq(q.field("status"), "playing"))
+          .first();
+        aiGameId = aiGame?._id;
+      }
+
+      return {
+        ...user,
+        username: profile?.username,
+        rank: profile?.rank,
+        avatarUrl: profile?.avatarUrl,
+        lastSeenAt: profile?.lastSeenAt,
+        currentPage: profile?.currentPage,
+        gameId: profile?.gameId,
+        lobbyId: profile?.lobbyId,
+        aiGameId,
+       };
+    }));
 
     // Return the recently active users from profiles
-    return recentProfiles.map(profile => ({
+    return onlineUsersWithProfile.map((profile) => ({
       userId: profile.userId,
       username: profile.username,
       rank: profile.rank,
       avatarUrl: profile.avatarUrl,
-      lastSeenAt: profile.lastSeenAt!,
+      lastSeenAt: profile.lastSeenAt,
       currentPage: profile.currentPage,
       gameId: profile.gameId,
       lobbyId: profile.lobbyId,
+      aiGameId: profile.aiGameId,
     }));
   },
 });

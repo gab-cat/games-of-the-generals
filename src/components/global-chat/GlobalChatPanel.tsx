@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Users, Settings, X, Send, ChevronUp, ChevronDown } from "lucide-react";
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -22,6 +22,7 @@ import { useChatProtection } from "../../lib/useChatProtection";
 import { useMobile } from "../../lib/useMobile";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
 import { useIP } from "../../lib/useIPStore";
+
 
 interface GlobalChatPanelProps {
   isOpen: boolean;
@@ -77,6 +78,16 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     closeSpamModal: () => void;
   };
 
+    // Current user profile - profile data changes infrequently
+  const { data: currentUser } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    {
+      staleTime: 120000, // 2 minutes - profile data changes infrequently
+      gcTime: 600000, // 10 minutes cache
+    }
+  );
+
   // IP address hook - fetches and stores IP once per session
   const { ipAddress } = useIP();
 
@@ -111,30 +122,14 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
   const presenceState = usePresence(
     api.presence,
     "global",
-    "Anonymous" // This will be overridden by the actual username from the presence system
+    currentUser?.username || "Anonymous" // This will be overridden by the actual username from the presence system
   );
+  const filteredPresenceState = presenceState?.filter((user) => user.online !== false);
 
-  // Get user profiles for presence users
-  const { data: onlineUsersData = [] } = useConvexQueryWithOptions(
-    api.globalChat.getOnlineUsers,
-    isOpen && showUsers ? {} : "skip",
-    {
-      enabled: !!(isOpen && showUsers),
-      staleTime: 30000, // 30 seconds - online users need moderate freshness
-      gcTime: 300000, // 5 minutes cache
-    }
-  );
 
-  // Combine presence data with profile data
-  const onlineUsers = useMemo(() => {
-    if (!presenceState || presenceState.length === 0) {
-      return onlineUsersData?.filter((user: null): user is NonNullable<typeof user> => user !== null) || [];
-    }
-    
-    // For now, use the legacy system as fallback
-    // TODO: Enhance this to merge presence data with profile data
-    return onlineUsersData?.filter((user: null): user is NonNullable<typeof user> => user !== null) || [];
-  }, [presenceState, onlineUsersData]);
+  // Fetch online users with profile data
+  const onlineUsers = useQuery(api.globalChat.getOnlineUsers, filteredPresenceState ? { users: filteredPresenceState } : "skip");
+  const filteredUsers = onlineUsers?.filter((user) => user.userId !== "Anonymous");
 
   const { data: unreadMentionCount = 0 } = useConvexQueryWithOptions(
     api.globalChat.getUnreadMentionCount,
@@ -172,23 +167,12 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     }
   }, [isOpen, isMinimized]);
 
-  // Current user profile - profile data changes infrequently
-  const { data: currentUser } = useConvexQueryWithOptions(
-    api.profiles.getCurrentProfile,
-    {},
-    {
-      staleTime: 120000, // 2 minutes - profile data changes infrequently
-      gcTime: 600000, // 10 minutes cache
-    }
-  );
+
 
   const handleSendMessage = async () => {
     if (!message.trim() || !isAuthenticated || !currentUser) return;
 
     const messageText = message.trim();
-    console.log('📤 Attempting to send message:', messageText);
-    console.log('📍 IP Address:', ipAddress || 'Not available yet');
-
     // Handle /clear command client-side
     if (messageText.toLowerCase() === '/clear') {
       // Clear chat history (client-side only)
@@ -203,14 +187,11 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
 
     // Validate message with rate limiting and spam filtering
     const validation = await validateMessage(messageText);
-    console.log('📤 Validation result:', validation);
 
     if (!validation.allowed) {
-      console.log('📤 Message blocked by validation');
       return; // Modal will be shown by the hook
     }
 
-    console.log('📤 Message passed validation, sending to server');
 
     // Create optimistic message
     const optimisticMessage: OptimisticMessage = {
@@ -233,8 +214,6 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     });
 
     if (result.success) {
-      // Message sent successfully
-      console.log('📤 Message sent successfully');
 
       // Record successful message for rate limiting and spam detection
       recordMessage(messageText);
@@ -522,7 +501,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
                   className="absolute bottom-0 right-80"
                 >
                   <OnlineUsersList
-                    users={onlineUsers}
+                    users={filteredUsers}
                     onClose={() => setShowUsers(false)}
                   />
                 </motion.div>
@@ -544,8 +523,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
               await agreeToRules({});
               setShowRules(false);
               toast.success("Rules accepted! You can now participate in the chat.");
-            } catch (error) {
-              console.error("Failed to agree to rules:", error);
+            } catch {
               toast.error("Failed to accept rules. Please try again.");
             }
           })();

@@ -62,7 +62,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
 
     // Filter users based on debounced query
     const filteredUsers = onlineUsers.filter((user) =>
-      user.username.toLowerCase().includes(debouncedMentionQuery.toLowerCase())
+      user.username?.toLowerCase().includes(debouncedMentionQuery.toLowerCase())
     );
 
     // Filter commands based on query
@@ -199,7 +199,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
           if (e.key === "Enter" && selectedIndex >= 0) {
             e.preventDefault();
             if (dropdownType === 'mention') {
-              handleMentionSelect(filteredUsers[selectedIndex].username);
+              handleMentionSelect(filteredUsers[selectedIndex].username!);
             } else {
               handleCommandSelect(filteredCommands[selectedIndex].command);
             }
@@ -284,7 +284,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
                     {filteredUsers.map((user, index) => (
                       <div
                         key={user.userId}
-                        onClick={() => handleMentionSelect(user.username)}
+                        onClick={() => handleMentionSelect(user.username!)}
                         className={cn(
                           "flex items-center gap-3 px-2 py-1 mb-1 cursor-pointer rounded-2xl transition-all",
                           selectedIndex === index
@@ -294,7 +294,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
                       >
                         {/* Avatar */}
                         <UserAvatar
-                          username={user.username}
+                          username={user.username!}
                           avatarUrl={user.avatarUrl}
                           rank={user.rank}
                           size="xs"

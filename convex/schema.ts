@@ -243,6 +243,7 @@ const applicationTables = {
   messages: defineTable({
     senderId: v.id("users"),
     senderUsername: v.string(),
+    senderAvatarUrl: v.optional(v.string()),
     recipientId: v.id("users"),
     recipientUsername: v.string(),
     content: v.string(),

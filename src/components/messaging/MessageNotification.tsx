@@ -5,6 +5,7 @@ import { useConvexAuth } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { useQuery } from "convex-helpers/react/cache";
+import { UserAvatar } from "../UserAvatar";
 
 interface Message {
   _id: string;
@@ -340,11 +341,20 @@ export function MessageNotification({
             className="bg-gray-950/80 backdrop-blur-sm border border-white/10 rounded-2xl shadow-2xl p-4 min-w-80 max-w-sm"
           >
             <div className="flex items-start gap-3">
-              {/* Message Icon */}
+              {/* Message Icon/Avatar */}
               <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
-                  {getNotificationIcon(message.messageType)}
-                </div>
+                {message.senderAvatarUrl ? (
+                  <UserAvatar
+                    username={message.senderUsername}
+                    avatarUrl={message.senderAvatarUrl}
+                    size="md"
+                    className="ring-2 ring-green-500/20"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                    {getNotificationIcon(message.messageType)}
+                  </div>
+                )}
               </div>
 
               {/* Content */}

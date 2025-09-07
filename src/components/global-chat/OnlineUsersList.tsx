@@ -6,22 +6,23 @@ import { Crown, Shield, Star, Zap, Target, X, GamepadIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
 import { Button } from "../ui/button";
-import { Id } from "../../../convex/_generated/dataModel";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
+import { Id } from "../../../convex/_generated/dataModel";
 
 interface OnlineUser {
-  userId: Id<"users">;
-  username: string;
-  rank: string;
+  userId: string;
+  username: string | undefined;
+  rank: string | undefined;
   avatarUrl?: string;
-  lastSeenAt: number;
+  lastSeenAt: number | undefined;
   currentPage?: string;
   gameId?: Id<"games">;
   lobbyId?: Id<"lobbies">;
+  aiGameId?: Id<"aiGameSessions">;
 }
 
 interface OnlineUsersListProps {
-  users: OnlineUser[];
+  users: OnlineUser[] | undefined;
   onClose: () => void;
 }
 
@@ -60,27 +61,38 @@ const rankColors = {
 export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
   const usersListRef = useAutoAnimate();
   const navigate = useNavigate();
+  console.log('📍 Users:', users);
 
   const handleUserClick = (username: string) => {
     void navigate({ to: "/profile", search: { u: username } });
   };
 
   const getActivityIcon = (user: OnlineUser) => {
+    if (user.aiGameId) {
+      // AI games - yellow
+      return <GamepadIcon className="w-5 h-5 text-yellow-400" />;
+    }
     if (user.gameId) {
-      return <GamepadIcon className="w-3 h-3 text-green-400" />;
+      // Regular multiplayer games - red
+      return <GamepadIcon className="w-5 h-5 text-red-400" />;
     }
     if (user.lobbyId) {
-      return <Target className="w-3 h-3 text-blue-400" />;
+      // In lobby - green
+      return <Target className="w-3 h-3 text-green-400" />;
     }
+    // Generally online - green dot
     return <div className="w-3 h-3 bg-green-400 rounded-full" />;
   };
 
   const getActivityText = (user: OnlineUser) => {
     if (user.gameId) {
-      return "In Game";
+      return (<span className="text-red-400/80">In Game</span>);
     }
     if (user.lobbyId) {
-      return "In Lobby";
+      return (<span className="text-green-400/80">In Lobby</span>);
+    }
+    if (user.aiGameId) {
+      return (<span className="text-yellow-400/80">In AI Game</span>);
     }
     return ""; // Empty string for online status
   };
@@ -97,7 +109,7 @@ export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
           <span className="text-white/90 font-medium text-sm">Online Players</span>
-          <span className="text-white/60 text-xs">({users.length})</span>
+          <span className="text-white/60 text-xs">({users?.length})</span>
         </div>
         <Button
           variant="ghost"
@@ -111,13 +123,13 @@ export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
 
       {/* Users List */}
       <div className="max-h-96 overflow-y-auto">
-        {users.length === 0 ? (
+        {users?.length === 0 ? (
           <div className="p-4 text-center text-white/60 text-sm">
             No players online
           </div>
         ) : (
           <div ref={usersListRef} className="p-2 space-y-1">
-            {users.map((user) => {
+            {users?.map((user) => {
               const RankIcon = rankIcons[user.rank as keyof typeof rankIcons] || Shield;
               const rankColor = rankColors[user.rank as keyof typeof rankColors] || "text-gray-400";
 
@@ -127,11 +139,11 @@ export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   className="flex items-center gap-3 p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group"
-                  onClick={() => handleUserClick(user.username)}
+                  onClick={() => handleUserClick(user.username!)}
                 >
                   {/* Avatar */}
                   <UserAvatar
-                    username={user.username}
+                    username={user.username!}
                     avatarUrl={user.avatarUrl}
                     rank={user.rank}
                     size="xs"
@@ -141,21 +153,22 @@ export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
                   {/* User Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 justify-between">
-                      <div className="flex items-center gap-1">
-                        <span className="text-white/90 text-xs font-medium truncate">
-                          {user.username}
-                        </span>
-                        <RankIcon className={cn("w-3 h-3 flex-shrink-0", rankColor)} />
+                      <div className="flex gap-1 flex-col">
+                        <div className="text-left flex items-center gap-1">
+                          <span className="text-white/90 text-sm font-medium truncate">
+                            {user.username}
+                          </span>
+                          <RankIcon className={cn("w-3 h-3 flex-shrink-0", rankColor)} />
+                        </div>
+                        <div className="text-white/50 text-[0.65rem] truncate  -mt-1 font-light">
+                          {getActivityText(user)}
+                        </div>
                       </div>
-                      {/* Green dot next to username */}
-                      <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0" />
-                    </div>
-                    {getActivityText(user) && (
-                      <div className="flex items-center gap-1 text-white/60 text-xs">
+                      {/* Activity indicator dot */}
+                      <div className="flex-shrink-0">
                         {getActivityIcon(user)}
-                        <span>{getActivityText(user)}</span>
                       </div>
-                    )}
+                    </div>
                   </div>
                 </motion.div>
               );

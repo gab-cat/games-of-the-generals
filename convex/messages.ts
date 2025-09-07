@@ -102,6 +102,7 @@ export const sendMessage = mutation({
     const messageId = await ctx.db.insert("messages", {
       senderId: userId,
       senderUsername: senderProfile.username,
+      senderAvatarUrl: senderProfile.avatarUrl,
       recipientId: recipientProfile.userId,
       recipientUsername: args.recipientUsername,
       content: args.content,
@@ -455,6 +456,7 @@ export const getRecentUnreadMessages = query({
       _id: msg._id,
       senderId: msg.senderId,
       senderUsername: msg.senderUsername,
+      senderAvatarUrl: msg.senderAvatarUrl,
       content: msg.content,
       messageType: msg.messageType,
       timestamp: msg.timestamp,
@@ -745,6 +747,7 @@ export const sendMessageInternal = internalMutation({
     const messageId = await ctx.db.insert("messages", {
       senderId: args.senderId,
       senderUsername: senderProfile.username,
+      senderAvatarUrl: senderProfile.avatarUrl,
       recipientId: recipientProfile.userId,
       recipientUsername: args.recipientUsername,
       content: args.content,
