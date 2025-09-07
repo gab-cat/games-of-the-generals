@@ -8,6 +8,8 @@ import { createRouter, RouterProvider } from '@tanstack/react-router';
 import "./index.css";
 import { registerSW } from 'virtual:pwa-register';
 import { ConvexQueryCacheProvider } from "convex-helpers/react/cache/provider";
+import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
@@ -46,6 +48,8 @@ createRoot(document.getElementById("root")!).render(
       <ConvexQueryCacheProvider>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
+        <Analytics />
+        <SpeedInsights />
         {/* Add React Query DevTools for development only */}
         {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
       </QueryClientProvider>
