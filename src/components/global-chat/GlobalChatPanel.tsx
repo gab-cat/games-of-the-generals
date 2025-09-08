@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Users, Settings, X, Send, ChevronUp, ChevronDown } from "lucide-react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation } from "convex/react";
 import { useConvexAuth } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import usePresence from "@convex-dev/presence/react";
 import { Button } from "../ui/button";
 import ReactMarkdown from "react-markdown";
 

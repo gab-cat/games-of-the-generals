@@ -105,7 +105,7 @@ export const startAIGameSession = mutation({
     const aiBoard = generateAISetup();
     
     // Store session in database
-    await ctx.db.insert("aiGameSessions", {
+    const inserted = await ctx.db.insert("aiGameSessions", {
       sessionId,
       playerId: userId,
       playerUsername: profile.username,
@@ -120,6 +120,9 @@ export const startAIGameSession = mutation({
       setupTimeStarted: Date.now(),
       moveCount: 0,
     });
+
+    // Mark profile with active ai session id for quick presence lookup
+    await ctx.db.patch(profile._id, { aiSessionId: inserted });
 
     return { 
       sessionId, 
@@ -790,6 +793,15 @@ export const surrenderAIGame = mutation({
       gameEndReason: "surrender",
     });
 
+    // Clear profile ai session link
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (profile?.aiSessionId) {
+      await ctx.db.patch(profile._id, { aiSessionId: undefined });
+    }
+
     return null;
   },
 });
@@ -813,6 +825,15 @@ export const cleanupAIGameSession = mutation({
 
     // Delete the session
     await ctx.db.delete(session._id);
+
+    // Clear profile ai session link if pointing to this session
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (profile?.aiSessionId) {
+      await ctx.db.patch(profile._id, { aiSessionId: undefined });
+    }
 
     return null;
   },

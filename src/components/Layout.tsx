@@ -25,6 +25,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { toast } from "sonner";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
+import { deriveStatus, getStatusColorClass, getStatusText, getStatusIndicatorNode } from "../lib/getIndicator";
 import { useMobile } from "../lib/useMobile";
 import { MessageNotification } from "./messaging/MessageNotification";
 import { useQuery } from "convex-helpers/react/cache";
@@ -354,8 +355,23 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                         <div className="text-right hidden sm:block">
                           <div className="text-white/90 font-medium text-sm truncate">{user.username}</div>
                           <div className="flex items-center gap-1 justify-end">
-                            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                            <span className="text-white/50 text-xs">Online</span>
+                            {(() => {
+                              const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
+                              const node = getStatusIndicatorNode(status);
+                              return node ? (
+                                <div className="flex items-center justify-center">{node}</div>
+                              ) : (
+                                <div className="w-2 h-2 bg-white/30 rounded-full"></div>
+                              );
+                            })()}
+                            {(() => {
+                              const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
+                              const text = getStatusText(status) ?? "Online";
+                              const color = getStatusColorClass(status);
+                              return (
+                                <span className={"text-xs " + color}>{text}</span>
+                              );
+                            })()}
                           </div>
                         </div>
                         <UserAvatar
@@ -388,8 +404,23 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       <div>
                         <div className="text-white font-medium text-sm">{user.username}</div>
                         <div className="flex items-center gap-1 mt-0.5">
-                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full"></div>
-                          <span className="text-white/60 text-xs">Online</span>
+                          {(() => {
+                            const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
+                            const node = getStatusIndicatorNode(status);
+                            return node ? (
+                              <div className="flex items-center justify-center">{node}</div>
+                            ) : (
+                              <div className="w-1.5 h-1.5 bg-white/30 rounded-full"></div>
+                            );
+                          })()}
+                          {(() => {
+                            const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
+                            const text = getStatusText(status) ?? "Online";
+                            const color = getStatusColorClass(status);
+                            return (
+                              <span className={"text-xs " + color}>{text}</span>
+                            );
+                          })()}
                         </div>
                       </div>
                     </div>

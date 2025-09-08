@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft } from "lucide-react";
+import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft, GamepadIcon, Target } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useConvex, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
@@ -14,6 +14,7 @@ import { cn } from "../../lib/utils";
 import { toast } from "sonner";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { useDebouncedCallback } from "use-debounce";
+import { useOnlineUsers } from "../../lib/useOnlineUsers";
 
 interface OptimisticMessage {
   _id: string;
@@ -174,6 +175,40 @@ export function ConversationView({
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const newestTimestampRef = useRef<number>(0);
+
+  // Online users presence data
+  const { onlineUsers } = useOnlineUsers();
+
+  // Helper: status indicator node and status text for header
+  const getHeaderStatus = (username?: string) => {
+    if (!username) return { indicator: null as React.ReactNode, text: null as string | null };
+    const user = onlineUsers?.find(u => u.username === username);
+    if (!user) return { indicator: null as React.ReactNode, text: null as string | null };
+
+    if (user.gameId) {
+      return {
+        indicator: <GamepadIcon className="w-3 h-3 text-red-400" />,
+        text: "In Game",
+      };
+    }
+    if (user.lobbyId) {
+      return {
+        indicator: <Target className="w-3 h-3 text-green-400" />,
+        text: "In Lobby",
+      };
+    }
+    if (user.aiGameId) {
+      return {
+        indicator: <GamepadIcon className="w-3 h-3 text-yellow-400" />,
+        text: "In AI Game",
+      };
+    }
+    // Generally online
+    return {
+      indicator: <div className="w-3 h-3 bg-green-400 rounded-full" />,
+      text: null,
+    };
+  };
 
   // Dynamic profanity loader
   const [profanityFilter, setProfanityFilter] = useState<any>(null);
@@ -835,12 +870,22 @@ export function ConversationView({
               <ArrowLeft className="w-4 h-4" />
             </Button>
           )}
-          <UserAvatar
-            username={otherUserProfile.username}
-            avatarUrl={otherUserProfile.avatarUrl}
-            size="md"
-            className="ring-1 ring-white/20"
-          />
+          <div className="relative">
+            <UserAvatar
+              username={otherUserProfile.username}
+              avatarUrl={otherUserProfile.avatarUrl}
+              size="md"
+              className="ring-1 ring-white/20"
+            />
+            {(() => {
+              const { indicator } = getHeaderStatus(otherUserProfile.username);
+              return indicator ? (
+                <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                  {indicator}
+                </div>
+              ) : null;
+            })()}
+          </div>
           <div>
             <h3
               className="font-sm text-white hover:text-blue-400 cursor-pointer transition-colors"
@@ -850,14 +895,32 @@ export function ConversationView({
             >
               {otherUserProfile.username}
             </h3>
-            <p className="text-xs text-white/60">
-              {otherUserProfile.bio
-                ? otherUserProfile.bio.length > 50
-                  ? `${otherUserProfile.bio.substring(0, 50)}...`
-                  : otherUserProfile.bio
-                : `${otherUserProfile.rank && `${otherUserProfile.rank} • `}${otherUserProfile.wins}W ${otherUserProfile.losses}L`
+            {(() => {
+              const status = getHeaderStatus(otherUserProfile.username);
+              if (status.text) {
+                // Colorize status text only: In Lobby (green), In Game (red), In AI Game (yellow)
+                const colorClass = status.text === "In Lobby"
+                  ? "text-green-400"
+                  : status.text === "In Game"
+                  ? "text-red-400"
+                  : "text-yellow-400"; // In AI Game
+                return (
+                  <div className={`text-xs ${colorClass}`}>
+                    {status.text}
+                  </div>
+                );
               }
-            </p>
+              // Generally online: show bio/wins like before
+              return (
+                <p className="text-xs text-white/60">
+                  {otherUserProfile.bio
+                    ? otherUserProfile.bio.length > 50
+                      ? `${otherUserProfile.bio.substring(0, 50)}...`
+                      : otherUserProfile.bio
+                    : `${otherUserProfile.rank && `${otherUserProfile.rank} • `}${otherUserProfile.wins}W ${otherUserProfile.losses}L`}
+                </p>
+              );
+            })()}
           </div>
         </div>
 

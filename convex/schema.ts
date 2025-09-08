@@ -46,6 +46,8 @@ const applicationTables = {
     currentPage: v.optional(v.string()),
     gameId: v.optional(v.id("games")),
     lobbyId: v.optional(v.id("lobbies")),
+    // Current active AI session for presence/indicator without extra queries
+    aiSessionId: v.optional(v.id("aiGameSessions")),
     // Admin/Moderator role
     adminRole: v.optional(v.union(v.literal("moderator"), v.literal("admin"))),
   })

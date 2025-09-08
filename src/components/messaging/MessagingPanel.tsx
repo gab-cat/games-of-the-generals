@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText, GamepadIcon, Target } from "lucide-react";
+import { useState, useEffect, type ReactNode } from "react";
+import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText } from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -21,6 +21,7 @@ import {
 } from "../ui/sheet";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { useOnlineUsers } from "../../lib/useOnlineUsers";
+import { getStatusForUsername, getStatusIndicatorNode } from "../../lib/getIndicator";
 
 interface MessagingPanelProps {
   isOpen: boolean;
@@ -36,6 +37,7 @@ interface NewMessageViewProps {
   shouldShowEnablePush: boolean;
   isSubscribing: boolean;
   onEnablePush: () => void;
+  getOnlineStatusIndicator: (username: string) => ReactNode;
 }
 
 interface SearchResult {
@@ -45,33 +47,13 @@ interface SearchResult {
   rank?: string;
 }
 
-function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isSubscribing, onEnablePush }: NewMessageViewProps) {
+function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isSubscribing, onEnablePush, getOnlineStatusIndicator }: NewMessageViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
   
-  // Get online users data
-  const { onlineUsers } = useOnlineUsers();
-  
-  // Helper function to get online status indicator for a user
-  const getOnlineStatusIndicator = (username: string) => {
-    const onlineUser = onlineUsers?.find(user => user.username === username);
-    if (!onlineUser) return null;
+  // Using online indicators from parent; logging handled at root
 
-    if (onlineUser.aiGameId) {
-      // AI games - yellow
-      return <GamepadIcon className="w-3 h-3 text-yellow-400" />;
-    }
-    if (onlineUser.gameId) {
-      // Regular multiplayer games - red
-      return <GamepadIcon className="w-3 h-3 text-red-400" />;
-    }
-    if (onlineUser.lobbyId) {
-      // In lobby - green
-      return <Target className="w-3 h-3 text-green-400" />;
-    }
-    // Generally online - green dot
-    return <div className="w-2 h-2 bg-green-400 rounded-full" />;
-  };
+  // Helper function now comes from parent via props
 
   const { data: searchResults = [], isLoading: searchLoading } = useConvexQuery(
     api.messages.searchUsers,
@@ -261,28 +243,13 @@ export function MessagingPanel({
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
   const [hasLocalSubscription, setHasLocalSubscription] = useState(false);
   
-  // Get online users data
+  // Get online users data at root
   const { onlineUsers } = useOnlineUsers();
   
-  // Helper function to get online status indicator for a user
+  // Shared helper at root used by both list and NewMessageView
   const getOnlineStatusIndicator = (username: string) => {
-    const onlineUser = onlineUsers?.find(user => user.username === username);
-    if (!onlineUser) return null;
-
-    if (onlineUser.aiGameId) {
-      // AI games - yellow
-      return <GamepadIcon className="w-3 h-3 text-yellow-400" />;
-    }
-    if (onlineUser.gameId) {
-      // Regular multiplayer games - red
-      return <GamepadIcon className="w-3 h-3 text-red-400" />;
-    }
-    if (onlineUser.lobbyId) {
-      // In lobby - green
-      return <Target className="w-3 h-3 text-green-400" />;
-    }
-    // Generally online - green dot
-    return <div className="w-3 h-3 bg-green-400 rounded-full" />;
+    const status = getStatusForUsername(onlineUsers, username);
+    return getStatusIndicatorNode(status);
   };
   
   // Debounce search term to avoid too many queries
@@ -544,6 +511,7 @@ export function MessagingPanel({
                 shouldShowEnablePush={shouldShowEnablePush}
                 isSubscribing={isSubscribing}
                 onEnablePush={() => void handleEnablePush()}
+                getOnlineStatusIndicator={getOnlineStatusIndicator}
               />
             ) : (
               <div className="h-full flex flex-col">

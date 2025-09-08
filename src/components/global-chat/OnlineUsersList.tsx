@@ -61,7 +61,6 @@ const rankColors = {
 export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
   const usersListRef = useAutoAnimate();
   const navigate = useNavigate();
-  console.log('📍 Users:', users);
 
   const handleUserClick = (username: string) => {
     void navigate({ to: "/profile", search: { u: username } });

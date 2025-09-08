@@ -472,45 +472,28 @@ export const getOnlineUsers = query({
   handler: async (ctx, args) => {
     const onlineUsers = args.users || [];
 
-    const onlineUsersWithProfile = await Promise.all(onlineUsers.map(async (user) => {
-      const profile = await ctx.db.query("profiles").withIndex("by_username", (q) => q.eq("username", user.userId)).unique();
-
-      // Check if user is in an AI game
-      let aiGameId = undefined;
-      if (profile?.userId) {
-        const aiGame = await ctx.db
-          .query("aiGameSessions")
-          .withIndex("by_player", (q) => q.eq("playerId", profile.userId))
-          .filter((q) => q.eq(q.field("status"), "playing"))
-          .first();
-        aiGameId = aiGame?._id;
-      }
-
-      return {
-        ...user,
-        username: profile?.username,
-        rank: profile?.rank,
-        avatarUrl: profile?.avatarUrl,
-        lastSeenAt: profile?.lastSeenAt,
-        currentPage: profile?.currentPage,
-        gameId: profile?.gameId,
-        lobbyId: profile?.lobbyId,
-        aiGameId,
-       };
+    // Fetch all profiles for given usernames in parallel without extra AI queries
+    const profiles = await Promise.all(onlineUsers.map(async (u) => {
+      const p = await ctx.db
+        .query("profiles")
+        .withIndex("by_username", (q) => q.eq("username", u.userId))
+        .unique();
+      return { u, p };
     }));
 
-    // Return the recently active users from profiles
-    return onlineUsersWithProfile.map((profile) => ({
-      userId: profile.userId,
-      username: profile.username,
-      rank: profile.rank,
-      avatarUrl: profile.avatarUrl,
-      lastSeenAt: profile.lastSeenAt,
-      currentPage: profile.currentPage,
-      gameId: profile.gameId,
-      lobbyId: profile.lobbyId,
-      aiGameId: profile.aiGameId,
-    }));
+    return profiles
+      .filter(({ p }) => Boolean(p))
+      .map(({ u, p }) => ({
+        userId: u.userId,
+        username: p!.username,
+        rank: p!.rank,
+        avatarUrl: p!.avatarUrl,
+        lastSeenAt: p!.lastSeenAt,
+        currentPage: p!.currentPage,
+        gameId: p!.gameId,
+        lobbyId: p!.lobbyId,
+        aiGameId: p!.aiSessionId, // directly from profile now
+      }));
   },
 });
 
