@@ -398,6 +398,13 @@ export function ConversationView({
     const hasUnreadIncoming = messages.some((m) => {
       if ('isOptimistic' in m) return false;
       const msg = m as Message;
+
+      // For notification conversations (self-conversations), mark any unread message as read
+      if (isNotificationConversation) {
+        return !msg.readAt;
+      }
+
+      // For regular conversations, only mark messages from the other user to current user
       return (
         msg.senderId === otherUserId &&
         msg.recipientId === currentUserProfile.userId &&
@@ -418,7 +425,7 @@ export function ConversationView({
       .finally(() => {
         isMarkingReadRef.current = false;
       });
-  }, [messages, otherUserId, currentUserProfile, markAsRead]);
+  }, [messages, otherUserId, currentUserProfile, markAsRead, isNotificationConversation]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || isLoading) return;
