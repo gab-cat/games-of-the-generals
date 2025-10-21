@@ -1,4 +1,4 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -216,7 +216,7 @@ export const getRecentNotifications = query({
 export const deleteExpiredNotifications = internalMutation({
   args: {},
   returns: v.number(), // Number of notifications deleted
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const now = Date.now();
     const expiredNotifications = await ctx.db
       .query("notifications")
@@ -229,5 +229,42 @@ export const deleteExpiredNotifications = internalMutation({
     }
 
     return expiredNotifications.length;
+  },
+});
+
+/**
+ * Reset notification counter for a specific user
+ * Sets unread count to 0 for the user's notification conversation
+ */
+export const resetNotificationCounter = internalMutation({
+  args: {
+    userId: v.id("users"),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    // Find the notification conversation for this user
+    const notificationConversation = await ctx.db
+      .query("conversations")
+      .filter((q) =>
+        q.and(
+          q.eq(q.field("participant1Id"), args.userId),
+          q.eq(q.field("participant2Id"), args.userId), // Same user ID for system conversation
+          q.eq(q.field("isSystemNotification"), true)
+        )
+      )
+      .first();
+
+    if (!notificationConversation) {
+      // No notification conversation found for this user
+      return false;
+    }
+
+    // Reset the unread count for the notification conversation
+    await ctx.db.patch(notificationConversation._id, {
+      participant1UnreadCount: 0,
+      participant2UnreadCount: 0, // Also reset this for consistency
+    });
+
+    return true;
   },
 });
