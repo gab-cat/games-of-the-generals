@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft, GamepadIcon, Target } from "lucide-react";
+import { Send, Copy, ExternalLink, Users, CheckCheck, Check, AlertCircle, ArrowLeft, GamepadIcon, Target, Bell } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useConvex, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
@@ -39,6 +39,7 @@ interface ConversationViewProps {
   onNavigateToLobby?: (lobbyId: string) => void;
   onNavigateToGame?: (gameId: string) => void;
   onBack?: () => void;
+  onNavigateToTicket?: (ticketId: string) => void;
 }
 
 interface Message {
@@ -163,11 +164,14 @@ function LobbyInviteMessage({ message, onNavigateToLobby, copyLobbyCode, current
   );
 }
 
+type ConversationMode = "message" | "notification";
+
 export function ConversationView({
   otherUserId,
   onNavigateToLobby,
   onNavigateToGame,
-  onBack
+  onBack,
+  onNavigateToTicket
 }: ConversationViewProps) {
   const navigate = useNavigate();
   const [newMessage, setNewMessage] = useState("");
@@ -272,6 +276,16 @@ export function ConversationView({
       gcTime: 600000, // 10 minutes cache
     }
   );
+
+  // Check if this is a system notification conversation (both participants are the same user)
+  const isNotificationConversation = otherUserId === currentUserProfile?.userId;
+  console.log('🔧 Is notification conversation:', isNotificationConversation);
+  console.log('🔧 Other user ID:', otherUserId);
+  console.log('🔧 Current user profile ID:', currentUserProfile?._id);
+
+  // Determine conversation mode
+  const conversationMode: ConversationMode = isNotificationConversation ? "notification" : "message";
+  console.log('🔧 Conversation mode:', conversationMode);
 
   // Typing status of the other user
   const { data: typingStatus } = useConvexQuery(
@@ -725,13 +739,19 @@ export function ConversationView({
         {!isOwn && (
           <div className="w-8 flex flex-col justify-start">
             {showAvatar ? (
-              <UserAvatar
-                username={message.senderUsername || otherUserProfile?.username || ""}
-                avatarUrl={otherUserProfile?.avatarUrl}
-                rank={otherUserProfile?.rank}
-                size="sm"
-                className="mb-1"
-              />
+              isNotificationConversation ? (
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mb-1">
+                  <Bell className="w-4 h-4 text-white" />
+                </div>
+              ) : (
+                <UserAvatar
+                  username={message.senderUsername || otherUserProfile?.username || ""}
+                  avatarUrl={otherUserProfile?.avatarUrl}
+                  rank={otherUserProfile?.rank}
+                  size="sm"
+                  className="mb-1"
+                />
+              )
             ) : (
               <div className="w-8 h-8"></div>
             )}
@@ -784,9 +804,11 @@ export function ConversationView({
               <div className={cn(
                 "px-4 py-2 shadow-sm relative",
                 getBorderRadius(),
-                isOwn 
+                isOwn
                   ? "bg-blue-600 text-white"
-                  : "bg-white/10 text-white",
+                  : isNotificationConversation
+                    ? "bg-blue-600/20 border border-blue-500/30 text-white"
+                    : "bg-white/10 text-white",
                 message.messageType !== "text" && "border border-white/20",
                 isOptimistic && "opacity-70"
               )}>
@@ -817,7 +839,60 @@ export function ConversationView({
                     </div>
                   </div>
                 ) : (
-                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                  <div className={cn(
+                    "text-sm whitespace-pre-wrap break-words",
+                    isNotificationConversation && "text-blue-100"
+                  )}>
+                    {isNotificationConversation ? (
+                      (() => {
+                        // Parse notification content for clickable ticket links
+                        const ticketLinkMatch = message.content.match(/Ticket:\s*(https?:\/\/[^\s]+)/);
+                        if (ticketLinkMatch) {
+                          const [fullMatch, url] = ticketLinkMatch;
+                          const beforeLink = message.content.substring(0, message.content.indexOf(fullMatch));
+                          const afterLink = message.content.substring(message.content.indexOf(fullMatch) + fullMatch.length);
+                          
+                          const handleTicketLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            
+                            // Extract ticket ID from URL (format: /support/TICKET_ID)
+                            const urlParts = url.split('/support/');
+                            if (urlParts.length > 1) {
+                              const ticketId = urlParts[1];
+                              // Call the callback if provided
+                              if (onNavigateToTicket) {
+                                onNavigateToTicket(ticketId);
+                              }
+                              // Navigate to support page with ticket ID as query parameter
+                              void navigate({
+                                to: '/support',
+                                search: { ticketId }
+                              });
+                            }
+                          };
+                          
+                          return (
+                            <>
+                              {beforeLink}
+                              <a
+                                href={url}
+                                onClick={handleTicketLinkClick}
+                                className="text-blue-300 hover:text-blue-200 underline font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                View Ticket
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                              {afterLink}
+                            </>
+                          );
+                        }
+                        return message.content;
+                      })()
+                    ) : (
+                      message.content
+                    )}
+                  </div>
                 )}
               </div>
             </TooltipTrigger>
@@ -871,14 +946,20 @@ export function ConversationView({
             </Button>
           )}
           <div className="relative">
-            <UserAvatar
-              username={otherUserProfile.username}
-              avatarUrl={otherUserProfile.avatarUrl}
-              size="md"
-              className="ring-1 ring-white/20"
-            />
-            {(() => {
-              const { indicator } = getHeaderStatus(otherUserProfile.username);
+            {isNotificationConversation ? (
+              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
+                <Bell className="w-5 h-5 text-white" />
+              </div>
+            ) : (
+              <UserAvatar
+                username={otherUserProfile?.username || ""}
+                avatarUrl={otherUserProfile?.avatarUrl}
+                size="md"
+                className="ring-1 ring-white/20"
+              />
+            )}
+            {!isNotificationConversation && (() => {
+              const { indicator } = getHeaderStatus(otherUserProfile?.username);
               return indicator ? (
                 <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
                   {indicator}
@@ -888,15 +969,22 @@ export function ConversationView({
           </div>
           <div>
             <h3
-              className="font-sm text-white hover:text-blue-400 cursor-pointer transition-colors"
+              className={cn(
+                "font-sm text-white transition-colors",
+                !isNotificationConversation && "hover:text-blue-400 cursor-pointer"
+              )}
               onClick={() => {
-                void navigate({ to: '/profile', search: { u: otherUserProfile.username } });
+                if (!isNotificationConversation && otherUserProfile?.username) {
+                  void navigate({ to: '/profile', search: { u: otherUserProfile.username } });
+                }
               }}
             >
-              {otherUserProfile.username}
+              {isNotificationConversation ? "Notifications" : otherUserProfile?.username || "Unknown"}
             </h3>
-            {(() => {
-              const status = getHeaderStatus(otherUserProfile.username);
+            {isNotificationConversation ? (
+              <p className="text-xs text-blue-400">System Notifications</p>
+            ) : (() => {
+              const status = getHeaderStatus(otherUserProfile?.username);
               if (status.text) {
                 // Colorize status text only: In Lobby (green), In Game (red), In AI Game (yellow)
                 const colorClass = status.text === "In Lobby"
@@ -949,12 +1037,17 @@ export function ConversationView({
           ) : messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-white/40" />
+                <div className="w-16 h-16 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-blue-400" />
                 </div>
-                <p className="text-white/60 mb-2">No messages yet</p>
+                <p className="text-white/60 mb-2">
+                  {isNotificationConversation ? "No notifications yet" : "No messages yet"}
+                </p>
                 <p className="text-sm text-white/40">
-                  Start the conversation with {otherUserProfile.username}!
+                  {isNotificationConversation
+                    ? "You'll receive notifications about your support tickets here"
+                    : `Start the conversation with ${otherUserProfile?.username}!`
+                  }
                 </p>
               </div>
             </div>
@@ -975,7 +1068,7 @@ export function ConversationView({
               )}
               {messages.map((message: Message | OptimisticMessage, index) => {
                 const isOptimistic = 'isOptimistic' in message;
-                const isOwn = isOptimistic || message.senderId === currentUserProfile?.userId;
+                const isOwn = isNotificationConversation ? false : (isOptimistic || message.senderId === currentUserProfile?.userId);
                 
                 // Determine message position for clustering
                 const previousMessage = index > 0 ? messages[index - 1] : null;
@@ -1021,31 +1114,33 @@ export function ConversationView({
           )}
         </div>
 
-        {/* Message Input */}
-        <div className="p-4 border-t bg-slate-900/50">
-          <div className="flex gap-2">
-            <Input
-              placeholder={`Message ${otherUserProfile.username}...`}
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value);
-                signalTyping();
-              }}
-              onKeyPress={handleKeyPress}
-              disabled={isLoading}
-              className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
-            />
-            <Button
-              onClick={() => void handleSendMessage()}
-              disabled={!newMessage.trim() || isLoading}
-              size="sm"
-              variant='gradient'
-              className="disabled:opacity-50 rounded-full"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+        {/* Message Input - Hidden for notification conversations */}
+        {!isNotificationConversation && (
+          <div className="p-4 border-t bg-slate-900/50">
+            <div className="flex gap-2">
+              <Input
+                placeholder={`Message ${otherUserProfile?.username}...`}
+                value={newMessage}
+                onChange={(e) => {
+                  setNewMessage(e.target.value);
+                  signalTyping();
+                }}
+                onKeyPress={handleKeyPress}
+                disabled={isLoading}
+                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
+              />
+              <Button
+                onClick={() => void handleSendMessage()}
+                disabled={!newMessage.trim() || isLoading}
+                size="sm"
+                variant='gradient'
+                className="disabled:opacity-50 rounded-full"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </TooltipProvider>
   );

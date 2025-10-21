@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Ticket, 
@@ -32,7 +33,11 @@ import { SupportDialog } from "@/components/SupportDialog";
 import { SupportTicketDialog } from "@/components/SupportTicketDialog";
 import { Id } from "../../../convex/_generated/dataModel";
 
-export function SupportTicketsPage() {
+interface SupportTicketsPageProps {
+  initialTicketId?: string;
+}
+
+export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<Id<"supportTickets"> | null>(null);
   const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
@@ -43,6 +48,14 @@ export function SupportTicketsPage() {
     api.supportTickets.getUserSupportTickets,
     {}
   );
+
+  // Open ticket dialog if initialTicketId is provided
+  useEffect(() => {
+    if (initialTicketId && tickets && tickets.length > 0) {
+      setSelectedTicketId(initialTicketId as Id<"supportTickets">);
+      setIsTicketDialogOpen(true);
+    }
+  }, [initialTicketId, tickets]);
 
   // Filter tickets based on search and status
   const filteredTickets = tickets?.filter((ticket) => {

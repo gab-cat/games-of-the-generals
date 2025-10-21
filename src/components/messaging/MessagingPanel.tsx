@@ -1,5 +1,5 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText } from "lucide-react";
+import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText, Bell } from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -128,14 +128,20 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
                     >
                       <div className="relative">
-                        <UserAvatar
-                          username={conversation.otherParticipant.username}
-                          avatarUrl={conversation.otherParticipant.avatarUrl}
-                          size="md"
-                          className="ring-1 ring-white/20"
-                        />
-                        {/* Online status indicator */}
-                        {getOnlineStatusIndicator(conversation.otherParticipant.username) && (
+                        {conversation.otherParticipant.username === "Notifications" ? (
+                          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
+                            <Bell className="w-5 h-5 text-white" />
+                          </div>
+                        ) : (
+                          <UserAvatar
+                            username={conversation.otherParticipant.username}
+                            avatarUrl={conversation.otherParticipant.avatarUrl}
+                            size="md"
+                            className="ring-1 ring-white/20"
+                          />
+                        )}
+                        {/* Online status indicator - hide for Notifications */}
+                        {conversation.otherParticipant.username !== "Notifications" && getOnlineStatusIndicator(conversation.otherParticipant.username) && (
                           <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
                             {getOnlineStatusIndicator(conversation.otherParticipant.username)}
                           </div>
@@ -503,6 +509,7 @@ export function MessagingPanel({
                 onNavigateToLobby={onNavigateToLobby}
                 onNavigateToGame={onNavigateToGame}
                 onBack={() => setSelectedConversation(null)}
+                onNavigateToTicket={() => onClose()}
               />
             ) : showNewMessage ? (
               <NewMessageView
@@ -581,14 +588,20 @@ export function MessagingPanel({
                           className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
                         >
                           <div className="relative">
-                            <UserAvatar
-                              username={conversation.otherParticipant.username}
-                              avatarUrl={conversation.otherParticipant.avatarUrl}
-                              size="md"
-                              className="ring-1 ring-white/20"
-                            />
-                            {/* Online status indicator */}
-                            {getOnlineStatusIndicator(conversation.otherParticipant.username) && (
+                            {conversation.otherParticipant.username === "Notifications" ? (
+                              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
+                                <Bell className="w-5 h-5 text-white" />
+                              </div>
+                            ) : (
+                              <UserAvatar
+                                username={conversation.otherParticipant.username}
+                                avatarUrl={conversation.otherParticipant.avatarUrl}
+                                size="md"
+                                className="ring-1 ring-white/20"
+                              />
+                            )}
+                            {/* Online status indicator - hide for Notifications */}
+                            {conversation.otherParticipant.username !== "Notifications" && getOnlineStatusIndicator(conversation.otherParticipant.username) && (
                               <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
                                 {getOnlineStatusIndicator(conversation.otherParticipant.username)}
                               </div>

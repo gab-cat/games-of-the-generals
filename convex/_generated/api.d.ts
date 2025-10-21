@@ -12,6 +12,7 @@ import type * as ResendEmailChangeVerification from "../ResendEmailChangeVerific
 import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
 import type * as achievements from "../achievements.js";
 import type * as aiGame from "../aiGame.js";
+import type * as announcements from "../announcements.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
 import type * as fileUpload from "../fileUpload.js";
@@ -23,6 +24,7 @@ import type * as lobbies from "../lobbies.js";
 import type * as maintenance from "../maintenance.js";
 import type * as messages from "../messages.js";
 import type * as moderationEmails from "../moderationEmails.js";
+import type * as notifications from "../notifications.js";
 import type * as performance from "../performance.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -54,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   ResendOTPPasswordReset: typeof ResendOTPPasswordReset;
   achievements: typeof achievements;
   aiGame: typeof aiGame;
+  announcements: typeof announcements;
   auth: typeof auth;
   crons: typeof crons;
   fileUpload: typeof fileUpload;
@@ -65,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   maintenance: typeof maintenance;
   messages: typeof messages;
   moderationEmails: typeof moderationEmails;
+  notifications: typeof notifications;
   performance: typeof performance;
   presence: typeof presence;
   profiles: typeof profiles;

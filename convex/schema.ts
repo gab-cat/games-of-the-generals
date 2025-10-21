@@ -293,6 +293,8 @@ const applicationTables = {
     participant1UnreadCount: v.number(),
     participant2UnreadCount: v.number(),
     createdAt: v.number(),
+    // System notification conversations (read-only)
+    isSystemNotification: v.optional(v.boolean()), // For system-generated notification conversations
   })
     .index("by_participant1", ["participant1Id"])
     .index("by_participant2", ["participant2Id"])
@@ -302,6 +304,27 @@ const applicationTables = {
     .index("by_participant2_last_message", ["participant2Id", "lastMessageAt"]) // For efficient sorting
     .index("by_participant1_unread", ["participant1Id", "participant1UnreadCount"]) // For unread optimization
     .index("by_participant2_unread", ["participant2Id", "participant2UnreadCount"]), // For unread optimization
+
+  // Notification records for system notifications
+  notifications: defineTable({
+    userId: v.id("users"), // Recipient of the notification
+    type: v.union(v.literal("ticket_update")), // Extensible for future notification types
+    ticketId: v.optional(v.id("supportTickets")), // Reference to support ticket for ticket notifications
+    action: v.union(
+      v.literal("replied"),
+      v.literal("opened"),
+      v.literal("closed"),
+      v.literal("status_changed"),
+      v.literal("messaged")
+    ), // What happened
+    message: v.string(), // Human-readable description
+    ticketLink: v.optional(v.string()), // URL or ID reference to ticket
+    createdAt: v.number(),
+    expiresAt: v.number(), // When this notification should be auto-deleted (7 days from creation)
+  })
+    .index("by_user_created", ["userId", "createdAt"]) // For user's notification history
+    .index("by_expires_at", ["expiresAt"]) // For cleanup queries
+    .index("by_user_type", ["userId", "type"]), // For filtering notifications by type
 
   // Web Push Subscriptions per user
   pushSubscriptions: defineTable({
@@ -566,6 +589,19 @@ const applicationTables = {
     .index("by_ticket_timestamp", ["ticketId", "timestamp"])
     .index("by_user", ["userId"])
     .index("by_timestamp", ["timestamp"]),
+
+  // Announcements system
+  announcements: defineTable({
+    title: v.string(),
+    content: v.string(), // Markdown formatted content
+    isPinned: v.boolean(),
+    createdBy: v.id("users"),
+    createdByUsername: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_pinned_created", ["isPinned", "createdAt"]) // For efficient ordering (pinned first, then by creation time)
+    .index("by_created_at", ["createdAt"]), // For general ordering by creation time
 };
 
 export default defineSchema({

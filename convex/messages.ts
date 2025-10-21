@@ -1,4 +1,4 @@
-import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
@@ -161,8 +161,12 @@ export const getConversations = query({
       conversations2Query.take(limit),
     ]);
 
-    // Combine and sort by lastMessageAt, then take the top results
-    const allConversations = [...conversations1, ...conversations2]
+    // Combine and deduplicate conversations by _id, then sort by lastMessageAt
+    const conversationMap = new Map();
+    [...conversations1, ...conversations2].forEach(conv => {
+      conversationMap.set(conv._id, conv);
+    });
+    const allConversations = Array.from(conversationMap.values())
       .sort((a, b) => b.lastMessageAt - a.lastMessageAt)
       .slice(0, limit);
 
@@ -256,86 +260,138 @@ export const getConversationMessages = query({
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 50) : 20;
 
     // FIXED: More efficient query strategy using the conversation timestamp indexes
-    // Query both directions and combine results more efficiently
+    // Handle notification conversations (where otherUserId === userId) specially to avoid duplicates
+    const isNotificationConversation = args.otherUserId === userId;
+
     let allMessages: any[] = [];
 
     if (paginationOpts && paginationOpts.cursor) {
       // For cursor-based pagination, use a more efficient approach
-      const [sentMessages, receivedMessages] = await Promise.all([
-        ctx.db
+      if (isNotificationConversation) {
+        // For notification conversations, only query self-messages once
+        const messages = await ctx.db
           .query("messages")
-          .withIndex("by_conversation_timestamp", (q) => 
-            q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+          .withIndex("by_conversation_timestamp", (q) =>
+            q.eq("senderId", userId).eq("recipientId", userId)
           )
           .order("desc")
           .paginate({
-            numItems: Math.ceil(limit / 2),
+            numItems: limit,
             cursor: paginationOpts.cursor,
-          }),
-        
-        ctx.db
-          .query("messages")
-          .withIndex("by_conversation_timestamp", (q) => 
-            q.eq("senderId", args.otherUserId).eq("recipientId", userId)
-          )
-          .order("desc")
-          .paginate({
-            numItems: Math.ceil(limit / 2),
-            cursor: paginationOpts.cursor,
-          })
-      ]);
+          });
 
-      // Combine paginated results
-      allMessages = [...sentMessages.page, ...receivedMessages.page]
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, limit);
+        allMessages = messages.page;
 
-      return {
-        page: allMessages,
-        isDone: sentMessages.isDone && receivedMessages.isDone,
-        continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
-      };
+        return {
+          page: allMessages,
+          isDone: messages.isDone,
+          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+        };
+      } else {
+        // Regular conversation - query both directions
+        const [sentMessages, receivedMessages] = await Promise.all([
+          ctx.db
+            .query("messages")
+            .withIndex("by_conversation_timestamp", (q) =>
+              q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+            )
+            .order("desc")
+            .paginate({
+              numItems: Math.ceil(limit / 2),
+              cursor: paginationOpts.cursor,
+            }),
+
+          ctx.db
+            .query("messages")
+            .withIndex("by_conversation_timestamp", (q) =>
+              q.eq("senderId", args.otherUserId).eq("recipientId", userId)
+            )
+            .order("desc")
+            .paginate({
+              numItems: Math.ceil(limit / 2),
+              cursor: paginationOpts.cursor,
+            })
+        ]);
+
+        // Combine paginated results
+        allMessages = [...sentMessages.page, ...receivedMessages.page]
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, limit);
+
+        return {
+          page: allMessages,
+          isDone: sentMessages.isDone && receivedMessages.isDone,
+          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+        };
+      }
     } else {
       // Initial load or timestamp-based pagination
-      let sentQuery = ctx.db
-        .query("messages")
-        .withIndex("by_conversation_timestamp", (q) => 
-          q.eq("senderId", userId).eq("recipientId", args.otherUserId)
-        )
-        .order("desc");
+      let query;
 
-      let receivedQuery = ctx.db
-        .query("messages")
-        .withIndex("by_conversation_timestamp", (q) => 
-          q.eq("senderId", args.otherUserId).eq("recipientId", userId)
-        )
-        .order("desc");
+      if (isNotificationConversation) {
+        // For notification conversations, only query self-messages
+        query = ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) =>
+            q.eq("senderId", userId).eq("recipientId", userId)
+          )
+          .order("desc");
 
-      // Apply timestamp filter if provided
-      if (beforeTimestamp) {
-        sentQuery = sentQuery.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
-        receivedQuery = receivedQuery.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
+        // Apply timestamp filter if provided
+        if (beforeTimestamp) {
+          query = query.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
+        }
+
+        allMessages = await query.take(limit);
+
+        return {
+          page: allMessages,
+          isDone: allMessages.length < limit,
+          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+          hasMore: allMessages.length >= limit,
+        };
+      } else {
+        // Regular conversation - query both directions
+        let sentQuery = ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) =>
+            q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+          )
+          .order("desc");
+
+        let receivedQuery = ctx.db
+          .query("messages")
+          .withIndex("by_conversation_timestamp", (q) =>
+            q.eq("senderId", args.otherUserId).eq("recipientId", userId)
+          )
+          .order("desc");
+
+        // Apply timestamp filter if provided
+        if (beforeTimestamp) {
+          sentQuery = sentQuery.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
+          receivedQuery = receivedQuery.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
+        }
+
+        const [sentMessages, receivedMessages] = await Promise.all([
+          sentQuery.take(limit),
+          receivedQuery.take(limit)
+        ]);
+
+        // Combine and sort by timestamp
+        allMessages = [...sentMessages, ...receivedMessages]
+          .sort((a, b) => b.timestamp - a.timestamp)
+          .slice(0, limit);
+
+        // Check if there are more messages
+        const hasMoreMessages = sentMessages.length >= limit || receivedMessages.length >= limit;
+
+        return {
+          page: allMessages,
+          isDone: !hasMoreMessages,
+          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+          hasMore: hasMoreMessages,
+        };
       }
-
-      const [sentMessages, receivedMessages] = await Promise.all([
-        sentQuery.take(limit),
-        receivedQuery.take(limit)
-      ]);
-
-      // Combine and sort by timestamp
-      allMessages = [...sentMessages, ...receivedMessages]
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, limit);
-
-      // Check if there are more messages
-      const hasMoreMessages = sentMessages.length >= limit || receivedMessages.length >= limit;
-
-      return {
-        page: allMessages,
-        isDone: !hasMoreMessages,
-        continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
-        hasMore: hasMoreMessages,
-      };
     }
   },
 });

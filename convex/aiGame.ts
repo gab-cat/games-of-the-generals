@@ -263,7 +263,15 @@ function resolveBattle(attacker: string, defender: string): "attacker" | "defend
   const attackerRank = PIECES[attacker as keyof typeof PIECES];
   const defenderRank = PIECES[defender as keyof typeof PIECES];
 
-  if (attacker === "Spy") {
+  if (attacker === "Flag" || defender === "Flag") {
+    if (attacker === "Flag" && defender === "Flag") {
+      return "attacker";
+    } else if (attacker === "Flag") {
+      throw new Error("Flag cannot move to attack");
+    } else {
+      return "attacker";
+    }
+  } else if (attacker === "Spy") {
     if (defender === "Flag" || (defenderRank >= 2 && defenderRank <= 13)) {
       return "attacker";
     } else if (defender === "Private") {
@@ -296,14 +304,6 @@ function resolveBattle(attacker: string, defender: string): "attacker" | "defend
       return "defender";
     } else if (attacker === "Private") {
       return "tie";
-    } else {
-      return "attacker";
-    }
-  } else if (attacker === "Flag" || defender === "Flag") {
-    if (attacker === "Flag" && defender === "Flag") {
-      return "attacker";
-    } else if (attacker === "Flag") {
-      throw new Error("Flag cannot move to attack");
     } else {
       return "attacker";
     }
@@ -385,6 +385,11 @@ export const makeAIGameMove = mutation({
       // Challenge/battle
       if (toPiece.player === "player1") {
         throw new Error("Cannot attack your own piece");
+      }
+
+      // Validate flag can only attack another flag
+      if (fromPiece.piece === "Flag" && toPiece.piece !== "Flag") {
+        throw new Error("Flag can only capture another Flag");
       }
 
       const winner = resolveBattle(fromPiece.piece, toPiece.piece);
@@ -538,8 +543,8 @@ export const generateAIMove = action({
         // Can't move to own piece
         if (targetPiece && targetPiece.player === "player2") continue;
 
-        // Flag cannot attack - only move to empty squares
-        if (aiPiece.piece === "Flag" && targetPiece) continue;
+        // Flag can only attack another Flag
+        if (aiPiece.piece === "Flag" && targetPiece && targetPiece.piece !== "Flag") continue;
 
         const attackAdvantage = targetPiece ? (getPieceRank(aiPiece.piece) - getPieceRank(targetPiece.piece)) : 0;
         const isSafe = !canPlayerCaptureSquare(newRow, newCol, aiPiece.piece);
@@ -696,6 +701,11 @@ export const executeAIMove = mutation({
     let gameWinner: "player1" | "player2" | null = null;
 
     if (toPiece) {
+      // Validate flag can only attack another flag (safety check)
+      if (fromPiece.piece === "Flag" && toPiece.piece !== "Flag") {
+        throw new Error("Flag can only capture another Flag");
+      }
+
       // Battle logic
       const winner = resolveBattle(fromPiece.piece, toPiece.piece);
 

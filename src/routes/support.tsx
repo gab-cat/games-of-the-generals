@@ -7,6 +7,8 @@ import { SignInForm } from '@/auth/SignInForm'
 const SupportTicketsPage = lazy(() => import('../pages/support/00.support-tickets-page').then(module => ({ default: module.SupportTicketsPage })))
 
 function SupportComponent() {
+  const { ticketId } = Route.useSearch()
+  
   return (
     <>
       <Unauthenticated>
@@ -24,7 +26,7 @@ function SupportComponent() {
             </div>
           }
         >
-          <SupportTicketsPage />
+          <SupportTicketsPage initialTicketId={ticketId} />
         </Suspense>
       </Authenticated>
     </>
@@ -32,5 +34,8 @@ function SupportComponent() {
 }
 
 export const Route = createFileRoute('/support')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    ticketId: search.ticketId as string | undefined,
+  }),
   component: SupportComponent,
 })

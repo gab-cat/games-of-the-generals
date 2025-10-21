@@ -1,6 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 // Create a new support ticket
 export const createSupportTicket = mutation({
@@ -155,6 +156,19 @@ export const addSupportTicketUpdate = mutation({
       updatedAt: now,
     });
 
+    // Send notification to ticket owner if admin replied
+    if (isAdmin && ticket.userId !== userId) {
+      const ticketLink = `${process.env.VITE_APP_URL || ''}/support/${args.ticketId}`;
+      await ctx.runMutation(internal.notifications.sendNotification, {
+        userId: ticket.userId,
+        type: "ticket_update",
+        ticketId: args.ticketId,
+        action: "replied",
+        message: `Admin ${profile.username} replied to your support ticket "${ticket.subject}"`,
+        ticketLink,
+      });
+    }
+
     return updateId;
   },
 });
@@ -242,6 +256,22 @@ export const updateSupportTicketStatus = mutation({
 
     // Update the ticket record
     await ctx.db.patch(args.ticketId, updateData);
+
+    // Send notification to ticket owner about status change
+    const ticketLink = `${process.env.VITE_APP_URL || ''}/support/${args.ticketId}`;
+    const statusAction = args.status === "closed" ? "closed" :
+                        args.status === "resolved" ? "status_changed" :
+                        args.status === "in_progress" ? "status_changed" :
+                        args.status === "open" ? "opened" : "status_changed";
+
+    await ctx.runMutation(internal.notifications.sendNotification, {
+      userId: currentTicket.userId,
+      type: "ticket_update",
+      ticketId: args.ticketId,
+      action: statusAction,
+      message: `Your support ticket "${currentTicket.subject}" status changed to ${args.status.replace("_", " ").toUpperCase()}`,
+      ticketLink,
+    });
   },
 });
 

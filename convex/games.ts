@@ -335,7 +335,16 @@ export const makeMove = mutation({
       // Special rules for Game of the Generals
       let winner: "attacker" | "defender" | "tie";
       
-      if (fromPiece.piece === "Spy") {
+      if (fromPiece.piece === "Flag" || toPiece.piece === "Flag") {
+        // Flag can eliminate opposing flag, but can be eliminated by any piece
+        if (fromPiece.piece === "Flag" && toPiece.piece === "Flag") {
+          winner = "attacker"; // Attacking flag wins
+        } else if (fromPiece.piece === "Flag") {
+          throw new Error("Flag cannot move to attack");
+        } else {
+          winner = "attacker"; // Any piece can eliminate flag
+        }
+      } else if (fromPiece.piece === "Spy") {
         // Spy eliminates all officers (Sergeant through 5 Star General) and Flag
         if (toPiece.piece === "Flag" || 
             (defenderRank >= 2 && defenderRank <= 13)) { // Sergeant to 5 Star General
@@ -399,15 +408,6 @@ export const makeMove = mutation({
           winner = "attacker";
         } else {
           winner = "tie";
-        }
-      } else if (fromPiece.piece === "Flag" || toPiece.piece === "Flag") {
-        // Flag can eliminate opposing flag, but can be eliminated by any piece
-        if (fromPiece.piece === "Flag" && toPiece.piece === "Flag") {
-          winner = "attacker"; // Attacking flag wins
-        } else if (fromPiece.piece === "Flag") {
-          throw new Error("Flag cannot move to attack");
-        } else {
-          winner = "attacker"; // Any piece can eliminate flag
         }
       } else {
         // Regular officer hierarchy: higher rank eliminates lower rank

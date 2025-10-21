@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, HelpCircle, Shield } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -152,9 +152,9 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       icon: Trophy
     },
     {
-      path: "/match-history",
-      label: "Match History",
-      icon: History
+      path: "/announcements",
+      label: "News",
+      icon: Newspaper
     },
     // {
     //   path: "/pricing",
@@ -247,7 +247,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
               className="flex flex-col cursor-pointer min-w-0 group"
-              onClick={() => void navigate({ to: "/" })}
+              onClick={() => void navigate({ to: "/", search: { lobbyId: undefined } })}
             >
               <motion.h1
                 whileHover={{
@@ -445,6 +445,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
+                      onClick={() => void navigate({ to: "/match-history" })}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <History className="h-4 w-4" />
+                      <span>Match History</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
                       onClick={() => void navigate({ to: "/settings" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
@@ -453,7 +461,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/support" })}
+                      onClick={() => void navigate({ to: "/support", search: { ticketId: undefined } })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
                       <HelpCircle className="h-4 w-4" />

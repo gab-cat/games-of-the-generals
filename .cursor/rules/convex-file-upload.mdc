@@ -1,0 +1,247 @@
+---
+description: Convex file upload pattern with image compression
+globs: **/*.ts,**/*.tsx,**/*.js,**/*.jsx
+alwaysApply: true
+---
+
+# Convex File Upload Pattern
+
+## Overview
+
+This project uses Convex's file storage system with image compression for optimal performance. The upload process involves multiple steps to ensure efficient storage and fast loading.
+
+## Complete Upload Flow
+
+### 1. Image Compression (for images only)
+
+Before uploading, compress images to reduce file size and improve performance:
+
+```typescript
+import { compressImage } from '@/lib/image-utils';
+
+// Compress image with specific parameters
+const compressedBlob = await compressImage(
+  { uri: imageUri },
+  {
+    width: 1200, // Max width
+    height: 1200, // Max height
+    quality: 0.8, // 80% quality
+    format: 'webp', // WebP format for better compression
+  }
+);
+```
+
+### 2. Generate Upload URL
+
+Use Convex's `generateUploadUrl` mutation to get a signed upload URL:
+
+```typescript
+import { api } from '@convex/_generated/api';
+import { useMutation } from 'convex/react';
+
+const generateUploadUrl = useMutation(api.file.generateUploadUrl);
+
+// Generate the upload URL
+const urlResult = await generateUploadUrl({});
+if (!urlResult.success || !urlResult.uploadUrl) {
+  throw new Error(urlResult.message || 'Failed to generate upload URL');
+}
+```
+
+### 3. Upload File to Storage
+
+Upload the compressed file data to the generated URL using fetch:
+
+```typescript
+// Upload the compressed image data
+const response = await fetch(urlResult.uploadUrl, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'image/webp', // or appropriate MIME type
+  },
+  body: compressedBlob, // The compressed file data
+});
+
+if (!response.ok) {
+  const errorText = await response.text();
+  throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+}
+
+const responseData = await response.json();
+const { storageId } = responseData;
+
+if (!storageId) {
+  throw new Error('No storageId returned from upload server');
+}
+```
+
+### 4. Save File Reference
+
+Save the uploaded file reference in your Convex database:
+
+```typescript
+const saveUploadedPhoto = useMutation(api.yourModule.saveUploadedPhoto);
+
+// Save with metadata
+const saveResult = await saveUploadedPhoto({
+  storageId,
+  fileName: `your-file-name-${Date.now()}.webp`,
+  contentType: 'image/webp',
+});
+
+if (!saveResult.success || !saveResult.fileUrl) {
+  throw new Error(saveResult.message || 'Failed to save uploaded photo');
+}
+
+return saveResult.fileUrl; // Return the accessible URL
+```
+
+## Complete Upload Function Example
+
+```typescript
+const uploadImage = async (uri: string): Promise<string> => {
+  try {
+    // Step 1: Compress the image
+    console.log('Compressing image:', uri);
+    const compressedBlob = await compressImage(
+      { uri },
+      {
+        width: 1200,
+        height: 1200,
+        quality: 0.8,
+        format: 'webp',
+      }
+    );
+
+    // Step 2: Generate upload URL
+    const urlResult = await generateUploadUrl({});
+    if (!urlResult.success || !urlResult.uploadUrl) {
+      throw new Error(urlResult.message || 'Failed to generate upload URL');
+    }
+
+    // Step 3: Upload compressed image to the URL
+    const response = await fetch(urlResult.uploadUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'image/webp',
+      },
+      body: compressedBlob,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Upload failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    const { storageId } = responseData;
+
+    if (!storageId) {
+      throw new Error('No storageId returned from upload server');
+    }
+
+    // Step 4: Save the uploaded photo
+    const saveResult = await saveUploadedPhoto({
+      storageId,
+      fileName: `maintenance-photo-${Date.now()}.webp`,
+      contentType: 'image/webp',
+    });
+
+    if (!saveResult.success || !saveResult.fileUrl) {
+      throw new Error(saveResult.message || 'Failed to save uploaded photo');
+    }
+
+    return saveResult.fileUrl;
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    throw new Error('Failed to upload image');
+  }
+};
+```
+
+## Required Convex Functions
+
+### generateUploadUrl (in convex/file.ts)
+
+```typescript
+import { action } from './_generated/server';
+import { v } from 'convex/values';
+
+export const generateUploadUrl = action({
+  args: {},
+  returns: v.object({
+    success: v.boolean(),
+    uploadUrl: v.optional(v.string()),
+    message: v.optional(v.string()),
+  }),
+  handler: async ctx => {
+    try {
+      const uploadUrl = await ctx.storage.generateUploadUrl();
+      return { success: true, uploadUrl };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to generate upload URL',
+      };
+    }
+  },
+});
+```
+
+### saveUploadedPhoto (in your module)
+
+```typescript
+import { mutation } from './_generated/server';
+import { v } from 'convex/values';
+
+export const saveUploadedPhoto = mutation({
+  args: {
+    storageId: v.id('_storage'),
+    fileName: v.string(),
+    contentType: v.string(),
+  },
+  returns: v.object({
+    success: v.boolean(),
+    fileUrl: v.optional(v.string()),
+    message: v.optional(v.string()),
+  }),
+  handler: async (ctx, args) => {
+    try {
+      // Save file reference in your database table
+      // Generate public URL for access
+      const fileUrl = await ctx.storage.getUrl(args.storageId);
+
+      // Optionally save metadata to your table
+      await ctx.db.insert('yourTable', {
+        storageId: args.storageId,
+        fileName: args.fileName,
+        contentType: args.contentType,
+        fileUrl,
+        // ... other metadata
+      });
+
+      return { success: true, fileUrl };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to save uploaded photo',
+      };
+    }
+  },
+});
+```
+
+## Key Considerations
+
+1. **Image Compression**: Always compress images before upload to reduce storage costs and improve loading times
+2. **Error Handling**: Implement comprehensive error handling at each step
+3. **File Types**: Use appropriate MIME types and compression formats
+4. **Security**: Validate file types and sizes before upload
+5. **Storage IDs**: Store `storageId` in your database for file management
+6. **Public URLs**: Use `ctx.storage.getUrl(storageId)` to generate accessible URLs
+
+## File Size Limits
+
+- Convex has a 1MB limit per individual file
+- Consider chunking larger files if needed
+- Use compression to stay within limits

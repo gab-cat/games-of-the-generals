@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 // Get current user's profile
 export const getCurrentProfile = query({
@@ -150,7 +151,7 @@ export const createOrUpdateProfile = mutation({
       return currentProfile._id;
     } else {
       // Create new profile
-      return await ctx.db.insert("profiles", {
+      const profileId = await ctx.db.insert("profiles", {
         userId,
         username: args.username,
         wins: 0,
@@ -166,6 +167,14 @@ export const createOrUpdateProfile = mutation({
         piecesEliminated: 0,
         spiesRevealed: 0,
       });
+
+      // Initialize notification conversation for the user
+      await ctx.runMutation(internal.notifications.ensureNotificationConversation, {
+        userId,
+        username: args.username,
+      });
+
+      return profileId;
     }
   },
 });

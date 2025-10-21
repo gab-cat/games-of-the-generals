@@ -60,6 +60,14 @@ crons.cron(
   {}
 );
 
+// Run every 6 hours to delete expired notifications (>7 days old)
+crons.cron(
+  "Delete expired notifications (>7 days old)",
+  "20 */6 * * *", // Every 6 hours at minute 20
+  internal.notifications.deleteExpiredNotifications,
+  {}
+);
+
 export default crons;
 
 
