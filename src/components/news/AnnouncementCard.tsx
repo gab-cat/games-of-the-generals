@@ -7,6 +7,7 @@ import { CreateAnnouncementDialog } from "./CreateAnnouncementDialog";
 import { DeleteAnnouncementDialog } from "./DeleteAnnouncementDialog";
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface Announcement {
   _id: Id<"announcements">;
@@ -27,6 +28,7 @@ interface AnnouncementCardProps {
 export function AnnouncementCard({ announcement, isAdmin }: AnnouncementCardProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const formatTime = (timestamp: number) => {
     try {
@@ -35,6 +37,14 @@ export function AnnouncementCard({ announcement, isAdmin }: AnnouncementCardProp
       return "Unknown time";
     }
   };
+
+  const CHARACTER_LIMIT = 500;
+  const shouldTruncate = announcement.content.length > CHARACTER_LIMIT;
+  const displayContent = isExpanded || !shouldTruncate
+    ? announcement.content
+    : announcement.content.slice(0, CHARACTER_LIMIT) + "...";
+
+  const toggleExpanded = () => setIsExpanded(!isExpanded);
 
   return (
     <>
@@ -131,9 +141,33 @@ export function AnnouncementCard({ announcement, isAdmin }: AnnouncementCardProp
               ),
             }}
           >
-            {announcement.content}
+            {displayContent}
           </ReactMarkdown>
         </div>
+
+        {/* Expand/Collapse Button */}
+        {shouldTruncate && (
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleExpanded}
+              className="text-white/60 hover:text-white border border-white/10 hover:bg-white/10 p-2 h-auto text-sm"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp className="w-4 h-4 mr-1" />
+                  Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4 mr-1" />
+                  Read More
+                </>
+              )}
+            </Button>
+          </div>
+        )}
       </motion.div>
 
       {/* Edit Dialog */}
