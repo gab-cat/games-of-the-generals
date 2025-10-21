@@ -157,7 +157,7 @@ export function SupportResolvePage() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardHeader className="p-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
@@ -190,7 +190,7 @@ export function SupportResolvePage() {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
+        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardContent className="p-3">
             <div className="flex flex-col lg:flex-row gap-3">
               <div className="flex-1">
@@ -253,14 +253,14 @@ export function SupportResolvePage() {
         className="space-y-2"
       >
         {isLoading ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
               <p className="text-white/60">Loading support tickets...</p>
             </CardContent>
           </Card>
         ) : error ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-6 text-center">
               <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-4" />
               <p className="text-red-400">Failed to load tickets</p>
@@ -268,7 +268,7 @@ export function SupportResolvePage() {
             </CardContent>
           </Card>
         ) : filteredTickets.length === 0 ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-6 text-center">
               <Ticket className="w-12 h-12 text-white/40 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-white/80 mb-2">
@@ -295,7 +295,7 @@ export function SupportResolvePage() {
                 className="cursor-pointer"
                 onClick={() => setSelectedTicketId(ticket._id)}
               >
-                <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-200">
+                <Card className="bg-black/20 backdrop-blur-xl border border-white/10 hover:bg-black/30 hover:border-white/20 shadow-2xl shadow-black/20 transition-all duration-200">
                   <CardContent className="p-4">
                     {/* Header with user info and status */}
                     <div className="flex items-start justify-between mb-3">

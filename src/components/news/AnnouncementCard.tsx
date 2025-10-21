@@ -38,7 +38,7 @@ export function AnnouncementCard({ announcement, isAdmin }: AnnouncementCardProp
     }
   };
 
-  const CHARACTER_LIMIT = 500;
+  const CHARACTER_LIMIT = 300;
   const shouldTruncate = announcement.content.length > CHARACTER_LIMIT;
   const displayContent = isExpanded || !shouldTruncate
     ? announcement.content

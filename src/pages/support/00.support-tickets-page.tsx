@@ -193,7 +193,7 @@ export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps)
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all duration-200 shadow-lg">
+        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardContent className="p-3 sm:p-4">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1">
@@ -233,14 +233,14 @@ export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps)
         className="space-y-4"
       >
         {isLoading ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-6 sm:p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
               <p className="text-white/60 text-sm sm:text-base">Loading your tickets...</p>
             </CardContent>
           </Card>
         ) : error ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-6 sm:p-8 text-center">
               <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-4" />
               <p className="text-red-400 text-sm sm:text-base">Failed to load tickets</p>
@@ -248,7 +248,7 @@ export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps)
             </CardContent>
           </Card>
         ) : filteredTickets.length === 0 ? (
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-6 sm:p-8 text-center">
               <Ticket className="w-10 h-10 sm:w-12 sm:h-12 text-white/40 mx-auto mb-4" />
               <h3 className="text-base sm:text-lg font-semibold text-white/80 mb-2">
@@ -285,7 +285,7 @@ export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps)
                 className="cursor-pointer"
                 onClick={() => handleTicketClick(ticket._id)}
               >
-                <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 shadow-lg">
+                <Card className="bg-black/20 backdrop-blur-xl border border-white/10 hover:bg-black/30 hover:border-white/20 shadow-2xl shadow-black/20 transition-all duration-200">
                   <CardContent className="p-4 sm:p-6">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 space-y-3">

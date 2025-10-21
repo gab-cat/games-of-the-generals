@@ -268,7 +268,7 @@ export function SupportTicketDetails({ ticketId, onBack, isAdminView = false }: 
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
-        <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardHeader className="p-3">
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
@@ -321,7 +321,7 @@ export function SupportTicketDetails({ ticketId, onBack, isAdminView = false }: 
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
       >
-        <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardContent className="p-4">
             {/* User info and timestamp in a sleek header */}
             <div className="flex items-center justify-between mb-3">
@@ -464,7 +464,7 @@ export function SupportTicketDetails({ ticketId, onBack, isAdminView = false }: 
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
       >
-        <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
           <CardContent className="p-4">
             {updates.length === 0 ? (
               <div className="text-center py-8">
@@ -618,7 +618,7 @@ export function SupportTicketDetails({ ticketId, onBack, isAdminView = false }: 
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.4 }}
         >
-          <Card className="bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg">
+          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardContent className="p-4">
               <div className="flex gap-3">
                 {/* Avatar */}
