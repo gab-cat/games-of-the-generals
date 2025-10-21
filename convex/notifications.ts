@@ -125,11 +125,17 @@ export const sendNotification = internalMutation({
     // Update conversation metadata with last message reference
     const conversation = await ctx.db.get(conversationId);
     if (conversation) {
+      // For notification conversations, both participants are the same user,
+      // so only increment one unread count to avoid double counting
+      const isNotificationConversation = conversation.participant1Id === conversation.participant2Id;
+
       await ctx.db.patch(conversationId, {
         lastMessageId: messageId,
         lastMessageAt: now,
         participant1UnreadCount: conversation.participant1UnreadCount + 1,
-        participant2UnreadCount: conversation.participant2UnreadCount + 1,
+        participant2UnreadCount: isNotificationConversation
+          ? conversation.participant2UnreadCount // Don't increment for notification conversations
+          : conversation.participant2UnreadCount + 1,
       });
     }
   },
