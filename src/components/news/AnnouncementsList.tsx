@@ -8,9 +8,11 @@ import { useQuery } from "convex-helpers/react/cache";
 import { Button } from "../ui/button";
 import { Plus, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 
 export function AnnouncementsList() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Check if user is admin
   const isAdmin = useQuery(api.globalChat.isUserAdmin, {});
@@ -57,6 +59,20 @@ export function AnnouncementsList() {
             Create Announcement
           </Button>
         )}
+      </div>
+
+      {/* Support Message */}
+      <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+        <p className="text-white/80 text-sm">
+          If you encounter any issues or would like to request new features, please visit the{" "}
+          <button
+            onClick={() => void navigate({ to: "/support", search: { ticketId: undefined } })}
+            className="text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+          >
+            support section
+          </button>
+          .
+        </p>
       </div>
 
       {/* Pinned Announcements */}

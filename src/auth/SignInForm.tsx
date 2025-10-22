@@ -9,9 +9,11 @@ import ImageBackground from "../components/backgrounds/ImageBackground";
 import Squares from "../components/backgrounds/Squares/Squares";
 import { PasswordResetForm } from "./PasswordResetForm";
 import { useAuthMutation } from "../lib/convex-query-hooks";
+import { useNavigate } from "@tanstack/react-router";
 
 export function SignInForm() {
   const [flow, setFlow] = useState<"signIn" | "signUp" | "resetPassword">("signIn");
+  const navigate = useNavigate();
   
   // Use the auth mutation hook for better error handling
   const authMutation = useAuthMutation({
@@ -408,9 +410,9 @@ export function SignInForm() {
                   {/* Compliance: Terms & Privacy Links */}
                   <p className="mt-3 text-center text-[11px] sm:text-xs text-white/60">
                     By continuing, you agree to our
-                    <a href="/terms" className="mx-1 underline underline-offset-2 text-white/80 hover:text-white">Terms</a>
+                    <button onClick={() => void navigate({ to: "/terms" })} className="mx-1 underline underline-offset-2 text-white/80 hover:text-white">Terms</button>
                     and acknowledge our
-                    <a href="/privacy" className="ml-1 underline underline-offset-2 text-white/80 hover:text-white">Privacy Policy</a>.
+                    <button onClick={() => void navigate({ to: "/privacy" })} className="ml-1 underline underline-offset-2 text-white/80 hover:text-white">Privacy Policy</button>.
                   </p>
                 </form>
 
