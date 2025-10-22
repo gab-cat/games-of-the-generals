@@ -487,53 +487,52 @@ export function SupportTicketDetails({ ticketId, onBack, isAdminView = false }: 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="flex justify-center"
+                        className="flex justify-end"
                       >
                         <div className="bg-gray-500/20 border border-gray-500/30 rounded-2xl px-4 py-3 max-w-[80%]">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-6 h-6 bg-gray-500/20 rounded-full flex items-center justify-center">
-                              {getSystemChangeIcon(systemChange.type)}
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-gray-500/20 rounded-full flex items-center justify-center">
+                                {getSystemChangeIcon(systemChange.type)}
+                              </div>
+
+                              {systemChange.type === "status" && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Badge className={`${getStatusColor(systemChange.from)} text-xs`}>
+                                    {getStatusIcon(systemChange.from.toLocaleUpperCase())}
+                                    <span className="ml-1">{systemChange.from.replace("_", " ").toUpperCase()}</span>
+                                  </Badge>
+                                  <ArrowRight className="w-3 h-3 text-white/40" />
+                                  <Badge className={`${getStatusColor(systemChange.to)} text-xs`}>
+                                    {getStatusIcon(systemChange.to.toLocaleUpperCase())}
+                                    <span className="ml-1">{systemChange.to.replace("_", " ").toUpperCase()}</span>
+                                  </Badge>
+                                </div>
+                              )}
+
+                              {systemChange.type === "priority" && (
+                                <div className="flex items-center gap-2 text-sm">
+                                  <Badge className={`${getPriorityColor(systemChange.from)} text-xs`}>
+                                    {systemChange.from.toUpperCase()}
+                                  </Badge>
+                                  <ArrowRight className="w-3 h-3 text-white/40" />
+                                  <Badge className={`${getPriorityColor(systemChange.to)} text-xs`}>
+                                    {systemChange.to.toUpperCase()}
+                                  </Badge>
+                                </div>
+                              )}
+
+                              {systemChange.type === "assignment" && (
+                                <div className="flex items-center gap-2 text-sm text-white/80">
+                                  <span>Assigned to <span className="text-gray-300 font-medium">{systemChange.username}</span></span>
+                                </div>
+                              )}
                             </div>
-                            <span className="text-xs font-medium text-gray-300">
-                              System Update
-                            </span>
-                            <span className="text-xs text-white/40">
+
+                            <span className="text-xs text-white/40 flex-shrink-0">
                               {format(new Date(update.timestamp), "h:mm a")}
                             </span>
                           </div>
-                          
-                          {systemChange.type === "status" && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Badge className={`${getStatusColor(systemChange.from)} text-xs`}>
-                                {getStatusIcon(systemChange.from.toLocaleUpperCase())}
-                                <span className="ml-1">{systemChange.from.replace("_", " ").toUpperCase()}</span>
-                              </Badge>
-                              <ArrowRight className="w-3 h-3 text-white/40" />
-                              <Badge className={`${getStatusColor(systemChange.to)} text-xs`}>
-                                {getStatusIcon(systemChange.to.toLocaleUpperCase())}
-                                <span className="ml-1">{systemChange.to.replace("_", " ").toUpperCase()}</span>
-                              </Badge>
-                            </div>
-                          )}
-                          
-                          {systemChange.type === "priority" && (
-                            <div className="flex items-center gap-2 text-sm">
-                              <Badge className={`${getPriorityColor(systemChange.from)} text-xs`}>
-                                {systemChange.from.toUpperCase()}
-                              </Badge>
-                              <ArrowRight className="w-3 h-3 text-white/40" />
-                              <Badge className={`${getPriorityColor(systemChange.to)} text-xs`}>
-                                {systemChange.to.toUpperCase()}
-                              </Badge>
-                            </div>
-                          )}
-                          
-                          {systemChange.type === "assignment" && (
-                            <div className="flex items-center gap-2 text-sm text-white/80">
-                              <UserPlus className="w-4 h-4 text-gray-400" />
-                              <span>Assigned to <span className="text-gray-300 font-medium">{systemChange.username}</span></span>
-                            </div>
-                          )}
                         </div>
                       </motion.div>
                     );
