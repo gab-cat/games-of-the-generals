@@ -62,7 +62,11 @@ export function AnnouncementsList() {
       </div>
 
       {/* Support Message */}
-      <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+      <motion.div
+        className="bg-white/5 rounded-lg p-4 border border-white/10"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+      >
         <p className="text-white/80 text-sm">
           If you encounter any issues or would like to request new features, please visit the{" "}
           <button
@@ -73,7 +77,7 @@ export function AnnouncementsList() {
           </button>
           .
         </p>
-      </div>
+      </motion.div>
 
       {/* Pinned Announcements */}
       {pinnedAnnouncements.length > 0 && (
