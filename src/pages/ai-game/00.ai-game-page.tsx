@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Bot, User, Star, Zap, Crown, Shield, Target, Feather } from "lucide-react";
+import { Loader2, Bot, User, Star, Zap, Crown, Shield, Target, Feather, Eye, EyeOff } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AIGameBoard } from "../../components/ai-game/AIGameBoard";
 import { motion } from "framer-motion";
@@ -73,6 +73,7 @@ export function AIGamePage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>("medium");
   const [selectedBehavior, setSelectedBehavior] = useState<Behavior>("balanced");
   const [isStarting, setIsStarting] = useState(false);
+  const [revealAIPieces, setRevealAIPieces] = useState(false);
   
   // Mutations
   const startAIGame = useMutation(api.aiGame.startAIGameSession);
@@ -197,15 +198,37 @@ export function AIGamePage() {
                   )}
                 </div>
 
-                <div className="text-white/60 text-sm self-start sm:self-auto">
-                  {currentSession.status === "setup" ? "Setting up pieces..." : "Battle in progress"}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 self-start sm:self-auto">
+                  <div className="text-white/60 text-sm">
+                    {currentSession.status === "setup" ? "Setting up pieces..." : "Battle in progress"}
+                  </div>
+                  {import.meta.env.DEV && currentSession.status === "playing" && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setRevealAIPieces(!revealAIPieces)}
+                      className="bg-yellow-500/20 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/30 hover:text-yellow-300 text-xs px-2 py-1 h-7"
+                    >
+                      {revealAIPieces ? (
+                        <>
+                          <EyeOff className="h-3 w-3 mr-1" />
+                          Hide AI
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="h-3 w-3 mr-1" />
+                          Reveal AI
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Game Board */}
-          <AIGameBoard sessionId={currentSession.sessionId} />
+          <AIGameBoard sessionId={currentSession.sessionId} revealAIPieces={revealAIPieces} />
         </div>
       </div>
     );

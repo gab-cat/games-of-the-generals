@@ -5,10 +5,10 @@ import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
-import { 
-  Bot, 
-  Shuffle, 
-  CheckCircle, 
+import {
+  Bot,
+  Shuffle,
+  CheckCircle,
   RefreshCw,
   ArrowRightLeft,
   Info,
@@ -50,9 +50,10 @@ const createEmptyBoard = () => Array(BOARD_ROWS).fill(null).map(() => Array(BOAR
 
 interface AIGameBoardProps {
   sessionId: string;
+  revealAIPieces?: boolean;
 }
 
-export function AIGameBoard({ sessionId }: AIGameBoardProps) {
+export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardProps) {
   // Setup state
   const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() => createEmptyBoard());
   const [availablePieces, setAvailablePieces] = useState(() => [...INITIAL_PIECES]);
@@ -727,7 +728,7 @@ export function AIGameBoard({ sessionId }: AIGameBoardProps) {
                           </div>
                         ) : (
                           <div className="text-foreground">
-                            {cell.revealed ? (
+                            {(cell.revealed || revealAIPieces) ? (
                               <>
                                 {/* Mobile: No labels, small size */}
                                 <div className="block sm:hidden">

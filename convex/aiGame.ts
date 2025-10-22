@@ -427,6 +427,27 @@ export const makeAIGameMove = mutation({
       }
     }
 
+    // Check if either player has only the flag remaining
+    const hasOnlyFlag = (board: any[][], player: "player1" | "player2"): boolean => {
+      const pieces = [];
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 9; col++) {
+          const cell = board[row][col];
+          if (cell && cell.player === player) {
+            pieces.push(cell.piece);
+          }
+        }
+      }
+      return pieces.length === 1 && pieces[0] === "Flag";
+    };
+
+    // If either player has only the flag, end the game
+    if (hasOnlyFlag(newBoard, "player1")) {
+      gameWinner = "player2";
+    } else if (hasOnlyFlag(newBoard, "player2")) {
+      gameWinner = "player1";
+    }
+
     // Update session
     const updates: any = {
       board: newBoard,
@@ -440,11 +461,17 @@ export const makeAIGameMove = mutation({
     if (gameWinner) {
       updates.status = "finished";
       updates.winner = gameWinner;
-      updates.gameEndReason = challengeResult && challengeResult.defender === "Flag" 
-        ? "flag_captured" 
-        : fromPiece.piece === "Flag" 
-          ? "flag_reached_base" 
-          : "flag_captured";
+
+      // Determine game end reason
+      let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" = "flag_captured";
+      if (fromPiece.piece === "Flag" && !toPiece) {
+        gameEndReason = "flag_reached_base";
+      } else if (hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")) {
+        gameEndReason = "elimination";
+      } else if (challengeResult && challengeResult.defender === "Flag") {
+        gameEndReason = "flag_captured";
+      }
+      updates.gameEndReason = gameEndReason;
     }
 
     await ctx.db.patch(session._id, updates);
@@ -511,6 +538,9 @@ export const generateAIMove = action({
         if (!inBounds(rr, cc)) continue;
         const p = session.board[rr][cc];
         if (p && p.player === "player1") {
+          // Skip pieces that cannot attack (like Flag)
+          if (p.piece === "Flag") continue;
+
           const outcome = resolveBattle(p.piece, aiPieceName);
           if (outcome === "attacker") return true;
         }
@@ -543,7 +573,7 @@ export const generateAIMove = action({
         // Can't move to own piece
         if (targetPiece && targetPiece.player === "player2") continue;
 
-        // Flag can only attack another Flag
+        // Flag can only attack other Flags
         if (aiPiece.piece === "Flag" && targetPiece && targetPiece.piece !== "Flag") continue;
 
         const attackAdvantage = targetPiece ? (getPieceRank(aiPiece.piece) - getPieceRank(targetPiece.piece)) : 0;
@@ -574,7 +604,6 @@ export const generateAIMove = action({
     const scoreMove = (m: typeof possibleMoves[number]): number => {
       let score = 0;
       const myRank = getPieceRank(m.piece);
-      const targetRank = m.targetPiece ? getPieceRank(m.targetPiece) : -1;
       const isFlagAttack = m.targetPiece === "Flag";
       const spyGood = m.piece === "Spy" && !!m.targetPiece && m.targetPiece !== "Private" && m.targetPiece !== "Spy";
       const privateVsSpy = m.piece === "Private" && m.targetPiece === "Spy";
@@ -742,6 +771,27 @@ export const executeAIMove = mutation({
       }
     }
 
+    // Check if either player has only the flag remaining
+    const hasOnlyFlag = (board: any[][], player: "player1" | "player2"): boolean => {
+      const pieces = [];
+      for (let row = 0; row < 8; row++) {
+        for (let col = 0; col < 9; col++) {
+          const cell = board[row][col];
+          if (cell && cell.player === player) {
+            pieces.push(cell.piece);
+          }
+        }
+      }
+      return pieces.length === 1 && pieces[0] === "Flag";
+    };
+
+    // If either player has only the flag, end the game
+    if (hasOnlyFlag(newBoard, "player1")) {
+      gameWinner = "player2";
+    } else if (hasOnlyFlag(newBoard, "player2")) {
+      gameWinner = "player1";
+    }
+
     // Update session
     const updates: any = {
       board: newBoard,
@@ -755,11 +805,17 @@ export const executeAIMove = mutation({
     if (gameWinner) {
       updates.status = "finished";
       updates.winner = gameWinner;
-      updates.gameEndReason = challengeResult && challengeResult.defender === "Flag" 
-        ? "flag_captured" 
-        : fromPiece.piece === "Flag" 
-          ? "flag_reached_base" 
-          : "flag_captured";
+
+      // Determine game end reason
+      let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" = "flag_captured";
+      if (fromPiece.piece === "Flag" && !toPiece) {
+        gameEndReason = "flag_reached_base";
+      } else if (hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")) {
+        gameEndReason = "elimination";
+      } else if (challengeResult && challengeResult.defender === "Flag") {
+        gameEndReason = "flag_captured";
+      }
+      updates.gameEndReason = gameEndReason;
     }
 
     await ctx.db.patch(session._id, updates);
