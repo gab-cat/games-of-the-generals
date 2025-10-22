@@ -169,6 +169,19 @@ export const addSupportTicketUpdate = mutation({
       });
     }
 
+    // Send notification to assigned person if ticket creator replied
+    if (!isAdmin && ticket.assignedToId && ticket.assignedToId !== userId) {
+      const ticketLink = `${process.env.VITE_APP_URL || ''}/support/${args.ticketId}`;
+      await ctx.runMutation(internal.notifications.sendNotification, {
+        userId: ticket.assignedToId,
+        type: "ticket_update",
+        ticketId: args.ticketId,
+        action: "replied",
+        message: `${profile.username} replied to support ticket "${ticket.subject}"`,
+        ticketLink,
+      });
+    }
+
     return updateId;
   },
 });
