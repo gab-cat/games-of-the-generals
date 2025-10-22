@@ -1,6 +1,17 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, QueryCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { Id } from "./_generated/dataModel";
+
+// Helper function to check if user is admin
+async function isUserAdmin(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
+  const profile = await ctx.db
+    .query("profiles")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .unique();
+
+  return profile?.adminRole === "admin" || profile?.adminRole === "moderator";
+}
 
 // Join as spectator
 export const joinAsSpectator = mutation({
@@ -21,6 +32,17 @@ export const joinAsSpectator = mutation({
 
     if (game.player1Id === userId || game.player2Id === userId) {
       throw new Error("You are already a player in this game");
+    }
+
+    // Check if user is admin - admins can spectate any game
+    const userIsAdmin = await isUserAdmin(ctx, userId);
+
+    // If not admin, check lobby settings for spectator restrictions
+    if (!userIsAdmin) {
+      const lobby = await ctx.db.get(game.lobbyId);
+      if (!lobby?.allowSpectators || lobby?.isPrivate) {
+        throw new Error("Spectators are not allowed in this game");
+      }
     }
 
     // Optimized: Only update if user is not already a spectator
@@ -61,7 +83,19 @@ export const getSpectatableGames = query({
   },
   handler: async (ctx, args) => {
     const { paginationOpts } = args;
-    
+
+    // Check if current user is admin (if authenticated)
+    let userIsAdmin = false;
+    try {
+      const userId = await getAuthUserId(ctx);
+      if (userId) {
+        userIsAdmin = await isUserAdmin(ctx, userId);
+      }
+    } catch {
+      // If we can't determine admin status, assume not admin
+      userIsAdmin = false;
+    }
+
     // Optimized: Use status index for better performance
     const queryBuilder = ctx.db
       .query("games")
@@ -107,10 +141,17 @@ export const getSpectatableGames = query({
       })
     );
 
-    // Filter out games that don't allow spectators or are private
-    const spectatableGames = gamesWithLobbyInfo.filter(game => 
-      game.allowSpectators && !game.isPrivate
-    );
+    let spectatableGames;
+
+    if (userIsAdmin) {
+      // Admins can see all active games
+      spectatableGames = gamesWithLobbyInfo;
+    } else {
+      // Regular users can only see games that allow spectators and are not private
+      spectatableGames = gamesWithLobbyInfo.filter(game =>
+        game.allowSpectators && !game.isPrivate
+      );
+    }
 
     return {
       ...result,

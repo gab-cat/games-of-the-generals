@@ -1,6 +1,17 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { Id } from "./_generated/dataModel";
+
+// Helper function to check if user is admin
+async function isUserAdmin(ctx: any, userId: Id<"users">): Promise<boolean> {
+  const profile = await ctx.db
+    .query("profiles")
+    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .unique();
+
+  return profile?.adminRole === "admin" || profile?.adminRole === "moderator";
+}
 
 // Get all available lobbies with optimized cursor-based pagination using new indexes
 export const getLobbies = query({
@@ -345,9 +356,20 @@ export const spectateGameById = mutation({
     const lobby = await ctx.db.get(game.lobbyId);
     if (!lobby) throw new Error("Associated lobby not found");
 
-    // Check if spectators are allowed
-    if (lobby.allowSpectators === false) {
-      throw new Error("Spectators are not allowed in this game");
+    // Check if user is admin - admins can spectate any game
+    const userIsAdmin = await isUserAdmin(ctx, userId);
+
+    // If not admin, check spectator restrictions
+    if (!userIsAdmin) {
+      // Check if spectators are allowed
+      if (lobby.allowSpectators === false) {
+        throw new Error("Spectators are not allowed in this game");
+      }
+
+      // Check spectator limit
+      if (lobby.maxSpectators && game.spectators.length >= lobby.maxSpectators) {
+        throw new Error("Maximum number of spectators reached");
+      }
     }
 
     // Check if user is already a player
@@ -358,11 +380,6 @@ export const spectateGameById = mutation({
     // Check if user is already spectating
     if (game.spectators.includes(userId)) {
       return game._id; // Already spectating
-    }
-
-    // Check spectator limit
-    if (lobby.maxSpectators && game.spectators.length >= lobby.maxSpectators) {
-      throw new Error("Maximum number of spectators reached");
     }
 
     // Add user to spectators
