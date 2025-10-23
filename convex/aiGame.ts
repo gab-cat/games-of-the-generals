@@ -405,7 +405,7 @@ export const makeAIGameMove = mutation({
       if (winner === "attacker") {
         newBoard[args.toRow][args.toCol] = revealedFromPiece;
         newBoard[args.fromRow][args.fromCol] = null;
-        
+
         if (toPiece.piece === "Flag") {
           gameWinner = "player1";
         }
@@ -472,18 +472,27 @@ export const makeAIGameMove = mutation({
         gameEndReason = "flag_captured";
       }
       updates.gameEndReason = gameEndReason;
+
+      // Clear AI session ID from profile when game ends
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      if (profile?.aiSessionId) {
+        await ctx.db.patch(profile._id, { aiSessionId: undefined });
+      }
     }
 
     await ctx.db.patch(session._id, updates);
 
-    return { 
-      success: true, 
-      challengeResult: challengeResult || undefined, 
+    return {
+      success: true,
+      challengeResult: challengeResult || undefined,
       winner: gameWinner || undefined
-    } as { 
-      success: boolean; 
-      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" }; 
-      winner?: "player1" | "player2" 
+    } as {
+      success: boolean;
+      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" };
+      winner?: "player1" | "player2"
     };
   },
 });
@@ -749,7 +758,7 @@ export const executeAIMove = mutation({
       if (winner === "attacker") {
         newBoard[args.toRow][args.toCol] = revealedFromPiece;
         newBoard[args.fromRow][args.fromCol] = null;
-        
+
         if (toPiece.piece === "Flag") {
           gameWinner = "player2";
         }
@@ -816,18 +825,27 @@ export const executeAIMove = mutation({
         gameEndReason = "flag_captured";
       }
       updates.gameEndReason = gameEndReason;
+
+      // Clear AI session ID from profile when game ends
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", session.playerId))
+        .unique();
+      if (profile?.aiSessionId) {
+        await ctx.db.patch(profile._id, { aiSessionId: undefined });
+      }
     }
 
     await ctx.db.patch(session._id, updates);
 
-    return { 
-      success: true, 
-      challengeResult: challengeResult || undefined, 
+    return {
+      success: true,
+      challengeResult: challengeResult || undefined,
       winner: gameWinner || undefined
-    } as { 
-      success: boolean; 
-      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" }; 
-      winner?: "player1" | "player2" 
+    } as {
+      success: boolean;
+      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" };
+      winner?: "player1" | "player2"
     };
   },
 });
