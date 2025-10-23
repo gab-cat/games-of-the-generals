@@ -336,13 +336,15 @@ export const makeMove = mutation({
       let winner: "attacker" | "defender" | "tie";
       
       if (fromPiece.piece === "Flag" || toPiece.piece === "Flag") {
-        // Flag can eliminate opposing flag, but can be eliminated by any piece
+        // Flag logic: can only eat another flag
         if (fromPiece.piece === "Flag" && toPiece.piece === "Flag") {
-          winner = "attacker"; // Attacking flag wins
+          winner = "attacker"; // Attacking flag wins over defending flag
         } else if (fromPiece.piece === "Flag") {
-          throw new Error("Flag cannot move to attack");
+          // Flag trying to attack a non-flag piece: flag always loses
+          winner = "defender";
         } else {
-          winner = "attacker"; // Any piece can eliminate flag
+          // Non-flag attacking flag: attacker wins
+          winner = "attacker";
         }
       } else if (fromPiece.piece === "Spy") {
         // Spy eliminates all officers (Sergeant through 5 Star General) and Flag
@@ -443,6 +445,11 @@ export const makeMove = mutation({
         // Defender piece stays and remains hidden (not revealed)
         newBoard[args.toRow][args.toCol] = toPiece; // Keep original defender piece without revealing
         newBoard[args.fromRow][args.fromCol] = null;
+        
+        // Check if the attacking piece was a flag - if so, opponent wins
+        if (fromPiece.piece === "Flag") {
+          gameWinner = currentPlayer === "player1" ? "player2" : "player1";
+        }
       } else {
         // Tie - both eliminated and both revealed
         newBoard[args.toRow][args.toCol] = null;
@@ -511,7 +518,7 @@ export const makeMove = mutation({
       updates.finishedAt = Date.now();
       
       // Determine the reason for winning
-      if (challengeResult && challengeResult.defender === "Flag") {
+      if (challengeResult && (challengeResult.defender === "Flag" || challengeResult.attacker === "Flag")) {
         updates.gameEndReason = "flag_captured" as const;
       } else if (fromPiece.piece === "Flag") {
         updates.gameEndReason = "flag_reached_base" as const;
