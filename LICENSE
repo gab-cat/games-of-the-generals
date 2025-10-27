@@ -1,0 +1,117 @@
+# Games of the Generals - Custom License
+
+**Version 1.0 - October 27, 2025**
+
+## Preamble
+
+Games of the Generals is a digital adaptation of the classic Filipino strategy board game. This license governs the use, modification, and distribution of the Games of the Generals codebase and related assets.
+
+## Definitions
+
+- **"The Software"** refers to the Games of the Generals codebase, including all source code, documentation, assets, and related materials.
+- **"Personal Use"** means non-commercial use by individuals for personal entertainment, education, or research purposes.
+- **"Educational Use"** means use in academic institutions for teaching, research, or educational projects that are not commercially funded.
+- **"Commercial Use"** means any use that generates revenue, provides commercial services, or is part of a commercial product or service.
+- **"Contribution"** means any modification, enhancement, or addition to the Software that is submitted back to the project maintainers.
+
+## Permitted Uses
+
+### ✅ Personal and Educational Use
+
+You are granted a **royalty-free, non-exclusive license** to:
+
+- Use the Software for personal entertainment and education
+- Study, analyze, and learn from the codebase
+- Modify the Software for personal or educational purposes
+- Share unmodified copies of the Software with others for personal/educational use
+
+### ✅ Contributions to the Open-Source Project
+
+You are encouraged to contribute improvements back to the project:
+
+- Submit bug fixes, features, and improvements via pull requests
+- Modify and extend the codebase as part of community contributions
+- Help maintain and improve the project documentation
+- Participate in community discussions and development
+
+### ✅ Academic and Research Use
+
+Educational institutions may use the Software for:
+
+- Computer science curriculum and coursework
+- Research projects that advance the field of game development
+- Academic publications and presentations
+
+## Restricted Uses
+
+### ❌ Commercial Use Without Permission
+
+**Commercial use of the Software is strictly prohibited** without explicit written permission from the project maintainer.
+
+This includes but is not limited to:
+
+- Using the Software in commercial products or services
+- Offering the Software as part of paid services
+- Distributing modified versions commercially
+- Using the Software to generate revenue
+- Incorporating the Software into commercial applications
+
+### ❌ Commercial Derivatives
+
+Creating and distributing derivative works for commercial purposes is not permitted without approval.
+
+## Conditions
+
+### For Personal/Educational Use:
+
+1. You must retain all copyright notices and this license
+2. You may not use the Software's name, branding, or trademarks commercially
+3. Any modifications must clearly indicate they are derivative works
+4. You must not remove or alter license headers in source files
+
+### For Contributions:
+
+1. Contributions must be submitted under the same license terms
+2. Contributors grant the project maintainer rights to use, modify, and distribute contributions
+3. Contributions must not introduce restrictive licensing terms
+4. Contributors must ensure they have rights to submit their contributions
+
+## Requesting Commercial Use Permission
+
+If you wish to use the Software commercially, you must:
+
+1. Contact the project maintainer at [maintainer-email]
+2. Provide detailed information about your intended use
+3. Await explicit written permission before proceeding
+4. Negotiate appropriate licensing terms if permission is granted
+
+Permission requests will be evaluated based on:
+
+- Alignment with the project's goals and values
+- Potential positive impact on the Filipino gaming community
+- Non-compete with existing commercial offerings
+- Fair compensation considerations
+
+## Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Termination
+
+This license is effective until terminated. Your rights under this license will terminate automatically without notice if you fail to comply with any of its terms. Upon termination, you must cease all use of the Software and destroy all copies.
+
+## Governing Law
+
+This license shall be governed by and construed in accordance with the laws of the Republic of the Philippines, without regard to its conflict of law provisions.
+
+## Contact Information
+
+For licensing inquiries, permissions, or questions:
+
+- **Project Repository**: [GitHub Repository URL]
+- **Maintainer**: [Maintainer Name/Contact]
+- **Email**: [Contact Email]
+
+---
+
+**By using this Software, you acknowledge that you have read, understood, and agree to be bound by the terms of this license.**
