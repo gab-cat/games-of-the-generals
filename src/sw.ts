@@ -20,7 +20,7 @@ cleanupOutdatedCaches()
 // self.__WB_MANIFEST is injected at build time by workbox (via injectManifest)
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-precacheAndRoute(self.__WB_MANIFEST.filter( (_) => false ))
+precacheAndRoute(self.__WB_MANIFEST.filter(entry => entry.url === 'index.html'))
 
 // App Shell routing: serve index.html for navigation requests
 const navigationFallbackHandler = createHandlerBoundToURL('/index.html')
