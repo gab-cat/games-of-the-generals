@@ -27,11 +27,23 @@ export default defineConfig(({ mode }) => ({
       minify: true,
       includeAssets: [
         'favicon.ico',
+        'icons/icon-144.svg',
+        'icons/icon-192.png',
+        'icons/icon-192.svg',
+        'icons/icon-512.png',
+        'icons/icon-512.svg',
+        'icons/icon-maskable-512.png',
+        'icons/icon-maskable-512.svg',
+        'icons/shortcut-history-96.png',
+        'icons/shortcut-history-96.svg',
+        'icons/shortcut-lobbies-96.png',
+        'icons/shortcut-lobbies-96.svg',
       ],
       injectManifest: {
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
       },
       manifest: {
+        id: 'games-of-the-generals',
         name: 'Games of the Generals',
         short_name: 'GoG',
         description: 'Battle of wits. Play Games of the Generals online.',
