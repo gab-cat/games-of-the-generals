@@ -57,7 +57,7 @@ self.addEventListener('push', (event) => {
       body,
       tag,
       data: { url, ...(data.data || {}) },
-      icon: '/icons/icon-192.png',
+      icon: image || '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
       ...(image && { image }),
     } as NotificationOptions)
