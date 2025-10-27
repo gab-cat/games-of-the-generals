@@ -91,6 +91,9 @@ self.addEventListener('activate', (event) => {
       // Claim clients is already handled by clientsClaim(), but double ensure
       await self.clients.claim();
       // Navigation preload disabled to avoid preload response cancellation warnings
+      if ('navigationPreload' in self.registration) {
+        await self.registration.navigationPreload.disable();
+      }
     } catch { /* ignore */ }
   })());
 });
