@@ -125,6 +125,11 @@ export const sendMessage = mutation({
       timestamp,
     });
 
+    // Send push notification to recipient
+    await ctx.scheduler.runAfter(0, internal.pushNode.sendPushForMessage, {
+      messageId,
+    });
+
     return messageId;
   },
 });
@@ -824,6 +829,11 @@ export const sendMessageInternal = internalMutation({
       participant2Username: args.recipientUsername,
       messageId,
       timestamp,
+    });
+
+    // Send push notification to recipient
+    await ctx.scheduler.runAfter(0, internal.pushNode.sendPushForMessage, {
+      messageId,
     });
 
     return messageId;
