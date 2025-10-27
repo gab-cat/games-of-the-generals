@@ -59,7 +59,7 @@ createRoot(document.getElementById("root")!).render(
 );
 
 // Register PWA update checker
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !import.meta.env.DEV) {
   const updateSW = registerSW({
     immediate: true,
     // Vite PWA v1 exposes either onRegistered or onRegisteredSW depending on import

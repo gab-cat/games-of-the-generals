@@ -69,7 +69,7 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: undefined,
-      devOptions: { enabled: true }
+      devOptions: { enabled: false }
     })
   ].filter(Boolean),
   resolve: {
