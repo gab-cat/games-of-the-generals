@@ -903,7 +903,7 @@ export function ConversationView({
                 )}
               </div>
             </TooltipTrigger>
-            <TooltipContent className="backdrop-blur-xl py-1 bg-black/40 text-xs text-white/80 rounded-xl p-2">
+            <TooltipContent className="backdrop-blur-xl z-[320] py-1 bg-black/40 text-xs text-white/80 rounded-xl p-2">
               <p className="text-xs">{formatFullTimestamp('isOptimistic' in message ? message._creationTime : message.timestamp)}</p>
             </TooltipContent>
           </Tooltip>
