@@ -50,6 +50,7 @@ self.addEventListener('push', (event) => {
   const body = data.body || 'New notification';
   const tag = data.tag || 'gog';
   const url = data.url || '/';
+  const image = data.image;
 
   event.waitUntil(
     self.registration.showNotification(title, {
@@ -58,7 +59,8 @@ self.addEventListener('push', (event) => {
       data: { url, ...(data.data || {}) },
       icon: '/icons/icon-192.png',
       badge: '/icons/icon-192.png',
-    })
+      ...(image && { image }),
+    } as NotificationOptions)
   );
 });
 

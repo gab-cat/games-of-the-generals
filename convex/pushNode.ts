@@ -34,6 +34,7 @@ export const sendPushForMessage = internalAction({
       body: message.content.slice(0, 140),
       url: `${siteUrl}`,
       tag: `dm-${message.senderId}`,
+      image: message.senderAvatarUrl,
       data: {
         type: "message",
         senderUsername: message.senderUsername,

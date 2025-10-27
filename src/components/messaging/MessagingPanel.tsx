@@ -307,6 +307,11 @@ export function MessagingPanel({
     isAuthenticated ? {} : "skip"
   );
 
+  const { data: currentProfile } = useConvexQuery(
+    api.profiles.getCurrentProfile,
+    isAuthenticated ? {} : "skip"
+  );
+
   const saveSubscription = useMutation(api.push.saveSubscription);
 
   const sendMessage = useMutation(api.messages.sendMessage);
@@ -631,16 +636,19 @@ export function MessagingPanel({
                                     {conversation.lastMessage.messageType === "lobby_invite" && (
                                       <span className="inline-flex items-center gap-1">
                                         <Users className="w-3 h-3" />
-                                        Lobby invite: 
+                                        Lobby invite:
                                       </span>
                                     )}
                                     {conversation.lastMessage.messageType === "game_invite" && (
                                       <span className="inline-flex items-center gap-1">
                                         <ExternalLink className="w-3 h-3" />
-                                        Game invite: 
+                                        Game invite:
                                       </span>
                                     )}
-                                    {truncateMessage(conversation.lastMessage.content)}
+                                    {currentProfile && conversation.lastMessage.senderId === currentProfile.userId
+                                      ? `You: ${truncateMessage(conversation.lastMessage.content)}`
+                                      : truncateMessage(conversation.lastMessage.content)
+                                    }
                                   </>
                                 ) : (
                                   "No messages yet"
