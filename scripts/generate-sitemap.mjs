@@ -30,11 +30,20 @@ async function main() {
 
 function normalizeSiteUrl(input) {
   if (!input) return 'http://localhost:5173';
-  // If env provides just the domain (e.g. my-app.vercel.app), add https://
+  
+  // If env provides just the domain (e.g my-app.vercel.app), add https://
   if (!/^https?:\/\//i.test(input)) {
     return `https://${input}`;
   }
-  return input.replace(/\/$/, '');
+  
+  let normalized = input.replace(/\/$/, '');
+  
+  // Ensure www version for production domain
+  if (normalized.includes('generalsonline.app')) {
+    normalized = normalized.replace(/https?:\/\/(?:www\.)?generalsonline\.app/i, 'https://www.generalsonline.app');
+  }
+  
+  return normalized;
 }
 
 async function collectStaticRoutes(routesDir) {
