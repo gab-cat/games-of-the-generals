@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
@@ -1522,5 +1522,92 @@ export const acknowledgeGameResult = mutation({
     });
 
     return { success: true };
+  },
+});
+
+// Internal function to cleanup stale games (setup >40 mins, playing >40 mins)
+export const cleanupStaleGames = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const fortyMinutesAgo = Date.now() - (40 * 60 * 1000); // 40 minutes in milliseconds
+    let deletedSetupGames = 0;
+    let forfeitedPlayingGames = 0;
+
+    // Handle stale setup games (>40 minutes old)
+    const staleSetupGames = await ctx.db
+      .query("games")
+      .withIndex("by_status_setup_time", (q) =>
+        q.eq("status", "setup").lt("setupTimeStarted", fortyMinutesAgo)
+      )
+      .collect();
+
+    for (const game of staleSetupGames) {
+      try {
+        // Get both player profiles
+        const [player1Profile, player2Profile] = await Promise.all([
+          ctx.db
+            .query("profiles")
+            .withIndex("by_user", (q) => q.eq("userId", game.player1Id))
+            .unique(),
+          ctx.db
+            .query("profiles")
+            .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
+            .unique(),
+        ]);
+
+        // Clear gameId and lobbyId from both profiles
+        if (player1Profile) {
+          await ctx.db.patch(player1Profile._id, {
+            gameId: undefined,
+            lobbyId: undefined,
+          });
+        }
+        if (player2Profile) {
+          await ctx.db.patch(player2Profile._id, {
+            gameId: undefined,
+            lobbyId: undefined,
+          });
+        }
+
+        // Delete the associated lobby
+        await ctx.db.delete(game.lobbyId);
+
+        // Delete the game
+        await ctx.db.delete(game._id);
+
+        // Clean up presence room
+        await presence.removeRoom(ctx, game._id);
+
+        deletedSetupGames++;
+      } catch (error) {
+        console.error(`Error deleting stale setup game ${game._id}:`, error);
+      }
+    }
+
+    // Handle stale playing games (>40 minutes old)
+    const stalePlayingGames = await ctx.db
+      .query("games")
+      .withIndex("by_status_game_time", (q) =>
+        q.eq("status", "playing").lt("gameTimeStarted", fortyMinutesAgo)
+      )
+      .collect();
+
+    for (const game of stalePlayingGames) {
+      try {
+        // Use existing forfeitGame mutation to handle playing games
+        // The current turn player loses (took too long on their turn)
+        await ctx.runMutation(api.games.forfeitGame, {
+          gameId: game._id,
+          reason: "disconnection_timeout",
+        });
+
+        forfeitedPlayingGames++;
+      } catch (error) {
+        console.error(`Error forfeiting stale playing game ${game._id}:`, error);
+      }
+    }
+
+    console.log(`Cleaned up ${deletedSetupGames} stale setup games and ${forfeitedPlayingGames} stale playing games`);
+    return { deletedSetupGames, forfeitedPlayingGames };
   },
 });

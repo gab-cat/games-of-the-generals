@@ -68,6 +68,14 @@ crons.cron(
   {}
 );
 
+// Run every hour to cleanup stale games (>40 minutes)
+crons.cron(
+  "Cleanup stale games (>40 minutes)",
+  "0 * * * *", // Every hour
+  internal.games.cleanupStaleGames,
+  {}
+);
+
 export default crons;
 
 
