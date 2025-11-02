@@ -8,7 +8,7 @@
 
 > **A classic Filipino strategy board game brought to life online** - Battle of wits in real-time multiplayer matches against players worldwide or challenge AI opponents!
 
-![Games of the Generals Gameplay](screenshots/wide-1200x630.png)
+![Games of the Generals Gameplay](public/screenshots/wide-1200x630.png)
 
 ## 🎮 What is Games of the Generals?
 
