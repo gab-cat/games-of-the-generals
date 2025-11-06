@@ -76,6 +76,14 @@ crons.cron(
   {}
 );
 
+// Run every 6 hours to cleanup stale AI game sessions (>1 hour old)
+crons.cron(
+  "Cleanup stale AI game sessions (>1 hour old)",
+  "30 */6 * * *", // Every 6 hours at minute 30
+  internal.aiGame.cleanupStaleAIGameSessions,
+  {}
+);
+
 export default crons;
 
 

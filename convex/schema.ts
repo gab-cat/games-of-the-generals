@@ -391,7 +391,8 @@ const applicationTables = {
   })
     .index("by_session_id", ["sessionId"])
     .index("by_player", ["playerId"])
-    .index("by_player_status", ["playerId", "status"]),
+    .index("by_player_status", ["playerId", "status"])
+    .index("by_created_at", ["createdAt"]),
 
   // Global Chat Messages
   globalChat: defineTable({

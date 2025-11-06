@@ -1,4 +1,4 @@
-import { query, mutation, action } from "./_generated/server";
+import { query, mutation, action, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
@@ -664,6 +664,9 @@ export const generateAIMove = action({
             if (!inBounds(rr, cc)) continue;
             const p = session.board[rr][cc];
             if (p && p.player === "player1") {
+              // Flag can only attack another Flag
+              if (p.piece === "Flag" && m.piece !== "Flag") continue;
+
               const outcome = resolveBattle(p.piece, m.piece);
               if (outcome === "attacker") {
                 score -= 8 + Math.max(0, getPieceRank(p.piece) - myRank);
@@ -984,5 +987,48 @@ export const getCurrentUserAIGame = query({
       .first();
 
     return activeSession;
+  },
+});
+
+// Cleanup stale AI game sessions (internal function for cron job)
+export const cleanupStaleAIGameSessions = internalMutation({
+  args: {},
+  returns: v.object({
+    deletedCount: v.number(),
+    processedCount: v.number(),
+  }),
+  handler: async (ctx) => {
+    const now = Date.now();
+    const oneHourAgo = now - (60 * 60 * 1000); // 1 hour in milliseconds
+
+    // Find all AI game sessions older than 1 hour (uses by_created_at index)
+    const staleSessions = await ctx.db
+      .query("aiGameSessions")
+      .withIndex("by_created_at")
+      .filter((q) => q.lt(q.field("createdAt"), oneHourAgo))
+      .collect();
+
+    let deletedCount = 0;
+
+    for (const session of staleSessions) {
+      // Clear aiSessionId from associated profile if it matches this session
+      const profile = await ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", session.playerId))
+        .unique();
+
+      if (profile?.aiSessionId === session._id) {
+        await ctx.db.patch(profile._id, { aiSessionId: undefined });
+      }
+
+      // Delete the stale session
+      await ctx.db.delete(session._id);
+      deletedCount++;
+    }
+
+    return {
+      deletedCount,
+      processedCount: staleSessions.length,
+    };
   },
 });
