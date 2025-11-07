@@ -60,6 +60,47 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [1.5.1] - 2025-11-XX
+
+### 🎨 Enhanced User Interface
+
+**Loading Experience**
+
+- Unified loading spinner component for consistent visual feedback across all pages
+- Improved loading state management with centralized reusable component
+- Better user experience during page transitions and data loading
+
+**Leaderboard Enhancements**
+
+- Expandable player statistics showing detailed performance metrics
+- Interactive player rows with toggle functionality for deeper insights
+- Improved leaderboard navigation and information density
+
+**Game Board Improvements**
+
+- Real-time eliminated pieces tracker showing battle history
+- Collapsible piece legend for better space management on smaller screens
+- Enhanced battle outcome visualization with move-by-move tracking
+- Improved visual hierarchy with expandable information sections
+
+### 🔧 Technical Improvements
+
+**Component Architecture**
+
+- New ExpandableCard component for consistent interactive elements
+- Outside click detection hook for better modal and dropdown behavior
+- Centralized component library reducing code duplication
+- Improved component reusability across the application
+
+**Performance Optimizations**
+
+- Memoized game moves processing for better performance
+- Lazy loading optimizations for route components
+- Reduced bundle size through component consolidation
+- Enhanced state management efficiency
+
+---
+
 ## [1.5.0] - 2025-11-XX
 
 ### ⚡ Quick Match System
