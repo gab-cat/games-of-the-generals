@@ -6,6 +6,7 @@ import { Toaster } from 'sonner'
 import { useConvexQuery } from '../lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
 import { Id } from '../../convex/_generated/dataModel'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 // Lazy load Layout component for better code splitting
 const Layout = lazy(() => import('../components/Layout').then(module => ({ default: module.Layout })))
@@ -28,11 +29,7 @@ function RootComponent() {
   return (
     <div className="min-h-screen">
       <Suspense
-        fallback={
-          <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
-            <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
-          </div>
-        }
+        fallback={<LoadingSpinner fullScreen={true} />}
       >
         <Layout
           user={profile ? { username: profile.username } : undefined}

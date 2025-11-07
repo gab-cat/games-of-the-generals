@@ -543,7 +543,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl min-h-[90vh] mx-auto mt-4 sm:mt-8 px-3 sm:px-6">
+      <main className="flex-1 max-w-7xl min-h-[90vh] mx-auto mt-4 sm:mt-8 px-3 pb-4 sm:px-6">
         {isAuthenticated && isBanned ? <BanScreen /> : children}
       </main>
 

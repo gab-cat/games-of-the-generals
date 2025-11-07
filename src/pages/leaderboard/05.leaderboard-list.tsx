@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { LeaderboardHeader } from "./01.leaderboard-header";
@@ -8,6 +9,8 @@ import { useAutoAnimate } from "../../lib/useAutoAnimate";
 
 export function LeaderboardList() {
   const listRef = useAutoAnimate();
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+
   const { data: leaderboardData, isPending: isLoadingLeaderboard, error: leaderboardError } = useConvexQuery(
     api.profiles.getLeaderboard,
     {} // Use default pagination settings
@@ -15,6 +18,10 @@ export function LeaderboardList() {
 
   // Extract leaderboard from paginated response
   const leaderboard = Array.isArray(leaderboardData) ? leaderboardData : leaderboardData?.page || [];
+
+  const handlePlayerToggle = (playerId: string) => {
+    setExpandedPlayerId(expandedPlayerId === playerId ? null : playerId);
+  };
 
   if (isLoadingLeaderboard) {
     return <LeaderboardLoading />;
@@ -38,6 +45,8 @@ export function LeaderboardList() {
             key={player._id}
             player={player}
             index={index}
+            isExpanded={expandedPlayerId === player._id}
+            onToggle={() => handlePlayerToggle(player._id)}
           />
         ))}
       </div>

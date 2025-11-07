@@ -220,8 +220,10 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const movesData = useQuery(api.games.getGameMoves, { gameId });
   const isLoadingMoves = !movesData;
 
-  // Extract moves from paginated response
-  const moves = Array.isArray(movesData) ? movesData : movesData?.page || [];
+  // Extract moves from paginated response - memoized to avoid dependency issues
+  const moves = useMemo(() => {
+    return Array.isArray(movesData) ? movesData : movesData?.page || [];
+  }, [movesData]);
   
   const matchResult = useQuery(api.games.getMatchResult, { gameId });
 
@@ -319,6 +321,79 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     game?.currentTurn === (isPlayer1 ? "player1" : "player2"), 
     [game?.currentTurn, isPlayer1]
   );
+  
+  // Process moves to extract eliminated pieces with move numbers (only current player's losses)
+  const eliminatedPieces = useMemo(() => {
+    if (!moves || !game) return [];
+    
+    // Determine current player
+    const currentPlayerId = isPlayer1 ? game.player1Id : game.player2Id;
+    
+    const eliminated: Array<{
+      piece: string;
+      moveNumber: number;
+      battleOutcome: "attacker" | "defender" | "tie";
+    }> = [];
+    
+    let moveNumber = 0;
+    
+    for (const move of moves) {
+      // Skip setup moves
+      if (move.moveType === "setup") continue;
+      
+      // Count all game moves (both "move" and "challenge")
+      moveNumber++;
+      
+      // Process challenge moves to extract eliminated pieces
+      if (move.moveType === "challenge" && move.challengeResult) {
+        const result = move.challengeResult;
+        
+        // Determine which player made this move
+        const isPlayer1Move = move.playerId === game.player1Id;
+        const attackerPlayerId = isPlayer1Move ? game.player1Id : game.player2Id;
+        const defenderPlayerId = isPlayer1Move ? game.player2Id : game.player1Id;
+        
+        if (result.winner === "attacker") {
+          // Defender was eliminated - check if it's the current player's piece
+          if (defenderPlayerId === currentPlayerId) {
+            eliminated.push({
+              piece: result.defender,
+              moveNumber,
+              battleOutcome: "attacker", // Attacker won, so defender (current player) lost
+            });
+          }
+        } else if (result.winner === "defender") {
+          // Attacker was eliminated - check if it's the current player's piece
+          if (attackerPlayerId === currentPlayerId) {
+            eliminated.push({
+              piece: result.attacker,
+              moveNumber,
+              battleOutcome: "defender", // Defender won, so attacker (current player) lost
+            });
+          }
+        } else if (result.winner === "tie") {
+          // Both pieces were eliminated - check if current player's pieces were lost
+          if (attackerPlayerId === currentPlayerId) {
+            eliminated.push({
+              piece: result.attacker,
+              moveNumber,
+              battleOutcome: "tie",
+            });
+          }
+          if (defenderPlayerId === currentPlayerId) {
+            eliminated.push({
+              piece: result.defender,
+              moveNumber,
+              battleOutcome: "tie",
+            });
+          }
+        }
+      }
+    }
+    
+    // Reverse to show most recent eliminated pieces at the top
+    return eliminated.reverse();
+  }, [moves, game, isPlayer1]);
   
   // Determine if board should be flipped (player2 sees board flipped so they appear at bottom)
   const shouldFlipBoard = useMemo(() => isPlayer2, [isPlayer2]);
@@ -1824,15 +1899,83 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
             </Card>
           </div>
 
+          {/* Eliminated Pieces */}
+          {eliminatedPieces.length > 0 && (
+            <Card className={`bg-black/20 backdrop-blur-xl border shadow-2xl shadow-black/20 ${
+              isPlayer1 ? "border-blue-500/30" : "border-red-500/30"
+            }`}>
+              <CardHeader className="p-4 sm:p-6 sm:pb-2 pb-2">
+                <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
+                  <Sword className={`h-5 w-5 ${isPlayer1 ? "text-blue-400" : "text-red-400"}`} />
+                  Eliminated Pieces
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 sm:p-2 sm:pt-2 pt-2">
+                <div className="max-h-48 sm:max-h-60 overflow-y-auto">
+                  <div className="space-y-2">
+                    {eliminatedPieces.map((eliminated, index) => (
+                      <motion.div
+                        key={`${eliminated.piece}-${eliminated.moveNumber}-${index}`}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className={`flex items-center gap-3 p-2 rounded-lg border ${
+                          isPlayer1 
+                            ? "bg-blue-500/10 border-blue-500/30" 
+                            : "bg-red-500/10 border-red-500/30"
+                        }`}
+                      >
+                        <div className={`flex-shrink-0 ${isPlayer1 ? "text-blue-400" : "text-red-400"}`}>
+                          {getPieceDisplay(eliminated.piece, { size: "small" })}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs sm:text-sm font-medium text-white/90 truncate">
+                            {eliminated.piece}
+                          </div>
+                          <div className={`text-xs ${isPlayer1 ? "text-blue-300/70" : "text-red-300/70"}`}>
+                            {eliminated.battleOutcome === "attacker" && "Attacker won"}
+                            {eliminated.battleOutcome === "defender" && "Defender won"}
+                            {eliminated.battleOutcome === "tie" && "Tie - both eliminated"}
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 text-xs sm:text-sm font-semibold text-white/70">
+                          Move {eliminated.moveNumber}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Legend */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardHeader className="p-4 sm:p-6">
-              <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                <Info className="h-5 w-5 text-orange-400" />
-                Piece Legend
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
+                  <Info className="h-5 w-5 text-orange-400" />
+                  Piece Legend
+                </CardTitle>
+                <Button
+                  onClick={() => setIsLegendExpanded(!isLegendExpanded)}
+                  variant="ghost"
+                  size="sm"
+                  className="text-white/70 hover:text-white"
+                >
+                  {isLegendExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="p-4 sm:p-6">
+            <AnimatePresence>
+              {isLegendExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <CardContent className="p-4 sm:p-6 pt-0">
               <div className="max-h-60 sm:max-h-80 overflow-y-auto">
                 <table className="w-full text-xs sm:text-sm">
                   <thead>
@@ -1878,7 +2021,10 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   <p>• Goal: Capture opponent's Flag to win</p>
                 </div>
               </div>
-            </CardContent>
+                </CardContent>
+              </motion.div>
+            )}
+            </AnimatePresence>
           </Card>
         </div>
       </div>

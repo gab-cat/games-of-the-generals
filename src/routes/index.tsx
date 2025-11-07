@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Authenticated, Unauthenticated, useConvexAuth } from 'convex/react'
 import { useConvexQueryWithOptions } from '@/lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
-import { motion } from 'framer-motion'
 import { lazy, Suspense } from 'react'
 import { Id } from '../../convex/_generated/dataModel'
 import { useEffect, useState } from 'react'
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 // Lazy load components for better code splitting
 const SignInForm = lazy(() => import('../auth/SignInForm').then(module => ({ default: module.SignInForm })))
@@ -59,26 +59,14 @@ function IndexComponent() {
 
   // Show loading only when auth state is still being determined
   if (isLoading || (isAuthenticated && !profileLoaded)) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"
-        />
-      </div>
-    )
+    return <LoadingSpinner />
   }
 
   return (
     <>
       <Unauthenticated>
         <Suspense
-          fallback={
-            <div className="flex justify-center items-center min-h-[60vh] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
-              <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
-            </div>
-          }
+          fallback={<LoadingSpinner />}
         >
           {showSplash ? (
             <SplashScreen onComplete={handleSplashComplete} />
@@ -90,11 +78,7 @@ function IndexComponent() {
 
       <Authenticated>
         <Suspense
-          fallback={
-            <div className="flex justify-center items-center min-h-[60vh] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
-              <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
-            </div>
-          }
+          fallback={<LoadingSpinner />}
         >
           {!profile ? (
             <SetupPage />

@@ -5,19 +5,7 @@ import { SetupPage } from '../pages/setup/00.setup-page'
 import { PricingPage } from '../pages/pricing/00.pricing-page'
 import { useConvexQuery } from '../lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
-import { motion } from 'framer-motion'
-
-function LoadingSpinner() {
-  return (
-    <div className="flex justify-center items-center min-h-[60vh]">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"
-      />
-    </div>
-  )
-}
+import { LoadingSpinner } from '../components/LoadingSpinner'
 
 function PricingComponent() {
   const { isPending: isLoadingUser } = useConvexQuery(api.auth.loggedInUser)
