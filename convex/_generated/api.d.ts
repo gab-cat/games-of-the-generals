@@ -24,6 +24,7 @@ import type * as lobbies from "../lobbies.js";
 import type * as maintenance from "../maintenance.js";
 import type * as matchmaking from "../matchmaking.js";
 import type * as messages from "../messages.js";
+import type * as migrations from "../migrations.js";
 import type * as moderationEmails from "../moderationEmails.js";
 import type * as notifications from "../notifications.js";
 import type * as performance from "../performance.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   maintenance: typeof maintenance;
   matchmaking: typeof matchmaking;
   messages: typeof messages;
+  migrations: typeof migrations;
   moderationEmails: typeof moderationEmails;
   notifications: typeof notifications;
   performance: typeof performance;

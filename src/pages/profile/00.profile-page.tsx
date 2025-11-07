@@ -165,6 +165,20 @@ export function ProfilePage() {
           <RecentGames recentGames={profileStats.recentGames} userId={profileStats.userId} />
           <PerformanceInsights profileStats={profileStats} />
         </div>
+
+        {/* ELO Rating Information Note */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="mt-6 px-4"
+        >
+          <div className="rounded-lg border border-yellow-500/20 bg-yellow-500/10 p-4">
+            <p className="text-sm text-yellow-200/90 text-center">
+              <strong>Note:</strong> ELO rating is calculated only from Quick Match games, as matchmaking ensures fair skill-based pairings.
+            </p>
+          </div>
+        </motion.div>
       </div>
     </div>
   );

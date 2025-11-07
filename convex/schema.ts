@@ -24,6 +24,7 @@ const applicationTables = {
     losses: v.number(),
     gamesPlayed: v.number(),
     rank: v.string(),
+    elo: v.optional(v.number()), // ELO rating (default 1500, only updates from quick match games)
     createdAt: v.number(),
     avatarUrl: v.optional(v.string()), // URL to compressed avatar image
     avatarStorageId: v.optional(v.id("_storage")), // Storage ID for deleting old avatars
@@ -61,7 +62,8 @@ const applicationTables = {
     .index("by_username_games", ["username", "gamesPlayed"]) // For efficient username search
     .index("by_rank_games", ["rank", "gamesPlayed"]) // For rank-based queries
     .index("by_created_at", ["createdAt"]) // For new user queries
-    .index("by_last_seen", ["lastSeenAt"]), // For online status queries
+    .index("by_last_seen", ["lastSeenAt"]) // For online status queries
+    .index("by_elo", ["elo"]), // For ELO-based leaderboard queries
 
   // User achievements
   achievements: defineTable({

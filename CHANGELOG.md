@@ -60,6 +60,51 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [1.6.0] - 2025-01-XX
+
+### 🎨 Enhanced Profile & Statistics
+
+**Comprehensive Battle Statistics**
+
+- Detailed battle stats display showing win streaks, play time, and performance metrics
+- Fastest win and longest game tracking for competitive players
+- Combat statistics including flags captured, pieces eliminated, and spies revealed
+- Rank progress visualization with clear path to next rank
+- Enhanced visual design with gradient icons and improved information hierarchy
+
+**Leaderboard Improvements**
+
+- Expanded player statistics with comprehensive performance breakdown
+- Interactive player cards showing detailed metrics on demand
+- Recent games history display for quick context
+- Win rate visualization with circular progress indicators
+- Better mobile responsiveness for expanded statistics view
+
+**Profile Page Enhancements**
+
+- Redesigned battle stats section with compact, information-dense layout
+- Visual rank progress tracking with next rank indicators
+- Improved stat cards with gradient backgrounds and icons
+- Better organization of performance metrics
+- Enhanced visual feedback for achievements and milestones
+
+### 🔧 Technical Improvements
+
+**Backend Enhancements**
+
+- Enhanced profile statistics calculation and aggregation
+- Improved data schema for extended player metrics
+- Better performance tracking and analytics
+- Optimized queries for leaderboard and profile data
+
+**Database & Schema Updates**
+
+- Extended profile statistics schema with new metrics
+- Migration support for new statistics fields
+- Improved data consistency and validation
+
+---
+
 ## [1.5.1] - 2025-11-XX
 
 ### 🎨 Enhanced User Interface

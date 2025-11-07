@@ -2,6 +2,91 @@ import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
+
+// ELO Rating System Functions
+
+/**
+ * Calculate expected score for a player based on ELO ratings
+ * Formula: E_A = 1 / (1 + 10^((R_B - R_A) / 400))
+ */
+function calculateExpectedScore(playerElo: number, opponentElo: number): number {
+  return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
+}
+
+/**
+ * Calculate new ELO rating after a game
+ * Formula: R'_A = R_A + K * (S_A - E_A)
+ * @param playerElo Current ELO rating
+ * @param opponentElo Opponent's ELO rating
+ * @param actualScore 1 for win, 0.5 for draw, 0 for loss
+ * @param kFactor K-factor (32 for new players < 30 games, 16 for established)
+ * @returns New ELO rating (clamped between 800-2500)
+ */
+function calculateNewElo(playerElo: number, opponentElo: number, actualScore: number, kFactor: number): number {
+  const expectedScore = calculateExpectedScore(playerElo, opponentElo);
+  const newElo = playerElo + kFactor * (actualScore - expectedScore);
+  // Clamp between 800-2500
+  return Math.max(800, Math.min(2500, Math.round(newElo)));
+}
+
+/**
+ * Update ELO ratings for both players after a game
+ * @param ctx Database context
+ * @param winnerId Winner's user ID
+ * @param loserId Loser's user ID
+ * @param winnerElo Winner's current ELO
+ * @param loserElo Loser's current ELO
+ * @param winnerGamesPlayed Winner's total games played (for K-factor)
+ * @param loserGamesPlayed Loser's total games played (for K-factor)
+ */
+export async function updateEloRatings(
+  ctx: any,
+  winnerId: Id<"users">,
+  loserId: Id<"users">,
+  winnerElo: number,
+  loserElo: number,
+  winnerGamesPlayed: number,
+  loserGamesPlayed: number
+): Promise<void> {
+  // Determine K-factor: 32 for players with < 30 games, 16 for established
+  const winnerKFactor = winnerGamesPlayed < 30 ? 32 : 16;
+  const loserKFactor = loserGamesPlayed < 30 ? 32 : 16;
+
+  // Calculate new ELO ratings
+  const newWinnerElo = calculateNewElo(winnerElo, loserElo, 1, winnerKFactor); // Win = 1
+  const newLoserElo = calculateNewElo(loserElo, winnerElo, 0, loserKFactor); // Loss = 0
+
+  // Update profiles
+  const [winnerProfile, loserProfile] = await Promise.all([
+    ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q: any) => q.eq("userId", winnerId))
+      .unique(),
+    ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q: any) => q.eq("userId", loserId))
+      .unique(),
+  ]);
+
+  if (winnerProfile) {
+    await ctx.db.patch(winnerProfile._id, { elo: newWinnerElo });
+  }
+
+  if (loserProfile) {
+    await ctx.db.patch(loserProfile._id, { elo: newLoserElo });
+  }
+}
+
+/**
+ * Check if a game is a quick match by checking the lobby name pattern
+ * Quick match lobbies have name pattern: "Quick Match ${timestamp}"
+ */
+export async function isQuickMatchGame(ctx: any, lobbyId: Id<"lobbies">): Promise<boolean> {
+  const lobby = await ctx.db.get(lobbyId);
+  if (!lobby) return false;
+  return lobby.name?.startsWith("Quick Match") ?? false;
+}
 
 // Get current user's profile
 export const getCurrentProfile = query({
@@ -158,6 +243,7 @@ export const createOrUpdateProfile = mutation({
         losses: 0,
         gamesPlayed: 0,
         rank: "Private",
+        elo: 1500, // Default ELO rating
         createdAt: Date.now(),
         avatarUrl: oauthImageUrl || undefined,
         totalPlayTime: 0,
@@ -421,15 +507,21 @@ export const getLeaderboard = query({
       numItems: v.number(),
       cursor: v.optional(v.string()),
     })),
-    sortBy: v.optional(v.union(v.literal("wins"), v.literal("gamesPlayed"), v.literal("winRate"))),
+    sortBy: v.optional(v.union(v.literal("wins"), v.literal("gamesPlayed"), v.literal("winRate"), v.literal("elo"))),
   },
   handler: async (ctx, args) => {
-    const { paginationOpts, sortBy = "wins" } = args;
+    const { paginationOpts, sortBy = "elo" } = args; // Default to ELO sorting
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 25) : 20;
 
     // Use different indexes based on sort criteria for optimal performance
     let queryBuilder;
-    if (sortBy === "gamesPlayed") {
+    if (sortBy === "elo") {
+      // Default: sort by ELO using the optimized ELO index
+      queryBuilder = ctx.db
+        .query("profiles")
+        .withIndex("by_elo", (q) => q.gte("elo", 0))
+        .order("desc");
+    } else if (sortBy === "gamesPlayed") {
       // Use compound index for gamesPlayed + wins (ties broken by wins)
       queryBuilder = ctx.db
         .query("profiles")
@@ -442,7 +534,7 @@ export const getLeaderboard = query({
         .withIndex("by_games_wins", (q) => q.gte("gamesPlayed", 1)) // Only include players with games
         .order("desc");
     } else {
-      // Default: sort by wins using the optimized wins index
+      // Sort by wins using the optimized wins index
       queryBuilder = ctx.db
         .query("profiles")
         .withIndex("by_wins", (q) => q.gte("wins", 0))

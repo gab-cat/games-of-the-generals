@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
 import { presence } from "./presence";
+import { updateEloRatings, isQuickMatchGame } from "./profiles";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -644,7 +645,7 @@ export const makeMove = mutation({
         spiesRevealed: loserSpiesRevealed
       });
 
-      // Check and unlock achievements for both players
+      // Get profiles for ELO update and achievements
       const winnerProfile = await ctx.db
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", winnerId))
@@ -654,6 +655,22 @@ export const makeMove = mutation({
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", loserId))
         .unique();
+
+      // Update ELO ratings for quick match games only
+      const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+      if (isQuickMatch && winnerProfile && loserProfile) {
+        await updateEloRatings(
+          ctx,
+          winnerId,
+          loserId,
+          winnerProfile.elo ?? 1500,
+          loserProfile.elo ?? 1500,
+          winnerProfile.gamesPlayed,
+          loserProfile.gamesPlayed
+        );
+      }
+
+      // Check and unlock achievements for both players
 
       if (winnerProfile) {
         await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
@@ -830,6 +847,20 @@ export const surrenderGame = mutation({
       .withIndex("by_user", (q) => q.eq("userId", loserId))
       .unique();
 
+    // Update ELO ratings for quick match games only
+    const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+    if (isQuickMatch && winnerProfile && loserProfile) {
+      await updateEloRatings(
+        ctx,
+        winnerId,
+        loserId,
+        winnerProfile.elo ?? 1500,
+        loserProfile.elo ?? 1500,
+        winnerProfile.gamesPlayed,
+        loserProfile.gamesPlayed
+      );
+    }
+
     if (winnerProfile) {
       void Promise.all([
         await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
@@ -943,6 +974,20 @@ export const timeoutGame = mutation({
       .withIndex("by_user", (q) => q.eq("userId", loserId))
       .unique();
 
+    // Update ELO ratings for quick match games only
+    const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+    if (isQuickMatch && winnerProfile && loserProfile) {
+      await updateEloRatings(
+        ctx,
+        winnerId,
+        loserId,
+        winnerProfile.elo ?? 1500,
+        loserProfile.elo ?? 1500,
+        winnerProfile.gamesPlayed,
+        loserProfile.gamesPlayed
+      );
+    }
+
     if (winnerProfile) {
       void Promise.all([
         await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
@@ -1036,6 +1081,20 @@ export const forfeitGame = mutation({
         winStreak: 0,
         gameId: undefined,
       });
+    }
+
+    // Update ELO ratings for quick match games only
+    const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+    if (isQuickMatch && winnerProfile && loserProfile) {
+      await updateEloRatings(
+        ctx,
+        winnerId,
+        loserId,
+        winnerProfile.elo ?? 1500,
+        loserProfile.elo ?? 1500,
+        winnerProfile.gamesPlayed, // Use current value before increment
+        loserProfile.gamesPlayed   // Use current value before increment
+      );
     }
 
     // Check achievements
@@ -1192,6 +1251,20 @@ export const checkOpponentTimeout = mutation({
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", loserId))
         .unique();
+
+      // Update ELO ratings for quick match games only
+      const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+      if (isQuickMatch && winnerProfile && loserProfile) {
+        await updateEloRatings(
+          ctx,
+          winnerId,
+          loserId,
+          winnerProfile.elo ?? 1500,
+          loserProfile.elo ?? 1500,
+          winnerProfile.gamesPlayed,
+          loserProfile.gamesPlayed
+        );
+      }
 
       if (winnerProfile) {
         void Promise.all([

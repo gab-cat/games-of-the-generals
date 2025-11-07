@@ -20,6 +20,7 @@ interface Player {
   losses: number;
   gamesPlayed: number;
   winRate: number;
+  elo: number;
   position: number;
 }
 
@@ -279,8 +280,8 @@ export function PlayerRow({ player, index, isExpanded, onToggle }: PlayerRowProp
             </div>
 
             {/* Stats Section - Desktop: inline, Mobile: below */}
-            <div className={`grid grid-cols-4 gap-2 sm:gap-4 text-center flex-shrink-0 mt-3 sm:mt-0 border-t border-white/10 sm:border-t-0 pt-3 sm:pt-0 ${
-              player.position <= 3 ? 'min-w-[160px] sm:min-w-[180px]' : 'min-w-[140px] sm:min-w-[160px]'
+            <div className={`grid grid-cols-5 gap-2 sm:gap-4 text-center flex-shrink-0 mt-3 sm:mt-0 border-t border-white/10 sm:border-t-0 pt-3 sm:pt-0 ${
+              player.position <= 3 ? 'min-w-[200px] sm:min-w-[220px]' : 'min-w-[180px] sm:min-w-[200px]'
             }`}>
               <div>
                 <div className={`font-bold leading-tight ${
@@ -330,6 +331,17 @@ export function PlayerRow({ player, index, isExpanded, onToggle }: PlayerRowProp
                 <div className="text-xs text-white/60 leading-tight">
                   <span className="hidden sm:inline">Win Rate</span>
                   <span className="sm:hidden">WR</span>
+                </div>
+              </div>
+              <div>
+                <div className={`font-bold leading-tight ${
+                  player.position <= 3 ? 'text-base sm:text-lg text-yellow-300' : 'text-sm sm:text-base text-yellow-400'
+                }`}>
+                  {player.elo ?? 1500}
+                </div>
+                <div className="text-xs text-white/60 leading-tight">
+                  <span className="hidden sm:inline">ELO</span>
+                  <span className="sm:hidden">E</span>
                 </div>
               </div>
             </div>

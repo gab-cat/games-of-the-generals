@@ -24,6 +24,7 @@ interface ProfileStats {
   losses: number;
   gamesPlayed: number;
   winRate: number;
+  elo: number;
   winStreak?: number;
   bestWinStreak?: number;
   totalPlayTime?: number;
@@ -166,6 +167,16 @@ export function ExpandedPlayerStats({ profileStats }: ExpandedPlayerStatsProps) 
           >
             <div className="text-xl font-bold text-purple-400">{profileStats.winRate}%</div>
             <div className="text-gray-500 text-xs uppercase tracking-wider">Win Rate</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center"
+          >
+            <div className="text-xl font-bold text-yellow-400">{profileStats.elo ?? 1500}</div>
+            <div className="text-gray-500 text-xs uppercase tracking-wider">ELO</div>
           </motion.div>
         </div>
       </div>

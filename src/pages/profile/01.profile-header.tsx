@@ -19,6 +19,7 @@ interface ProfileStats {
   losses: number;
   gamesPlayed: number;
   winRate: number;
+  elo: number;
   bio?: string;
   userId?: Id<"users">;
 }
@@ -293,6 +294,16 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
           >
             <div className="text-2xl font-bold text-purple-400">{profileStats.winRate}%</div>
             <div className="text-gray-500 text-xs uppercase tracking-wider">Win Rate</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center sm:text-right"
+          >
+            <div className="text-2xl font-bold text-yellow-400">{profileStats.elo ?? 1500}</div>
+            <div className="text-gray-500 text-xs uppercase tracking-wider">ELO</div>
           </motion.div>
         </div>
       </div>
