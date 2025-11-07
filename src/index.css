@@ -36,8 +36,8 @@
   * {
     @apply border-border;
   }
-    body {
-    @apply bg-background text-foreground;
+  body {
+    @apply bg-background text-foreground overflow-x-hidden;
     font-family:
       "Inter Variable",
       ui-sans-serif,
@@ -55,8 +55,11 @@
       "Segoe UI Symbol",
       "Noto Color Emoji";
     /* Add subtle grain texture for depth */
-    background-image:
-      radial-gradient(circle at 1px 1px, rgba(255,255,255,0.15) 1px, transparent 0);
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      rgba(255, 255, 255, 0.15) 1px,
+      transparent 0
+    );
     background-size: 20px 20px;
   }
 }
@@ -66,15 +69,15 @@
   .glass-card {
     @apply bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20;
   }
-  
+
   .glass-surface {
     @apply bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg;
   }
-  
+
   .glass-button {
     @apply bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20;
   }
-  
+
   .glass-input {
     @apply bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50;
   }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper, Headphones, Lock, ScrollText, Cog, Swords } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -63,6 +63,23 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const isMobile = useMobile();
 
   const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
+
+  // Footer link data
+  const quickLinks = [
+    { icon: Swords, label: "Play Game", path: "/" },
+    { icon: Trophy, label: "Leaderboard", path: "/leaderboard" },
+    { icon: Bot, label: "VS AI", path: "/ai-game" },
+    { icon: History, label: "Match History", path: "/match-history" },
+    { icon: Newspaper, label: "News & Updates", path: "/announcements" },
+  ];
+
+  const supportLinks = [
+    { icon: Headphones, label: "Support Center", path: "/support", search: { ticketId: undefined } },
+    { icon: User, label: "Profile", path: "/profile" },
+    { icon: Lock, label: "Privacy Policy", path: "/privacy" },
+    { icon: ScrollText, label: "Terms of Service", path: "/terms" },
+    { icon: Cog, label: "Settings", path: "/settings" },
+  ];
 
   // Profile data doesn't change frequently, cache it for longer
   const { data: profile } = useConvexQueryWithOptions(
@@ -184,7 +201,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 px-2 lg:pb-0 no-scrollbar">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 lg:pb-0 no-scrollbar">
       {/* Minimalist Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
@@ -526,9 +543,157 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       </motion.header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto mt-4 sm:mt-8 px-3 sm:px-6">
+      <main className="flex-1 max-w-7xl min-h-[90vh] mx-auto mt-4 sm:mt-8 px-3 sm:px-6">
         {isAuthenticated && isBanned ? <BanScreen /> : children}
       </main>
+
+      {/* Footer */}
+      <motion.footer
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.8, duration: 0.5 }}
+        className=""
+      >
+        <div className={cn(
+          "relative backdrop-blur-sm bg-black/40 border-t border-white/10 transition-all duration-300 w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8"
+        )}>
+          {/* Floating particles effect */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(12)].map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute w-1 h-1 bg-white/30 rounded-full"
+                initial={{
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
+                  y: Math.random() * 120,
+                  opacity: 0
+                }}
+                animate={{
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
+                  y: Math.random() * 120,
+                  opacity: [0, 1, 0]
+                }}
+                transition={{
+                  duration: 6 + Math.random() * 4,
+                  repeat: Infinity,
+                  delay: i * 0.6
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="relative max-w-7xl mx-auto">
+            {/* Main Footer Content */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
+              {/* Brand Section */}
+              <div className="lg:col-span-2 space-y-4">
+                <div className="flex items-center gap-3">
+                  {/* Logo */}
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200">
+                    <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-white/90 group-hover:text-white transition-colors" />
+                  </div>
+
+                  {/* Title */}
+                  <div className="flex flex-col cursor-pointer group" onClick={() => void navigate({ to: "/", search: { lobbyId: undefined } })}>
+                    <h2 className="text-lg sm:text-xl font-display font-semibold text-white/95 tracking-tight group-hover:text-white transition-colors duration-200">
+                      Games of the Generals
+                    </h2>
+                    <span className="text-xs font-mono text-gray-400">
+                      v{version}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-3">
+                  <p className="text-white/80 text-sm leading-relaxed">
+                    Experience the classic strategy board game reimagined for the digital age. Command your army, outmaneuver your opponents, and become the ultimate tactician in this timeless game of military strategy.
+                  </p>
+                  <p className="text-white/60 text-xs leading-relaxed">
+                    Features real-time multiplayer battles, AI opponents, tournament play, and a vibrant community of strategic minds from around the world.
+                  </p>
+                </div>
+
+                {/* Game Stats */}
+                <div className="flex flex-wrap gap-4 pt-2">
+                  <div className="text-center">
+                    <div className="text-white/90 font-semibold text-sm">1K+</div>
+                    <div className="text-white/60 text-xs">Active Players</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-white/90 font-semibold text-sm">2K+</div>
+                    <div className="text-white/60 text-xs">Games Played</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-white/90 font-semibold text-sm">24/7</div>
+                    <div className="text-white/60 text-xs">Online Play</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Links */}
+              <div className="space-y-3">
+                <h3 className="text-white/90 font-semibold text-xs uppercase tracking-wider">Quick Links</h3>
+                <nav className="flex flex-col space-y-0.5">
+                  {quickLinks.map((link) => {
+                    const Icon = link.icon;
+                    return (
+                      <motion.button
+                        key={link.path}
+                        onClick={() => void navigate({ to: link.path })}
+                        className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 text-xs text-left"
+                        whileHover={{ x: 1 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                      >
+                        <Icon className="w-3.5 h-3.5 text-white/60 group-hover:text-white transition-colors flex-shrink-0" />
+                        <span className="font-medium">{link.label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              {/* Support & Legal */}
+              <div className="space-y-3">
+                <h3 className="text-white/90 font-semibold text-xs uppercase tracking-wider">Support & Legal</h3>
+                <nav className="flex flex-col space-y-0.5">
+                  {supportLinks.map((link) => {
+                    const Icon = link.icon;
+                    return (
+                      <motion.button
+                        key={link.path}
+                        onClick={() => void navigate({ to: link.path, search: link.search })}
+                        className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 text-xs text-left"
+                        whileHover={{ x: 1 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                      >
+                        <Icon className="w-3.5 h-3.5 text-white/60 group-hover:text-white transition-colors flex-shrink-0" />
+                        <span className="font-medium">{link.label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </nav>
+              </div>
+            </div>
+
+            {/* Bottom Section */}
+            <div className="mt-8 pt-6 border-t border-white/10">
+              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="text-white/60 text-xs sm:text-sm">
+                  © 2025 Games of the Generals. All rights reserved.
+                </div>
+                <div className="flex items-center gap-4 text-white/50 text-xs">
+                  <span>Made with ❤️ for strategy enthusiasts</span>
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>All systems operational</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.footer>
 
       {/* Floating Global Chat Button - Desktop */}
       {isAuthenticated && !isBanned && (
