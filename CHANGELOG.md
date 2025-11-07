@@ -60,6 +60,45 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [1.5.0] - 2025-11-XX
+
+### ⚡ Quick Match System
+
+**Instant Matchmaking**
+
+- New Quick Match button for instant opponent pairing
+- Skill-based matchmaking algorithm for fair and balanced games
+- Real-time queue status with live countdown timer
+- Automatic game start when opponents are found
+- Queue timeout after 10 minutes for inactive players
+
+**Queue Management**
+
+- Visual queue status indicator showing search progress
+- Cancel queue option at any time during matchmaking
+- Automatic queue removal when joining lobbies manually
+- Seamless transition from queue to game start
+
+### 🎯 Enhanced User Experience
+
+**Surrender Confirmation**
+
+- Improved surrender dialog with clear confirmation prompt
+- Better visual design with alert styling and icons
+- Prevents accidental surrenders with explicit confirmation
+- Consistent confirmation pattern across the application
+
+### 🔧 Technical Improvements
+
+**Performance & Stability**
+
+- Updated core dependencies for better performance
+- Enhanced matchmaking logic with skill rating calculations
+- Improved lobby state management and queue cleanup
+- Better error handling in matchmaking scenarios
+
+---
+
 ## [1.4.2] - 2025-01-XX
 
 ### 🎯 Flag Battle Rules Enhancement
