@@ -526,6 +526,18 @@ export const getAISessionById = internalQuery({
     playerSetup: v.boolean(),
     aiSetup: v.boolean(),
     moveCount: v.number(),
+    createdAt: v.number(),
+    setupTimeStarted: v.optional(v.number()),
+    gameTimeStarted: v.optional(v.number()),
+    lastMoveTime: v.optional(v.number()),
+    lastMoveFrom: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
+    lastMoveTo: v.optional(v.object({
+      row: v.number(),
+      col: v.number(),
+    })),
   })),
   handler: async (ctx, args) => {
     // OPTIMIZED: Use profile lookup for direct session access
