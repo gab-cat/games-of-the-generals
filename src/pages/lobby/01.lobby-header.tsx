@@ -12,6 +12,7 @@ interface Profile {
   losses: number;
   gamesPlayed: number;
   rank: string;
+  elo?: number;
 }
 
 interface LobbyHeaderProps {
@@ -74,7 +75,7 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 text-center"
+            className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 text-center"
           >
             <motion.div
               initial={{ y: 20, opacity: 0 }}
@@ -107,6 +108,14 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
             >
               <div className="text-xl sm:text-2xl font-bold text-blue-400">{winRate}%</div>
               <div className="text-xs text-white/60">Win Rate</div>
+            </motion.div>
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.9 }}
+            >
+              <div className="text-xl sm:text-2xl font-bold text-yellow-400">{profile.elo ?? 1500}</div>
+              <div className="text-xs text-white/60">ELO</div>
             </motion.div>
           </motion.div>
         </div>

@@ -24,7 +24,7 @@ const applicationTables = {
     losses: v.number(),
     gamesPlayed: v.number(),
     rank: v.string(),
-    elo: v.optional(v.number()), // ELO rating (default 1500, only updates from quick match games)
+    elo: v.number(), // ELO rating (default 1500, only updates from quick match games)
     createdAt: v.number(),
     avatarUrl: v.optional(v.string()), // URL to compressed avatar image
     avatarStorageId: v.optional(v.id("_storage")), // Storage ID for deleting old avatars
