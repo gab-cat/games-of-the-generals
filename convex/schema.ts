@@ -101,6 +101,20 @@ const applicationTables = {
     .index("by_status_created", ["status", "createdAt"]) // For sorting waiting lobbies by creation time
     .index("by_waiting_public", ["status", "isPrivate", "createdAt"]), // Optimized for public lobby list
 
+  // Quick Match matchmaking queue
+  matchmakingQueue: defineTable({
+    userId: v.id("users"),
+    username: v.string(),
+    skillRating: v.number(),
+    joinedAt: v.number(),
+    timeoutAt: v.number(),
+    status: v.union(v.literal("waiting"), v.literal("matched")),
+  })
+  .index("by_status", ["status"])
+  .index("by_user", ["userId"])
+  .index("by_status_skill", ["status", "skillRating"])
+  .index("by_timeout", ["timeoutAt"]),
+
     // Active games
   games: defineTable({
     lobbyId: v.id("lobbies"),

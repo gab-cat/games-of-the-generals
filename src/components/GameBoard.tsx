@@ -27,11 +27,13 @@ import {
   AlertCircle,
   AlertTriangle,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "./ui/alert-dialog";
 import { Badge } from "./ui/badge";
 import { Timer } from "../pages/game/Timer";
 import { GameResultModal } from "../pages/game/GameResultModal";
@@ -305,6 +307,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const [pendingMove, setPendingMove] = useState<{fromRow: number, fromCol: number, toRow: number, toCol: number} | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+  const [showSurrenderDialog, setShowSurrenderDialog] = useState(false);
   
   const [_, setBoardRect] = useState<DOMRect | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -539,9 +542,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   }, []);
 
   const handleSurrender = useCallback(() => {
-    if (window.confirm("Are you sure you want to surrender? This cannot be undone.")) {
-      surrenderGame({ gameId });
-    }
+    surrenderGame({ gameId });
   }, [surrenderGame, gameId]);
 
   const handleAcknowledgeResult = useCallback(() => {
@@ -1376,31 +1377,74 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
             {/* Surrender Button */}
             {game.status === "playing" && (isPlayer1 || isPlayer2) && (
               <div className="order-1 sm:order-2">
-                <Button
-                  onClick={() => void handleSurrender()}
-                  disabled={isSurrendering}
-                  variant="destructive"
-                  size="sm"
-                  className="flex items-center rounded-full gap-2 disabled:opacity-50 w-full sm:w-auto"
-                >
-                  {isSurrendering ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                      />
-                      <span className="hidden sm:inline">Surrendering...</span>
-                      <span className="sm:hidden">...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Flag className="h-4 w-4" />
-                      <span className="hidden sm:inline">Surrender</span>
-                      <span className="sm:hidden">Give Up</span>
-                    </>
-                  )}
-                </Button>
+                <AlertDialog open={showSurrenderDialog} onOpenChange={setShowSurrenderDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      disabled={isSurrendering}
+                      variant="destructive"
+                      size="sm"
+                      className="flex items-center rounded-full gap-2 disabled:opacity-50 w-full sm:w-auto"
+                    >
+                      {isSurrendering ? (
+                        <>
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                            className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+                          />
+                          <span className="hidden sm:inline">Surrendering...</span>
+                          <span className="sm:hidden">...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Flag className="h-4 w-4" />
+                          <span className="hidden sm:inline">Surrender</span>
+                          <span className="sm:hidden">Give Up</span>
+                        </>
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="sm:max-w-[425px] bg-gray-500/10 backdrop-blur-md border border-white/10">
+                    <AlertDialogHeader>
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="h-6 w-6 text-amber-400" />
+                        <AlertDialogTitle className="text-white/90">Confirm Surrender</AlertDialogTitle>
+                      </div>
+                      <AlertDialogDescription className="text-white/60">
+                        Are you sure you want to surrender? This cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
+                        <span className="flex items-center gap-2">
+                          <X className="h-4 w-4" />
+                          Cancel
+                        </span>
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => void handleSurrender()}
+                        disabled={isSurrendering}
+                        className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                      >
+                        {isSurrendering ? (
+                          <div className="flex items-center gap-2">
+                            <motion.div
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full"
+                            />
+                            Surrendering...
+                          </div>
+                        ) : (
+                          <>
+                            <Flag className="h-4 w-4 mr-2" />
+                            Surrender
+                          </>
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
             )}
           </div>

@@ -135,6 +135,16 @@ export const createLobby = mutation({
       lobbyId,
     });
 
+    // Remove user from matchmaking queue if they were in it
+    const queueEntry = await ctx.db
+      .query("matchmakingQueue")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (queueEntry) {
+      await ctx.db.delete(queueEntry._id);
+    }
+
     return lobbyId;
   },
 });
@@ -146,26 +156,30 @@ export const getUserActiveLobby = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // First check if user is a host
+    // First check if user is a host - get most recent waiting lobby
     let lobby = await ctx.db
       .query("lobbies")
       .withIndex("by_host_status", (q) => q.eq("hostId", userId).eq("status", "waiting"))
-      .unique();
+      .order("desc")
+      .first();
 
     if (!lobby) {
+      // Check for most recent playing lobby where user is host
       lobby = await ctx.db
         .query("lobbies")
         .withIndex("by_host_status", (q) => q.eq("hostId", userId).eq("status", "playing"))
-        .unique();
+        .order("desc")
+        .first();
     }
 
-    // If not found as host, check if user is a player in any lobby
+    // If not found as host, check if user is a player in any lobby - get most recent
     if (!lobby) {
       lobby = await ctx.db
         .query("lobbies")
         .filter((q) => q.eq(q.field("playerId"), userId))
         .filter((q) => q.or(q.eq(q.field("status"), "waiting"), q.eq(q.field("status"), "playing")))
-        .unique();
+        .order("desc")
+        .first();
     }
 
     return lobby;
@@ -215,6 +229,16 @@ export const joinLobby = mutation({
     await ctx.db.patch(profile._id, {
       lobbyId: args.lobbyId,
     });
+
+    // Remove user from matchmaking queue if they were in it
+    const queueEntry = await ctx.db
+      .query("matchmakingQueue")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (queueEntry) {
+      await ctx.db.delete(queueEntry._id);
+    }
 
     return args.lobbyId;
   },
@@ -267,6 +291,16 @@ export const joinLobbyByCode = mutation({
     await ctx.db.patch(profile._id, {
       lobbyId: lobby._id,
     });
+
+    // Remove user from matchmaking queue if they were in it
+    const queueEntry = await ctx.db
+      .query("matchmakingQueue")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    if (queueEntry) {
+      await ctx.db.delete(queueEntry._id);
+    }
 
     return lobby._id;
   },

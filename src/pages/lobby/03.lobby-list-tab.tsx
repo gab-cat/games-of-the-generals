@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { LobbyCard } from "./LobbyCard";
 import { motion } from "framer-motion";
-import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock } from "lucide-react";
+import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock, Zap, X } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -59,6 +59,10 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
   // Track if we've already shown countdown for this lobby state to prevent duplicates
   const countdownShownRef = useRef<string | null>(null);
 
+  // Quick Match state
+  const [isInQueue, setIsInQueue] = useState(false);
+  const [queueTimeRemaining, setQueueTimeRemaining] = useState<number | null>(null);
+
   const LOBBIES_PER_PAGE = 10;
 
   const lobbiesQuery = useQuery(api.lobbies.getLobbies, {
@@ -70,6 +74,27 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
 
   const activeLobby = useQuery(api.lobbies.getUserActiveLobby);
   const currentGame = useQuery(api.games.getCurrentUserGame);
+
+  // Quick Match queries
+  const queueStatus = useQuery(api.matchmaking.getQueueStatus);
+  const queueCount = useQuery(api.matchmaking.getQueueCount);
+
+  // Update queue status state
+  useEffect(() => {
+    if (queueStatus) {
+      setIsInQueue(queueStatus.inQueue);
+      setQueueTimeRemaining(queueStatus.timeRemaining || null);
+    }
+  }, [queueStatus]);
+
+  // Clear queue state when player gets matched (has active lobby)
+  useEffect(() => {
+    if (activeLobby && isInQueue) {
+      // Player was matched and now has an active lobby, clear queue state
+      setIsInQueue(false);
+      setQueueTimeRemaining(null);
+    }
+  }, [activeLobby, isInQueue]);
 
   // Show countdown modal when lobby becomes full (for host)
   useEffect(() => {
@@ -213,6 +238,56 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
       toast.error("Failed to leave lobby");
     }
   });
+
+  // Quick Match mutations
+  const joinQueueMutation = useConvexMutationWithQuery(api.matchmaking.joinQueue, {
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Joined matchmaking queue!");
+      } else {
+        toast.info("Already in queue");
+      }
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to join queue");
+    }
+  });
+
+  const leaveQueueMutation = useConvexMutationWithQuery(api.matchmaking.leaveQueue, {
+    onSuccess: () => {
+      setIsInQueue(false);
+      setQueueTimeRemaining(null);
+      toast.success("Left matchmaking queue");
+    },
+    onError: () => {
+      toast.error("Failed to leave queue");
+    }
+  });
+
+  // Countdown timer for queue timeout
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (isInQueue && queueTimeRemaining && queueTimeRemaining > 0) {
+      interval = setInterval(() => {
+        setQueueTimeRemaining(prev => {
+          if (prev && prev > 1000) {
+            return prev - 1000;
+          } else {
+            // Time's up - leave queue (check current queue status to avoid double calls)
+            if (queueStatus?.inQueue) {
+              leaveQueueMutation.mutate({});
+            }
+            return null;
+          }
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isInQueue, queueTimeRemaining, leaveQueueMutation, queueStatus]);
 
   const lobbies = lobbiesQuery?.page || [];
 
@@ -429,12 +504,52 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
           </div>
         </motion.div>
         
-        <motion.div 
+        <motion.div
           initial={{ x: 20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
           className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto"
         >
+          {/* Quick Match Button */}
+          {!activeLobby && !isInQueue && (
+            <Button
+              className="flex items-center justify-center transition-all duration-300 gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 w-full sm:w-auto"
+              onClick={() => joinQueueMutation.mutate({})}
+              disabled={joinQueueMutation.isPending}
+            >
+              <Zap className="h-4 w-4" />
+              <span className="sm:hidden">Quick Match</span>
+              <span className="hidden sm:inline">Quick Match</span>
+            </Button>
+          )}
+
+          {/* Queue Status */}
+          {isInQueue && (
+            <div className="bg-green-500/10 backdrop-blur-sm border border-green-500/30 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <div>
+                  <p className="text-green-200 font-medium text-sm">Finding opponent...</p>
+                  {queueTimeRemaining && (
+                    <p className="text-xs text-green-300">
+                      {Math.ceil(queueTimeRemaining / 1000)}s remaining
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                onClick={() => leaveQueueMutation.mutate({})}
+                disabled={leaveQueueMutation.isPending}
+              >
+                <X className="h-4 w-4" />
+                {leaveQueueMutation.isPending ? "Leaving..." : "Cancel"}
+              </Button>
+            </div>
+          )}
+
           <Dialog open={showJoinByCode} onOpenChange={setShowJoinByCode}>
             <DialogTrigger asChild>
               <Button variant="outline" className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20 w-full sm:w-auto">

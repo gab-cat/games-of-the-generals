@@ -22,6 +22,7 @@ import type * as globalChat from "../globalChat.js";
 import type * as http from "../http.js";
 import type * as lobbies from "../lobbies.js";
 import type * as maintenance from "../maintenance.js";
+import type * as matchmaking from "../matchmaking.js";
 import type * as messages from "../messages.js";
 import type * as moderationEmails from "../moderationEmails.js";
 import type * as notifications from "../notifications.js";
@@ -66,6 +67,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   lobbies: typeof lobbies;
   maintenance: typeof maintenance;
+  matchmaking: typeof matchmaking;
   messages: typeof messages;
   moderationEmails: typeof moderationEmails;
   notifications: typeof notifications;
