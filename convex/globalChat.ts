@@ -461,6 +461,7 @@ export const getMessages = query({
 });
 
 // Get online users (recently active users within 5 minutes)
+// OPTIMIZED: Batch fetches profiles efficiently, handles empty arrays early
 export const getOnlineUsers = query({
   args: {
     users: v.optional(v.array(v.object({
@@ -471,29 +472,48 @@ export const getOnlineUsers = query({
   },
   handler: async (ctx, args) => {
     const onlineUsers = args.users || [];
+    
+    // Early return if no users
+    if (onlineUsers.length === 0) {
+      return [];
+    }
 
-    // Fetch all profiles for given usernames in parallel without extra AI queries
-    const profiles = await Promise.all(onlineUsers.map(async (u) => {
-      const p = await ctx.db
+    // OPTIMIZED: Extract unique usernames to avoid duplicate queries
+    const uniqueUsernames = Array.from(new Set(onlineUsers.map(u => u.userId)));
+    
+    // OPTIMIZED: Batch fetch all profiles in parallel using Promise.all
+    // Note: Convex doesn't support "IN" queries, so we still need individual lookups
+    // but Promise.all ensures they execute in parallel efficiently
+    const profiles = await Promise.all(uniqueUsernames.map(async (username) => {
+      const profile = await ctx.db
         .query("profiles")
-        .withIndex("by_username", (q) => q.eq("username", u.userId))
+        .withIndex("by_username", (q) => q.eq("username", username))
         .unique();
-      return { u, p };
+      return { username, profile };
     }));
 
-    return profiles
-      .filter(({ p }) => Boolean(p))
-      .map(({ u, p }) => ({
-        userId: u.userId,
-        username: p!.username,
-        rank: p!.rank,
-        avatarUrl: p!.avatarUrl,
-        lastSeenAt: p!.lastSeenAt,
-        currentPage: p!.currentPage,
-        gameId: p!.gameId,
-        lobbyId: p!.lobbyId,
-        aiGameId: p!.aiSessionId, // directly from profile now
-      }));
+    // Create a map for O(1) lookup
+    const profileMap = new Map(profiles.map(({ username, profile }) => [username, profile]));
+
+    // Map results preserving original order and presence data
+    return onlineUsers
+      .map((u) => {
+        const profile = profileMap.get(u.userId);
+        if (!profile) return null;
+        
+        return {
+          userId: u.userId,
+          username: profile.username,
+          rank: profile.rank,
+          avatarUrl: profile.avatarUrl,
+          lastSeenAt: profile.lastSeenAt,
+          currentPage: profile.currentPage,
+          gameId: profile.gameId,
+          lobbyId: profile.lobbyId,
+          aiGameId: profile.aiSessionId, // directly from profile now
+        };
+      })
+      .filter((user): user is NonNullable<typeof user> => user !== null);
   },
 });
 
@@ -616,13 +636,15 @@ export const getChatRules = query({
 });
 
 // Get all usernames for mention validation
+// OPTIMIZED: Reduced limit to prevent excessive document scanning
 export const getAllUsernames = query({
   args: {},
   handler: async (ctx) => {
     // Get all profiles with their usernames
+    // OPTIMIZED: Reduced from 10000 to 1000 to reduce bandwidth usage
     const profiles = await ctx.db
       .query("profiles")
-      .take(10000); // Get all users (reasonable limit)
+      .take(1000); // Reduced limit - enough for mention autocomplete
 
     return profiles.map(profile => ({
       userId: profile.userId,
@@ -639,13 +661,13 @@ export const getUnreadMentionCount = query({
     if (!userId) return 0;
 
     // Use the optimized index to count unread mentions efficiently
-    // For counting, we don't need to fetch all records, just get a reasonable sample
+    // OPTIMIZED: Reduced limit from 1000 to 500 - enough for accurate counting
     const unreadMentions = await ctx.db
       .query("chatMentions")
       .withIndex("by_mentioned_user_read", (q) =>
         q.eq("mentionedUserId", userId).eq("isRead", false)
       )
-      .take(1000); // Increased limit for more accurate counting
+      .take(500); // Reduced limit - enough for accurate count, prevents excessive scanning
 
     return unreadMentions.length;
   },

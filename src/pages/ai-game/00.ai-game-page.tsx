@@ -84,7 +84,7 @@ export function AIGamePage() {
     api.aiGame.getCurrentUserAIGame,
     {},
     {
-      staleTime: 30000, // 30 seconds - game session data needs moderate freshness
+      staleTime: 60000, // 60 seconds - OPTIMIZED: increased from 30s to reduce polling frequency
       gcTime: 300000, // 5 minutes cache
     }
   );

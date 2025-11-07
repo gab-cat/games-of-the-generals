@@ -192,10 +192,11 @@ export const getQueueCount = query({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const waitingPlayers = await ctx.db
       .query("matchmakingQueue")
       .withIndex("by_status", (q) => q.eq("status", "waiting"))
-      .collect();
+      .take(1000); // Reasonable limit for queue count
 
     return waitingPlayers.length;
   },
@@ -214,11 +215,12 @@ export const attemptMatch = internalMutation({
     let playersMatched = 0;
 
     // Get all waiting players ordered by skill rating
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     let waitingPlayers = await ctx.db
       .query("matchmakingQueue")
       .withIndex("by_status_skill", (q) => q.eq("status", "waiting"))
       .order("asc") // Order by skill rating ascending
-      .collect();
+      .take(100); // Process in batches to avoid timeout
 
     // Filter out players who already have active lobbies
     const filteredPlayers = [];

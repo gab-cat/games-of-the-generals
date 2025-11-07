@@ -433,12 +433,13 @@ export const deleteInactiveLobbies = internalMutation({
     const thirtyMinutesAgo = Date.now() - (30 * 60 * 1000); // 30 minutes in milliseconds
     
     // Find waiting lobbies created more than 30 minutes ago using index
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const inactiveLobbies = await ctx.db
       .query("lobbies")
       .withIndex("by_status_created", (q) => 
         q.eq("status", "waiting").lt("createdAt", thirtyMinutesAgo)
       )
-      .collect();
+      .take(100); // Process in batches to avoid timeout
 
     let deletedCount = 0;
     

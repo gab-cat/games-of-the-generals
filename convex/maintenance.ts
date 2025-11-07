@@ -7,14 +7,15 @@ import { Presence } from "@convex-dev/presence";
 // - Deletes profiles, presets, achievements, push subscriptions, email verifications
 // - Deletes waiting lobbies hosted by the anonymous user (avoids ghost lobbies)
 // - Leaves playing/finished lobbies and all games intact
+// OPTIMIZED: Added limits to prevent excessive document scanning
 export const deleteAnonymousUsers = internalMutation({
   args: {},
   handler: async (ctx) => {
-    // Find all anonymous users
+    // Find all anonymous users - OPTIMIZED: Process in batches
     const anonymousUsers = await ctx.db
       .query("users")
       .withIndex("by_isAnonymous", (q) => q.eq("isAnonymous", true))
-      .collect();
+      .take(100); // Process in batches to avoid timeout
 
     for (const user of anonymousUsers) {
       const userId = user._id;
@@ -29,32 +30,35 @@ export const deleteAnonymousUsers = internalMutation({
       }
 
       // Delete user-specific data that is safe to remove
+      // OPTIMIZED: Added limits to prevent excessive scanning
       const [presets, achievements, pushes, verifications, aiSessions] = await Promise.all([
-        ctx.db.query("setupPresets").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
-        ctx.db.query("achievements").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
-        ctx.db.query("pushSubscriptions").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
-        ctx.db.query("emailChangeVerifications").withIndex("by_user", (q) => q.eq("userId", userId)).collect(),
-        ctx.db.query("aiGameSessions").withIndex("by_player", (q) => q.eq("playerId", userId)).collect(),
+        ctx.db.query("setupPresets").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
+        ctx.db.query("achievements").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
+        ctx.db.query("pushSubscriptions").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
+        ctx.db.query("emailChangeVerifications").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
+        ctx.db.query("aiGameSessions").withIndex("by_player", (q) => q.eq("playerId", userId)).take(100),
       ]);
 
       // Find conversations where user is participant1 or participant2
+      // OPTIMIZED: Added limits
       const [conversationsAsParticipant1, conversationsAsParticipant2] = await Promise.all([
-        ctx.db.query("conversations").withIndex("by_participant1", (q) => q.eq("participant1Id", userId)).collect(),
-        ctx.db.query("conversations").withIndex("by_participant2", (q) => q.eq("participant2Id", userId)).collect(),
+        ctx.db.query("conversations").withIndex("by_participant1", (q) => q.eq("participant1Id", userId)).take(100),
+        ctx.db.query("conversations").withIndex("by_participant2", (q) => q.eq("participant2Id", userId)).take(100),
       ]);
 
       const conversations = [...conversationsAsParticipant1, ...conversationsAsParticipant2];
 
       // Delete messages from conversations this user is part of
+      // OPTIMIZED: Added limits
       for (const conversation of conversations) {
         const otherParticipantId = conversation.participant1Id === userId ? conversation.participant2Id : conversation.participant1Id;
 
         // Get all messages between these two users (in both directions)
         const [messagesFromUser, messagesToUser] = await Promise.all([
           ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", userId))
-            .filter((q) => q.eq(q.field("recipientId"), otherParticipantId)).collect(),
+            .filter((q) => q.eq(q.field("recipientId"), otherParticipantId)).take(1000),
           ctx.db.query("messages").withIndex("by_recipient", (q) => q.eq("recipientId", userId))
-            .filter((q) => q.eq(q.field("senderId"), otherParticipantId)).collect(),
+            .filter((q) => q.eq(q.field("senderId"), otherParticipantId)).take(1000),
         ]);
 
         const conversationMessages = [...messagesFromUser, ...messagesToUser];
@@ -73,10 +77,11 @@ export const deleteAnonymousUsers = internalMutation({
       }
 
       // Delete waiting lobbies hosted by this user (avoid ghost lobbies)
+      // OPTIMIZED: Added limit
       const hostedLobbies = await ctx.db
         .query("lobbies")
         .withIndex("by_host", (q) => q.eq("hostId", userId))
-        .collect();
+        .take(100);
 
       for (const lobby of hostedLobbies) {
         if (lobby.status === "waiting") {
@@ -93,13 +98,14 @@ export const deleteAnonymousUsers = internalMutation({
 });
 
 // Internal: Cleanup finished lobbies. Games and replays remain intact.
+// OPTIMIZED: Added limit to prevent excessive document scanning
 export const cleanupFinishedLobbies = internalMutation({
   args: {},
   handler: async (ctx) => {
     const finishedLobbies = await ctx.db
       .query("lobbies")
       .withIndex("by_status", (q) => q.eq("status", "finished"))
-      .collect();
+      .take(100); // Process in batches to avoid timeout
 
     for (const lobby of finishedLobbies) {
       await ctx.db.delete(lobby._id);
@@ -155,6 +161,7 @@ export const deleteOldMessages = internalMutation({
 
 // Internal: Migration to fix incorrect unread counts caused by old deletion process
 // This fixes conversations where unread counts don't match actual unread messages
+// OPTIMIZED: Added limit to prevent excessive document scanning
 export const fixUnreadCounts = internalMutation({
   args: {},
   handler: async (ctx) => {
@@ -163,12 +170,14 @@ export const fixUnreadCounts = internalMutation({
     let totalAdjustments = 0;
 
     // Get all conversations in batches to avoid timeouts
-    const allConversations = await ctx.db.query("conversations").collect();
+    // OPTIMIZED: Added limit to prevent excessive scanning
+    const allConversations = await ctx.db.query("conversations").take(500);
 
     for (const conversation of allConversations) {
       conversationsProcessed++;
 
       // Count actual unread messages for participant1 (messages sent to them that they haven't read)
+      // OPTIMIZED: Added limit
       const participant1UnreadMessages = await ctx.db
         .query("messages")
         .withIndex("by_recipient_read", (q) =>
@@ -176,9 +185,10 @@ export const fixUnreadCounts = internalMutation({
             .eq("readAt", undefined)
         )
         .filter((q) => q.eq(q.field("senderId"), conversation.participant2Id))
-        .collect();
+        .take(1000);
 
       // Count actual unread messages for participant2 (messages sent to them that they haven't read)
+      // OPTIMIZED: Added limit
       const participant2UnreadMessages = await ctx.db
         .query("messages")
         .withIndex("by_recipient_read", (q) =>
@@ -186,7 +196,7 @@ export const fixUnreadCounts = internalMutation({
             .eq("readAt", undefined)
         )
         .filter((q) => q.eq(q.field("senderId"), conversation.participant1Id))
-        .collect();
+        .take(1000);
 
       const actualParticipant1UnreadCount = participant1UnreadMessages.length;
       const actualParticipant2UnreadCount = participant2UnreadMessages.length;
@@ -223,14 +233,15 @@ export const fixUnreadCounts = internalMutation({
 });
 
 // Internal: Cleanup orphaned conversations where one or both participants no longer exist
+// OPTIMIZED: Added limit to prevent excessive document scanning
 export const cleanupOrphanedConversations = internalMutation({
   args: {},
   handler: async (ctx) => {
     let deletedConversations = 0;
     let deletedMessages = 0;
 
-    // Get all conversations
-    const allConversations = await ctx.db.query("conversations").collect();
+    // Get all conversations - OPTIMIZED: Added limit
+    const allConversations = await ctx.db.query("conversations").take(500);
 
     for (const conversation of allConversations) {
       // Check if both participants still exist
@@ -241,12 +252,12 @@ export const cleanupOrphanedConversations = internalMutation({
 
       // If either participant doesn't exist, delete the conversation and its messages
       if (!participant1Exists || !participant2Exists) {
-        // Delete all messages in this conversation
+        // Delete all messages in this conversation - OPTIMIZED: Added limits
         const [messagesFromParticipant1, messagesFromParticipant2] = await Promise.all([
           ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", conversation.participant1Id))
-            .filter((q) => q.eq(q.field("recipientId"), conversation.participant2Id)).collect(),
+            .filter((q) => q.eq(q.field("recipientId"), conversation.participant2Id)).take(1000),
           ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", conversation.participant2Id))
-            .filter((q) => q.eq(q.field("recipientId"), conversation.participant1Id)).collect(),
+            .filter((q) => q.eq(q.field("recipientId"), conversation.participant1Id)).take(1000),
         ]);
 
         const conversationMessages = [...messagesFromParticipant1, ...messagesFromParticipant2];
@@ -278,11 +289,12 @@ export const deleteAllPresenceRooms = internalMutation({
 
     // Get all active games from the last 24 hours (these have presence rooms)
     const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
+    // OPTIMIZED: Added limit to prevent excessive scanning
     const activeGames = await ctx.db
       .query("games")
       .withIndex("by_status", (q) => q.eq("status", "finished"))
       .filter((q) => q.gte(q.field("createdAt"), twentyFourHoursAgo))
-      .collect();
+      .take(500); // Reasonable limit for presence cleanup
 
     // Collect all room IDs that should have presence data
     const roomIds = new Set<string>();
@@ -299,7 +311,7 @@ export const deleteAllPresenceRooms = internalMutation({
         await presence.removeRoom(ctx, roomId);
         deletedRooms++;
         console.log(`Removed room ${roomId}`);
-      } catch (error) {
+      } catch {
         // Room might not exist in presence system, which is fine
         console.log(`Room ${roomId} not found in presence system or already removed`);
       }

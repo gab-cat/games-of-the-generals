@@ -1,7 +1,7 @@
-import { query, mutation, action, internalMutation } from "./_generated/server";
+import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 
 // Game pieces and their ranks (same as regular games)
 const PIECES = {
@@ -497,7 +497,59 @@ export const makeAIGameMove = mutation({
   },
 });
 
+// Internal query to get AI session by sessionId - optimized for actions
+export const getAISessionById = internalQuery({
+  args: {
+    sessionId: v.string(),
+    userId: v.id("users"),
+  },
+  returns: v.union(v.null(), v.object({
+    _id: v.id("aiGameSessions"),
+    _creationTime: v.number(),
+    sessionId: v.string(),
+    playerId: v.id("users"),
+    playerUsername: v.string(),
+    behavior: v.union(
+      v.literal("aggressive"),
+      v.literal("defensive"),
+      v.literal("passive"),
+      v.literal("balanced"),
+    ),
+    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
+    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+    board: v.array(v.array(v.union(v.null(), v.object({
+      piece: v.string(),
+      player: v.union(v.literal("player1"), v.literal("player2")),
+      revealed: v.boolean(),
+    })))),
+    playerSetup: v.boolean(),
+    aiSetup: v.boolean(),
+    moveCount: v.number(),
+  })),
+  handler: async (ctx, args) => {
+    // OPTIMIZED: Use profile lookup for direct session access
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .unique();
+
+    if (!profile?.aiSessionId) return null;
+
+    // Direct lookup using aiSessionId
+    const session = await ctx.db.get(profile.aiSessionId);
+    
+    // Verify session exists, belongs to user, and matches sessionId
+    if (!session || session.playerId !== args.userId || session.sessionId !== args.sessionId) {
+      return null;
+    }
+
+    return session;
+  },
+});
+
 // Generate AI move
+// OPTIMIZED: Queries database directly via internal query instead of calling public query
 export const generateAIMove = action({
   args: { 
     sessionId: v.string(),
@@ -516,9 +568,15 @@ export const generateAIMove = action({
     toCol: number;
     piece: string;
   } | null> => {
-    // Get session data directly from database instead of using query
-    const sessions = await ctx.runQuery(api.aiGame.getCurrentUserAIGame, {});
-    const session = sessions && sessions.sessionId === args.sessionId ? sessions : null;
+    // Get userId from auth via loggedInUser query
+    const user = await ctx.runQuery(api.auth.loggedInUser, {});
+    if (!user?._id) return null;
+
+    // OPTIMIZED: Use internal query for direct database access instead of public query
+    const session = await ctx.runQuery(internal.aiGame.getAISessionById, {
+      sessionId: args.sessionId,
+      userId: user._id,
+    });
 
     if (!session || session.status !== "playing" || session.currentTurn !== "player2") {
       return null;
@@ -927,6 +985,7 @@ export const cleanupAIGameSession = mutation({
 });
 
 // Get current user's active AI game
+// OPTIMIZED: Uses profile.aiSessionId for O(1) direct lookup instead of index scan + filter
 export const getCurrentUserAIGame = query({
   args: {},
   returns: v.union(v.null(), v.object({
@@ -977,16 +1036,28 @@ export const getCurrentUserAIGame = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    const activeSession = await ctx.db
-      .query("aiGameSessions")
-      .withIndex("by_player_status", (q) => q.eq("playerId", userId))
-      .filter((q) => q.or(
-        q.eq(q.field("status"), "setup"),
-        q.eq(q.field("status"), "playing")
-      ))
-      .first();
+    // OPTIMIZED: Get profile first to use aiSessionId for direct lookup
+    const profile = await ctx.db
+      .query("profiles")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
 
-    return activeSession;
+    if (!profile?.aiSessionId) return null;
+
+    // Direct lookup using aiSessionId - O(1) instead of index scan + filter
+    const session = await ctx.db.get(profile.aiSessionId);
+    
+    // Verify session exists, belongs to user, and is active
+    if (!session || session.playerId !== userId) {
+      return null;
+    }
+
+    // Only return if session is in setup or playing status
+    if (session.status !== "setup" && session.status !== "playing") {
+      return null;
+    }
+
+    return session;
   },
 });
 

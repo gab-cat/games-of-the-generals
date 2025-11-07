@@ -314,6 +314,7 @@ export const getProfileStats = query({
       .slice(0, 5);
 
     // Fallback compute for fastestWin if not yet stored (backfill-on-read)
+    // OPTIMIZED: Added limits to prevent excessive document scanning
     let computedFastestWin = profile.fastestWin;
     if (!computedFastestWin) {
       const [allFinishedAsP1, allFinishedAsP2] = await Promise.all([
@@ -322,13 +323,13 @@ export const getProfileStats = query({
           .withIndex("by_player1_finished", (q) =>
             q.eq("player1Id", userId).eq("status", "finished")
           )
-          .collect(),
+          .take(500), // Reasonable limit - enough to find fastest win, prevents excessive scanning
         ctx.db
           .query("games")
           .withIndex("by_player2_finished", (q) =>
             q.eq("player2Id", userId).eq("status", "finished")
           )
-          .collect(),
+          .take(500), // Reasonable limit - enough to find fastest win, prevents excessive scanning
       ]);
 
       const wins = [

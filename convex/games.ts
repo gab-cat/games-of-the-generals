@@ -567,17 +567,18 @@ export const makeMove = mutation({
       
       // OPTIMIZED: Use indexed queries instead of collecting all moves
       // Count pieces eliminated and spies revealed from moves in this game
+      // OPTIMIZED: Added limit to prevent excessive document scanning
       const [winnerMoves, loserMoves] = await Promise.all([
         ctx.db
           .query("moves")
           .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
           .filter((q) => q.eq(q.field("playerId"), winnerId))
-          .collect(),
+          .take(250), // Reasonable limit - games rarely exceed 500 moves
         ctx.db
           .query("moves")
           .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
           .filter((q) => q.eq(q.field("playerId"), loserId))
-          .collect()
+          .take(250) // Reasonable limit - games rarely exceed 500 moves
       ]);
 
       let winnerPiecesEliminated = 0;
@@ -1534,12 +1535,13 @@ export const cleanupStaleGames = internalMutation({
     let forfeitedPlayingGames = 0;
 
     // Handle stale setup games (>40 minutes old)
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const staleSetupGames = await ctx.db
       .query("games")
       .withIndex("by_status_setup_time", (q) =>
         q.eq("status", "setup").lt("setupTimeStarted", fortyMinutesAgo)
       )
-      .collect();
+      .take(100); // Process in batches to avoid timeout
 
     for (const game of staleSetupGames) {
       try {
@@ -1585,12 +1587,13 @@ export const cleanupStaleGames = internalMutation({
     }
 
     // Handle stale playing games (>40 minutes old)
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const stalePlayingGames = await ctx.db
       .query("games")
       .withIndex("by_status_game_time", (q) =>
         q.eq("status", "playing").lt("gameTimeStarted", fortyMinutesAgo)
       )
-      .collect();
+      .take(100); // Process in batches to avoid timeout
 
     for (const game of stalePlayingGames) {
       try {

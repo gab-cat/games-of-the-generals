@@ -276,10 +276,11 @@ export const cleanupSpectatorChat = mutation({
   },
   handler: async (ctx, args) => {
     // Optimized: Batch delete chat messages when game ends
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const chatMessages = await ctx.db
       .query("spectatorChat")
       .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-      .collect();
+      .take(1000); // Reasonable limit - games rarely have more than 500 spectator messages
     
     // Use Promise.all for parallel deletion
     await Promise.all(

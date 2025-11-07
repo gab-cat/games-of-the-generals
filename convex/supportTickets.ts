@@ -57,11 +57,12 @@ export const getUserSupportTickets = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const tickets = await ctx.db
       .query("supportTickets")
       .withIndex("by_user_created", (q) => q.eq("userId", userId))
       .order("desc")
-      .collect();
+      .take(100); // Reasonable limit - users rarely have more than 50 tickets
 
     return tickets;
   },
@@ -94,11 +95,12 @@ export const getSupportTicketWithUpdates = query({
     }
 
     // Get all updates for this ticket
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const updates = await ctx.db
       .query("supportTicketUpdates")
       .withIndex("by_ticket_timestamp", (q) => q.eq("ticketId", args.ticketId))
       .order("asc")
-      .collect();
+      .take(500); // Reasonable limit - tickets rarely have more than 100 updates
 
     return {
       ticket,
@@ -322,7 +324,8 @@ export const getAllSupportTickets = query({
       if (args.limit) {
         return await query.take(args.limit);
       }
-      return await query.collect();
+      // OPTIMIZED: Added default limit to prevent excessive document scanning
+      return await query.take(500); // Default limit for admin queries
     } else {
       const query = ctx.db
         .query("supportTickets")
@@ -331,7 +334,8 @@ export const getAllSupportTickets = query({
       if (args.limit) {
         return await query.take(args.limit);
       }
-      return await query.collect();
+      // OPTIMIZED: Added default limit to prevent excessive document scanning
+      return await query.take(500); // Default limit for admin queries
     }
   },
 });
