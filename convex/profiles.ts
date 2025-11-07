@@ -510,7 +510,7 @@ export const getLeaderboard = query({
     sortBy: v.optional(v.union(v.literal("wins"), v.literal("gamesPlayed"), v.literal("winRate"), v.literal("elo"))),
   },
   handler: async (ctx, args) => {
-    const { paginationOpts, sortBy = "elo" } = args; // Default to ELO sorting
+    const { paginationOpts, sortBy = "wins" } = args; // Default to ELO sorting
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 25) : 20;
 
     // Use different indexes based on sort criteria for optimal performance
