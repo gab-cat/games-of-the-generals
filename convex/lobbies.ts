@@ -173,13 +173,27 @@ export const getUserActiveLobby = query({
     }
 
     // If not found as host, check if user is a player in any lobby - get most recent
+    // OPTIMIZED: Use status index first, then filter by playerId in memory (better than full scan)
     if (!lobby) {
-      lobby = await ctx.db
-        .query("lobbies")
-        .filter((q) => q.eq(q.field("playerId"), userId))
-        .filter((q) => q.or(q.eq(q.field("status"), "waiting"), q.eq(q.field("status"), "playing")))
-        .order("desc")
-        .first();
+      const [waitingLobbies, playingLobbies] = await Promise.all([
+        ctx.db
+          .query("lobbies")
+          .withIndex("by_status", (q) => q.eq("status", "waiting"))
+          .order("desc")
+          .take(100), // Reasonable limit
+        ctx.db
+          .query("lobbies")
+          .withIndex("by_status", (q) => q.eq("status", "playing"))
+          .order("desc")
+          .take(100), // Reasonable limit
+      ]);
+
+      // Find the most recent lobby where user is a player
+      const allActiveLobbies = [...waitingLobbies, ...playingLobbies]
+        .filter((l) => l.playerId === userId)
+        .sort((a, b) => b.createdAt - a.createdAt);
+      
+      lobby = allActiveLobbies[0] || null;
     }
 
     return lobby;

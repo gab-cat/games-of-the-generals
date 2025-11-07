@@ -218,17 +218,37 @@ export const deleteExpiredNotifications = internalMutation({
   returns: v.number(), // Number of notifications deleted
   handler: async (ctx, _args) => {
     const now = Date.now();
-    const expiredNotifications = await ctx.db
-      .query("notifications")
-      .withIndex("by_expires_at")
-      .filter((q) => q.lt(q.field("expiresAt"), now))
-      .collect();
+    // OPTIMIZED: Added limit and batch processing to prevent excessive document scanning
+    const BATCH_SIZE = 100;
+    let totalDeleted = 0;
+    let hasMore = true;
 
-    for (const notification of expiredNotifications) {
-      await ctx.db.delete(notification._id);
+    while (hasMore) {
+      const expiredNotifications = await ctx.db
+        .query("notifications")
+        .withIndex("by_expires_at")
+        .filter((q) => q.lt(q.field("expiresAt"), now))
+        .take(BATCH_SIZE);
+
+      if (expiredNotifications.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      // Delete batch
+      await Promise.all(
+        expiredNotifications.map(notification => ctx.db.delete(notification._id))
+      );
+
+      totalDeleted += expiredNotifications.length;
+
+      // If we got less than batch size, we're done
+      if (expiredNotifications.length < BATCH_SIZE) {
+        hasMore = false;
+      }
     }
 
-    return expiredNotifications.length;
+    return totalDeleted;
   },
 });
 

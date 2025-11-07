@@ -213,10 +213,11 @@ export const verifyEmailChange = mutation({
     });
 
     // Clean up old verification records for this user
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const oldVerifications = await ctx.db
       .query("emailChangeVerifications")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(10); // Reasonable limit - users rarely have >10 verification records
 
     for (const oldVerification of oldVerifications) {
       await ctx.db.delete(oldVerification._id);
@@ -265,10 +266,11 @@ export const cancelEmailChange = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     // Delete all pending verification records for this user
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const verifications = await ctx.db
       .query("emailChangeVerifications")
       .withIndex("by_user_verified", (q) => q.eq("userId", userId).eq("verified", false))
-      .collect();
+      .take(10); // Reasonable limit - users rarely have >10 verification records
 
     for (const verification of verifications) {
       await ctx.db.delete(verification._id);
@@ -406,10 +408,11 @@ export const createEmailChangeVerification = internalMutation({
   },
   handler: async (ctx, args) => {
     // Delete any existing verification requests for this user
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const existingVerifications = await ctx.db
       .query("emailChangeVerifications")
       .withIndex("by_user_verified", (q) => q.eq("userId", args.userId).eq("verified", false))
-      .collect();
+      .take(10); // Reasonable limit - users rarely have >10 verification records
 
     for (const verification of existingVerifications) {
       await ctx.db.delete(verification._id);

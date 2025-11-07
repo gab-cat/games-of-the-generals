@@ -209,10 +209,11 @@ export const getUserAchievements = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const achievements = await ctx.db
       .query("achievements")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(100); // Reasonable limit - users rarely have >100 achievements
 
     return achievements.map(achievement => ({
       ...achievement,
@@ -228,10 +229,11 @@ export const getAllAchievements = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
 
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const userAchievements = await ctx.db
       .query("achievements")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(100); // Reasonable limit - users rarely have >100 achievements
 
     const unlockedIds = new Set(userAchievements.map(a => a.achievementId));
 
@@ -436,10 +438,11 @@ export const checkGameSpecificAchievements = mutation({
     };
 
     // Get all moves for this game to analyze patterns
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const moves = await ctx.db
       .query("moves")
       .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-      .collect();
+      .take(500); // Reasonable limit - games rarely exceed 500 moves
 
     // Check for Perfectionist achievement (win without losing any pieces)
     let winnerLostPieces = false;
@@ -514,12 +517,13 @@ export const getRecentAchievements = query({
     const hoursBack = args.hoursBack || 1;
     const cutoffTime = Date.now() - (hoursBack * 60 * 60 * 1000);
 
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const recentAchievements = await ctx.db
       .query("achievements")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .filter((q) => q.gte(q.field("unlockedAt"), cutoffTime))
       .order("desc")
-      .collect();
+      .take(50); // Reasonable limit - recent achievements only
 
     return recentAchievements.map(achievement => ({
       ...achievement,

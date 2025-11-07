@@ -54,11 +54,12 @@ export const deleteAnonymousUsers = internalMutation({
         const otherParticipantId = conversation.participant1Id === userId ? conversation.participant2Id : conversation.participant1Id;
 
         // Get all messages between these two users (in both directions)
+        // OPTIMIZED: Reduced limit to prevent excessive document scanning
         const [messagesFromUser, messagesToUser] = await Promise.all([
           ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", userId))
-            .filter((q) => q.eq(q.field("recipientId"), otherParticipantId)).take(1000),
+            .filter((q) => q.eq(q.field("recipientId"), otherParticipantId)).take(500),
           ctx.db.query("messages").withIndex("by_recipient", (q) => q.eq("recipientId", userId))
-            .filter((q) => q.eq(q.field("senderId"), otherParticipantId)).take(1000),
+            .filter((q) => q.eq(q.field("senderId"), otherParticipantId)).take(500),
         ]);
 
         const conversationMessages = [...messagesFromUser, ...messagesToUser];
@@ -177,7 +178,7 @@ export const fixUnreadCounts = internalMutation({
       conversationsProcessed++;
 
       // Count actual unread messages for participant1 (messages sent to them that they haven't read)
-      // OPTIMIZED: Added limit
+      // OPTIMIZED: Reduced limit to prevent excessive document scanning
       const participant1UnreadMessages = await ctx.db
         .query("messages")
         .withIndex("by_recipient_read", (q) =>
@@ -185,10 +186,10 @@ export const fixUnreadCounts = internalMutation({
             .eq("readAt", undefined)
         )
         .filter((q) => q.eq(q.field("senderId"), conversation.participant2Id))
-        .take(1000);
+        .take(500);
 
       // Count actual unread messages for participant2 (messages sent to them that they haven't read)
-      // OPTIMIZED: Added limit
+      // OPTIMIZED: Reduced limit to prevent excessive document scanning
       const participant2UnreadMessages = await ctx.db
         .query("messages")
         .withIndex("by_recipient_read", (q) =>
@@ -196,7 +197,7 @@ export const fixUnreadCounts = internalMutation({
             .eq("readAt", undefined)
         )
         .filter((q) => q.eq(q.field("senderId"), conversation.participant1Id))
-        .take(1000);
+        .take(500);
 
       const actualParticipant1UnreadCount = participant1UnreadMessages.length;
       const actualParticipant2UnreadCount = participant2UnreadMessages.length;
@@ -252,12 +253,12 @@ export const cleanupOrphanedConversations = internalMutation({
 
       // If either participant doesn't exist, delete the conversation and its messages
       if (!participant1Exists || !participant2Exists) {
-        // Delete all messages in this conversation - OPTIMIZED: Added limits
+        // Delete all messages in this conversation - OPTIMIZED: Reduced limits
         const [messagesFromParticipant1, messagesFromParticipant2] = await Promise.all([
           ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", conversation.participant1Id))
-            .filter((q) => q.eq(q.field("recipientId"), conversation.participant2Id)).take(1000),
+            .filter((q) => q.eq(q.field("recipientId"), conversation.participant2Id)).take(500),
           ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", conversation.participant2Id))
-            .filter((q) => q.eq(q.field("recipientId"), conversation.participant1Id)).take(1000),
+            .filter((q) => q.eq(q.field("recipientId"), conversation.participant1Id)).take(500),
         ]);
 
         const conversationMessages = [...messagesFromParticipant1, ...messagesFromParticipant2];

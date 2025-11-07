@@ -8,11 +8,12 @@ export const listAnnouncements = query({
   args: {},
   handler: async (ctx) => {
     // Get all pinned announcements first (ordered by creation time, newest first)
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const pinnedAnnouncements = await ctx.db
       .query("announcements")
       .withIndex("by_pinned_created", (q) => q.eq("isPinned", true))
       .order("desc")
-      .collect();
+      .take(20); // Reasonable limit for pinned announcements
 
     // Get up to 5 most recent non-pinned announcements
     const recentAnnouncements = await ctx.db
@@ -169,10 +170,11 @@ export const listAllAnnouncements = query({
     }
 
     // Get all announcements ordered by creation time (newest first)
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     return await ctx.db
       .query("announcements")
       .withIndex("by_created_at")
       .order("desc")
-      .collect();
+      .take(100); // Reasonable limit for admin view
   },
 });

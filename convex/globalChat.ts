@@ -810,10 +810,11 @@ export const sendMentionNotifications = internalMutation({
         // Send push notifications if user has mentions enabled (default true)
         if (mentionedUserSettings?.enableMentions !== false) {
           // Check if user has push subscriptions
+          // OPTIMIZED: Added limit to prevent excessive document scanning
           const subscriptions = await ctx.db
             .query("pushSubscriptions")
             .withIndex("by_user", (q) => q.eq("userId", mentionedUserId))
-            .collect();
+            .take(10); // Reasonable limit - users rarely have >10 push subscriptions
 
           if (subscriptions.length > 0) {
             // Schedule push notification

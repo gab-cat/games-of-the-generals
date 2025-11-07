@@ -1072,34 +1072,50 @@ export const cleanupStaleAIGameSessions = internalMutation({
     const now = Date.now();
     const oneHourAgo = now - (60 * 60 * 1000); // 1 hour in milliseconds
 
-    // Find all AI game sessions older than 1 hour (uses by_created_at index)
-    const staleSessions = await ctx.db
-      .query("aiGameSessions")
-      .withIndex("by_created_at")
-      .filter((q) => q.lt(q.field("createdAt"), oneHourAgo))
-      .collect();
+    // OPTIMIZED: Added limit and batch processing to prevent excessive document scanning
+    const BATCH_SIZE = 100;
+    let totalDeleted = 0;
+    let hasMore = true;
 
-    let deletedCount = 0;
+    while (hasMore) {
+      // Find all AI game sessions older than 1 hour (uses by_created_at index)
+      const staleSessions = await ctx.db
+        .query("aiGameSessions")
+        .withIndex("by_created_at")
+        .filter((q) => q.lt(q.field("createdAt"), oneHourAgo))
+        .take(BATCH_SIZE);
 
-    for (const session of staleSessions) {
-      // Clear aiSessionId from associated profile if it matches this session
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", session.playerId))
-        .unique();
-
-      if (profile?.aiSessionId === session._id) {
-        await ctx.db.patch(profile._id, { aiSessionId: undefined });
+      if (staleSessions.length === 0) {
+        hasMore = false;
+        break;
       }
 
-      // Delete the stale session
-      await ctx.db.delete(session._id);
-      deletedCount++;
+      // Process batch
+      for (const session of staleSessions) {
+        // Clear aiSessionId from associated profile if it matches this session
+        const profile = await ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", session.playerId))
+          .unique();
+
+        if (profile?.aiSessionId === session._id) {
+          await ctx.db.patch(profile._id, { aiSessionId: undefined });
+        }
+
+        // Delete the stale session
+        await ctx.db.delete(session._id);
+        totalDeleted++;
+      }
+
+      // If we got less than batch size, we're done
+      if (staleSessions.length < BATCH_SIZE) {
+        hasMore = false;
+      }
     }
 
     return {
-      deletedCount,
-      processedCount: staleSessions.length,
+      deletedCount: totalDeleted,
+      processedCount: totalDeleted,
     };
   },
 });

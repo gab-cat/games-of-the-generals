@@ -192,11 +192,11 @@ export const getQueueCount = query({
   args: {},
   returns: v.number(),
   handler: async (ctx) => {
-    // OPTIMIZED: Added limit to prevent excessive document scanning
+    // OPTIMIZED: Reduced limit to prevent excessive document scanning
     const waitingPlayers = await ctx.db
       .query("matchmakingQueue")
       .withIndex("by_status", (q) => q.eq("status", "waiting"))
-      .take(1000); // Reasonable limit for queue count
+      .take(500); // Sufficient for accurate count, prevents excessive scanning
 
     return waitingPlayers.length;
   },
@@ -223,18 +223,38 @@ export const attemptMatch = internalMutation({
       .take(100); // Process in batches to avoid timeout
 
     // Filter out players who already have active lobbies
+    // OPTIMIZED: Use indexes where possible to avoid full table scans
     const filteredPlayers = [];
     for (const player of waitingPlayers) {
-      // Check if player has an active lobby (host or player)
-      const existingLobby = await ctx.db
+      // Check if player has an active lobby as host (uses by_host_status index)
+      const hostLobbyWaiting = await ctx.db
         .query("lobbies")
-        .filter((q) =>
-          q.or(
-            q.and(q.eq(q.field("hostId"), player.userId), q.or(q.eq(q.field("status"), "waiting"), q.eq(q.field("status"), "playing"))),
-            q.and(q.eq(q.field("playerId"), player.userId), q.or(q.eq(q.field("status"), "waiting"), q.eq(q.field("status"), "playing")))
-          )
-        )
+        .withIndex("by_host_status", (q) => q.eq("hostId", player.userId).eq("status", "waiting"))
         .first();
+      
+      const hostLobbyPlaying = await ctx.db
+        .query("lobbies")
+        .withIndex("by_host_status", (q) => q.eq("hostId", player.userId).eq("status", "playing"))
+        .first();
+
+      // Check if player has an active lobby as player (query by status, filter by playerId)
+      // OPTIMIZED: Query by status index first, then filter in memory (better than full scan)
+      const [waitingLobbies, playingLobbies] = await Promise.all([
+        ctx.db
+          .query("lobbies")
+          .withIndex("by_status", (q) => q.eq("status", "waiting"))
+          .take(100), // Reasonable limit
+        ctx.db
+          .query("lobbies")
+          .withIndex("by_status", (q) => q.eq("status", "playing"))
+          .take(100), // Reasonable limit
+      ]);
+
+      const playerLobby = [...waitingLobbies, ...playingLobbies].find(
+        (lobby) => lobby.playerId === player.userId
+      );
+
+      const existingLobby = hostLobbyWaiting || hostLobbyPlaying || playerLobby;
 
       if (!existingLobby) {
         filteredPlayers.push(player);

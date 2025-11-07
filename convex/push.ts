@@ -68,10 +68,11 @@ export const getSubscriptionsForCurrentUser = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     return await ctx.db
       .query("pushSubscriptions")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(10); // Reasonable limit - users rarely have >10 devices
   },
 });
 
@@ -79,10 +80,11 @@ export const getSubscriptionsForCurrentUser = query({
 export const getSubscriptionsForUser = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     return await ctx.db
       .query("pushSubscriptions")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .collect();
+      .take(10); // Reasonable limit - users rarely have >10 devices
   },
 });
 
@@ -106,10 +108,11 @@ export const getGlobalChatMessageById = internalQuery({
 export const getMentionsByMessage = internalQuery({
   args: { messageId: v.id("globalChat") },
   handler: async (ctx, args) => {
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     return await ctx.db
       .query("chatMentions")
       .withIndex("by_message", (q) => q.eq("messageId", args.messageId))
-      .collect();
+      .take(50); // Reasonable limit - messages rarely have >50 mentions
   },
 });
 

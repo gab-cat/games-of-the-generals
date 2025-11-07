@@ -211,11 +211,12 @@ export const getUserSetupPresets = query({
     }
 
     // Get user's custom presets only (no built-in presets from DB)
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const userPresets = await ctx.db
       .query("setupPresets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
-      .collect();
+      .take(10); // Reasonable limit - users limited to 5 presets, but add buffer
 
     return userPresets;
   },
@@ -242,10 +243,11 @@ export const saveSetupPreset = mutation({
     }
 
     // Check if user already has 5 custom presets (limit)
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const userCustomPresets = await ctx.db
       .query("setupPresets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(10); // Reasonable limit - checking limit
 
     if (userCustomPresets.length >= 5) {
       throw new Error("Maximum of 5 custom presets allowed. Please delete one first.");
@@ -506,10 +508,11 @@ export const migrateUsageCountToUpvotes = mutation({
     }
 
     // Get all user presets that might have usageCount
+    // OPTIMIZED: Added limit to prevent excessive document scanning
     const presets = await ctx.db
       .query("setupPresets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .collect();
+      .take(10); // Reasonable limit - users limited to 5 presets, but add buffer
 
     let migrated = 0;
     for (const preset of presets) {
