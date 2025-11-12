@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { 
@@ -14,6 +14,7 @@ import {
   Info,
   Crown,
   Swords,
+  Sword,
   Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -174,6 +175,116 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
     
     return formatTime(remaining);
   };
+
+  // Extract moves from paginated response - memoized to avoid dependency issues
+  const movesArray = useMemo(() => {
+    return Array.isArray(moves) ? moves : moves?.page || [];
+  }, [moves]);
+
+  // Process moves to extract eliminated pieces for both players
+  const eliminatedPieces = useMemo(() => {
+    if (!movesArray || !game) {
+      return { player1: [], player2: [] };
+    }
+    
+    const player1Eliminated: Array<{
+      piece: string;
+      moveNumber: number;
+      battleOutcome: "attacker" | "defender" | "tie";
+    }> = [];
+    
+    const player2Eliminated: Array<{
+      piece: string;
+      moveNumber: number;
+      battleOutcome: "attacker" | "defender" | "tie";
+    }> = [];
+    
+    let moveNumber = 0;
+    
+    for (const move of movesArray) {
+      // Skip setup moves
+      if (move.moveType === "setup") continue;
+      
+      // Count all game moves (both "move" and "challenge")
+      moveNumber++;
+      
+      // Process challenge moves to extract eliminated pieces
+      if (move.moveType === "challenge" && move.challengeResult) {
+        const result = move.challengeResult;
+        
+        // Determine which player made this move
+        const isPlayer1Move = move.playerId === game.player1Id;
+        const attackerPlayerId = isPlayer1Move ? game.player1Id : game.player2Id;
+        const defenderPlayerId = isPlayer1Move ? game.player2Id : game.player1Id;
+        
+        if (result.winner === "attacker") {
+          // Defender was eliminated
+          if (defenderPlayerId === game.player1Id) {
+            player1Eliminated.push({
+              piece: result.defender,
+              moveNumber,
+              battleOutcome: "attacker", // Attacker won, so defender (player1) lost
+            });
+          } else {
+            player2Eliminated.push({
+              piece: result.defender,
+              moveNumber,
+              battleOutcome: "attacker", // Attacker won, so defender (player2) lost
+            });
+          }
+        } else if (result.winner === "defender") {
+          // Attacker was eliminated
+          if (attackerPlayerId === game.player1Id) {
+            player1Eliminated.push({
+              piece: result.attacker,
+              moveNumber,
+              battleOutcome: "defender", // Defender won, so attacker (player1) lost
+            });
+          } else {
+            player2Eliminated.push({
+              piece: result.attacker,
+              moveNumber,
+              battleOutcome: "defender", // Defender won, so attacker (player2) lost
+            });
+          }
+        } else if (result.winner === "tie") {
+          // Both pieces were eliminated
+          if (attackerPlayerId === game.player1Id) {
+            player1Eliminated.push({
+              piece: result.attacker,
+              moveNumber,
+              battleOutcome: "tie",
+            });
+          } else {
+            player2Eliminated.push({
+              piece: result.attacker,
+              moveNumber,
+              battleOutcome: "tie",
+            });
+          }
+          if (defenderPlayerId === game.player1Id) {
+            player1Eliminated.push({
+              piece: result.defender,
+              moveNumber,
+              battleOutcome: "tie",
+            });
+          } else {
+            player2Eliminated.push({
+              piece: result.defender,
+              moveNumber,
+              battleOutcome: "tie",
+            });
+          }
+        }
+      }
+    }
+    
+    // Reverse to show most recent eliminated pieces at the top
+    return {
+      player1: player1Eliminated.reverse(),
+      player2: player2Eliminated.reverse(),
+    };
+  }, [movesArray, game]);
 
   // Helper function to check if user is near bottom of chat container
   const isNearBottom = (threshold = 50): boolean => {
@@ -535,7 +646,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
 
                   {game.status === "playing" && (
                     <div className="text-sm text-white/60">
-                      Turn {Math.floor(((moves?.page?.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
+                      Turn {Math.floor(((movesArray.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
                     </div>
                   )}
                 </div>
@@ -589,7 +700,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                           )}
                           
                           <div className="text-xs text-white/60">
-                            {moves?.page?.length || 0} moves
+                            {movesArray.length || 0} moves
                           </div>
                         </div>
                       </div>
@@ -749,6 +860,99 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
             </CardContent>
           </Card>
 
+          {/* Eliminated Pieces */}
+          {(eliminatedPieces.player1.length > 0 || eliminatedPieces.player2.length > 0) && (
+            <div className="space-y-4">
+              {/* Player 1 Eliminated Pieces */}
+              {eliminatedPieces.player1.length > 0 && (
+                <Card className="bg-black/20 backdrop-blur-xl border border-blue-500/30 shadow-2xl shadow-black/20">
+                  <CardHeader className="p-4 sm:p-6 sm:pb-2 pb-2">
+                    <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
+                      <Sword className="h-5 w-5 text-blue-400" />
+                      {game.player1Username}'s Eliminated
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-2 sm:pt-2 pt-2">
+                    <div className="max-h-48 sm:max-h-60 overflow-y-auto">
+                      <div className="space-y-2">
+                        {eliminatedPieces.player1.map((eliminated, index) => (
+                          <motion.div
+                            key={`player1-${eliminated.piece}-${eliminated.moveNumber}-${index}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="flex items-center gap-3 p-2 rounded-lg border bg-blue-500/10 border-blue-500/30"
+                          >
+                            <div className="flex-shrink-0 text-blue-400">
+                              {getPieceDisplay(eliminated.piece, { size: "small" })}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs sm:text-sm font-medium text-white/90 truncate">
+                                {eliminated.piece}
+                              </div>
+                              <div className="text-xs text-blue-300/70">
+                                {eliminated.battleOutcome === "attacker" && "Attacker won"}
+                                {eliminated.battleOutcome === "defender" && "Defender won"}
+                                {eliminated.battleOutcome === "tie" && "Tie - both eliminated"}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0 text-xs sm:text-sm font-semibold text-white/70">
+                              Move {eliminated.moveNumber}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Player 2 Eliminated Pieces */}
+              {eliminatedPieces.player2.length > 0 && (
+                <Card className="bg-black/20 backdrop-blur-xl border border-red-500/30 shadow-2xl shadow-black/20">
+                  <CardHeader className="p-4 sm:p-6 sm:pb-2 pb-2">
+                    <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
+                      <Sword className="h-5 w-5 text-red-400" />
+                      {game.player2Username}'s Eliminated
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-2 sm:p-2 sm:pt-2 pt-2">
+                    <div className="max-h-48 sm:max-h-60 overflow-y-auto">
+                      <div className="space-y-2">
+                        {eliminatedPieces.player2.map((eliminated, index) => (
+                          <motion.div
+                            key={`player2-${eliminated.piece}-${eliminated.moveNumber}-${index}`}
+                            initial={{ opacity: 0, x: -10 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            className="flex items-center gap-3 p-2 rounded-lg border bg-red-500/10 border-red-500/30"
+                          >
+                            <div className="flex-shrink-0 text-red-400">
+                              {getPieceDisplay(eliminated.piece, { size: "small" })}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-xs sm:text-sm font-medium text-white/90 truncate">
+                                {eliminated.piece}
+                              </div>
+                              <div className="text-xs text-red-300/70">
+                                {eliminated.battleOutcome === "attacker" && "Attacker won"}
+                                {eliminated.battleOutcome === "defender" && "Defender won"}
+                                {eliminated.battleOutcome === "tie" && "Tie - both eliminated"}
+                              </div>
+                            </div>
+                            <div className="flex-shrink-0 text-xs sm:text-sm font-semibold text-white/70">
+                              Move {eliminated.moveNumber}
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
           {/* Chat */}
           <AnimatePresence>
             {showChat && (
@@ -873,7 +1077,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-white/60">Moves:</span>
-                  <span className="text-white/90">{moves?.page?.length || 0}</span>
+                  <span className="text-white/90">{movesArray.length || 0}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-white/60">Status:</span>
