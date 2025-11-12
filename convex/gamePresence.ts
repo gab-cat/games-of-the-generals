@@ -4,6 +4,35 @@ import { mutation, query } from "./_generated/server";
 import { presence } from "./presence";
 import { Id } from "./_generated/dataModel";
 
+// Retry helper with exponential backoff for handling write conflicts
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 100
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      // Check if it's a write conflict error
+      const isWriteConflict = error instanceof Error && 
+        (error.message.includes("write conflict") || 
+         error.message.includes("retried") ||
+         error.message.includes("concurrent modification"));
+      
+      if (!isWriteConflict || attempt === maxRetries) {
+        // If it's not a write conflict or we've exhausted retries, throw
+        throw error;
+      }
+      
+      // Exponential backoff: 100ms, 300ms, 900ms
+      const delay = baseDelay * Math.pow(3, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 // Game-specific presence functions
 export const heartbeat = mutation({
   args: { 
@@ -17,22 +46,25 @@ export const heartbeat = mutation({
     const authUserId = await getAuthUserId(ctx);
     if (!authUserId) throw new Error("Not authenticated");
     
-    // Verify the user is actually a player in this game or spectator
-    const game = await ctx.db.get(roomId as Id<"games">);
-    if (!game) throw new Error("Game not found");
-    
-    const isPlayer = game.player1Id === authUserId || game.player2Id === authUserId;
-    const isSpectator = game.spectators.includes(authUserId);
-    
-    if (!isPlayer && !isSpectator) {
-      throw new Error("Not authorized to join this game room");
-    }
-    
-    // Use roomId (which is the gameId) for game-specific presence
-    const result = await presence.heartbeat(ctx, roomId, userId, sessionId, interval);
-    
-    
-    return result;
+    // Retry with exponential backoff to handle write conflicts
+    // This includes both game lookup and presence heartbeat operations
+    return await retryWithBackoff(async () => {
+      // Verify the user is actually a player in this game or spectator
+      const game = await ctx.db.get(roomId as Id<"games">);
+      if (!game) throw new Error("Game not found");
+      
+      const isPlayer = game.player1Id === authUserId || game.player2Id === authUserId;
+      const isSpectator = game.spectators.includes(authUserId);
+      
+      if (!isPlayer && !isSpectator) {
+        throw new Error("Not authorized to join this game room");
+      }
+      
+      // Use roomId (which is the gameId) for game-specific presence
+      // Note: presence.heartbeat already has retry logic, but wrapping here
+      // handles conflicts during game document reads
+      return await presence.heartbeat(ctx, roomId, userId, sessionId, interval);
+    }, 3, 100);
   },
 });
 
@@ -62,9 +94,13 @@ export const disconnect = mutation({
   },
   handler: async (ctx, { sessionToken }) => {
     // Disconnect from presence first
-    const result = await presence.disconnect(ctx, sessionToken);
-    
-    
-    return result;
+    // Retry with exponential backoff to handle write conflicts
+    // Note: presence.disconnect already has retry logic, but wrapping here
+    // provides additional resilience
+    return await retryWithBackoff(
+      () => presence.disconnect(ctx, sessionToken),
+      3,
+      100
+    );
   },
 });

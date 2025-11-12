@@ -105,6 +105,26 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [1.6.1] - 2025-01-XX
+
+### ⚡ Performance & Stability Improvements
+
+**Connection Reliability**
+
+- Improved online status tracking with better error handling and automatic retry logic
+- More stable presence system that handles network conflicts gracefully
+- Reduced unnecessary network calls for better performance during gameplay
+- Smoother online/offline status updates for players and spectators
+
+**Chat Experience when Spectating**
+
+- Fixed chat auto-scrolling that was interrupting typing in spectator mode
+- Chat now stays in place when you're composing a message
+- Smoother scrolling behavior that respects your reading position
+- Better experience when chatting during live games
+
+---
+
 ## [1.5.1] - 2025-11-XX
 
 ### 🎨 Enhanced User Interface

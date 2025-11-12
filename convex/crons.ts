@@ -19,6 +19,14 @@ crons.cron(
   {}
 );
 
+// Run daily at 00:03 UTC to cleanup presence table records
+crons.cron(
+  "Cleanup presence table records (daily 00:03 UTC)",
+  "3 0 * * *",
+  internal.maintenance.cleanupPresenceTable,
+  {}
+);
+
 // Run daily at 00:05 UTC to clean finished lobbies
 crons.cron(
   "Cleanup finished lobbies (daily 00:05 UTC)",

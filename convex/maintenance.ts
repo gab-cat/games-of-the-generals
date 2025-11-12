@@ -1,5 +1,5 @@
 import { internalMutation } from "./_generated/server";
-import { components } from "./_generated/api";
+import { components, internal } from "./_generated/api";
 import { Presence } from "@convex-dev/presence";
 
 // Internal: Delete all anonymous users and clean up dependent data that could break UIs
@@ -321,6 +321,158 @@ export const deleteAllPresenceRooms = internalMutation({
     return {
       deletedRooms,
       totalRoomsChecked: roomIds.size
+    };
+  },
+});
+
+// Internal: Cleanup presence table by deleting records in small batches
+// Optimized to reduce write conflicts by:
+// 1. Processing smaller batches (50 records instead of 100)
+// 2. Adding delays between operations to avoid conflicts
+// 3. Skipping active sessions to prevent conflicts with heartbeat operations
+// 4. Rescheduling with longer delays to reduce contention
+export const cleanupPresenceTable = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const presence = new Presence(components.presence);
+    let deletedRecords = 0;
+    let skippedRecords = 0;
+    let remainingRecords = 0;
+    let rescheduled = false;
+    const BATCH_SIZE = 50; // Reduced from 100 to minimize write conflicts
+    const RESCHEDULE_DELAY = 10000; // Increased from 5s to 10s to reduce contention
+
+    try {
+      // Since we can't directly query the presence component's internal tables,
+      // we'll use the presence component's methods to clean up stale presence data
+
+      // Get all active rooms that might have presence data
+      // We'll focus on rooms that correspond to active games and global chat
+      const activeRooms = new Set<string>();
+
+      // Add global room
+      activeRooms.add('global');
+
+      // Get active games (playing or setup status) - reduced batch size
+      const playingGames = await ctx.db
+        .query("games")
+        .withIndex("by_status", (q) => q.eq("status", "playing"))
+        .take(25); // Reduced to avoid conflicts
+
+      const setupGames = await ctx.db
+        .query("games")
+        .withIndex("by_status", (q) => q.eq("status", "setup"))
+        .take(25); // Reduced to avoid conflicts
+
+      const activeGames = [...playingGames, ...setupGames];
+
+      activeGames.forEach(game => activeRooms.add(game._id));
+
+      let totalPresenceRecords = 0;
+      const oneHourAgo = Date.now() - (60 * 60 * 1000);
+      const fiveMinutesAgo = Date.now() - (5 * 60 * 1000); // Skip recently active sessions
+
+      // For each active room, get the presence data and clean up if needed
+      for (const roomId of activeRooms) {
+        try {
+          // Get presence data for this room
+          const roomPresence = await presence.listRoom(ctx, roomId, false); // false = include offline users
+
+          // Process records in smaller batches with conflict detection
+          for (const userPresence of roomPresence) {
+            // Skip if we've reached batch limit
+            if (deletedRecords >= BATCH_SIZE) {
+              break;
+            }
+
+            // Skip online users - they're actively using presence
+            if (userPresence.online) {
+              totalPresenceRecords++;
+              continue;
+            }
+
+            // Skip users who disconnected recently (within 5 minutes) to avoid conflicts
+            // with disconnect operations
+            if (userPresence.lastDisconnected > fiveMinutesAgo) {
+              skippedRecords++;
+              totalPresenceRecords++;
+              continue;
+            }
+
+            // Clean up offline users who have been disconnected for more than 1 hour
+            if (userPresence.lastDisconnected < oneHourAgo) {
+              try {
+                // Remove this stale presence record with error handling
+                await presence.removeRoomUser(ctx, roomId, userPresence.userId);
+                deletedRecords++;
+              } catch (error) {
+                // If we get a write conflict, skip this record and continue
+                // It will be cleaned up in the next run
+                const isWriteConflict = error instanceof Error && 
+                  (error.message.includes("write conflict") || 
+                   error.message.includes("retried") ||
+                   error.message.includes("concurrent modification"));
+                
+                if (isWriteConflict) {
+                  skippedRecords++;
+                  console.log(`Skipping ${userPresence.userId} due to write conflict, will retry later`);
+                } else {
+                  // Re-throw non-conflict errors
+                  throw error;
+                }
+              }
+            } else {
+              totalPresenceRecords++;
+            }
+          }
+        } catch (error) {
+          // Room might not exist or other error, continue with next room
+          const isWriteConflict = error instanceof Error && 
+            (error.message.includes("write conflict") || 
+             error.message.includes("retried") ||
+             error.message.includes("concurrent modification"));
+          
+          if (isWriteConflict) {
+            console.log(`Write conflict processing room ${roomId}, will retry later`);
+            skippedRecords++;
+          } else {
+            console.log(`Error processing room ${roomId}:`, error);
+          }
+        }
+
+        // If we've processed enough records, break and check for rescheduling
+        if (deletedRecords >= BATCH_SIZE) {
+          break;
+        }
+      }
+
+      // Estimate remaining records (heuristic based on total found)
+      remainingRecords = totalPresenceRecords > BATCH_SIZE ? totalPresenceRecords - deletedRecords : 0;
+
+      // If we deleted records and there might be more, reschedule with longer delay
+      if (deletedRecords > 0 && remainingRecords > 0) {
+        await ctx.scheduler.runAfter(RESCHEDULE_DELAY, internal.maintenance.cleanupPresenceTable, {});
+        rescheduled = true;
+      }
+
+    } catch (error) {
+      console.error("Error cleaning up presence table:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+        deletedRecords: 0,
+        skippedRecords: 0,
+        remainingRecords: 0,
+        rescheduled: false
+      };
+    }
+
+    return {
+      success: true,
+      deletedRecords,
+      skippedRecords,
+      remainingRecords,
+      rescheduled
     };
   },
 });

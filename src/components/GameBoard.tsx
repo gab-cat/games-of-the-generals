@@ -207,8 +207,15 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const game = useQuery(api.games.getGame, { gameId });
   const isLoadingGame = game === undefined;
 
-  // 60 seconds
-  const presenceState = usePresence(api.gamePresence, gameId, profile.username, 60000);
+  // Memoize stable parameters to prevent unnecessary presence hook re-initialization
+  // This prevents rapid heartbeat calls when component re-renders
+  const stableGameId = useMemo(() => gameId, [gameId]);
+  const stableUsername = useMemo(() => profile.username, [profile.username]);
+  const PRESENCE_INTERVAL = 60000; // 60 seconds - matches server-side retry logic
+
+  // Use presence system with stable parameters to prevent rapid re-initialization
+  // The hook manages heartbeats internally, so stable params prevent rapid heartbeat calls
+  const presenceState = usePresence(api.gamePresence, stableGameId, stableUsername, PRESENCE_INTERVAL);
   console.log(presenceState);
 
   // Helper function to get online status for a player

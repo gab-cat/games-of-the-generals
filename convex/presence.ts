@@ -6,6 +6,35 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const presence = new Presence(components.presence);
 
+// Retry helper with exponential backoff for handling write conflicts
+async function retryWithBackoff<T>(
+  operation: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 100
+): Promise<T> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      // Check if it's a write conflict error
+      const isWriteConflict = error instanceof Error && 
+        (error.message.includes("write conflict") || 
+         error.message.includes("retried") ||
+         error.message.includes("concurrent modification"));
+      
+      if (!isWriteConflict || attempt === maxRetries) {
+        // If it's not a write conflict or we've exhausted retries, throw
+        throw error;
+      }
+      
+      // Exponential backoff: 100ms, 300ms, 900ms
+      const delay = baseDelay * Math.pow(3, attempt);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error("Max retries exceeded");
+}
+
 // Heartbeat mutation for presence tracking
 export const heartbeat = mutation({
   args: { 
@@ -24,7 +53,12 @@ export const heartbeat = mutation({
     // For security, we could verify that authUserId matches userId if needed
     // For now, we'll trust the client but this could be enhanced
     
-    return await presence.heartbeat(ctx, roomId, userId, sessionId, interval);
+    // Retry with exponential backoff to handle write conflicts
+    return await retryWithBackoff(
+      () => presence.heartbeat(ctx, roomId, userId, sessionId, interval),
+      3,
+      100
+    );
   },
 });
 
@@ -48,7 +82,12 @@ export const disconnect = mutation({
   args: { sessionToken: v.string() },
   handler: async (ctx, { sessionToken }) => {
     // if all users in a room are offline, the room is automatically removed
-    return await presence.disconnect(ctx, sessionToken);
+    // Retry with exponential backoff to handle write conflicts
+    return await retryWithBackoff(
+      () => presence.disconnect(ctx, sessionToken),
+      3,
+      100
+    );
   },
 });
 
@@ -66,8 +105,18 @@ export const listUser = query({
 // List users in a room
 export const listRoom = query({
   args: { roomId: v.string() },
-  handler: async (ctx) => {
-    const list = await presence.listRoom(ctx, 'global', true);
+  returns: v.array(v.union(
+    v.object({
+      userId: v.string(),
+      online: v.boolean(),
+      lastDisconnected: v.number(),
+      image: v.optional(v.string()),
+    }),
+    v.null()
+  )),
+  handler: async (ctx, { roomId }) => {
+    // Use the provided roomId instead of hardcoded 'global'
+    const list = await presence.listRoom(ctx, roomId, true);
     console.log('📍 List room:', list);
     // Remove if userId is "Anonymous"
     const listWithImage = await Promise.all(list.map(async (user) => {

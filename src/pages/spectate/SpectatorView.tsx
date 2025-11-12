@@ -62,6 +62,9 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const [currentTime, setCurrentTime] = useState(Date.now());
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isInputFocusedRef = useRef(false);
 
   const game = useQuery(api.games.getGame, { gameId });
   const isLoadingGame = game === undefined;
@@ -172,10 +175,35 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
     return formatTime(remaining);
   };
 
-  // Auto-scroll chat to bottom
+  // Helper function to check if user is near bottom of chat container
+  const isNearBottom = (threshold = 50): boolean => {
+    if (!chatContainerRef.current) return true; // Default to true if container not found
+    
+    const container = chatContainerRef.current;
+    const scrollTop = container.scrollTop;
+    const scrollHeight = container.scrollHeight;
+    const clientHeight = container.clientHeight;
+    
+    // Check if user is within threshold pixels of the bottom
+    return scrollHeight - scrollTop - clientHeight <= threshold;
+  };
+
+  // Auto-scroll chat to bottom (only when input is not focused and user was near bottom)
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+    // Don't auto-scroll if input is focused (user is typing)
+    if (isInputFocusedRef.current) {
+      return;
+    }
+    
+    // Only auto-scroll if user was already near the bottom
+    if (!isNearBottom()) {
+      return;
+    }
+    
+    // Use scrollTop manipulation for more control
+    if (chatContainerRef.current && chatEndRef.current) {
+      const container = chatContainerRef.current;
+      container.scrollTop = container.scrollHeight;
     }
   }, [chatMessages, optimisticMessages]);
 
@@ -738,7 +766,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                   </CardHeader>
                   <CardContent>
                     {/* Chat Messages */}
-                    <div className="space-y-2 h-64 overflow-y-auto mb-4 pr-2">
+                    <div ref={chatContainerRef} className="space-y-2 h-64 overflow-y-auto mb-4 pr-2">
                       {allMessages && allMessages.length > 0 ? (
                         allMessages.map((message) => (
                           <motion.div
@@ -779,8 +807,33 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                     {(isSpectating || isPlayer) && game.status !== "finished" && (
                       <form onSubmit={handleSendMessage} className="flex gap-2">
                         <Input
+                          ref={inputRef}
                           value={chatMessage}
                           onChange={(e) => setChatMessage(e.target.value)}
+                          onFocus={(e) => {
+                            isInputFocusedRef.current = true;
+                            // Store current scroll positions to prevent unwanted scrolling
+                            const chatScrollTop = chatContainerRef.current?.scrollTop ?? 0;
+                            const pageScrollY = window.scrollY;
+                            
+                            // Prevent browser from scrolling input into view
+                            // Use multiple attempts to catch browser scroll behavior
+                            const restoreScroll = () => {
+                              if (chatContainerRef.current) {
+                                chatContainerRef.current.scrollTop = chatScrollTop;
+                              }
+                              window.scrollTo({ top: pageScrollY, behavior: 'instant' });
+                            };
+                            
+                            // Restore immediately and after browser attempts to scroll
+                            restoreScroll();
+                            requestAnimationFrame(restoreScroll);
+                            setTimeout(restoreScroll, 0);
+                            setTimeout(restoreScroll, 10);
+                          }}
+                          onBlur={() => {
+                            isInputFocusedRef.current = false;
+                          }}
                           placeholder="Type a message..."
                           maxLength={500}
                           className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
