@@ -107,6 +107,16 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ## [1.6.1] - 2025-01-XX
 
+### 🎯 Gameplay Rule Improvements
+
+**Flag Base Win Condition - Aligned to Rulebook**
+
+- Flag base win conditions now follow official rulebook specifications
+- When player1's flag reaches player2's base, player2 gets one final turn to respond
+- Player2 can now attack player1's flag if it reaches their base before the game ends
+- When player2's flag reaches player1's base, the game ends immediately
+- Ensures fair gameplay with equal move opportunities for both players
+
 ### ⚡ Performance & Stability Improvements
 
 **Connection Reliability**

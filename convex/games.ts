@@ -461,16 +461,11 @@ export const makeMove = mutation({
       newBoard[args.toRow][args.toCol] = fromPiece;
       newBoard[args.fromRow][args.fromCol] = null;
 
-      // Check if flag reached the opponent's back row
-      if (fromPiece.piece === "Flag") {
-        const player1BackRow = 0; // Player 1's back row (top of board)
-        const player2BackRow = 7; // Player 2's back row (bottom of board)
-        
-        if ((currentPlayer === "player1" && args.toRow === player1BackRow) ||
-            (currentPlayer === "player2" && args.toRow === player2BackRow)) {
-          gameWinner = currentPlayer;
-        }
+      // Immediate check: If player2's flag reaches player1's base (row 0), game ends immediately
+      if (fromPiece.piece === "Flag" && currentPlayer === "player2" && args.toRow === 0) {
+        gameWinner = "player2";
       }
+      // Note: Player1's flag reaching player2's base is checked after player2's turn (deferred)
     }
 
     // Record move
@@ -513,6 +508,24 @@ export const makeMove = mutation({
       updates.player2TimeUsed = (game.player2TimeUsed || 0) + timeUsedThisTurn;
     }
 
+    // Deferred check: After player2's turn, check if player1's flag is in player2's base (row 7)
+    // This ensures player2 gets one more turn when player1's flag reaches their base
+    // Note: Player2's flag reaching player1's base ends immediately (checked above)
+    let flagReachedBase = false;
+    const nextTurn = updates.currentTurn;
+    if (!gameWinner && nextTurn === "player1") {
+      // After turn switches to player1 (meaning player2 just moved), check if player1's flag is in player2's base
+      const player2BackRow = 7; // Player 2's back row (bottom of board)
+      for (let col = 0; col < 9; col++) {
+        const cell = newBoard[player2BackRow][col];
+        if (cell && cell.player === "player1" && cell.piece === "Flag") {
+          gameWinner = "player1";
+          flagReachedBase = true;
+          break;
+        }
+      }
+    }
+
     if (gameWinner) {
       updates.status = "finished";
       updates.winner = gameWinner;
@@ -521,6 +534,8 @@ export const makeMove = mutation({
       // Determine the reason for winning
       if (challengeResult && (challengeResult.defender === "Flag" || challengeResult.attacker === "Flag")) {
         updates.gameEndReason = "flag_captured" as const;
+      } else if (flagReachedBase) {
+        updates.gameEndReason = "flag_reached_base" as const;
       } else if (fromPiece.piece === "Flag") {
         updates.gameEndReason = "flag_reached_base" as const;
       } else {

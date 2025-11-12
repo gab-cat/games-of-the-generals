@@ -420,11 +420,6 @@ export const makeAIGameMove = mutation({
       // Simple move
       newBoard[args.toRow][args.toCol] = fromPiece;
       newBoard[args.fromRow][args.fromCol] = null;
-
-      // Check if flag reached the opponent's back row
-      if (fromPiece.piece === "Flag" && args.toRow === 0) {
-        gameWinner = "player1";
-      }
     }
 
     // Check if either player has only the flag remaining
@@ -458,13 +453,30 @@ export const makeAIGameMove = mutation({
       moveCount: session.moveCount + 1,
     };
 
+    // Deferred check: After turn switches to player2, check if player1's flag is in player2's base (row 0)
+    // This ensures both players have equal moves before the game ends
+    let flagReachedBase = false;
+    if (!gameWinner) {
+      const player2BaseRow = 0; // Player 2's base row (top of board)
+      for (let col = 0; col < 9; col++) {
+        const cell = newBoard[player2BaseRow][col];
+        if (cell && cell.player === "player1" && cell.piece === "Flag") {
+          gameWinner = "player1";
+          flagReachedBase = true;
+          break;
+        }
+      }
+    }
+
     if (gameWinner) {
       updates.status = "finished";
       updates.winner = gameWinner;
 
       // Determine game end reason
       let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" = "flag_captured";
-      if (fromPiece.piece === "Flag" && !toPiece) {
+      if (flagReachedBase) {
+        gameEndReason = "flag_reached_base";
+      } else if (fromPiece.piece === "Flag" && !toPiece) {
         gameEndReason = "flag_reached_base";
       } else if (hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")) {
         gameEndReason = "elimination";
@@ -847,10 +859,11 @@ export const executeAIMove = mutation({
       newBoard[args.toRow][args.toCol] = fromPiece;
       newBoard[args.fromRow][args.fromCol] = null;
 
-      // Check if AI flag reached player's back row
+      // Immediate check: If player2's flag reaches player1's base (row 7), game ends immediately
       if (fromPiece.piece === "Flag" && args.toRow === 7) {
         gameWinner = "player2";
       }
+      // Note: Player1's flag reaching player2's base is checked after player2's turn (deferred)
     }
 
     // Check if either player has only the flag remaining
@@ -884,13 +897,22 @@ export const executeAIMove = mutation({
       moveCount: session.moveCount + 1,
     };
 
+    // Note: Player2's flag reaching player1's base ends immediately (checked above)
+    // No deferred check needed here since player2's win is immediate
+    let flagReachedBase = false;
+    if (gameWinner && fromPiece.piece === "Flag" && !toPiece && args.toRow === 7) {
+      flagReachedBase = true;
+    }
+
     if (gameWinner) {
       updates.status = "finished";
       updates.winner = gameWinner;
 
       // Determine game end reason
       let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" = "flag_captured";
-      if (fromPiece.piece === "Flag" && !toPiece) {
+      if (flagReachedBase) {
+        gameEndReason = "flag_reached_base";
+      } else if (fromPiece.piece === "Flag" && !toPiece) {
         gameEndReason = "flag_reached_base";
       } else if (hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")) {
         gameEndReason = "elimination";
