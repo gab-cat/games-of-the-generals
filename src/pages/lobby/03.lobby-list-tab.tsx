@@ -12,6 +12,7 @@ import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { GameStartCountdownModal } from "../../components/GameStartCountdownModal";
+import { GameModeSelector, type GameMode } from "../../components/GameModeSelector";
 import generateName from "@scaleway/random-name";
 import { useQuery } from "convex-helpers/react/cache";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
@@ -41,6 +42,7 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
   const [isPrivate, setIsPrivate] = useState(false);
   const [allowSpectators, setAllowSpectators] = useState(true);
   const [maxSpectators, setMaxSpectators] = useState("");
+  const [gameMode, setGameMode] = useState<GameMode>("classic");
   const [joinCode, setJoinCode] = useState("");
   const [lobbiesCursor, setLobbiesCursor] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -205,6 +207,7 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
       setIsPrivate(false);
       setAllowSpectators(true);
       setMaxSpectators("");
+      setGameMode("classic");
       setShowCreateLobby(false);
       
       if (isPrivate && newLobby) {
@@ -304,6 +307,7 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
       isPrivate,
       allowSpectators,
       maxSpectators: maxSpectatorsNum,
+      gameMode,
     });
   };
 
@@ -681,6 +685,12 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
                       className="bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
                     />
                   )}
+
+                  <GameModeSelector
+                    value={gameMode}
+                    onChange={setGameMode}
+                    disabled={createLobbyMutation.isPending}
+                  />
 
                   {/* Warning about auto-deletion */}
                   <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">

@@ -94,6 +94,11 @@ const applicationTables = {
     gameId: v.optional(v.id("games")),
     allowSpectators: v.optional(v.boolean()), // Default true
     maxSpectators: v.optional(v.number()), // Default unlimited (null)
+    gameMode: v.optional(v.union(
+      v.literal("classic"),
+      v.literal("blitz"),
+      v.literal("reveal")
+    )), // Game mode: classic (15 min), blitz (6 min), or reveal (15 min with winner reveals)
   })
     .index("by_status", ["status"])
     .index("by_host", ["hostId"])
@@ -174,6 +179,11 @@ const applicationTables = {
     player2DisconnectedAt: v.optional(v.number()),
     disconnectionGracePeriod: v.optional(v.number()), // Default 2 minutes in milliseconds
     moveCount: v.optional(v.number()), // Cache move count to avoid querying moves table
+    gameMode: v.optional(v.union(
+      v.literal("classic"),
+      v.literal("blitz"),
+      v.literal("reveal")
+    )), // Game mode: classic (15 min), blitz (6 min), or reveal (15 min with winner reveals). Optional for backward compatibility with existing games.
   })
     .index("by_lobby", ["lobbyId"])
     .index("by_status", ["status"])

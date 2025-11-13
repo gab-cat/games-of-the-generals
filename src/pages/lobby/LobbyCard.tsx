@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useQuery } from "convex-helpers/react/cache";
 import { motion } from "framer-motion";
-import { Users, MessageCircle } from "lucide-react";
+import { Users, MessageCircle, Clock, Zap, Eye } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ interface LobbyCardProps {
     playerUsername?: string;
     status: "waiting" | "playing" | "finished";
     isPrivate?: boolean;
+    gameMode?: "classic" | "blitz" | "reveal";
   };
   index: number;
   currentUserId: Id<"users">;
@@ -29,6 +30,31 @@ interface LobbyCardProps {
   isJoining?: boolean;
   isLeaving?: boolean;
 }
+
+const getGameModeBadge = (gameMode?: "classic" | "blitz" | "reveal") => {
+  const mode = gameMode || "classic";
+  switch (mode) {
+    case "blitz":
+      return {
+        label: "Blitz",
+        icon: <Zap className="h-3 w-3" />,
+        className: "bg-orange-500/20 text-orange-300 border-orange-500/30",
+      };
+    case "reveal":
+      return {
+        label: "Reveal",
+        icon: <Eye className="h-3 w-3" />,
+        className: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+      };
+    case "classic":
+    default:
+      return {
+        label: "Classic",
+        icon: <Clock className="h-3 w-3" />,
+        className: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+      };
+  }
+};
 
 export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInviteToLobby, isJoining, isLeaving }: LobbyCardProps) {
   // Fetch host profile for avatar
@@ -41,6 +67,8 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
     api.profiles.getProfileByUsername,
     lobby.playerUsername ? { username: lobby.playerUsername } : "skip"
   );
+
+  const gameModeBadge = getGameModeBadge(lobby.gameMode);
 
   return (
     <motion.div
@@ -88,6 +116,10 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
             </div>
           </div>
           <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
+            <Badge className={gameModeBadge.className}>
+              {gameModeBadge.icon}
+              <span className="ml-1 hidden sm:inline">{gameModeBadge.label}</span>
+            </Badge>
             <Badge variant={lobby.playerId ? "destructive" : "secondary"} className={lobby.playerId ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-green-500/20 text-green-300 border-green-500/30"}>
               {lobby.playerId ? "2/2" : "1/2"}
             </Badge>

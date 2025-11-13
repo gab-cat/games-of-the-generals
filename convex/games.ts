@@ -48,6 +48,19 @@ function createEmptyBoard() {
   return Array(8).fill(null).map(() => Array(9).fill(null));
 }
 
+// Get time limit in milliseconds based on game mode
+function getTimeLimitMs(gameMode?: "classic" | "blitz" | "reveal"): number {
+  switch (gameMode) {
+    case "blitz":
+      return 6 * 60 * 1000; // 6 minutes
+    case "classic":
+    case "reveal":
+      return 15 * 60 * 1000; // 15 minutes
+    default:
+      return 15 * 60 * 1000; // Default to classic for undefined/legacy games
+  }
+}
+
 // Start a new game
 export const startGame = mutation({
   args: {
@@ -79,6 +92,7 @@ export const startGame = mutation({
     }
 
     // Create new game
+    const gameMode = lobby.gameMode ?? "classic"; // Default to classic if not set (for legacy lobbies)
     const gameId = await ctx.db.insert("games", {
       lobbyId: args.lobbyId,
       lobbyName: lobby.name,
@@ -98,6 +112,7 @@ export const startGame = mutation({
       player2TimeUsed: 0,
       moveCount: 0, // Initialize move count
       disconnectionGracePeriod: 120 * 1000, // 120 seconds in milliseconds
+      gameMode, // Copy game mode from lobby
     });
 
     // Update lobby with game reference and change status to playing
@@ -429,12 +444,21 @@ export const makeMove = mutation({
         winner,
       };
 
-      // Reveal attacking piece only when there's a challenge
-      const revealedFromPiece = { ...fromPiece, revealed: false };
+      // In Reveal Mode, winner's piece is revealed after challenge
+      // In Classic/Blitz, only ties reveal both pieces
+      const isRevealMode = game.gameMode === "reveal";
 
       if (winner === "attacker") {
-        // Attacker wins, move attacking piece and reveal it
-        newBoard[args.toRow][args.toCol] = revealedFromPiece;
+        // Attacker wins
+        if (isRevealMode) {
+          // Reveal Mode: reveal the winner's piece
+          const revealedFromPiece = { ...fromPiece, revealed: true };
+          newBoard[args.toRow][args.toCol] = revealedFromPiece;
+        } else {
+          // Classic/Blitz: attacker piece moves but stays hidden
+          const revealedFromPiece = { ...fromPiece, revealed: false };
+          newBoard[args.toRow][args.toCol] = revealedFromPiece;
+        }
         newBoard[args.fromRow][args.fromCol] = null;
         
         // Check if flag was captured
@@ -442,9 +466,15 @@ export const makeMove = mutation({
           gameWinner = currentPlayer;
         }
       } else if (winner === "defender") {
-        // Attacker loses, only attacker piece is removed
-        // Defender piece stays and remains hidden (not revealed)
-        newBoard[args.toRow][args.toCol] = toPiece; // Keep original defender piece without revealing
+        // Defender wins
+        if (isRevealMode) {
+          // Reveal Mode: reveal the winner's piece
+          const revealedToPiece = { ...toPiece, revealed: true };
+          newBoard[args.toRow][args.toCol] = revealedToPiece;
+        } else {
+          // Classic/Blitz: defender piece stays hidden
+          newBoard[args.toRow][args.toCol] = toPiece;
+        }
         newBoard[args.fromRow][args.fromCol] = null;
         
         // Check if the attacking piece was a flag - if so, opponent wins
@@ -452,7 +482,7 @@ export const makeMove = mutation({
           gameWinner = currentPlayer === "player1" ? "player2" : "player1";
         }
       } else {
-        // Tie - both eliminated and both revealed
+        // Tie - both eliminated and both revealed (same for all modes)
         newBoard[args.toRow][args.toCol] = null;
         newBoard[args.fromRow][args.fromCol] = null;
       }
@@ -1198,8 +1228,8 @@ export const checkOpponentTimeout = mutation({
       throw new Error("Game is not active");
     }
 
-    // Each player gets 15 minutes total
-    const TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes in milliseconds
+    // Get time limit based on game mode
+    const TIME_LIMIT_MS = getTimeLimitMs(game.gameMode);
 
     const currentTime = Date.now();
     const gameStartTime = game.gameTimeStarted || game.createdAt;

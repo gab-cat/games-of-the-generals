@@ -67,6 +67,11 @@ export const createLobby = mutation({
     isPrivate: v.optional(v.boolean()),
     allowSpectators: v.optional(v.boolean()),
     maxSpectators: v.optional(v.number()),
+    gameMode: v.optional(v.union(
+      v.literal("classic"),
+      v.literal("blitz"),
+      v.literal("reveal")
+    )), // Defaults to "classic" if not provided
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -118,6 +123,8 @@ export const createLobby = mutation({
       }
     }
 
+    const gameMode = args.gameMode ?? "classic"; // Default to classic if not provided
+
     const lobbyId = await ctx.db.insert("lobbies", {
       name: args.name,
       hostId: userId,
@@ -127,6 +134,7 @@ export const createLobby = mutation({
       lobbyCode,
       allowSpectators,
       maxSpectators,
+      gameMode,
       createdAt: Date.now(),
     });
 

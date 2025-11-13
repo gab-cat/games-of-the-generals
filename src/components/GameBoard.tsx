@@ -28,7 +28,9 @@ import {
   AlertTriangle,
   ChevronUp,
   ChevronDown,
-  X
+  X,
+  Clock,
+  Zap
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
@@ -79,9 +81,46 @@ const INITIAL_PIECES = [
 ];
 
 // Constants for better performance
-const TOTAL_TIME_SECONDS = 15 * 60; // 15 minutes
 const BOARD_ROWS = 8;
 const BOARD_COLS = 9;
+
+// Get time limit in seconds based on game mode
+const getTimeLimitSeconds = (gameMode?: "classic" | "blitz" | "reveal"): number => {
+  switch (gameMode) {
+    case "blitz":
+      return 6 * 60; // 6 minutes
+    case "classic":
+    case "reveal":
+    default:
+      return 15 * 60; // 15 minutes
+  }
+};
+
+// Get game mode badge info
+const getGameModeBadge = (gameMode?: "classic" | "blitz" | "reveal") => {
+  const mode = gameMode || "classic";
+  switch (mode) {
+    case "blitz":
+      return {
+        label: "Blitz",
+        icon: <Zap className="h-3 w-3" />,
+        className: "bg-orange-500/20 text-orange-300 border-orange-500/30",
+      };
+    case "reveal":
+      return {
+        label: "Reveal",
+        icon: <Eye className="h-3 w-3" />,
+        className: "bg-purple-500/20 text-purple-300 border-purple-500/30",
+      };
+    case "classic":
+    default:
+      return {
+        label: "Classic",
+        icon: <Clock className="h-3 w-3" />,
+        className: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+      };
+  }
+};
 
 // Create empty board factory function
 const createEmptyBoard = () => Array(BOARD_ROWS).fill(null).map(() => Array(BOARD_COLS).fill(null));
@@ -521,19 +560,24 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     }
   }, [isPlayer2, game, timeoutGame, gameId, getPlayerPresence]);
 
+  // Get time limit based on game mode
+  const timeLimitSeconds = useMemo(() => {
+    return getTimeLimitSeconds(game?.gameMode);
+  }, [game?.gameMode]);
+
   // Optimized getPlayerTime function with timeout handling
   const getPlayerTime = useCallback((isPlayerParam: boolean) => {
-    if (!game) return "15:00"; // Default time display
+    if (!game) return formatTime(timeLimitSeconds); // Default time display
     
     if (game.status === "finished") {
       // Show final time remaining for finished games
       const timeUsed = isPlayerParam ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
       const timeUsedSeconds = Math.floor(timeUsed / 1000);
-      const remaining = Math.max(0, TOTAL_TIME_SECONDS - timeUsedSeconds);
+      const remaining = Math.max(0, timeLimitSeconds - timeUsedSeconds);
       return formatTime(remaining);
     }
     
-    if (game.status !== "playing") return "15:00"; // Default time display for setup
+    if (game.status !== "playing") return formatTime(timeLimitSeconds); // Default time display for setup
     
     const timeUsed = isPlayerParam ? (game.player1TimeUsed || 0) : (game.player2TimeUsed || 0);
     const timeUsedSeconds = Math.floor(timeUsed / 1000);
@@ -548,7 +592,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     }
     
     const totalUsed = timeUsedSeconds + currentTurnTime;
-    const remaining = Math.max(0, TOTAL_TIME_SECONDS - totalUsed);
+    const remaining = Math.max(0, timeLimitSeconds - totalUsed);
     
     // Check for timeout condition - only trigger once per timeout
     if (remaining <= 0 && isCurrentTurn && game.status === "playing") {
@@ -561,7 +605,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     }
     
     return formatTime(remaining);
-  }, [game, currentTime, formatTime, handlePlayer1Timeout, handlePlayer2Timeout]);
+  }, [game, currentTime, formatTime, handlePlayer1Timeout, handlePlayer2Timeout, timeLimitSeconds]);
 
   // Memoized valid rows calculation - logical positions (not display positions)
   const validRows = useMemo(() => isPlayer1 ? [5, 6, 7] : [0, 1, 2], [isPlayer1]);
@@ -1654,6 +1698,15 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
             </div>
 
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+              {(() => {
+                const gameModeBadge = getGameModeBadge(game.gameMode);
+                return (
+                  <Badge className={gameModeBadge.className}>
+                    {gameModeBadge.icon}
+                    <span className="ml-1">{gameModeBadge.label}</span>
+                  </Badge>
+                );
+              })()}
               <Badge 
                 variant={game.status === "playing" ? "default" : "outline"}
                 className={
