@@ -60,6 +60,50 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [1.7.0] - 2025-11-XX
+
+### 🎮 Game Mode Revolution
+
+**Three Distinct Game Modes**
+
+- **Classic Mode**: Traditional 15-minute gameplay with standard Stratego rules
+- **Blitz Mode**: Fast-paced action with 6 minutes per player for quick matches
+- **Reveal Mode**: Winner's piece rank is revealed after each attack, adding strategic depth
+
+**Enhanced Lobby Experience**
+
+- Game mode selection when creating lobbies with visual mode indicators
+- Clear mode badges showing Classic, Blitz, or Reveal for each game
+- Intuitive game mode selector with descriptions and icons
+- Mode-specific timer adjustments and gameplay expectations
+
+**Strategic Variety**
+
+- Choose your preferred pace and risk level for different gaming experiences
+- Blitz mode perfect for rapid competitive play and quick decisions
+- Reveal mode adds psychological depth with information revelation mechanics
+- Classic mode maintains the traditional Stratego experience
+
+### 🎨 Visual Enhancements
+
+**Game Mode Integration**
+
+- Mode badges displayed prominently in lobbies and during gameplay
+- Color-coded indicators: Blue for Classic, Orange for Blitz, Purple for Reveal
+- Enhanced game board showing current mode and time limits
+- Improved lobby cards with mode information at a glance
+
+### 🔧 Technical Foundation
+
+**Game Mode Infrastructure**
+
+- Complete game mode support across lobby creation and gameplay
+- Dynamic timer systems adapting to selected game mode
+- Enhanced database schema supporting mode-specific configurations
+- Seamless mode transitions and state management
+
+---
+
 ## [1.6.0] - 2025-01-XX
 
 ### 🎨 Enhanced Profile & Statistics
