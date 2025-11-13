@@ -38,7 +38,7 @@ export const joinQueue = mutation({
     success: v.boolean(),
     message: v.optional(v.string()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -130,7 +130,7 @@ export const leaveQueue = mutation({
     success: v.boolean(),
     message: v.optional(v.string()),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
@@ -210,7 +210,7 @@ export const attemptMatch = internalMutation({
     matchesCreated: v.number(),
     playersMatched: v.number(),
   }),
-  handler: async (ctx, args) => {
+  handler: async (ctx) => {
     let matchesCreated = 0;
     let playersMatched = 0;
 

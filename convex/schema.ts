@@ -56,12 +56,9 @@ const applicationTables = {
     .index("by_wins", ["wins"])
     .index("by_username", ["username"])
     .index("by_games_wins", ["gamesPlayed", "wins"]) // Compound index for better leaderboard queries
-    .index("by_rank_wins", ["rank", "wins"]) // Index for ranking within same rank
     .index("by_active_players", ["gamesPlayed", "username"]) // For finding active players
     .index("by_admin_role", ["adminRole"]) // For finding admin/moderator users
     .index("by_username_games", ["username", "gamesPlayed"]) // For efficient username search
-    .index("by_rank_games", ["rank", "gamesPlayed"]) // For rank-based queries
-    .index("by_created_at", ["createdAt"]) // For new user queries
     .index("by_last_seen", ["lastSeenAt"]) // For online status queries
     .index("by_elo", ["elo"]), // For ELO-based leaderboard queries
 
@@ -74,11 +71,7 @@ const applicationTables = {
     seenAt: v.optional(v.number()), // For marking notifications as seen
   })
     .index("by_user", ["userId"])
-    .index("by_achievement", ["achievementId"])
-    .index("by_user_achievement", ["userId", "achievementId"])
-    .index("by_achievement_user", ["achievementId", "userId"]) // For achievement progress queries
-    .index("by_user_unlocked", ["userId", "unlockedAt"]) // For recent achievements
-    .index("by_unlocked_at", ["unlockedAt"]), // For global achievement stats
+    .index("by_user_achievement", ["userId", "achievementId"]),
 
   // Game lobbies/rooms
   lobbies: defineTable({
@@ -103,7 +96,6 @@ const applicationTables = {
     .index("by_status", ["status"])
     .index("by_host", ["hostId"])
     .index("by_code", ["lobbyCode"])
-    .index("by_status_private", ["status", "isPrivate"])
     .index("by_host_status", ["hostId", "status"])
     .index("by_status_created", ["status", "createdAt"]) // For sorting waiting lobbies by creation time
     .index("by_waiting_public", ["status", "isPrivate", "createdAt"]), // Optimized for public lobby list
@@ -119,8 +111,7 @@ const applicationTables = {
   })
   .index("by_status", ["status"])
   .index("by_user", ["userId"])
-  .index("by_status_skill", ["status", "skillRating"])
-  .index("by_timeout", ["timeoutAt"]),
+  .index("by_status_skill", ["status", "skillRating"]),
 
     // Active games
   games: defineTable({
@@ -187,12 +178,9 @@ const applicationTables = {
   })
     .index("by_lobby", ["lobbyId"])
     .index("by_status", ["status"])
-    .index("by_players", ["player1Id", "player2Id"])
     .index("by_player1", ["player1Id"])
     .index("by_player2", ["player2Id"])
     .index("by_status_finished", ["status", "finishedAt"])
-    .index("by_player1_status", ["player1Id", "status"])
-    .index("by_player2_status", ["player2Id", "status"])// For recent finished games
     .index("by_player1_finished", ["player1Id", "status", "finishedAt"]) // Player history optimization
     .index("by_player2_finished", ["player2Id", "status", "finishedAt"]) // Player history optimization
     .index("by_status_setup_time", ["status", "setupTimeStarted"]) // For finding stale setup games
@@ -264,10 +252,7 @@ const applicationTables = {
     upvotes: v.optional(v.number()), // Track upvotes for future features
   })
     .index("by_user", ["userId"])
-    .index("by_user_default", ["userId", "isDefault"])
-    .index("by_user_builtin", ["userId", "isBuiltIn"])
-    .index("by_builtin", ["isBuiltIn"])
-    .index("by_upvotes", ["upvotes"]), // For popular presets
+    .index("by_user_default", ["userId", "isDefault"]),
 
   // Direct messages between users
   messages: defineTable({
@@ -296,13 +281,9 @@ const applicationTables = {
   })
     .index("by_recipient", ["recipientId"])
     .index("by_sender", ["senderId"])
-    .index("by_conversation", ["senderId", "recipientId"])
     .index("by_timestamp", ["timestamp"])
     .index("by_recipient_read", ["recipientId", "readAt"])
     .index("by_conversation_timestamp", ["senderId", "recipientId", "timestamp"]) // For efficient conversation queries
-    .index("by_recipient_timestamp", ["recipientId", "timestamp"]) // For recipient message history
-    .index("by_sender_timestamp", ["senderId", "timestamp"]) // For sender message history
-    .index("by_message_type", ["messageType", "timestamp"]) // For filtering by message type
     .index("by_unread_messages", ["recipientId", "readAt", "timestamp"]), // For efficient unread queries
 
   // Chat conversations metadata
@@ -326,7 +307,6 @@ const applicationTables = {
   })
     .index("by_participant1", ["participant1Id"])
     .index("by_participant2", ["participant2Id"])
-    .index("by_last_message", ["lastMessageAt"])
     .index("by_participants", ["participant1Id", "participant2Id"])
     .index("by_participant1_last_message", ["participant1Id", "lastMessageAt"]) // For efficient sorting
     .index("by_participant2_last_message", ["participant2Id", "lastMessageAt"]) // For efficient sorting
@@ -351,8 +331,7 @@ const applicationTables = {
     expiresAt: v.number(), // When this notification should be auto-deleted (7 days from creation)
   })
     .index("by_user_created", ["userId", "createdAt"]) // For user's notification history
-    .index("by_expires_at", ["expiresAt"]) // For cleanup queries
-    .index("by_user_type", ["userId", "type"]), // For filtering notifications by type
+    .index("by_expires_at", ["expiresAt"]), // For cleanup queries
 
   // Web Push Subscriptions per user
   pushSubscriptions: defineTable({
@@ -439,10 +418,7 @@ const applicationTables = {
     .index("by_timestamp", ["timestamp"])
     .index("by_user", ["userId"])
     .index("by_user_timestamp", ["userId", "timestamp"])
-    .index("by_message_hash", ["messageHash"])
-    .index("by_timestamp_user", ["timestamp", "userId"]) // For efficient pagination with user context
-    .index("by_system_message", ["isSystemMessage", "timestamp"]) // For system message queries
-    .index("by_ip_address", ["ipAddress"]), // For spam detection
+    .index("by_message_hash", ["messageHash"]), // For spam detection
 
 
   // User Chat Settings and Preferences
@@ -462,8 +438,7 @@ const applicationTables = {
     mutedUntil: v.optional(v.number()),
     muteReason: v.optional(v.string()),
   })
-    .index("by_user", ["userId"])
-    .index("by_muted_until", ["mutedUntil"]),
+    .index("by_user", ["userId"]),
 
 
 
@@ -482,9 +457,7 @@ const applicationTables = {
     .index("by_mentioned_user", ["mentionedUserId"])
     .index("by_mentioned_user_read", ["mentionedUserId", "isRead"])
     .index("by_mentioned_user_timestamp", ["mentionedUserId", "timestamp"])
-    .index("by_message", ["messageId"])
-    .index("by_timestamp_read", ["timestamp", "isRead"]) // For bulk mark as read operations
-    .index("by_mentioner_timestamp", ["mentionerId", "timestamp"]), // For mentioner activity tracking
+    .index("by_message", ["messageId"]), // For mentioner activity tracking
 
   // Chat Rules and Agreements
   chatRules: defineTable({
@@ -493,7 +466,6 @@ const applicationTables = {
     createdAt: v.number(),
     isActive: v.boolean(),
   })
-    .index("by_version", ["version"])
     .index("by_active", ["isActive"]),
 
   // Admin Users - for identifying moderators and administrators
@@ -506,7 +478,6 @@ const applicationTables = {
     isActive: v.boolean(),
   })
     .index("by_user", ["userId"])
-    .index("by_role", ["role"])
     .index("by_active", ["isActive"]),
 
   // User Moderation Actions (mutes, bans, etc.)
@@ -523,8 +494,6 @@ const applicationTables = {
     isActive: v.boolean(), // Whether this moderation is still in effect
   })
     .index("by_target_user", ["targetUserId"])
-    .index("by_moderator", ["moderatorId"])
-    .index("by_action", ["action"])
     .index("by_active", ["isActive"])
     .index("by_expires_at", ["expiresAt"])
     .index("by_target_active", ["targetUserId", "isActive"]),
@@ -556,9 +525,7 @@ const applicationTables = {
     reason: v.optional(v.string()),
     createdAt: v.number(),
   })
-    .index("by_message", ["messageId"])
-    .index("by_moderator", ["moderatorId"])
-    .index("by_action", ["action"]),
+    .index("by_message", ["messageId"]),
 
   // Support Tickets
   supportTickets: defineTable({
@@ -595,13 +562,9 @@ const applicationTables = {
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
-    .index("by_category", ["category"])
-    .index("by_priority", ["priority"])
     .index("by_user_status", ["userId", "status"])
     .index("by_status_created", ["status", "createdAt"])
-    .index("by_user_created", ["userId", "createdAt"])
-    .index("by_assigned", ["assignedToId"])
-    .index("by_status_priority", ["status", "priority"]),
+    .index("by_user_created", ["userId", "createdAt"]),
 
   // Support Ticket Updates/Comments
   supportTicketUpdates: defineTable({
@@ -614,7 +577,6 @@ const applicationTables = {
     attachmentStorageId: v.optional(v.id("_storage")),
     timestamp: v.number(),
   })
-    .index("by_ticket", ["ticketId"])
     .index("by_ticket_timestamp", ["ticketId", "timestamp"])
     .index("by_user", ["userId"])
     .index("by_timestamp", ["timestamp"]),

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
+import Squares from "@/components/backgrounds/Squares/Squares";
 
 
 
@@ -31,6 +32,7 @@ interface GameResultModalProps {
   isPlayer1: boolean;
   isOpen: boolean;
   onClose: () => void;
+  onCheckBoard: () => void;
   onReturnToLobby: () => void;
   gameId: Id<"games">;
   onViewReplay: (gameId: Id<"games">) => void;
@@ -38,12 +40,13 @@ interface GameResultModalProps {
   player2Profile?: (Profile & { avatarUrl?: string }) | null;
 }
 
-export function GameResultModal({ 
-  result, 
-  profile, 
-  isPlayer1, 
-  isOpen, 
-  onClose, 
+export function GameResultModal({
+  result,
+  profile,
+  isPlayer1,
+  isOpen,
+  onClose,
+  onCheckBoard,
   onReturnToLobby,
   gameId,
   onViewReplay,
@@ -101,73 +104,65 @@ export function GameResultModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] bg-black/20 backdrop-blur-lg overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] bg-black/20 backdrop-blur-xl border border-white/10 shadow-xl overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="sr-only">Game Result</DialogTitle>
         </DialogHeader>
 
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
+          initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="space-y-6 pb-4"
+          className="space-y-4 pb-2"
         >
           {/* Main Result Header */}
-          <div className={`text-center py-8 px-6 rounded-2xl backdrop-blur-xl border ${getBgGradient()} relative overflow-hidden`}>
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="mx-auto mb-4"
-            >
-              {getResultIcon()}
-            </motion.div>
-            
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <h2 className={`text-4xl font-bold ${getResultColor()} mb-2`}>
-                {getResultText()}
-              </h2>
-              <p className="text-white/60 text-lg">
-                {getReasonText()}
-              </p>
-            </motion.div>
+          <div className={`text-center py-6 px-6 rounded-2xl backdrop-blur-sm border ${getBgGradient()} relative overflow-hidden`}>
+            {/* Animated Squares Background */}
+            <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-20">
+              <Squares
+                direction="diagonal"
+                speed={0.3}
+                borderColor="rgba(255, 255, 255, 0.1)"
+                squareSize={20}
+                hoverFillColor="rgba(99, 102, 241, 0.1)"
+              />
+            </div>
 
-            {/* Celebration Effects */}
-            {isWinner && (
+            {/* Content overlay */}
+            <div className="relative z-10">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="absolute inset-0 pointer-events-none overflow-hidden"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 mb-4"
               >
-                {[...Array(10)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ y: -20, opacity: 1, scale: 0 }}
-                    animate={{
-                      y: [0, 100, 200],
-                      opacity: [1, 1, 0],
-                      scale: [0, 1, 0.5],
-                      rotate: [0, 180, 360]
-                    }}
-                    transition={{
-                      duration: 2,
-                      delay: i * 0.1,
-                      ease: "easeOut"
-                    }}
-                    className="absolute text-yellow-400 text-sm"
-                    style={{
-                      left: `${Math.random() * 100}%`,
-                    }}
-                  >
-                    ⭐
-                  </motion.div>
-                ))}
+                {getResultIcon()}
               </motion.div>
-            )}
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h2 className={`text-3xl font-bold ${getResultColor()} mb-2 tracking-tight`}>
+                  {getResultText()}
+                </h2>
+                <p className="text-white/60 text-base">
+                  {getReasonText()}
+                </p>
+              </motion.div>
+
+              {/* Subtle celebration for winners */}
+              {isWinner && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="absolute top-2 right-2 text-yellow-400/60"
+                >
+                  ✨
+                </motion.div>
+              )}
+            </div>
           </div>
 
           {/* Match Summary */}
@@ -175,201 +170,160 @@ export function GameResultModal({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="space-y-4"
+            className="space-y-3"
           >
-            <div className="flex items-center gap-2 mb-4">
-              <Trophy className="h-5 w-5 text-blue-400" />
+            <div className="flex items-center gap-2">
+              <Trophy className="h-4 w-4 text-blue-400" />
               <h3 className="text-lg font-semibold text-white/90">Battle Summary</h3>
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <motion.div 
-                whileHover={{ scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 300 }}
-                className="flex items-center justify-between p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-colors"
-              >
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className={`p-4 rounded-xl backdrop-blur-sm border transition-all duration-200 ${
+                isWinner && !isDraw
+                  ? 'bg-green-500/10 border-green-500/30'
+                  : 'bg-white/5 border-white/10'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <UserAvatar 
+                  <UserAvatar
                     username={isPlayer1 ? result.player1Username : result.player2Username}
                     avatarUrl={isPlayer1 ? player1Profile?.avatarUrl : player2Profile?.avatarUrl}
                     rank={isPlayer1 ? player1Profile?.rank : player2Profile?.rank}
-                    size="md"
+                    size="sm"
                   />
-                  <div>
-                    <div className="font-semibold text-white/90">
+                  <div className="flex-1">
+                    <div className="font-semibold text-white/90 text-sm">
                       {isPlayer1 ? result.player1Username : result.player2Username}
                     </div>
-                    <Badge 
+                    <Badge
                       variant={isWinner && !isDraw ? "default" : "secondary"}
-                      className={`text-xs ${isWinner && !isDraw ? 'bg-green-500/20 text-green-300 border-green-500/30' : 'bg-white/10 text-white/70 border-white/20'}`}
+                      className={`text-xs px-2 py-0 ${
+                        isWinner && !isDraw
+                          ? 'bg-green-500/20 text-green-200 border-green-400/30'
+                          : 'bg-white/10 text-white/70 border-white/20'
+                      }`}
                     >
-                      {profile.username} (You)
+                      You
                     </Badge>
                   </div>
+                  {isWinner && !isDraw && (
+                    <Crown className="h-4 w-4 text-yellow-500" />
+                  )}
                 </div>
-                {isWinner && !isDraw && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <Crown className="h-5 w-5 text-yellow-500" />
-                  </motion.div>
-                )}
-              </motion.div>
-              
-              <motion.div 
-                whileHover={{ scale: 1.02 }}
-                transition={{ type: "spring", stiffness: 300 }}
-                className="flex items-center justify-between p-4 rounded-xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-colors"
-              >
+              </div>
+
+              <div className={`p-4 rounded-xl backdrop-blur-sm border transition-all duration-200 ${
+                !isWinner && !isDraw
+                  ? 'bg-red-500/10 border-red-500/30'
+                  : 'bg-white/5 border-white/10'
+              }`}>
                 <div className="flex items-center gap-3">
-                  <UserAvatar 
+                  <UserAvatar
                     username={isPlayer1 ? result.player2Username : result.player1Username}
                     avatarUrl={isPlayer1 ? player2Profile?.avatarUrl : player1Profile?.avatarUrl}
                     rank={isPlayer1 ? player2Profile?.rank : player1Profile?.rank}
-                    size="md"
+                    size="sm"
                   />
-                  <div>
-                    <div className="font-semibold text-white/90">
+                  <div className="flex-1">
+                    <div className="font-semibold text-white/90 text-sm">
                       {isPlayer1 ? result.player2Username : result.player1Username}
                     </div>
-                    <Badge 
+                    <Badge
                       variant={!isWinner && !isDraw ? "default" : "secondary"}
-                      className={`text-xs ${!isWinner && !isDraw ? 'bg-green-500/20 text-green-300 border-green-500/30' : 'bg-white/10 text-white/70 border-white/20'}`}
+                      className={`text-xs px-2 py-0 ${
+                        !isWinner && !isDraw
+                          ? 'bg-red-500/20 text-red-200 border-red-400/30'
+                          : 'bg-white/10 text-white/70 border-white/20'
+                      }`}
                     >
                       Opponent
                     </Badge>
                   </div>
+                  {!isWinner && !isDraw && (
+                    <Crown className="h-4 w-4 text-yellow-500" />
+                  )}
                 </div>
-                {!isWinner && !isDraw && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <Crown className="h-5 w-5 text-yellow-500" />
-                  </motion.div>
-                )}
-              </motion.div>
+              </div>
             </div>
           </motion.div>
 
           {/* Game Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="grid grid-cols-3 gap-3"
-          >
-            <motion.div 
-              whileHover={{ scale: 1.02 }} 
-              transition={{ type: "spring", stiffness: 300 }}
-              className="text-center p-4 rounded-xl bg-blue-500/10 backdrop-blur-sm border border-blue-500/20 hover:border-blue-500/40 transition-colors"
-            >
-              <div className="p-2 bg-blue-500/20 backdrop-blur-sm rounded-lg w-fit mx-auto mb-2">
-                <Clock className="h-4 w-4 text-blue-400" />
-              </div>
-              <div className="text-lg font-bold mb-1 text-white/90">{formatDuration(result.duration)}</div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="text-center p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10">
+              <Clock className="h-4 w-4 text-blue-400 mx-auto mb-2" />
+              <div className="text-sm font-semibold text-white/90">{formatDuration(result.duration)}</div>
               <div className="text-xs text-white/60">Duration</div>
-            </motion.div>
-            
-            <motion.div 
-              whileHover={{ scale: 1.02 }} 
-              transition={{ type: "spring", stiffness: 300 }}
-              className="text-center p-4 rounded-xl bg-orange-500/10 backdrop-blur-sm border border-orange-500/20 hover:border-orange-500/40 transition-colors"
-            >
-              <div className="p-2 bg-orange-500/20 backdrop-blur-sm rounded-lg w-fit mx-auto mb-2">
-                <Zap className="h-4 w-4 text-orange-400" />
-              </div>
-              <div className="text-lg font-bold mb-1 text-white/90">{result.moves}</div>
-              <div className="text-xs text-white/60">Moves</div>
-            </motion.div>
-            
-            <motion.div 
-              whileHover={{ scale: 1.02 }} 
-              transition={{ type: "spring", stiffness: 300 }}
-              className="text-center p-4 rounded-xl bg-purple-500/10 backdrop-blur-sm border border-purple-500/20 hover:border-purple-500/40 transition-colors"
-            >
-              <div className="p-2 bg-purple-500/20 backdrop-blur-sm rounded-lg w-fit mx-auto mb-2">
-                <Medal className="h-4 w-4 text-purple-400" />
-              </div>
-              <div className="text-lg font-bold mb-1 text-white/90">{profile.rank}</div>
-              <div className="text-xs text-white/60">Rank</div>
-            </motion.div>
-          </motion.div>
-
-          {/* Updated Stats */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.6 }}
-            className="space-y-4"
-          >
-            <div className="flex items-center gap-2">
-              <Target className="h-5 w-5 text-blue-400" />
-              <h3 className="text-lg font-semibold text-white/90">Your Campaign Record</h3>
             </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                className="text-center p-4 rounded-xl bg-green-500/10 backdrop-blur-sm border border-green-500/20 hover:border-green-500/40 transition-colors"
-              >
-                <div className="text-xl font-bold text-green-400 mb-1">{profile.wins}</div>
-                <div className="text-xs text-white/60">Wins</div>
-              </motion.div>
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                className="text-center p-4 rounded-xl bg-red-500/10 backdrop-blur-sm border border-red-500/20 hover:border-red-500/40 transition-colors"
-              >
-                <div className="text-xl font-bold text-red-400 mb-1">{profile.losses}</div>
-                <div className="text-xs text-white/60">Losses</div>
-              </motion.div>
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                className="text-center p-4 rounded-xl bg-blue-500/10 backdrop-blur-sm border border-blue-500/20 hover:border-blue-500/40 transition-colors"
-              >
-                <div className="text-xl font-bold text-blue-400 mb-1">{profile.gamesPlayed}</div>
-                <div className="text-xs text-white/60">Total</div>
-              </motion.div>
-              <motion.div 
-                whileHover={{ scale: 1.05 }}
-                className="text-center p-4 rounded-xl bg-purple-500/10 backdrop-blur-sm border border-purple-500/20 hover:border-purple-500/40 transition-colors"
-              >
-                <div className="text-xl font-bold text-purple-400 mb-1">
+
+            <div className="text-center p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10">
+              <Zap className="h-4 w-4 text-orange-400 mx-auto mb-2" />
+              <div className="text-sm font-semibold text-white/90">{result.moves}</div>
+              <div className="text-xs text-white/60">Moves</div>
+            </div>
+
+            <div className="text-center p-3 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10">
+              <Medal className="h-4 w-4 text-purple-400 mx-auto mb-2" />
+              <div className="text-sm font-semibold text-white/90">{profile.rank}</div>
+              <div className="text-xs text-white/60">Rank</div>
+            </div>
+          </div>
+
+          {/* Campaign Stats */}
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <Target className="h-4 w-4 text-blue-400" />
+              <span className="text-white/70">Campaign:</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <div className="text-green-400 font-semibold">{profile.wins}</div>
+                <div className="text-xs text-white/60">W</div>
+              </div>
+              <div className="text-center">
+                <div className="text-red-400 font-semibold">{profile.losses}</div>
+                <div className="text-xs text-white/60">L</div>
+              </div>
+              <div className="text-center">
+                <div className="text-purple-400 font-semibold">
                   {profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0}%
                 </div>
-                <div className="text-xs text-white/60">Win Rate</div>
-              </motion.div>
+                <div className="text-xs text-white/60">WR</div>
+              </div>
             </div>
-          </motion.div>
+          </div>
 
           {/* Action Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="flex flex-col sm:flex-row gap-3 justify-center pt-4"
-          >
+          <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
+            <Button
+              onClick={onCheckBoard}
+              variant="outline"
+              size="sm"
+              className="flex-1 max-w-xs rounded-lg border border-white/30 text-white/90 hover:bg-white/10 backdrop-blur-sm transition-colors"
+            >
+              <Target className="h-4 w-4 mr-2" />
+              Check Board
+            </Button>
+
             {gameId && onViewReplay && (
-              <Button 
+              <Button
                 onClick={() => onViewReplay(gameId)}
                 variant="secondary"
-                className="flex-1 max-w-xs rounded-xl bg-purple-500/20 border-purple-500/30 text-purple-300 hover:bg-purple-500/30 backdrop-blur-sm"
+                size="sm"
+                className="flex-1 max-w-xs rounded-lg bg-purple-500/20 border border-purple-500/30 text-purple-300 hover:bg-purple-500/30 backdrop-blur-sm transition-colors"
               >
                 <Play className="h-4 w-4 mr-2" />
                 View Replay
               </Button>
             )}
-            <Button 
+
+            <Button
               onClick={onReturnToLobby}
-              className="flex-1 max-w-xs rounded-xl text-black bg-white hover:bg-white/90"
+              size="sm"
+              className="flex-1 max-w-xs rounded-lg bg-white text-black hover:bg-white/90 font-semibold"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Return to Lobby
+              Back to Lobby
             </Button>
-          </motion.div>
+          </div>
         </motion.div>
       </DialogContent>
     </Dialog>

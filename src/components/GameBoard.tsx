@@ -678,13 +678,29 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   }, [acknowledgeGameResult, gameId]);
 
   const handleViewReplay = useCallback((gameId: Id<"games">) => {
-    void navigate({ to: "/spectate", search: { gameId: gameId as string } });
-  }, [navigate]);
-
-  const handleReturnToLobby = useCallback(() => {
+    // Acknowledge result and navigate to replay
     void handleAcknowledgeResult();
     setShowResultModal(false);
-    onBackToLobby();
+    // Use setTimeout to ensure modal closes before navigation
+    setTimeout(() => {
+      void navigate({ to: "/replay", search: { gameId: gameId as string } });
+    }, 150);
+  }, [navigate, handleAcknowledgeResult]);
+
+  const handleCheckBoard = useCallback(() => {
+    // Just close the modal without acknowledging or navigating
+    // User can view the final board state
+    setShowResultModal(false);
+  }, []);
+
+  const handleReturnToLobby = useCallback(() => {
+    // First acknowledge the result and close modal, then navigate
+    void handleAcknowledgeResult();
+    setShowResultModal(false);
+    // Use setTimeout to ensure modal closes before navigation
+    setTimeout(() => {
+      onBackToLobby();
+    }, 100);
   }, [handleAcknowledgeResult, onBackToLobby]);
 
   // Helper function to check if a square is highlighted - memoized
@@ -2160,9 +2176,11 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
         isPlayer1={isPlayer1}
         isOpen={showResultModal}
         onClose={() => {
+          // Ensure modal closes and doesn't reopen
           void handleAcknowledgeResult();
           setShowResultModal(false);
         }}
+        onCheckBoard={handleCheckBoard}
         onReturnToLobby={handleReturnToLobby}
         gameId={gameId}
         onViewReplay={handleViewReplay}

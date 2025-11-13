@@ -737,19 +737,10 @@ export const makeMove = mutation({
 
     // Clean up presence room when game ends
     if (gameWinner) {
-      await presence.removeRoom(ctx, args.gameId);
-    }
-
-    // Update user's last seen time (they performed a significant action)
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
-
-    if (profile) {
-      await ctx.db.patch(profile._id, {
-        lastSeenAt: currentTime,
-      });
+      await presence.removeRoom(ctx, args.gameId as string);
+      // Remove both players from presence
+      await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
+      await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
     }
 
     return { success: true, challengeResult, winner: gameWinner };
@@ -863,7 +854,10 @@ export const surrenderGame = mutation({
     });
 
     // Clean up presence room when game ends
-    await presence.removeRoom(ctx, args.gameId);
+    await presence.removeRoom(ctx, args.gameId as string);
+    // Remove both players from presence
+    await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
     // Clean up spectator chat when game ends
     await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
@@ -993,7 +987,10 @@ export const timeoutGame = mutation({
     });
 
     // Clean up presence room when game ends
-    await presence.removeRoom(ctx, args.gameId);
+    await presence.removeRoom(ctx, args.gameId as string);
+    // Remove both players from presence
+    await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
     // Update player stats with game duration
     await ctx.runMutation(api.profiles.updateProfileStats, { 
@@ -1095,7 +1092,10 @@ export const forfeitGame = mutation({
     }
 
     // Clean up presence room when game ends
-    await presence.removeRoom(ctx, gameId);
+    await presence.removeRoom(ctx, gameId as string);
+    // Remove both players from presence
+    await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
 
     // Update player profiles
     const [winnerProfile, loserProfile] = await Promise.all([
@@ -1268,7 +1268,10 @@ export const checkOpponentTimeout = mutation({
     });
 
       // Clean up presence room when game ends
-      await presence.removeRoom(ctx, args.gameId);
+      await presence.removeRoom(ctx, args.gameId as string);
+      // Remove both players from presence
+      await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
+      await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
       // Clean up spectator chat when game ends
       await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
@@ -1454,64 +1457,53 @@ export const getMatchHistory = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
-    // Use proper pagination with cursor support
-    let result;
-    if (paginationOpts.cursor && paginationOpts.cursor.trim() !== "") {
-      try {
-        // Create a fresh query for pagination
-        const paginatedQuery = ctx.db
-          .query("games")
-          .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
-          .filter((q) => 
-            q.or(
-              q.eq(q.field("player1Id"), userId),
-              q.eq(q.field("player2Id"), userId)
-            )
-          )
-          .order("desc");
+    // Optimized: Use player-specific indexes to avoid scanning all finished games
+    // Query both player positions separately and merge results
+    const fetchLimit = limit * 2; // Fetch more to account for merging
 
-        result = await paginatedQuery.paginate({
-          numItems: limit,
-          cursor: paginationOpts.cursor,
-        });
-      } catch (error) {
-        // If cursor parsing fails, fall back to first page with proper pagination
-        console.warn("Failed to parse cursor, falling back to first page:", error);
-        const fallbackQuery = ctx.db
-          .query("games")
-          .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
-          .filter((q) => 
-            q.or(
-              q.eq(q.field("player1Id"), userId),
-              q.eq(q.field("player2Id"), userId)
-            )
-          )
-          .order("desc");
-
-        // Use paginate even for fallback to get proper cursor
-        result = await fallbackQuery.paginate({
-          numItems: limit,
-          cursor: null,
-        });
-      }
-    } else {
-      // First page - create a fresh query with proper pagination
-      const firstPageQuery = ctx.db
+    const [player1Games, player2Games] = await Promise.all([
+      ctx.db
         .query("games")
-        .withIndex("by_status_finished", (q) => q.eq("status", "finished"))
-        .filter((q) => 
-          q.or(
-            q.eq(q.field("player1Id"), userId),
-            q.eq(q.field("player2Id"), userId)
-          )
+        .withIndex("by_player1_finished", (q) =>
+          q.eq("player1Id", userId).eq("status", "finished")
         )
-        .order("desc");
+        .order("desc")
+        .take(fetchLimit),
+      ctx.db
+        .query("games")
+        .withIndex("by_player2_finished", (q) =>
+          q.eq("player2Id", userId).eq("status", "finished")
+        )
+        .order("desc")
+        .take(fetchLimit)
+    ]);
 
-      result = await firstPageQuery.paginate({
-        numItems: limit,
-        cursor: null,
-      });
+    // Merge and sort results by finishedAt descending, then by _id for tie-breaking
+    const allGames = [...player1Games, ...player2Games].sort((a, b) => {
+      const timeDiff = (b.finishedAt || 0) - (a.finishedAt || 0);
+      if (timeDiff !== 0) return timeDiff;
+      // If finishedAt is the same, sort by _id lexicographically
+      return b._id.localeCompare(a._id);
+    });
+
+    // Handle cursor-based pagination manually
+    let filteredGames = allGames;
+    if (paginationOpts.cursor && paginationOpts.cursor.trim() !== "") {
+      // Filter out games we've already seen (games before cursor)
+      filteredGames = allGames.filter(game => game._id > paginationOpts.cursor!);
     }
+
+    // Take the requested page size
+    const pageGames = filteredGames.slice(0, limit);
+
+    // Determine if we have more results
+    const hasMore = filteredGames.length > limit;
+
+    const result = {
+      page: pageGames,
+      isDone: !hasMore,
+      continueCursor: pageGames.length > 0 ? pageGames[pageGames.length - 1]._id : null,
+    };
 
     // Transform games into match history format
     const matchHistory = await Promise.all(
@@ -1696,7 +1688,10 @@ export const cleanupStaleGames = internalMutation({
         await ctx.db.delete(game._id);
 
         // Clean up presence room
-        await presence.removeRoom(ctx, game._id);
+        await presence.removeRoom(ctx, game._id as string);
+        // Remove both players from presence
+        await presence.removeRoomUser(ctx, game._id as string, game.player1Id);
+        await presence.removeRoomUser(ctx, game._id as string, game.player2Id);
 
         deletedSetupGames++;
       } catch (error) {
