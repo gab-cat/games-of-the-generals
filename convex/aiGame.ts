@@ -859,11 +859,7 @@ export const executeAIMove = mutation({
       newBoard[args.toRow][args.toCol] = fromPiece;
       newBoard[args.fromRow][args.fromCol] = null;
 
-      // Immediate check: If player2's flag reaches player1's base (row 7), game ends immediately
-      if (fromPiece.piece === "Flag" && args.toRow === 7) {
-        gameWinner = "player2";
-      }
-      // Note: Player1's flag reaching player2's base is checked after player2's turn (deferred)
+      // Note: Flag reaching opponent's base is checked after opponent's turn (deferred)
     }
 
     // Check if either player has only the flag remaining
@@ -897,11 +893,19 @@ export const executeAIMove = mutation({
       moveCount: session.moveCount + 1,
     };
 
-    // Note: Player2's flag reaching player1's base ends immediately (checked above)
-    // No deferred check needed here since player2's win is immediate
+    // Deferred check: After AI's turn, check if player2's flag reached player1's base (row 7)
+    // This ensures player1 gets one more turn to react when player2's flag reaches their base
     let flagReachedBase = false;
-    if (gameWinner && fromPiece.piece === "Flag" && !toPiece && args.toRow === 7) {
-      flagReachedBase = true;
+    if (!gameWinner) {
+      const player1BaseRow = 7; // Player 1's base row (bottom of board)
+      for (let col = 0; col < 9; col++) {
+        const cell = newBoard[player1BaseRow][col];
+        if (cell && cell.player === "player2" && cell.piece === "Flag") {
+          gameWinner = "player2";
+          flagReachedBase = true;
+          break;
+        }
+      }
     }
 
     if (gameWinner) {

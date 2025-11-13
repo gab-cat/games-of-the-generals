@@ -490,12 +490,7 @@ export const makeMove = mutation({
       // Simple move
       newBoard[args.toRow][args.toCol] = fromPiece;
       newBoard[args.fromRow][args.fromCol] = null;
-
-      // Immediate check: If player2's flag reaches player1's base (row 7), game ends immediately
-      if (fromPiece.piece === "Flag" && currentPlayer === "player2" && args.toRow === 7) {
-        gameWinner = "player2";
-      }
-      // Note: Player1's flag reaching player2's base is checked after player2's turn (deferred)
+      // Note: Flag reaching opponent's base is checked after opponent's turn (deferred)
     }
 
     // Record move
@@ -538,9 +533,8 @@ export const makeMove = mutation({
       updates.player2TimeUsed = (game.player2TimeUsed || 0) + timeUsedThisTurn;
     }
 
-    // Deferred check: After player2's turn, check if player1's flag is in player2's base (row 0)
-    // This ensures player2 gets one more turn when player1's flag reaches their base
-    // Note: Player2's flag reaching player1's base ends immediately (checked above)
+    // Deferred check: After a player's turn, check if their opponent's flag reached their base
+    // This ensures both players get one more turn to react when the opponent's flag reaches their base
     let flagReachedBase = false;
     const nextTurn = updates.currentTurn;
     if (!gameWinner && nextTurn === "player1") {
@@ -550,6 +544,19 @@ export const makeMove = mutation({
         const cell = newBoard[player2BackRow][col];
         if (cell && cell.player === "player1" && cell.piece === "Flag") {
           gameWinner = "player1";
+          flagReachedBase = true;
+          break;
+        }
+      }
+    }
+
+    if (!gameWinner && nextTurn === "player2") {
+      // After turn switches to player2 (meaning player1 just moved), check if player2's flag is in player1's base
+      const player1BackRow = 7; // Player 1's back row (bottom of board) - this is player1's base
+      for (let col = 0; col < 9; col++) {
+        const cell = newBoard[player1BackRow][col];
+        if (cell && cell.player === "player2" && cell.piece === "Flag") {
+          gameWinner = "player2";
           flagReachedBase = true;
           break;
         }
