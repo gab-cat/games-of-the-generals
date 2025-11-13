@@ -491,8 +491,8 @@ export const makeMove = mutation({
       newBoard[args.toRow][args.toCol] = fromPiece;
       newBoard[args.fromRow][args.fromCol] = null;
 
-      // Immediate check: If player2's flag reaches player1's base (row 0), game ends immediately
-      if (fromPiece.piece === "Flag" && currentPlayer === "player2" && args.toRow === 0) {
+      // Immediate check: If player2's flag reaches player1's base (row 7), game ends immediately
+      if (fromPiece.piece === "Flag" && currentPlayer === "player2" && args.toRow === 7) {
         gameWinner = "player2";
       }
       // Note: Player1's flag reaching player2's base is checked after player2's turn (deferred)
@@ -538,14 +538,14 @@ export const makeMove = mutation({
       updates.player2TimeUsed = (game.player2TimeUsed || 0) + timeUsedThisTurn;
     }
 
-    // Deferred check: After player2's turn, check if player1's flag is in player2's base (row 7)
+    // Deferred check: After player2's turn, check if player1's flag is in player2's base (row 0)
     // This ensures player2 gets one more turn when player1's flag reaches their base
     // Note: Player2's flag reaching player1's base ends immediately (checked above)
     let flagReachedBase = false;
     const nextTurn = updates.currentTurn;
     if (!gameWinner && nextTurn === "player1") {
       // After turn switches to player1 (meaning player2 just moved), check if player1's flag is in player2's base
-      const player2BackRow = 7; // Player 2's back row (bottom of board)
+      const player2BackRow = 0; // Player 2's back row (top of board) - this is player2's base
       for (let col = 0; col < 9; col++) {
         const cell = newBoard[player2BackRow][col];
         if (cell && cell.player === "player1" && cell.piece === "Flag") {
