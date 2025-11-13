@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
-import { Target, Trophy } from "lucide-react";
+import { Target, Trophy, HelpCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
 import { Id } from "../../../convex/_generated/dataModel";
+import Squares from "../../components/backgrounds/Squares/Squares";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -23,8 +25,17 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
   const winRate = profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
 
   return (
-    <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-      <CardHeader className="p-4 sm:p-6">
+    <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden">
+      {/* Animated Squares Background */}
+      <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-20">
+        <Squares
+          direction="diagonal"
+          speed={0.3}
+          squareSize={40}
+          borderColor="rgba(255,255,255,0.08)"
+        />
+      </div>
+      <CardHeader className="p-4 sm:p-6 relative z-10">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-0">
           <motion.div 
             initial={{ x: -20, opacity: 0 }}
@@ -66,7 +77,7 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
                 transition={{ delay: 0.3 }}
               >
                 <CardTitle className="text-lg sm:text-xl font-bold text-white/90">Commander Profile</CardTitle>
-                <p className="text-xs sm:text-sm text-white/60 mt-1">Battle Statistics & Performance</p>
+                <p className="text-xs sm:text-xs text-white/60 mt-1">Battle Statistics & Performance</p>
               </motion.div>
             </div>
           </motion.div>
@@ -115,7 +126,21 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
               transition={{ delay: 0.9 }}
             >
               <div className="text-xl sm:text-2xl font-bold text-yellow-400">{profile.elo ?? 1500}</div>
-              <div className="text-xs text-white/60">ELO</div>
+              <div className="text-xs text-white/60 flex text-center justify-center items-center gap-1">
+                ELO
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="w-3 h-3 text-white/40 hover:text-white/60 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs bg-black/20 backdrop-blur-sm text-white">
+                      <p className="text-xs">
+                        ELO rating is calculated only from Quick Match games, as matchmaking ensures fair skill-based pairings.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
             </motion.div>
           </motion.div>
         </div>

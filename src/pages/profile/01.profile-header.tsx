@@ -9,6 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import { MessageModerationMenu } from "../../components/global-chat/MessageModerationMenu";
 import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexAuth } from "convex/react";
+import Squares from "../../components/backgrounds/Squares/Squares";
 
 interface ProfileStats {
   username: string;
@@ -135,8 +136,19 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
     <motion.div
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="rounded-xl border border-white/10 bg-black/30 p-4 sm:p-6 mb-6"
+      className="rounded-xl border border-white/10 bg-black/30 p-4 sm:p-6 mb-6 relative overflow-hidden"
     >
+      {/* Animated Squares Background */}
+      <div className="absolute inset-0 rounded-xl overflow-hidden opacity-20">
+        <Squares
+          direction="diagonal"
+          speed={0.3}
+          squareSize={35}
+          borderColor="rgba(255,255,255,0.1)"
+        />
+      </div>
+
+      <div className="relative z-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {/* Left side - Avatar and Info */}
         <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -307,6 +319,7 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
           </motion.div>
         </div>
       </div>
+    </div>
     </motion.div>
   );
 }

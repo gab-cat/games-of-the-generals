@@ -826,6 +826,118 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
 
         {/* Sidebar */}
         <div className="space-y-4 lg:space-y-6 order-2 xl:order-2">
+          {/* Chat */}
+          <AnimatePresence>
+            {showChat && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <MessageSquare className="h-5 w-5 text-blue-400" />
+                      Spectator Chat
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {/* Chat Messages */}
+                    <div ref={chatContainerRef} className="space-y-2 h-64 overflow-y-auto mb-4 pr-2">
+                      {allMessages && allMessages.length > 0 ? (
+                        allMessages.map((message) => (
+                          <motion.div
+                            key={`${message._id}-${message.timestamp}`}
+                            initial={message.isOptimistic ? { opacity: 0, y: 10 } : false}
+                            animate={{ opacity: 1, y: 0 }}
+                            className={`text-sm flex items-start gap-2 ${
+                              message.isOptimistic ? 'opacity-60' : ''
+                            }`}
+                          >
+                            {message.isOptimistic && (
+                              <motion.div
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                className="flex-shrink-0 mt-0.5"
+                              >
+                                <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full" />
+                              </motion.div>
+                            )}
+                            <div className="flex-1">
+                              <span className="font-semibold text-blue-300">{message.username}:</span>
+                              <span className="text-white/80 ml-2">{message.message}</span>
+                            </div>
+                          </motion.div>
+                        ))
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-white/60">
+                          <div className="text-center">
+                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">No messages yet</p>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+
+                    {/* Chat Input */}
+                    {(isSpectating || isPlayer) && game.status !== "finished" && (
+                      <form onSubmit={handleSendMessage} className="flex gap-2">
+                        <Input
+                          ref={inputRef}
+                          value={chatMessage}
+                          onChange={(e) => setChatMessage(e.target.value)}
+                          onFocus={(e) => {
+                            isInputFocusedRef.current = true;
+                            // Store current scroll positions to prevent unwanted scrolling
+                            const chatScrollTop = chatContainerRef.current?.scrollTop ?? 0;
+                            const pageScrollY = window.scrollY;
+                            
+                            // Prevent browser from scrolling input into view
+                            // Use multiple attempts to catch browser scroll behavior
+                            const restoreScroll = () => {
+                              if (chatContainerRef.current) {
+                                chatContainerRef.current.scrollTop = chatScrollTop;
+                              }
+                              window.scrollTo({ top: pageScrollY, behavior: 'instant' });
+                            };
+                            
+                            // Restore immediately and after browser attempts to scroll
+                            restoreScroll();
+                            requestAnimationFrame(restoreScroll);
+                            setTimeout(restoreScroll, 0);
+                            setTimeout(restoreScroll, 10);
+                          }}
+                          onBlur={() => {
+                            isInputFocusedRef.current = false;
+                          }}
+                          placeholder="Type a message..."
+                          maxLength={500}
+                          className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          disabled={!chatMessage.trim()}
+                          className="bg-blue-500 hover:bg-blue-600 text-white"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </form>
+                    )}
+                    
+                    {/* Game Finished Message */}
+                    {game.status === "finished" && (
+                      <div className="flex items-center justify-center p-3 bg-gray-500/10 rounded-lg border border-gray-500/20">
+                        <p className="text-sm text-gray-400">Chat is disabled - Game has finished</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Spectators List */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
             <CardHeader>
@@ -952,118 +1064,6 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
               )}
             </div>
           )}
-
-          {/* Chat */}
-          <AnimatePresence>
-            {showChat && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-              >
-                <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <MessageSquare className="h-5 w-5 text-blue-400" />
-                      Spectator Chat
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {/* Chat Messages */}
-                    <div ref={chatContainerRef} className="space-y-2 h-64 overflow-y-auto mb-4 pr-2">
-                      {allMessages && allMessages.length > 0 ? (
-                        allMessages.map((message) => (
-                          <motion.div
-                            key={`${message._id}-${message.timestamp}`}
-                            initial={message.isOptimistic ? { opacity: 0, y: 10 } : false}
-                            animate={{ opacity: 1, y: 0 }}
-                            className={`text-sm flex items-start gap-2 ${
-                              message.isOptimistic ? 'opacity-60' : ''
-                            }`}
-                          >
-                            {message.isOptimistic && (
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                className="flex-shrink-0 mt-0.5"
-                              >
-                                <div className="w-3 h-3 border border-blue-400 border-t-transparent rounded-full" />
-                              </motion.div>
-                            )}
-                            <div className="flex-1">
-                              <span className="font-semibold text-blue-300">{message.username}:</span>
-                              <span className="text-white/80 ml-2">{message.message}</span>
-                            </div>
-                          </motion.div>
-                        ))
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-white/60">
-                          <div className="text-center">
-                            <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                            <p className="text-sm">No messages yet</p>
-                          </div>
-                        </div>
-                      )}
-                      <div ref={chatEndRef} />
-                    </div>
-
-                    {/* Chat Input */}
-                    {(isSpectating || isPlayer) && game.status !== "finished" && (
-                      <form onSubmit={handleSendMessage} className="flex gap-2">
-                        <Input
-                          ref={inputRef}
-                          value={chatMessage}
-                          onChange={(e) => setChatMessage(e.target.value)}
-                          onFocus={(e) => {
-                            isInputFocusedRef.current = true;
-                            // Store current scroll positions to prevent unwanted scrolling
-                            const chatScrollTop = chatContainerRef.current?.scrollTop ?? 0;
-                            const pageScrollY = window.scrollY;
-                            
-                            // Prevent browser from scrolling input into view
-                            // Use multiple attempts to catch browser scroll behavior
-                            const restoreScroll = () => {
-                              if (chatContainerRef.current) {
-                                chatContainerRef.current.scrollTop = chatScrollTop;
-                              }
-                              window.scrollTo({ top: pageScrollY, behavior: 'instant' });
-                            };
-                            
-                            // Restore immediately and after browser attempts to scroll
-                            restoreScroll();
-                            requestAnimationFrame(restoreScroll);
-                            setTimeout(restoreScroll, 0);
-                            setTimeout(restoreScroll, 10);
-                          }}
-                          onBlur={() => {
-                            isInputFocusedRef.current = false;
-                          }}
-                          placeholder="Type a message..."
-                          maxLength={500}
-                          className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={!chatMessage.trim()}
-                          className="bg-blue-500 hover:bg-blue-600 text-white"
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      </form>
-                    )}
-                    
-                    {/* Game Finished Message */}
-                    {game.status === "finished" && (
-                      <div className="flex items-center justify-center p-3 bg-gray-500/10 rounded-lg border border-gray-500/20">
-                        <p className="text-sm text-gray-400">Chat is disabled - Game has finished</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-          </AnimatePresence>
 
           {/* Game Info */}
           <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">

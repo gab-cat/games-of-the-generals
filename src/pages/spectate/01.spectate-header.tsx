@@ -4,6 +4,7 @@ import { CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { toast } from "sonner";
+import Squares from "../../components/backgrounds/Squares/Squares";
 
 interface SpectateHeaderProps {
   spectatorCount: number;
@@ -26,7 +27,18 @@ export function SpectateHeader({
   };
 
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between relative overflow-hidden">
+      {/* Animated Squares Background */}
+      <div className="absolute inset-0 overflow-hidden opacity-20">
+        <Squares
+          direction="right"
+          speed={0.6}
+          squareSize={40}
+          borderColor="rgba(255,255,255,0.1)"
+        />
+      </div>
+
+      <div className="flex items-center justify-between relative z-10 w-full">
       <div className="flex items-center gap-4">
         <motion.div
           whileHover={{ scale: 1.05 }}
@@ -90,6 +102,7 @@ export function SpectateHeader({
           Copy Game ID
         </Button>
       </div>
+    </div>
     </div>
   );
 }
