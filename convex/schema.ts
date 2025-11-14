@@ -60,7 +60,10 @@ const applicationTables = {
     .index("by_admin_role", ["adminRole"]) // For finding admin/moderator users
     .index("by_username_games", ["username", "gamesPlayed"]) // For efficient username search
     .index("by_last_seen", ["lastSeenAt"]) // For online status queries
-    .index("by_elo", ["elo"]), // For ELO-based leaderboard queries
+    .index("by_elo", ["elo"]) // For ELO-based leaderboard queries
+    .searchIndex("search_username", {
+      searchField: "username",
+    }),
 
   // User achievements
   achievements: defineTable({
