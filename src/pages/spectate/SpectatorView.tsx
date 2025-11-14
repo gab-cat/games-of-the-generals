@@ -24,6 +24,7 @@ import { UserAvatar } from "@/components/UserAvatar";
 import { useConvexMutationWithQuery, useConvexQuery } from "@/lib/convex-query-hooks";
 import { useQuery } from "convex-helpers/react/cache";
 import { getPieceDisplay } from "@/lib/piece-display";
+import { useSound } from "@/lib/SoundProvider";
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { api } from "../../../convex/_generated/api";
@@ -66,6 +67,13 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isInputFocusedRef = useRef(false);
+
+  // Refs for tracking previous game state to detect changes for SFX
+  const previousMoveCountRef = useRef<number>(0);
+  const previousGameStatusRef = useRef<string>("");
+
+  // Sound effects hook
+  const { playSFX } = useSound();
 
   const game = useQuery(api.games.getGame, { gameId });
   const isLoadingGame = game === undefined;
@@ -348,6 +356,50 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
       joinAsSpectator({ gameId });
     }
   }, [game, gameId, profile.userId, joinAsSpectator]);
+
+  // Detect new moves and play SFX
+  useEffect(() => {
+    if (!movesArray || !game || game.status !== "playing") return;
+
+    const currentMoveCount = movesArray.length;
+    const previousMoveCount = previousMoveCountRef.current;
+
+    // If this is not the initial load and we have new moves
+    if (previousMoveCount > 0 && currentMoveCount > previousMoveCount) {
+      // Get the newest move
+      const newMoves = movesArray.slice(previousMoveCount);
+      const latestMove = newMoves[newMoves.length - 1];
+
+      if (latestMove && latestMove.moveType !== "setup") {
+        if (latestMove.moveType === "challenge") {
+          // Battle occurred - play kill SFX
+          playSFX("kill");
+        } else if (latestMove.moveType === "move") {
+          // Regular move - play piece-move SFX
+          playSFX("piece-move");
+        }
+      }
+    }
+
+    // Update the ref with current move count
+    previousMoveCountRef.current = currentMoveCount;
+  }, [movesArray, game, playSFX]);
+
+  // Detect game end and play victory SFX
+  useEffect(() => {
+    if (!game) return;
+
+    const currentStatus = game.status;
+    const previousStatus = previousGameStatusRef.current;
+
+    // If game just finished (changed from playing/setup to finished)
+    if (previousStatus && previousStatus !== "finished" && currentStatus === "finished") {
+      playSFX("player-victory");
+    }
+
+    // Update the ref with current status
+    previousGameStatusRef.current = currentStatus;
+  }, [game, playSFX]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -887,7 +939,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                           ref={inputRef}
                           value={chatMessage}
                           onChange={(e) => setChatMessage(e.target.value)}
-                          onFocus={(e) => {
+                          onFocus={() => {
                             isInputFocusedRef.current = true;
                             // Store current scroll positions to prevent unwanted scrolling
                             const chatScrollTop = chatContainerRef.current?.scrollTop ?? 0;

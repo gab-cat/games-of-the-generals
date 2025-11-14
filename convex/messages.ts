@@ -663,44 +663,73 @@ export const searchUsers = query({
     const limit = Math.min(args.limit || 10, 15);
     const searchTerm = args.searchTerm.toLowerCase().trim();
 
-    // FIXED: Optimized case-insensitive search with better database-level filtering
-    // Use the active players index and filter efficiently
+    // FIXED: Use by_username_games index with range queries for prefix matching
+    // This provides better performance and accuracy than fetching all active players
+    const lower = searchTerm;
+    const upper = searchTerm.toUpperCase();
+
+    // Get profiles using range query for case-insensitive prefix matching
     const allProfiles = await ctx.db
       .query("profiles")
-      .withIndex("by_active_players", (q) => 
-        q.gte("gamesPlayed", 0)
+      .withIndex("by_username_games", (q) =>
+        q.gte("username", lower).lte("username", upper + '\uffff')
       )
-      .filter((q) => q.neq(q.field("userId"), userId))
-      .take(150); // Take a reasonable batch for filtering
+      .filter((q) => q.neq(q.field("userId"), userId)) // Exclude current user
+      .take(100); // Reduced from 150 - more efficient with better filtering
 
-    // FIXED: Case-insensitive filtering with better performance and prioritization
-    const filteredProfiles = allProfiles
-      .filter(p => {
-        const username = p.username.toLowerCase();
-        return username.includes(searchTerm);
-      })
+    // FIXED: Prioritize prefix matches over contains matches for better accuracy
+    // First, get exact prefix matches (most relevant)
+    const prefixMatches = allProfiles
+      .filter((p) => p.username.toLowerCase().startsWith(searchTerm))
       .sort((a, b) => {
         const aUsername = a.username.toLowerCase();
         const bUsername = b.username.toLowerCase();
-        
-        // Prioritize exact matches first
-        const aStartsWith = aUsername.startsWith(searchTerm);
-        const bStartsWith = bUsername.startsWith(searchTerm);
-        
-        if (aStartsWith && !bStartsWith) return -1;
-        if (!aStartsWith && bStartsWith) return 1;
-        
-        // Then prioritize by games played (more active users first)
+
+        // Sort by games played (more active users first)
         if (a.gamesPlayed !== b.gamesPlayed) {
           return b.gamesPlayed - a.gamesPlayed;
         }
-        
-        // Finally sort alphabetically
+
+        // Then alphabetically
         return aUsername.localeCompare(bUsername);
       })
       .slice(0, limit);
 
-    return filteredProfiles.map(p => ({
+    // If we have enough prefix matches, return them
+    if (prefixMatches.length >= limit) {
+      return prefixMatches.map(p => ({
+        userId: p.userId,
+        username: p.username,
+        avatarUrl: p.avatarUrl,
+        rank: p.rank,
+        gamesPlayed: p.gamesPlayed,
+      }));
+    }
+
+    // If not enough prefix matches, add contains matches as fallback
+    const containsMatches = allProfiles
+      .filter((p) =>
+        !p.username.toLowerCase().startsWith(searchTerm) &&
+        p.username.toLowerCase().includes(searchTerm)
+      )
+      .sort((a, b) => {
+        const aUsername = a.username.toLowerCase();
+        const bUsername = b.username.toLowerCase();
+
+        // Sort by games played (more active users first)
+        if (a.gamesPlayed !== b.gamesPlayed) {
+          return b.gamesPlayed - a.gamesPlayed;
+        }
+
+        // Then alphabetically
+        return aUsername.localeCompare(bUsername);
+      })
+      .slice(0, limit - prefixMatches.length);
+
+    // Combine prefix matches first, then contains matches
+    const combinedResults = [...prefixMatches, ...containsMatches];
+
+    return combinedResults.map(p => ({
       userId: p.userId,
       username: p.username,
       avatarUrl: p.avatarUrl,
