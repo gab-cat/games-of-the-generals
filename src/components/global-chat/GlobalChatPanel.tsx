@@ -455,6 +455,7 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
                               }}
                               placeholder="Type a message... Use @ to mention users"
                               maxLength={500}
+                              onlineUsers={onlineUsers}
                             />
                             <Button
                               onClick={() => void handleSendMessage()}

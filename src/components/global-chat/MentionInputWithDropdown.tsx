@@ -16,6 +16,7 @@ interface MentionInputWithDropdownProps extends Omit<React.InputHTMLAttributes<H
   maxLength?: number;
   className?: string;
   handleSendMessage: () => void;
+  onlineUsers?: Array<{ username: string; avatarUrl?: string; rank?: string; userId: string }>;
 }
 
 // Online user interface - no need for rank colors/icons since we're simplifying
@@ -28,6 +29,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
     maxLength,
     className,
     handleSendMessage,
+    onlineUsers = [],
     ...props
   }, ref) => {
     const [cursorPosition, setCursorPosition] = useState(0);
@@ -51,11 +53,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
       { command: 'clear', description: 'Clear chat history' },
     ];
 
-    // Get online users for autocomplete
-    const onlineUsers = useQuery(
-      api.globalChat.getOnlineUsers,
-      {} // Always query for online users
-    )?.filter((user): user is NonNullable<typeof user> => user !== null) || [];
+    // Online users are passed as props from parent component
 
     // Debounce the mention query for 500ms
     const [debouncedMentionQuery] = useDebounce(mentionQuery, 500);

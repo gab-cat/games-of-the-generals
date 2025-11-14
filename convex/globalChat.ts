@@ -1,10 +1,25 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { profanity, CensorType } from "@2toad/profanity";
 import { api, internal } from "./_generated/api";
 
+
+// Type for online user data from presence system
+interface OnlineUserData {
+  userId: string;
+  username: string;
+  rank?: string;
+  avatarUrl?: string;
+  lastSeenAt?: number;
+  currentPage?: string;
+  gameId?: Id<"games">;
+  lobbyId?: Id<"lobbies">;
+  aiGameId?: Id<"aiGameSessions">;
+  online: boolean;
+  lastDisconnected: number;
+}
 
 // Simple hash function to replace crypto for spam detection
 function simpleHash(str: string): string {
@@ -73,20 +88,9 @@ function formatRemainingTime(remainingMs: number): string {
   }
 }
 
-// Helper function to get online users count and details
-async function getOnlineUsersInfo(ctx: any): Promise<any[]> {
-  const fiveMinutesAgo = Date.now() - 5 * 60 * 1000; // 5 minutes ago
-
-  const recentProfiles = await ctx.db
-    .query("profiles")
-    .withIndex("by_last_seen", (q: any) => q.gte("lastSeenAt", fiveMinutesAgo))
-    .take(100);
-
-  return recentProfiles;
-}
 
 // Handle chat commands
-async function handleChatCommand(ctx: any, args: { message: string }, userId: Id<"users">, profile: any): Promise<any> {
+async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userId: Id<"users">, profile: Doc<"profiles">): Promise<any> {
   const message = args.message.trim();
 
   // Check if message is a command (starts with /)
@@ -129,15 +133,16 @@ async function handleChatCommand(ctx: any, args: { message: string }, userId: Id
     }
 
     case '/online': {
-      const onlineUsers = await getOnlineUsersInfo(ctx);
-      const onlineCount = onlineUsers.length;
+      const onlineUsers = await ctx.runQuery(api.presence.listRoom, { roomId: "global" }) as (OnlineUserData | null)[];
+      const onlineCount = onlineUsers.filter((user): user is OnlineUserData => user !== null).length;
 
       if (onlineCount === 0) {
         responseMessage = 'No users are currently online.';
       } else {
         const userList = onlineUsers
+          .filter((user): user is OnlineUserData => user !== null)
           .slice(0, 10) // Limit to first 10 users
-          .map((user: any) => `- ${user.username} (${user.rank})`)
+          .map((user: OnlineUserData) => `- ${user.username} (${user.rank})`)
           .join('\n');
 
         responseMessage = `**${onlineCount} users online:**\n\n${userList}${onlineCount > 10 ? `\n\n*...and ${onlineCount - 10} more...*` : ''}`;
@@ -460,62 +465,6 @@ export const getMessages = query({
   },
 });
 
-// Get online users (recently active users within 5 minutes)
-// OPTIMIZED: Batch fetches profiles efficiently, handles empty arrays early
-export const getOnlineUsers = query({
-  args: {
-    users: v.optional(v.array(v.object({
-      userId: v.string(),
-      online: v.boolean(),
-      lastDisconnected: v.number(),
-    }))),
-  },
-  handler: async (ctx, args) => {
-    const onlineUsers = args.users || [];
-    
-    // Early return if no users
-    if (onlineUsers.length === 0) {
-      return [];
-    }
-
-    // OPTIMIZED: Extract unique usernames to avoid duplicate queries
-    const uniqueUsernames = Array.from(new Set(onlineUsers.map(u => u.userId)));
-    
-    // OPTIMIZED: Batch fetch all profiles in parallel using Promise.all
-    // Note: Convex doesn't support "IN" queries, so we still need individual lookups
-    // but Promise.all ensures they execute in parallel efficiently
-    const profiles = await Promise.all(uniqueUsernames.map(async (username) => {
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_username", (q) => q.eq("username", username))
-        .unique();
-      return { username, profile };
-    }));
-
-    // Create a map for O(1) lookup
-    const profileMap = new Map(profiles.map(({ username, profile }) => [username, profile]));
-
-    // Map results preserving original order and presence data
-    return onlineUsers
-      .map((u) => {
-        const profile = profileMap.get(u.userId);
-        if (!profile) return null;
-        
-        return {
-          userId: u.userId,
-          username: profile.username,
-          rank: profile.rank,
-          avatarUrl: profile.avatarUrl,
-          lastSeenAt: profile.lastSeenAt,
-          currentPage: profile.currentPage,
-          gameId: profile.gameId,
-          lobbyId: profile.lobbyId,
-          aiGameId: profile.aiSessionId, // directly from profile now
-        };
-      })
-      .filter((user): user is NonNullable<typeof user> => user !== null);
-  },
-});
 
 // Get user's chat settings
 export const getUserChatSettings = query({

@@ -186,7 +186,7 @@ export function ConversationView({
   // Helper: status indicator node and status text for header
   const getHeaderStatus = (username?: string) => {
     if (!username) return { indicator: null as React.ReactNode, text: null as string | null };
-    const user = onlineUsers?.find(u => u.username === username);
+    const user = onlineUsers?.find((u: { username: string; }) => u.username === username);
     if (!user) return { indicator: null as React.ReactNode, text: null as string | null };
 
     if (user.gameId) {

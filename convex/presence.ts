@@ -102,28 +102,46 @@ export const listUser = query({
   },
 });
 
-// List users in a room
+// List users in a room with full profile data
 export const listRoom = query({
   args: { roomId: v.string() },
   returns: v.array(v.union(
     v.object({
       userId: v.string(),
+      username: v.string(),
+      rank: v.optional(v.string()),
+      avatarUrl: v.optional(v.string()),
+      lastSeenAt: v.optional(v.number()),
+      currentPage: v.optional(v.string()),
+      gameId: v.optional(v.id("games")),
+      lobbyId: v.optional(v.id("lobbies")),
+      aiGameId: v.optional(v.id("aiGameSessions")),
       online: v.boolean(),
       lastDisconnected: v.number(),
-      image: v.optional(v.string()),
     }),
     v.null()
   )),
   handler: async (ctx, { roomId }) => {
     // Use the provided roomId instead of hardcoded 'global'
     const list = await presence.listRoom(ctx, roomId, true);
-    console.log('📍 List room:', list);
     // Remove if userId is "Anonymous"
-    const listWithImage = await Promise.all(list.map(async (user) => {
+    const listWithProfileData = await Promise.all(list.map(async (user) => {
       const profile = await ctx.db.query("profiles").withIndex("by_username", (q) => q.eq("username", user.userId)).unique();
-      return user.userId !== "Anonymous" ? { ...user, image: profile?.avatarUrl } : null;
+      return user.userId !== "Anonymous" ? {
+        userId: user.userId,
+        username: profile?.username || user.userId,
+        rank: profile?.rank,
+        avatarUrl: profile?.avatarUrl,
+        lastSeenAt: profile?.lastSeenAt,
+        currentPage: profile?.currentPage,
+        gameId: profile?.gameId,
+        lobbyId: profile?.lobbyId,
+        aiGameId: profile?.aiSessionId,
+        online: user.online,
+        lastDisconnected: user.lastDisconnected,
+      } : null;
     }));
     
-    return listWithImage;
+    return listWithProfileData;
   },
 });
