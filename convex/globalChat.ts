@@ -750,6 +750,16 @@ export const sendMentionNotifications = internalMutation({
           mentionText: message.filteredMessage || message.message,
         });
 
+        // Send system notification
+        await ctx.runMutation(internal.notifications.sendNotification, {
+          userId: mentionedUserId,
+          type: "chat_mention",
+          messageId: args.messageId,
+          mentionerId: args.mentionerId,
+          action: "mentioned",
+          message: `@${args.mentionerUsername} mentioned you in chat: \n\n${message.filteredMessage || message.message}`,
+        });
+
         // Get the mentioned user's chat settings to check if they want mention notifications
         const mentionedUserSettings = await ctx.db
           .query("userChatSettings")

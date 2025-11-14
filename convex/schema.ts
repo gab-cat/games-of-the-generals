@@ -316,14 +316,17 @@ const applicationTables = {
   // Notification records for system notifications
   notifications: defineTable({
     userId: v.id("users"), // Recipient of the notification
-    type: v.union(v.literal("ticket_update")), // Extensible for future notification types
+    type: v.union(v.literal("ticket_update"), v.literal("chat_mention")), // Extensible for future notification types
     ticketId: v.optional(v.id("supportTickets")), // Reference to support ticket for ticket notifications
+    messageId: v.optional(v.id("globalChat")), // Reference to global chat message for chat mentions
+    mentionerId: v.optional(v.id("users")), // Reference to who mentioned the user
     action: v.union(
       v.literal("replied"),
       v.literal("opened"),
       v.literal("closed"),
       v.literal("status_changed"),
-      v.literal("messaged")
+      v.literal("messaged"),
+      v.literal("mentioned")
     ), // What happened
     message: v.string(), // Human-readable description
     ticketLink: v.optional(v.string()), // URL or ID reference to ticket

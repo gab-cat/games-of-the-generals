@@ -15,6 +15,8 @@ import { toast } from "sonner";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { useDebouncedCallback } from "use-debounce";
 import { useOnlineUsers } from "../../lib/useOnlineUsers";
+import { useChatProtection } from "../../lib/useChatProtection";
+import { RateLimitModal, SpamWarningModal } from "../global-chat";
 
 interface OptimisticMessage {
   _id: string;
@@ -178,10 +180,40 @@ export function ConversationView({
   const [isLoading, setIsLoading] = useState(false);
   const [optimisticMessages, setOptimisticMessages] = useState<OptimisticMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const newestTimestampRef = useRef<number>(0);
 
   // Online users presence data
   const { onlineUsers } = useOnlineUsers();
+
+  // Chat protection hook
+  const {
+    validateMessage,
+    recordMessage,
+    showRateLimitModal,
+    showSpamModal,
+    rateLimitState,
+    spamMessage,
+    spamType,
+    closeRateLimitModal,
+    closeSpamModal,
+    setSpamType,
+    setSpamMessage,
+    setShowSpamModal
+  } = useChatProtection() as {
+    validateMessage: (message: string) => Promise<{ allowed: boolean; type?: 'rateLimit' | 'spam'; reason?: string }>;
+    recordMessage: (message: string) => void;
+    showRateLimitModal: boolean;
+    showSpamModal: boolean;
+    rateLimitState: { messageCount: number; isLimited: boolean; remainingTime: number };
+    spamMessage: string;
+    spamType: 'repeated' | 'caps' | 'excessive' | 'profanity' | 'generic';
+    closeRateLimitModal: () => void;
+    closeSpamModal: () => void;
+    setSpamType: (type: 'repeated' | 'caps' | 'excessive' | 'profanity' | 'generic') => void;
+    setSpamMessage: (message: string) => void;
+    setShowSpamModal: (show: boolean) => void;
+  };
 
   // Helper: status indicator node and status text for header
   const getHeaderStatus = (username?: string) => {
@@ -214,29 +246,6 @@ export function ConversationView({
     };
   };
 
-  // Dynamic profanity loader
-  const [profanityFilter, setProfanityFilter] = useState<any>(null);
-  const [profanityLoading, setProfanityLoading] = useState(false);
-
-  const loadProfanityFilter = async () => {
-    if (profanityFilter) return profanityFilter;
-    if (profanityLoading) return null;
-
-    console.log('🔧 Dynamically loading profanity filter for messaging...');
-    setProfanityLoading(true);
-
-    try {
-      const { profanity, CensorType } = await import('@2toad/profanity');
-      console.log('✅ Profanity filter loaded for messaging');
-      setProfanityFilter({ profanity, CensorType });
-      return { profanity, CensorType };
-    } catch (error) {
-      console.error('❌ Failed to load profanity filter for messaging:', error);
-      return null;
-    } finally {
-      setProfanityLoading(false);
-    }
-  };
 
   const sendMessage = useMutation(api.messages.sendMessage);
   const markAsRead = useMutation(api.messages.markMessagesAsRead);
@@ -432,20 +441,20 @@ export function ConversationView({
 
     const messageText = newMessage.trim();
 
-    // Load profanity filter if needed
-    let filter = profanityFilter;
-    if (!filter) {
-      filter = await loadProfanityFilter();
+    // Validate message with rate limiting and spam filtering
+    const validation = await validateMessage(messageText);
+
+    if (!validation.allowed) {
+      return; // Modal will be shown by the hook
     }
 
-    // Apply censorship if filter is available
-    const censoredText = filter?.profanity?.censor(messageText, filter.CensorType?.Word) || messageText;
+    // Use original message text (profanity validation already prevents sending inappropriate content)
     const optimisticId = `optimistic-${Date.now()}-${Math.random()}`;
 
     // Create optimistic message
     const optimisticMessage: OptimisticMessage = {
       _id: optimisticId,
-      content: censoredText,
+      content: messageText,
       messageType: "text",
       senderId: currentUserProfile?.userId || "",
       _creationTime: Date.now(),
@@ -461,7 +470,7 @@ export function ConversationView({
     try {
       await sendMessage({
         recipientUsername: otherUserProfile?.username || "",
-        content: censoredText,
+        content: messageText,
         messageType: "text",
       });
       // Stop typing once message sent
@@ -469,23 +478,37 @@ export function ConversationView({
         setIsTyping(false);
         void setTyping({ otherUserId: otherUserId as Id<"users">, isTyping: false });
       }
-      
+
+      // Record successful message for rate limiting and spam detection
+      recordMessage(messageText);
+
       // Remove optimistic message on success (server message will replace it)
       setOptimisticMessages(prev => prev.filter(msg => msg._id !== optimisticId));
+
+      // Keep input focused for continued typing
+      setTimeout(() => inputRef.current?.focus(), 0);
     } catch (error) {
       console.error("Failed to send message:", error);
-      
+
       // Mark optimistic message as failed
-      setOptimisticMessages(prev => 
-        prev.map(msg => 
-          msg._id === optimisticId 
+      setOptimisticMessages(prev =>
+        prev.map(msg =>
+          msg._id === optimisticId
             ? { ...msg, status: "failed" as const }
             : msg
         )
       );
-      
-      // Show error feedback
-      console.error("Failed to send message");
+
+      // Check if this is a repeated message error - show modal instead of toast
+      const errorMessage = error instanceof Error ? error.message : "Failed to send message";
+      if (errorMessage.includes("repeatedly") || errorMessage.includes("same message")) {
+        setSpamType('repeated');
+        setSpamMessage(messageText);
+        setShowSpamModal(true);
+      } else {
+        // Show error feedback for other failures
+        console.error("Failed to send message");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -1126,6 +1149,7 @@ export function ConversationView({
           <div className="p-4 border-t bg-slate-900/50">
             <div className="flex gap-2">
               <Input
+                ref={inputRef}
                 placeholder={`Message ${otherUserProfile?.username}...`}
                 value={newMessage}
                 onChange={(e) => {
@@ -1133,8 +1157,7 @@ export function ConversationView({
                   signalTyping();
                 }}
                 onKeyPress={handleKeyPress}
-                disabled={isLoading}
-                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
+                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/20 focus:ring-0"
               />
               <Button
                 onClick={() => void handleSendMessage()}
@@ -1149,6 +1172,19 @@ export function ConversationView({
           </div>
         )}
       </div>
+
+      <RateLimitModal
+        isOpen={showRateLimitModal}
+        onClose={closeRateLimitModal}
+        remainingTime={rateLimitState.remainingTime}
+      />
+
+      <SpamWarningModal
+        isOpen={showSpamModal}
+        onClose={closeSpamModal}
+        spamType={spamType}
+        message={spamMessage}
+      />
     </TooltipProvider>
   );
 }

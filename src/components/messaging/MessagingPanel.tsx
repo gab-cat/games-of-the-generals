@@ -456,9 +456,10 @@ export function MessagingPanel({
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onClose} >
-        <SheetContent 
-          side="right" 
-          className="w-full max-w-md p-0 bg-gray-700/20 backdrop-blur-xl border-white/20 text-white"
+        <SheetContent
+          side="right"
+          className="w-full max-w-md p-0 focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none bg-gray-700/20 backdrop-blur-xl border-white/20 text-white"
+          tabIndex={-1}
         >
           <SheetHeader className={cn(
             "p-4 border-b border-white/20 bg-gray-900/40",
@@ -645,7 +646,7 @@ export function MessagingPanel({
                                         Game invite:
                                       </span>
                                     )}
-                                    {currentProfile && conversation.lastMessage.senderId === currentProfile.userId
+                                    {currentProfile && conversation.lastMessage.senderId === currentProfile.userId && conversation.otherParticipant.username !== "Notifications"
                                       ? `You: ${truncateMessage(conversation.lastMessage.content)}`
                                       : truncateMessage(conversation.lastMessage.content)
                                     }

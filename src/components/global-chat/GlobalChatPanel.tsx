@@ -65,7 +65,10 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     spamMessage,
     spamType,
     closeRateLimitModal,
-    closeSpamModal
+    closeSpamModal,
+    setSpamType,
+    setSpamMessage,
+    setShowSpamModal
   } = useChatProtection() as {
     validateMessage: (message: string) => Promise<{ allowed: boolean; type?: 'rateLimit' | 'spam'; reason?: string }>;
     recordMessage: (message: string) => void;
@@ -76,6 +79,9 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
     spamType: 'repeated' | 'caps' | 'excessive' | 'profanity' | 'generic';
     closeRateLimitModal: () => void;
     closeSpamModal: () => void;
+    setSpamType: (type: 'repeated' | 'caps' | 'excessive' | 'profanity' | 'generic') => void;
+    setSpamMessage: (message: string) => void;
+    setShowSpamModal: (show: boolean) => void;
   };
 
     // Current user profile - profile data changes infrequently
@@ -224,8 +230,15 @@ export function GlobalChatPanel({ isOpen, onToggle }: GlobalChatPanelProps) {
       // Remove optimistic message on error
       setOptimisticMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
 
-      // Show error message
-      toast.error(errorMessage || "Failed to send message");
+      // Check if this is a repeated message error - show modal instead of toast
+      if (errorMessage && (errorMessage.includes("repeatedly") || errorMessage.includes("same message"))) {
+        setSpamType('repeated');
+        setSpamMessage(messageText);
+        setShowSpamModal(true);
+      } else {
+        // Show error message for other failures
+        toast.error(errorMessage || "Failed to send message");
+      }
     }
   };
 

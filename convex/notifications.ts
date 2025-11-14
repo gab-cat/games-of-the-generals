@@ -68,14 +68,17 @@ export const ensureNotificationConversation = internalMutation({
 export const sendNotification = internalMutation({
   args: {
     userId: v.id("users"),
-    type: v.union(v.literal("ticket_update")),
+    type: v.union(v.literal("ticket_update"), v.literal("chat_mention")),
     ticketId: v.optional(v.id("supportTickets")),
+    messageId: v.optional(v.id("globalChat")),
+    mentionerId: v.optional(v.id("users")),
     action: v.union(
       v.literal("replied"),
       v.literal("opened"),
       v.literal("closed"),
       v.literal("status_changed"),
-      v.literal("messaged")
+      v.literal("messaged"),
+      v.literal("mentioned")
     ),
     message: v.string(),
     ticketLink: v.optional(v.string()),
@@ -87,6 +90,8 @@ export const sendNotification = internalMutation({
       userId: args.userId,
       type: args.type,
       ticketId: args.ticketId,
+      messageId: args.messageId,
+      mentionerId: args.mentionerId,
       action: args.action,
       message: args.message,
       ticketLink: args.ticketLink,

@@ -350,6 +350,9 @@ export function useChatProtection() {
     spamType,
     closeRateLimitModal,
     closeSpamModal,
+    setSpamType,
+    setSpamMessage,
+    setShowSpamModal,
     resetRateLimit,
     profanityLoading
   };
