@@ -14,6 +14,9 @@ import { useNavigate } from "@tanstack/react-router";
 export function SignInForm() {
   const [flow, setFlow] = useState<"signIn" | "signUp" | "resetPassword">("signIn");
   const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
+
+
   
   // Use the auth mutation hook for better error handling
   const authMutation = useAuthMutation({
@@ -39,6 +42,18 @@ export function SignInForm() {
       toast.error(toastTitle);
     }
   });
+
+  const handleOAuthSignIn = async (provider: "google" | "github") => {
+    setIsLoading(true);
+    try {
+      authMutation.mutate({ provider });
+    } catch (error) {
+      console.error(error);
+    } 
+  };
+
+  const showLoadingSpinner = authMutation.isPending || isLoading;
+  console.log("showLoadingSpinner: ", showLoadingSpinner);
 
   return (
     <div className="absolute inset-0 w-screen h-screen overflow-hidden">
@@ -300,8 +315,8 @@ export function SignInForm() {
                     aria-label="Sign in with Google"
                     variant="outline"
                     className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2 sm:py-2.5 rounded-full font-medium font-body text-sm flex items-center justify-center gap-2"
-                    onClick={() => authMutation.mutate({ provider: "google" })}
-                    disabled={authMutation.isPending}
+                    onClick={() => void handleOAuthSignIn("google")}
+                    disabled={showLoadingSpinner}
                   >
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -320,8 +335,8 @@ export function SignInForm() {
                     aria-label="Sign in with GitHub"
                     variant="outline"
                     className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2 sm:py-2.5 rounded-full font-medium font-body text-sm flex items-center justify-center gap-2"
-                    onClick={() => authMutation.mutate({ provider: "github" })}
-                    disabled={authMutation.isPending}
+                    onClick={() => void handleOAuthSignIn("github")}
+                    disabled={showLoadingSpinner}
                   >
                     <Github className="w-5 h-5" />
                     <span>GitHub</span>
@@ -333,7 +348,7 @@ export function SignInForm() {
                   variant="outline" 
                   className="w-full bg-white/5 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/10 hover:text-white hover:border-white/30 transition-all duration-200 py-2 sm:py-2.5 rounded-full font-medium font-body text-sm" 
                   onClick={() => authMutation.mutate({ provider: "anonymous" })}
-                  disabled={authMutation.isPending}
+                  disabled={showLoadingSpinner}
                 >
                   Enter as Guest Commander
                 </Button>
@@ -402,10 +417,10 @@ export function SignInForm() {
                   <Button 
                     type="submit" 
                     className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2 sm:py-2.5 px-5 rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm" 
-                    disabled={authMutation.isPending}
+                    disabled={showLoadingSpinner}
                   >
-                    {authMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : flow === "signIn" ? <ArrowRight className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-                    {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
+                    {showLoadingSpinner ? <Loader2 className="w-4 h-4 animate-spin" /> : flow === "signIn" ? <ArrowRight className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
+                    {showLoadingSpinner ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
                   </Button>
 
                   {/* Compliance: Terms & Privacy Links */}
