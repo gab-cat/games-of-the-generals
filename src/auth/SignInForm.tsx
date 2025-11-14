@@ -3,7 +3,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "../components/ui/button";
-import { Github, Linkedin } from "lucide-react";
+import { ArrowRight, Github, Linkedin, Loader2, UserPlus } from "lucide-react";
 import { Separator } from "../components/ui/separator";
 import ImageBackground from "../components/backgrounds/ImageBackground";
 import Squares from "../components/backgrounds/Squares/Squares";
@@ -404,6 +404,7 @@ export function SignInForm() {
                     className="w-full bg-gradient-to-r from-slate-600 via-gray-600 to-slate-600 hover:from-slate-700 hover:via-gray-700 hover:to-slate-700 text-white font-semibold py-2 sm:py-2.5 px-5 rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:shadow-slate-500/25 disabled:opacity-50 transform hover:scale-[1.02] active:scale-[0.98] font-body text-sm" 
                     disabled={authMutation.isPending}
                   >
+                    {authMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : flow === "signIn" ? <ArrowRight className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                     {authMutation.isPending ? "Processing..." : flow === "signIn" ? "Sign In" : "Create Account"}
                   </Button>
 

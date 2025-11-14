@@ -10,6 +10,7 @@ import { api } from "../../../convex/_generated/api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
 import { useState, useEffect } from "react";
 import { useQuery } from "convex-helpers/react/cache";
+import { useSound } from "../../lib/SoundProvider";
 
 interface Player {
   _id: string;
@@ -43,6 +44,7 @@ export function PlayerRow({ player, index, isExpanded, onToggle }: PlayerRowProp
 
   // Get current user profile
   const currentProfile = useQuery(api.profiles.getCurrentProfile, {});
+  const { playSFX } = useSound();
 
   // Show congratulations only for the current user in top positions (once per day)
   useEffect(() => {
@@ -58,6 +60,8 @@ export function PlayerRow({ player, index, isExpanded, onToggle }: PlayerRowProp
       if (shouldShow) {
         const timer = setTimeout(() => {
           setShowCongrats(true);
+          // Play leaderboard SFX when congratulations modal appears
+          playSFX("leaderboard");
           // Mark as shown today
           localStorage.setItem(storageKey, now.toString());
         }, 500 + (index * 200)); // Stagger the congratulations

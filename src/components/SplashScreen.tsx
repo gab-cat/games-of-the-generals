@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Gamepad2, Shield, Swords, Crown, Target, Zap } from "lucide-react";
+import { Gamepad2, Shield, Target } from "lucide-react";
 import { Progress } from "./ui/progress";
 import Squares from "./backgrounds/Squares/Squares";
+import { useSound } from "../lib/SoundProvider";
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -15,6 +16,7 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   const [showContent, setShowContent] = useState(false);
   const [currentPhase, setCurrentPhase] = useState(0);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const { playSFX } = useSound();
 
   const phases = [
     "Initializing battlefield...",
@@ -22,6 +24,9 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   ];
 
   useEffect(() => {
+    // Play intro SFX when splash screen starts
+    playSFX("intro");
+
     // Show content after a brief delay for smooth entrance
     const showTimer = setTimeout(() => setShowContent(true), 200);
 

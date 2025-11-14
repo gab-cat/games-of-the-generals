@@ -11,6 +11,8 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { Crown, Bot, Trophy, Target, Shield, Zap, Star, RotateCcw } from "lucide-react";
 import { motion } from "framer-motion";
+import { useSound } from "../../lib/SoundProvider";
+import ConfettiBoom from "react-confetti-boom";
 
 interface AIGameResultModalProps {
   isOpen: boolean;
@@ -37,6 +39,7 @@ export function AIGameResultModal({
 }: AIGameResultModalProps) {
   const isVictory = winner === "player1";
   const isDefeat = winner === "player2";
+  const { playSFX } = useSound();
 
   const getResultIcon = () => {
     if (isVictory) return <Crown className="h-12 w-12 text-yellow-400" />;
@@ -90,9 +93,43 @@ export function AIGameResultModal({
     }
   };
 
+  // Play victory/lose SFX when modal opens
+  React.useEffect(() => {
+    if (isOpen && winner) {
+      if (isVictory) {
+        playSFX("player-victory");
+      } else if (isDefeat) {
+        playSFX("player-lose");
+      }
+    }
+  }, [isOpen, winner, isVictory, isDefeat, playSFX]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md border-white/10 bg-black/80 backdrop-blur-xl">
+        {/* Confetti effect for victories */}
+        {isVictory && (
+          <ConfettiBoom
+            mode="boom"
+            particleCount={80}
+            colors={['#FFD700', '#FFA500', '#FF6B35', '#F7931E', '#FFD700']}
+            shapeSize={10}
+            launchSpeed={1.2}
+            opacityDeltaMultiplier={2.5}
+          />
+        )}
+
+        {/* Fall effect for defeats */}
+        {isDefeat && (
+          <ConfettiBoom
+            mode="fall"
+            particleCount={50}
+            colors={['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FEE2E2']}
+            shapeSize={7}
+            fadeOutHeight={0.8}
+          />
+        )}
+
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

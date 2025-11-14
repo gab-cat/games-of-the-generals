@@ -43,6 +43,7 @@ import { AchievementNotification } from "../pages/achievements/AchievementNotifi
 import { UserAvatar } from "./UserAvatar";
 import { getPieceDisplay } from "../lib/piece-display";
 import { SetupPresets } from "./setup-presets/SetupPresets";
+import { useSound } from "../lib/SoundProvider";
 import usePresence from "@convex-dev/presence/react";
 
 interface Profile {
@@ -257,6 +258,8 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
   const presenceState = usePresence(api.gamePresence, stableGameId, stableUsername, PRESENCE_INTERVAL);
   console.log(presenceState);
 
+  const { playBGM, playSFX } = useSound();
+
   // Helper function to get online status for a player
   const getPlayerPresence = useCallback((username: string) => {
     if (!presenceState || !Array.isArray(presenceState)) return null;
@@ -289,6 +292,9 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
       setPendingMove(null);
 
       if (result.challengeResult) {
+        // Play kill SFX when pieces are eliminated in battle
+        playSFX("kill");
+
         // Don't reveal pieces in toast, just indicate if it was a win/loss
         const isCurrentPlayerWinner = result.challengeResult.winner === "attacker";
         if (isCurrentPlayerWinner) {
@@ -783,6 +789,28 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     }
   }, [game?.status, game?.winner, isPlayer1, gameFinished, hasAcknowledgedResult]);
 
+  // BGM management based on game status
+  useEffect(() => {
+    if (!game?.status) return;
+
+    if (game.status === "setup") {
+      playBGM("setup");
+    } else if (game.status === "playing") {
+      playBGM("battle");
+    } else if (game.status === "finished") {
+      // Game finished, resume main BGM
+      playBGM("main");
+    }
+  }, [game?.status, playBGM]);
+
+  // Cleanup: resume main BGM when component unmounts (user navigates away)
+  useEffect(() => {
+    return () => {
+      // Only resume main BGM if we were playing setup or battle BGM
+      // The Layout will handle playing main BGM for authenticated users
+    };
+  }, []);
+
   // Memoized setup square click handler
   const handleSetupSquareClick = useCallback((logicalRow: number, logicalCol: number) => {
     if (!validRows.includes(logicalRow)) {
@@ -912,6 +940,9 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
       newBoard[fromSquare.row][fromSquare.col] = null;
       setOptimisticBoard(newBoard);
 
+      // Play piece-move SFX when a piece is moved
+      playSFX("piece-move");
+
       // Make the move immediately
       makeMove({
         gameId,
@@ -928,7 +959,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
         setSelectedSquare({ row, col });
       }
     }
-  }, [game, isCurrentPlayer, isMakingMove, selectedSquare, isPlayer1, optimisticBoard, makeMove, gameId]);
+  }, [game, isCurrentPlayer, isMakingMove, selectedSquare, isPlayer1, optimisticBoard, makeMove, gameId, playSFX]);
 
   const handleSetupTimeout = useCallback(() => {
     toast.error("Setup time expired! Pieces will be placed randomly.");

@@ -82,7 +82,7 @@ export function ExpandableCard({
                 initial={{ opacity: 0, height: 0, scale: 0.95 }}
                 animate={{ opacity: 1, height: "auto", scale: 1 }}
                 exit={{ opacity: 0, height: 0, scale: 0.95 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
+                transition={{ duration: 0.15, ease: "easeInOut" }}
                 className="overflow-hidden"
               >
                 {expandedContent}
@@ -102,7 +102,7 @@ export function ExpandableCard({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.1 }}
                 className="fixed inset-0 bg-black/30 backdrop-blur-sm z-40"
                 onClick={handleOutsideClick}
               />
@@ -112,7 +112,7 @@ export function ExpandableCard({
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
+                transition={{ duration: 0.15, ease: "easeOut" }}
                 className={`z-50 ${overlayClassName}`}
               >
                 {expandedContent}

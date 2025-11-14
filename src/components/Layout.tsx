@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, ChevronUp, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper, Headphones, Lock, ScrollText, Cog, Swords } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, ChevronUp, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper, Headphones, Lock, ScrollText, Cog, Swords, Volume2 } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -30,6 +30,7 @@ import { deriveStatus, getStatusColorClass, getStatusText, getStatusIndicatorNod
 import { useMobile } from "../lib/useMobile";
 import { MessageNotification } from "./messaging/MessageNotification";
 import { useQuery } from "convex-helpers/react/cache";
+import { useSound } from "../lib/SoundProvider";
 import packageJson from "../../package.json";
 
 // Lazy load components
@@ -37,6 +38,7 @@ const GlobalChatPanel = lazy(() => import("./global-chat/GlobalChatPanel").then(
 const MessagingPanel = lazy(() => import("./messaging/MessagingPanel").then(module => ({ default: module.MessagingPanel })));
 const MessageButton = lazy(() => import("./messaging/MessageButton").then(module => ({ default: module.MessageButton })));
 const SupportDialog = lazy(() => import("./SupportDialog").then(module => ({ default: module.SupportDialog })));
+const SoundSettingsDialog = lazy(() => import("./SoundSettingsDialog").then(module => ({ default: module.SoundSettingsDialog })));
 
 
 interface LayoutProps {
@@ -61,8 +63,10 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const [hasCheckedTutorial, setHasCheckedTutorial] = useState(false);
   const [isGlobalChatOpen, setIsGlobalChatOpen] = useState(false);
   const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
+  const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
   const isMobile = useMobile();
+  const { playBGM, stopBGM } = useSound();
 
   const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
 
@@ -164,6 +168,23 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       }, 3000);
     }
   }, [isAuthenticated]);
+
+  // Manage main BGM - play when authenticated (except during setup/battle phases), stop when logged out
+  // Don't play main BGM if we're on a game page - GameBoard/AIGameBoard will handle BGM there
+  useEffect(() => {
+    const isOnGamePage = location.pathname === "/game" || 
+                         location.pathname.startsWith("/game/") ||
+                         location.pathname === "/ai-game" ||
+                         location.pathname.startsWith("/ai-game/");
+    
+    if (isAuthenticated && !isBanned && !isOnGamePage) {
+      playBGM("main");
+    } else if (!isAuthenticated) {
+      // Stop BGM when not authenticated
+      stopBGM();
+    }
+    // If on game page, don't interfere - GameBoard/AIGameBoard will handle BGM
+  }, [isAuthenticated, isBanned, location.pathname, playBGM, stopBGM]);
 
   const isActiveTab = (path: string) => {
     if (path === "/" && location.pathname === "/") return true;
@@ -486,6 +507,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     >
                       <History className="h-4 w-4" />
                       <span>Match History</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
+                      onClick={() => setIsSoundSettingsOpen(true)}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <Volume2 className="h-4 w-4" />
+                      <span>Sound</span>
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
@@ -973,6 +1002,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
         <SupportDialog
           isOpen={isSupportDialogOpen}
           onClose={() => setIsSupportDialogOpen(false)}
+        />
+      </Suspense>
+
+      {/* Sound Settings Dialog */}
+      <Suspense fallback={null}>
+        <SoundSettingsDialog
+          isOpen={isSoundSettingsOpen}
+          onClose={() => setIsSoundSettingsOpen(false)}
         />
       </Suspense>
     </div>

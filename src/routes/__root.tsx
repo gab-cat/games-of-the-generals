@@ -7,6 +7,7 @@ import { useConvexQuery } from '../lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
 import { Id } from '../../convex/_generated/dataModel'
 import { LoadingSpinner } from '../components/LoadingSpinner'
+import { SoundProvider } from '@/lib/SoundProvider'
 
 // Lazy load Layout component for better code splitting
 const Layout = lazy(() => import('../components/Layout').then(module => ({ default: module.Layout })))
@@ -31,12 +32,14 @@ function RootComponent() {
       <Suspense
         fallback={<LoadingSpinner fullScreen={true} />}
       >
-        <Layout
-          user={profile ? { username: profile.username } : undefined}
-          onOpenMessagingWithLobby={onOpenMessagingWithLobby}
-        >
-          <Outlet />
-        </Layout>
+        <SoundProvider>
+          <Layout
+            user={profile ? { username: profile.username } : undefined}
+            onOpenMessagingWithLobby={onOpenMessagingWithLobby}
+          >
+            <Outlet />
+          </Layout>
+        </SoundProvider>
       </Suspense>
       <ConvertAnonymousPopup />
       <Toaster theme="dark" className="rounded-2xl" />

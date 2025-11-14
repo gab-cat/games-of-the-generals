@@ -5,6 +5,7 @@ import { Sword } from 'lucide-react';
 import { useQuery } from 'convex-helpers/react/cache';
 import { api } from '../../convex/_generated/api';
 import { UserAvatar } from './UserAvatar';
+import { useSound } from '../lib/SoundProvider';
 
 interface GameStartCountdownModalProps {
   isOpen: boolean;
@@ -30,11 +31,15 @@ export const GameStartCountdownModal = memo(function GameStartCountdownModal({
   const player2Profile = useQuery(api.profiles.getProfileByUsername, {
     username: player2Username || undefined
   });
+  const { playSFX } = useSound();
 
   useEffect(() => {
     if (isOpen) {
+      // Play match-found SFX when the game starting modal opens
+      playSFX("match-found");
+
       setCountdown(10);
-      
+
       const timer = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {

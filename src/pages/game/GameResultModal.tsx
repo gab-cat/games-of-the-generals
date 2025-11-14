@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { UserAvatar } from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
+import { useSound } from "@/lib/SoundProvider";
 import Squares from "@/components/backgrounds/Squares/Squares";
+import { useEffect } from "react";
+import ConfettiBoom from "react-confetti-boom";
 
 
 
@@ -55,6 +58,7 @@ export function GameResultModal({
 }: GameResultModalProps) {
   const isWinner = (isPlayer1 && result.winner === "player1") || (!isPlayer1 && result.winner === "player2");
   const isDraw = result.winner === "draw";
+  const { playSFX } = useSound();
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -102,12 +106,48 @@ export function GameResultModal({
       : "bg-gradient-to-br from-red-500/10 via-pink-500/20 to-red-500/20 border-red-500/30 shadow-lg shadow-red-500/10";
   };
 
+  // Play victory/lose SFX when modal opens
+  useEffect(() => {
+    if (isOpen && !isDraw) {
+      if (isWinner) {
+        playSFX("player-victory");
+      } else {
+        playSFX("player-lose");
+      }
+    }
+  }, [isOpen, isWinner, isDraw, playSFX]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] bg-black/20 backdrop-blur-xl border border-white/10 shadow-xl overflow-y-auto rounded-2xl">
         <DialogHeader>
           <DialogTitle className="sr-only">Game Result</DialogTitle>
         </DialogHeader>
+
+        {/* Confetti effect for winners */}
+        {isWinner && (
+          <ConfettiBoom
+            mode="boom"
+            particleCount={100}
+            colors={['#FFD700', '#FFA500', '#FF6B35', '#F7931E', '#FFD700']}
+            shapeSize={12}
+            launchSpeed={1.5}
+            opacityDeltaMultiplier={2}
+          />
+        )}
+
+        {/* Fall effect for losers */}
+        {!isWinner && !isDraw && (
+          <ConfettiBoom
+            mode="boom"
+            particleCount={100}
+            colors={['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FEE2E2']}
+            shapeSize={8}
+            launchSpeed={2.5}
+            opacityDeltaMultiplier={2}
+
+          />
+        )}
 
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}

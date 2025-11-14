@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
+import { useSound } from "../../lib/SoundProvider";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
@@ -75,7 +76,8 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
   
   // Actions
   const generateAIMove = useAction(api.aiGame.generateAIMove);
-  
+  const { playSFX, playBGM } = useSound();
+
   // Queries
   const { data: session } = useConvexQueryWithOptions(
     api.aiGame.getAIGameSession,
@@ -124,6 +126,11 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
               fromCol: aiMove.fromCol,
               toRow: aiMove.toRow,
               toCol: aiMove.toCol,
+            }).then((result: any) => {
+              // Play kill SFX when AI eliminates pieces in battle
+              if (result?.challengeResult) {
+                playSFX("kill");
+              }
             });
           }
         })
@@ -134,7 +141,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
           setIsProcessingMove(false);
         });
     }
-  }, [session?.status, session?.currentTurn, sessionId, generateAIMove, executeAIMove, isProcessingMove]);
+  }, [session?.status, session?.currentTurn, sessionId, generateAIMove, executeAIMove, isProcessingMove, playSFX]);
 
   // Open result modal when game finishes
   useEffect(() => {
@@ -142,6 +149,20 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
       setIsResultModalOpen(true);
     }
   }, [session?.status, session?.winner]);
+
+  // BGM management based on AI game session status
+  useEffect(() => {
+    if (!session?.status) return;
+
+    if (session.status === "setup") {
+      playBGM("setup");
+    } else if (session.status === "playing") {
+      playBGM("battle");
+    } else if (session.status === "finished") {
+      // Game finished, resume main BGM
+      playBGM("main");
+    }
+  }, [session?.status, playBGM]);
 
   // Memoized game actions
   const randomizeSetup = useCallback(() => {
@@ -362,6 +383,9 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
         return;
       }
 
+      // Play piece-move SFX when a piece is moved
+      playSFX("piece-move");
+
       // Make the move
       makeMove({
         sessionId,
@@ -369,7 +393,11 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
         fromCol: selectedSquare.col,
         toRow: row,
         toCol: col,
-      }).then(() => {
+      }).then((result: any) => {
+        // Play kill SFX when pieces are eliminated in battle
+        if (result?.challengeResult) {
+          playSFX("kill");
+        }
         setSelectedSquare(null);
       }).catch((error) => {
         console.error("Move failed:", error);
