@@ -60,6 +60,38 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [1.8.0] - 2025-11-XX
+
+### 🔊 Immersive Audio Experience
+
+**Dynamic Soundtrack**
+
+- Background music that changes with your game - calm setup music when placing pieces, intense battle music during combat, and victory themes when you win
+- Sound effects for every action: piece movements, battle clashes, match starting, leaderboard achievements, and game results
+- Complete audio control with dedicated settings for background music and sound effects
+
+### 🎨 Enhanced Visual Effects
+
+**Victory Celebrations**
+
+- Spectacular golden confetti explosions for victories that make winning feel epic
+- Color-coordinated particle effects for both wins and honorable defeats
+- Immersive visual feedback that celebrates every game outcome
+
+**Smoother Interface**
+
+- Faster, more responsive animations throughout the entire interface
+- Snappier transitions and interactions that feel premium and polished
+
+### 🌐 Better Social Features
+
+**Enhanced Online Status**
+
+- Improved online user tracking showing what games your friends are playing
+- More accurate presence indicators for reliable social connections
+
+---
+
 ## [1.7.0] - 2025-11-XX
 
 ### 🎮 Game Mode Revolution
