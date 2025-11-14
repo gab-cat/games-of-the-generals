@@ -1044,10 +1044,43 @@ export function ConversationView({
 
         {/* Retention notice */}
         <div className="px-4 py-2 border-b border-white/10 bg-gray-900/30">
-          <div className="flex items-center gap-2 text-xs text-white/60">
-            <AlertCircle className="w-4 h-4 text-yellow-400" />
-            <span>Messages older than 7 days are automatically deleted.</span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-2 text-xs text-white/60 cursor-help">
+                <AlertCircle className="w-4 h-4 text-yellow-400" />
+                <span>Messages older than 7 days are automatically deleted.</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="backdrop-blur-xl z-[320] pointer-events-auto py-3 px-4 bg-black/40 text-white/90 rounded-xl max-w-sm text-xs space-y-3">
+              <div className="space-y-2">
+                <p className="font-medium text-white">Message Retention Policy</p>
+                <div className="space-y-1 text-white/70">
+                  <p>• Messages are automatically deleted after 7 days</p>
+                  <p>• This applies to all message types (text, invites, etc.)</p>
+                  <p>• Deletion is permanent and cannot be recovered</p>
+                  <p>• This helps maintain performance and data privacy</p>
+                </div>
+                <div className="pt-1 border-t border-white/20">
+                  <p className="text-white/70 mb-2">Learn more:</p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => void navigate({ to: '/privacy' })}
+                      className="text-blue-300 hover:text-blue-200 underline text-xs transition-colors"
+                    >
+                      Privacy Policy
+                    </button>
+                    <span className="text-white/50">•</span>
+                    <button
+                      onClick={() => void navigate({ to: '/terms' })}
+                      className="text-blue-300 hover:text-blue-200 underline text-xs transition-colors"
+                    >
+                      Terms of Service
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Messages */}
