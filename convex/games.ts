@@ -4,6 +4,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api } from "./_generated/api";
 import { presence } from "./presence";
 import { updateEloRatings, isQuickMatchGame } from "./profiles";
+import { Doc } from "./_generated/dataModel";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -339,6 +340,9 @@ export const makeMove = mutation({
     let challengeResult = null;
     let gameWinner = null;
 
+    // Track eliminated pieces for performance optimization
+    const eliminatedPieces = game.eliminatedPieces || [];
+
     if (toPiece) {
       // Challenge/battle
       if (toPiece.player === currentPlayer) {
@@ -444,6 +448,41 @@ export const makeMove = mutation({
         winner,
       };
 
+      // Track eliminated pieces for performance optimization
+      const currentTurn = (game.moveCount || 0) + 1;
+
+      if (winner === "attacker") {
+        // Defender was eliminated
+        eliminatedPieces.push({
+          player: currentPlayer === "player1" ? "player2" : "player1",
+          piece: toPiece.piece,
+          turn: currentTurn,
+          battleOutcome: winner,
+        });
+      } else if (winner === "defender") {
+        // Attacker was eliminated
+        eliminatedPieces.push({
+          player: currentPlayer,
+          piece: fromPiece.piece,
+          turn: currentTurn,
+          battleOutcome: winner,
+        });
+      } else if (winner === "tie") {
+        // Both pieces eliminated
+        eliminatedPieces.push({
+          player: currentPlayer,
+          piece: fromPiece.piece,
+          turn: currentTurn,
+          battleOutcome: winner,
+        });
+        eliminatedPieces.push({
+          player: currentPlayer === "player1" ? "player2" : "player1",
+          piece: toPiece.piece,
+          turn: currentTurn,
+          battleOutcome: winner,
+        });
+      }
+
       // In Reveal Mode, winner's piece is revealed after challenge
       // In Classic/Blitz, only ties reveal both pieces
       const isRevealMode = game.gameMode === "reveal";
@@ -517,13 +556,14 @@ export const makeMove = mutation({
     }
     
     // Update game state
-    const updates: any = {
+    const updates: Partial<Doc<"games">> = {
       board: newBoard,
       currentTurn: currentPlayer === "player1" ? "player2" : "player1",
       lastMoveTime: currentTime,
       lastMoveFrom: { row: args.fromRow, col: args.fromCol },
       lastMoveTo: { row: args.toRow, col: args.toCol },
       moveCount: (game.moveCount || 0) + 1, // Increment cached move count
+      eliminatedPieces: eliminatedPieces, // Track eliminated pieces
     };
 
     // Update time used for current player
@@ -565,7 +605,7 @@ export const makeMove = mutation({
 
     if (gameWinner) {
       updates.status = "finished";
-      updates.winner = gameWinner;
+      updates.winner = gameWinner as "player1" | "player2" | undefined;
       updates.finishedAt = Date.now();
       
       // Determine the reason for winning

@@ -178,6 +178,12 @@ const applicationTables = {
       v.literal("blitz"),
       v.literal("reveal")
     )), // Game mode: classic (15 min), blitz (6 min), or reveal (15 min with winner reveals). Optional for backward compatibility with existing games.
+    eliminatedPieces: v.optional(v.array(v.object({
+      player: v.union(v.literal("player1"), v.literal("player2")),
+      piece: v.string(),
+      turn: v.number(), // moveCount value when elimination occurred
+      battleOutcome: v.union(v.literal("attacker"), v.literal("defender"), v.literal("tie")), // Who won the battle
+    }))), // Track eliminated pieces for performance optimization
   })
     .index("by_lobby", ["lobbyId"])
     .index("by_status", ["status"])

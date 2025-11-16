@@ -266,13 +266,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     return presenceState.find(presence => presence.userId === username);
   }, [presenceState]);
 
-  const movesData = useQuery(api.games.getGameMoves, { gameId });
-  const isLoadingMoves = !movesData;
-
-  // Extract moves from paginated response - memoized to avoid dependency issues
-  const moves = useMemo(() => {
-    return Array.isArray(movesData) ? movesData : movesData?.page || [];
-  }, [movesData]);
   
   const matchResult = useQuery(api.games.getMatchResult, { gameId });
 
@@ -340,13 +333,11 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     api.profiles.getProfileByUsername,
     game?.player1Username ? { username: game.player1Username } : "skip"
   );
-  const isLoadingPlayer1 = game?.player1Username && !player1Profile;
 
   const player2Profile = useQuery(
     api.profiles.getProfileByUsername,
     game?.player2Username ? { username: game.player2Username } : "skip"
   );
-  const isLoadingPlayer2 = game?.player2Username && !player2Profile;
 
   // Optimized state initialization
   const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() => createEmptyBoard());
@@ -374,78 +365,21 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     [game?.currentTurn, isPlayer1]
   );
   
-  // Process moves to extract eliminated pieces with move numbers (only current player's losses)
+  // Get eliminated pieces for current player from game data
   const eliminatedPieces = useMemo(() => {
-    if (!moves || !game) return [];
-    
-    // Determine current player
-    const currentPlayerId = isPlayer1 ? game.player1Id : game.player2Id;
-    
-    const eliminated: Array<{
-      piece: string;
-      moveNumber: number;
-      battleOutcome: "attacker" | "defender" | "tie";
-    }> = [];
-    
-    let moveNumber = 0;
-    
-    for (const move of moves) {
-      // Skip setup moves
-      if (move.moveType === "setup") continue;
-      
-      // Count all game moves (both "move" and "challenge")
-      moveNumber++;
-      
-      // Process challenge moves to extract eliminated pieces
-      if (move.moveType === "challenge" && move.challengeResult) {
-        const result = move.challengeResult;
-        
-        // Determine which player made this move
-        const isPlayer1Move = move.playerId === game.player1Id;
-        const attackerPlayerId = isPlayer1Move ? game.player1Id : game.player2Id;
-        const defenderPlayerId = isPlayer1Move ? game.player2Id : game.player1Id;
-        
-        if (result.winner === "attacker") {
-          // Defender was eliminated - check if it's the current player's piece
-          if (defenderPlayerId === currentPlayerId) {
-            eliminated.push({
-              piece: result.defender,
-              moveNumber,
-              battleOutcome: "attacker", // Attacker won, so defender (current player) lost
-            });
-          }
-        } else if (result.winner === "defender") {
-          // Attacker was eliminated - check if it's the current player's piece
-          if (attackerPlayerId === currentPlayerId) {
-            eliminated.push({
-              piece: result.attacker,
-              moveNumber,
-              battleOutcome: "defender", // Defender won, so attacker (current player) lost
-            });
-          }
-        } else if (result.winner === "tie") {
-          // Both pieces were eliminated - check if current player's pieces were lost
-          if (attackerPlayerId === currentPlayerId) {
-            eliminated.push({
-              piece: result.attacker,
-              moveNumber,
-              battleOutcome: "tie",
-            });
-          }
-          if (defenderPlayerId === currentPlayerId) {
-            eliminated.push({
-              piece: result.defender,
-              moveNumber,
-              battleOutcome: "tie",
-            });
-          }
-        }
-      }
-    }
-    
-    // Reverse to show most recent eliminated pieces at the top
-    return eliminated.reverse();
-  }, [moves, game, isPlayer1]);
+    if (!game?.eliminatedPieces) return [];
+
+    const currentPlayer = isPlayer1 ? "player1" : "player2";
+
+    return game.eliminatedPieces
+      .filter(ep => ep.player === currentPlayer)
+      .map(ep => ({
+        piece: ep.piece,
+        moveNumber: ep.turn,
+        battleOutcome: ep.battleOutcome,
+      }))
+      .reverse(); // Most recent first
+  }, [game?.eliminatedPieces, isPlayer1]);
   
   // Determine if board should be flipped (player2 sees board flipped so they appear at bottom)
   const shouldFlipBoard = useMemo(() => isPlayer2, [isPlayer2]);
@@ -1767,7 +1701,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
               {game.status === "playing" && (
                 <div className="text-xs sm:text-sm text-white/60 text-center sm:text-left">
-                  Turn {Math.floor(((moves.length || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
+                  Turn {Math.floor(((game.moveCount || 0) / 2) + 1)} • {game.currentTurn === "player1" ? game.player1Username : game.player2Username}'s turn
                 </div>
               )}
             </div>
@@ -1901,111 +1835,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
 
         {/* Game Info & Legend */}
         <div className="space-y-4 sm:space-y-6">
-          {/* Player Info */}
-          <div className="space-y-3 sm:space-y-4">
-            <Card className="bg-black/20 backdrop-blur-xl border border-blue-500/30 shadow-lg shadow-blue-500/10">
-              <CardContent className="p-3 sm:p-4">
-                <motion.div 
-                  initial={{ x: -10, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  className="flex items-center gap-3"
-                >
-                  {isLoadingPlayer1 ? (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-blue-400/20 border-2 border-blue-400/50 flex items-center justify-center">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-blue-400 border-t-transparent rounded-full"
-                      />
-                    </div>
-                  ) : (
-                    <UserAvatar 
-                      username={game.player1Username}
-                      avatarUrl={player1Profile?.avatarUrl}
-                      rank={player1Profile?.rank}
-                      size="sm"
-                      className="ring-1 ring-blue-400/50"
-                    />
-                  )}
-                  <div className="w-3 h-3 sm:w-4 sm:h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50 flex-shrink-0"></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-blue-400 text-sm sm:text-base truncate">{game.player1Username}</h3>
-                      {(() => {
-                        const player1Presence = getPlayerPresence(game.player1Username);
-                        return player1Presence ? (
-                          player1Presence.online ? (
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
-                              title="Online"
-                            />
-                          ) : (
-                            <div className="flex items-center gap-1 flex-shrink-0" title="Disconnected">
-                              <AlertTriangle className="w-3 h-3 text-orange-400" />
-                              <span className="text-xs text-orange-400 font-medium">Disconnected</span>
-                            </div>
-                          )
-                        ) : null;
-                      })()}
-                    </div>
-                    <div className="text-blue-400/80 text-xs sm:text-sm">Blue Army</div>
-                  </div>
-                </motion.div>
-              </CardContent>
-            </Card>
-            <Card className="bg-black/20 backdrop-blur-xl border border-red-500/30 shadow-lg shadow-red-500/10">
-              <CardContent className="p-3 sm:p-4">
-                <motion.div 
-                  initial={{ x: -10, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  transition={{ delay: 0.1 }}
-                  className="flex items-center gap-3"
-                >
-                  {isLoadingPlayer2 ? (
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-red-400/20 border-2 border-red-400/50 flex items-center justify-center">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                        className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-red-400 border-t-transparent rounded-full"
-                      />
-                    </div>
-                  ) : (
-                    <UserAvatar 
-                      username={game.player2Username}
-                      avatarUrl={player2Profile?.avatarUrl}
-                      rank={player2Profile?.rank}
-                      size="sm"
-                      className="ring-1 ring-red-400/50"
-                    />
-                  )}
-                  <div className="w-3 h-3 sm:w-4 sm:h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50 flex-shrink-0"></div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-red-400 text-sm sm:text-base truncate">{game.player2Username}</h3>
-                      {(() => {
-                        const player2Presence = getPlayerPresence(game.player2Username);
-                        return player2Presence ? (
-                          player2Presence.online ? (
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
-                              title="Online"
-                            />
-                          ) : (
-                            <div className="flex items-center gap-1 flex-shrink-0" title="Disconnected">
-                              <AlertTriangle className="w-3 h-3 text-orange-400" />
-                              <span className="text-xs text-orange-400 font-medium">Disconnected</span>
-                            </div>
-                          )
-                        ) : null;
-                      })()}
-                    </div>
-                    <div className="text-red-400/80 text-xs sm:text-sm">Red Army</div>
-                  </div>
-                </motion.div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Eliminated Pieces */}
           {eliminatedPieces.length > 0 && (
             <Card className={`bg-black/20 backdrop-blur-xl border shadow-2xl shadow-black/20 ${
@@ -2136,57 +1965,6 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
         </div>
       </div>
 
-      {/* Recent Moves */}
-      {(moves && moves.length > 0) || isLoadingMoves ? (
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-              <Eye className="h-5 w-5 text-purple-400" />
-              Recent Moves
-              {isLoadingMoves && (
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full ml-2"
-                />
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6">
-            {isLoadingMoves ? (
-              <div className="flex items-center justify-center py-4">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                  className="w-5 h-5 sm:w-6 sm:h-6 border-2 border-purple-400 border-t-transparent rounded-full"
-                />
-                <span className="ml-2 text-white/70 text-sm sm:text-base">Loading moves...</span>
-              </div>
-            ) : (
-              <div className="max-h-32 overflow-y-auto space-y-2">
-                {moves && moves.slice(-5).reverse().map((move: any) => (
-                  <motion.div
-                    key={move._id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    className="text-xs sm:text-sm text-white/70 bg-white/10 backdrop-blur-sm border border-white/20 rounded p-2"
-                  >
-                    {move.moveType === "challenge" && move.challengeResult ? (
-                      <span>
-                        Battle occurred - <span className="font-semibold text-foreground">{move.challengeResult.winner} wins!</span>
-                      </span>
-                    ) : (
-                      <span>
-                        Piece moved to ({move.toRow}, {move.toCol})
-                      </span>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
     </motion.div>
 
     {/* Achievement Notifications */}

@@ -189,110 +189,35 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
     return Array.isArray(moves) ? moves : moves?.page || [];
   }, [moves]);
 
-  // Process moves to extract eliminated pieces for both players
+  // Get eliminated pieces for both players from game data
   const eliminatedPieces = useMemo(() => {
-    if (!movesArray || !game) {
+    if (!game?.eliminatedPieces) {
       return { player1: [], player2: [] };
     }
-    
-    const player1Eliminated: Array<{
-      piece: string;
-      moveNumber: number;
-      battleOutcome: "attacker" | "defender" | "tie";
-    }> = [];
-    
-    const player2Eliminated: Array<{
-      piece: string;
-      moveNumber: number;
-      battleOutcome: "attacker" | "defender" | "tie";
-    }> = [];
-    
-    let moveNumber = 0;
-    
-    for (const move of movesArray) {
-      // Skip setup moves
-      if (move.moveType === "setup") continue;
-      
-      // Count all game moves (both "move" and "challenge")
-      moveNumber++;
-      
-      // Process challenge moves to extract eliminated pieces
-      if (move.moveType === "challenge" && move.challengeResult) {
-        const result = move.challengeResult;
-        
-        // Determine which player made this move
-        const isPlayer1Move = move.playerId === game.player1Id;
-        const attackerPlayerId = isPlayer1Move ? game.player1Id : game.player2Id;
-        const defenderPlayerId = isPlayer1Move ? game.player2Id : game.player1Id;
-        
-        if (result.winner === "attacker") {
-          // Defender was eliminated
-          if (defenderPlayerId === game.player1Id) {
-            player1Eliminated.push({
-              piece: result.defender,
-              moveNumber,
-              battleOutcome: "attacker", // Attacker won, so defender (player1) lost
-            });
-          } else {
-            player2Eliminated.push({
-              piece: result.defender,
-              moveNumber,
-              battleOutcome: "attacker", // Attacker won, so defender (player2) lost
-            });
-          }
-        } else if (result.winner === "defender") {
-          // Attacker was eliminated
-          if (attackerPlayerId === game.player1Id) {
-            player1Eliminated.push({
-              piece: result.attacker,
-              moveNumber,
-              battleOutcome: "defender", // Defender won, so attacker (player1) lost
-            });
-          } else {
-            player2Eliminated.push({
-              piece: result.attacker,
-              moveNumber,
-              battleOutcome: "defender", // Defender won, so attacker (player2) lost
-            });
-          }
-        } else if (result.winner === "tie") {
-          // Both pieces were eliminated
-          if (attackerPlayerId === game.player1Id) {
-            player1Eliminated.push({
-              piece: result.attacker,
-              moveNumber,
-              battleOutcome: "tie",
-            });
-          } else {
-            player2Eliminated.push({
-              piece: result.attacker,
-              moveNumber,
-              battleOutcome: "tie",
-            });
-          }
-          if (defenderPlayerId === game.player1Id) {
-            player1Eliminated.push({
-              piece: result.defender,
-              moveNumber,
-              battleOutcome: "tie",
-            });
-          } else {
-            player2Eliminated.push({
-              piece: result.defender,
-              moveNumber,
-              battleOutcome: "tie",
-            });
-          }
-        }
-      }
-    }
-    
-    // Reverse to show most recent eliminated pieces at the top
+
+    const player1Eliminated = game.eliminatedPieces
+      .filter(ep => ep.player === "player1")
+      .map(ep => ({
+        piece: ep.piece,
+        moveNumber: ep.turn,
+        battleOutcome: ep.battleOutcome,
+      }))
+      .reverse(); // Most recent first
+
+    const player2Eliminated = game.eliminatedPieces
+      .filter(ep => ep.player === "player2")
+      .map(ep => ({
+        piece: ep.piece,
+        moveNumber: ep.turn,
+        battleOutcome: ep.battleOutcome,
+      }))
+      .reverse(); // Most recent first
+
     return {
-      player1: player1Eliminated.reverse(),
-      player2: player2Eliminated.reverse(),
+      player1: player1Eliminated,
+      player2: player2Eliminated,
     };
-  }, [movesArray, game]);
+  }, [game?.eliminatedPieces]);
 
   // Helper function to check if user is near bottom of chat container
   const isNearBottom = (threshold = 50): boolean => {

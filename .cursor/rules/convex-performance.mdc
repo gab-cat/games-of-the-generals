@@ -1,0 +1,432 @@
+---
+description: Performance optimization rules for Convex database operations - ensuring efficient queries, proper indexing, and minimal document access costs
+globs: convex/**/*.ts,convex/**/*.tsx,convex/**/*.js,convex/**/*.jsx
+alwaysApply: true
+---
+
+# Convex Performance Optimization Rules
+
+**Critical Priority**: Each document access in Convex is expensive. Always minimize database operations and ensure every access is efficient and necessary.
+
+## 1. Query Optimization Principles
+
+### ALWAYS Use Indexes Instead of Filters
+
+❌ **AVOID** - Using `.filter()` without indexes:
+
+```typescript
+// EXPENSIVE: Table scan on every query
+const messages = await ctx.db
+  .query("messages")
+  .filter((q) => q.eq(q.field("channelId"), args.channelId))
+  .take(10);
+```
+
+✅ **REQUIRED** - Use `.withIndex()` with proper schema indexes:
+
+```typescript
+// EFFICIENT: Uses index for fast lookup
+const messages = await ctx.db
+  .query("messages")
+  .withIndex("by_channel", (q) => q.eq("channelId", args.channelId))
+  .take(10);
+```
+
+### Index Design Rules
+
+- **Index ALL query fields** in the same order as queried
+- **Name indexes descriptively**: `"by_channel_and_author"` for `["channelId", "authorId"]`
+- **Create separate indexes** for different query patterns
+- **NEVER query fields without indexes** unless absolutely necessary
+
+### Pagination Requirements
+
+- **ALWAYS use pagination** for queries that might return >100 results
+- **Use `paginationOptsValidator`** from `"convex/server"`
+- **Return paginated results** instead of large arrays
+
+```typescript
+import { paginationOptsValidator } from "convex/server";
+
+export const listItems = query({
+  args: { paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    return await ctx.db.query("items").paginate(args.paginationOpts);
+  },
+});
+```
+
+## 2. Document Access Minimization
+
+### Batch Operations Instead of Individual Accesses
+
+❌ **AVOID** - N+1 Query Problem:
+
+```typescript
+// EXPENSIVE: Multiple individual document accesses
+for (const userId of userIds) {
+  const user = await ctx.db.get(userId); // Separate DB call per user
+  // process user...
+}
+```
+
+✅ **REQUIRED** - Use batch queries or single efficient query:
+
+```typescript
+// EFFICIENT: Single query with index
+const users = await ctx.db
+  .query("users")
+  .withIndex("by_ids", (q) => q.neq("status", "inactive"))
+  .collect();
+```
+
+### Prefer Query Methods Over Individual Gets
+
+- **Use `ctx.db.query().withIndex()`** instead of multiple `ctx.db.get()` calls
+- **Use `.collect()` or `.take(n)`** to limit results
+- **Use `.unique()`** when expecting exactly one result
+
+### Cache Results When Possible
+
+```typescript
+// Cache within function scope to avoid duplicate queries
+const getCachedUser = (() => {
+  const cache = new Map<Id<"users">, Doc<"users">>();
+  return async (ctx: QueryCtx, userId: Id<"users">) => {
+    if (!cache.has(userId)) {
+      const user = await ctx.db.get(userId);
+      if (user) cache.set(userId, user);
+    }
+    return cache.get(userId);
+  };
+})();
+```
+
+## 3. Full Text Search Implementation
+
+### When to Use Full Text Search
+
+- **Use search indexes** for text matching across large datasets
+- **Create search indexes** in schema for searchable fields
+- **Use `.withSearchIndex()`** for text queries
+
+```typescript
+// Schema definition
+messages: defineTable({
+  content: v.string(),
+  channelId: v.id("channels"),
+}).searchIndex("search_content", {
+  searchField: "content",
+  filterFields: ["channelId"],
+});
+
+// Query usage
+const messages = await ctx.db
+  .query("messages")
+  .withSearchIndex("search_content", (q) =>
+    q.search("content", searchTerm).eq("channelId", channelId)
+  )
+  .take(20);
+```
+
+### Search Index Best Practices
+
+- **Include filter fields** in search indexes to narrow results
+- **Use specific search terms** instead of broad queries
+- **Limit results** with `.take(n)` to control performance
+
+## 4. Function Call Optimization
+
+### Minimize Cross-Function Calls
+
+❌ **AVOID** - Excessive `ctx.runQuery()` calls:
+
+```typescript
+// EXPENSIVE: Multiple function calls
+const data1 = await ctx.runQuery(api.queries.getData1, args);
+const data2 = await ctx.runQuery(api.queries.getData2, args);
+```
+
+✅ **REQUIRED** - Consolidate logic or use direct database access:
+
+```typescript
+// EFFICIENT: Single function with all needed data
+export const getCombinedData = query({
+  handler: async (ctx) => {
+    const [data1, data2] = await Promise.all([
+      ctx.db.query("table1").collect(),
+      ctx.db.query("table2").collect(),
+    ]);
+    return { data1, data2 };
+  },
+});
+```
+
+### Transaction Boundaries
+
+- **Keep mutations atomic** - single transaction per mutation
+- **Avoid long-running transactions** that hold database locks
+- **Use scheduler** for non-critical operations instead of blocking mutations
+
+## 5. Schema Optimization
+
+### Index Strategy
+
+```typescript
+export default defineSchema({
+  // Good: Indexed for common queries
+  messages: defineTable({
+    channelId: v.id("channels"),
+    authorId: v.id("users"),
+    content: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_channel_created", ["channelId", "createdAt"])
+    .index("by_author_created", ["authorId", "createdAt"])
+    .searchIndex("search_content", {
+      searchField: "content",
+      filterFields: ["channelId"],
+    }),
+
+  // Avoid: Over-indexing unused fields
+  users: defineTable({
+    name: v.string(),
+    email: v.string(),
+    // Don't index fields not used in queries
+  }),
+});
+```
+
+### Data Type Optimization
+
+- **Use appropriate validators** (`v.id()`, `v.string()`, etc.)
+- **Avoid large objects** in frequently queried fields
+- **Use references** (`v.id()`) instead of embedded data for relationships
+
+## 6. Schema Denormalization and Optimization
+
+### When to Denormalize Data
+
+**Denormalize when frequently accessed related data causes multiple expensive queries:**
+
+❌ **AVOID** - Multiple queries for related data:
+
+```typescript
+// EXPENSIVE: 1 query per message + N queries for users
+const messages = await ctx.db
+  .query("messages")
+  .withIndex("by_channel")
+  .take(10);
+for (const message of messages) {
+  const author = await ctx.db.get(message.authorId); // N expensive calls
+  // use author data...
+}
+```
+
+✅ **REQUIRED** - Embed frequently accessed data:
+
+```typescript
+// EFFICIENT: Single query with embedded data
+messages: defineTable({
+  channelId: v.id("channels"),
+  content: v.string(),
+  authorName: v.string(), // Denormalized for performance
+  authorId: v.id("users"), // Keep reference for updates
+}).index("by_channel", ["channelId"]);
+
+// Single efficient query
+const messages = await ctx.db
+  .query("messages")
+  .withIndex("by_channel")
+  .take(10);
+// authorName available immediately, no additional queries needed
+```
+
+### Counter Fields for Aggregations
+
+**Store counts to avoid expensive counting operations:**
+
+```typescript
+channels: defineTable({
+  name: v.string(),
+  memberCount: v.number(), // Cached count, updated on membership changes
+  messageCount: v.number(), // Cached count, updated on new messages
+});
+
+// Update counters atomically with membership changes
+export const addMember = mutation({
+  handler: async (ctx, args) => {
+    await ctx.db.patch(channelId, { memberCount: memberCount + 1 });
+    // Add membership record...
+  },
+});
+```
+
+### Computed Fields for Expensive Calculations
+
+**Pre-compute values that require complex calculations:**
+
+```typescript
+games: defineTable({
+  player1Id: v.id("users"),
+  player2Id: v.id("users"),
+  status: v.string(), // "active", "completed"
+  winnerId: v.optional(v.id("users")),
+  score: v.number(), // Computed field: player1Score - player2Score
+  duration: v.number(), // Computed field: endTime - startTime
+  lastMoveAt: v.number(),
+}).index("active_games", ["status", "lastMoveAt"]);
+```
+
+### Nested Arrays for 1:N Relationships
+
+**Embed arrays when child records are frequently accessed with parent:**
+
+```typescript
+gameSessions: defineTable({
+  gameId: v.id("games"),
+  moves: v.array(
+    v.object({
+      playerId: v.id("users"),
+      position: v.object({ x: v.number(), y: v.number() }),
+      timestamp: v.number(),
+    })
+  ), // Nested moves array - accessed with game data
+  currentTurn: v.id("users"),
+});
+```
+
+### Reference vs Embedding Decision Framework
+
+**Use references when:**
+
+- Data changes frequently and needs to be updated in multiple places
+- Data is large (>1KB per document)
+- Data has complex relationships requiring joins
+- Data needs referential integrity constraints
+
+**Use embedding when:**
+
+- Data is frequently accessed together (read-heavy)
+- Data is small and changes infrequently
+- Relationship is 1:1 or parent owns children completely
+- Performance is critical and extra queries are expensive
+
+### Cache Invalidation Strategy
+
+**When denormalizing, implement proper cache invalidation:**
+
+```typescript
+// When user name changes, update all their messages
+export const updateUsername = mutation({
+  handler: async (ctx, args) => {
+    // Update user record
+    await ctx.db.patch(userId, { name: args.newName });
+
+    // Update denormalized authorName in all messages
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_author", (q) => q.eq("authorId", userId))
+      .collect();
+
+    // Batch update for performance
+    for (const message of messages) {
+      await ctx.db.patch(message._id, { authorName: args.newName });
+    }
+  },
+});
+```
+
+### Materialized Views Pattern
+
+**Create summary documents for complex aggregations:**
+
+```typescript
+// Main table with detailed data
+gameMoves: defineTable({
+  gameId: v.id("games"),
+  playerId: v.id("users"),
+  move: v.string(),
+  timestamp: v.number(),
+}).index("by_game", ["gameId"]);
+
+// Summary table with computed stats
+gameStats: defineTable({
+  gameId: v.id("games"),
+  totalMoves: v.number(),
+  playerStats: v.record(
+    v.id("users"),
+    v.object({
+      moves: v.number(),
+      avgResponseTime: v.number(),
+    })
+  ),
+}).index("by_game", ["gameId"]);
+```
+
+### Schema Optimization Checklist
+
+- [ ] Identify frequently accessed relationships that cause N+1 queries
+- [ ] Consider embedding for read-heavy, stable data
+- [ ] Add counter fields for frequently counted collections
+- [ ] Pre-compute expensive calculations as stored fields
+- [ ] Implement proper cache invalidation for denormalized data
+- [ ] Balance performance gains against update complexity
+- [ ] Monitor query performance to validate optimizations
+
+## 8. Performance Monitoring
+
+### Query Analysis
+
+- **Review query execution** in Convex dashboard
+- **Monitor slow queries** and optimize indexes
+- **Use pagination** for all user-facing lists
+
+### Cost Awareness
+
+- **Each document access costs resources**
+- **Minimize unnecessary reads** and writes
+- **Use batch operations** for bulk updates
+
+## 9. Common Anti-Patterns to Avoid
+
+### ❌ Never Do These:
+
+1. **Query without indexes** for filtered results
+2. **Multiple individual `ctx.db.get()` calls** in loops
+3. **Large result sets** without pagination
+4. **Complex filters** without proper indexing
+5. **Full table scans** for user-facing queries
+6. **Excessive function calls** between queries/mutations
+7. **Storing large objects** in frequently accessed fields
+8. **Denormalize without cache invalidation** - leads to stale data
+9. **Over-embed data** - increases document size unnecessarily
+
+### ✅ Always Do These:
+
+1. **Define indexes** for all query patterns
+2. **Use batch queries** instead of individual gets
+3. **Implement pagination** for list endpoints
+4. **Use search indexes** for text search requirements
+5. **Minimize database operations** per function call
+6. **Cache results** within function scope when possible
+7. **Monitor query performance** in production
+8. **Balance normalization vs denormalization** based on access patterns
+9. **Implement cache invalidation** when denormalizing data
+
+## Performance Checklist
+
+Before committing Convex code, verify:
+
+- [ ] All queries use `.withIndex()` or `.withSearchIndex()`
+- [ ] No `.filter()` calls without corresponding indexes
+- [ ] Pagination implemented for all list queries
+- [ ] No N+1 query patterns (loops with individual gets)
+- [ ] Functions minimize cross-function calls
+- [ ] Search indexes used appropriately for text queries
+- [ ] Schema indexes match actual query patterns
+- [ ] No unnecessary document accesses
+- [ ] Results limited with `.take()` or `.unique()` where appropriate
+- [ ] Schema denormalization decisions balance performance vs complexity
+- [ ] Cache invalidation implemented for denormalized fields
+- [ ] Counter and computed fields used appropriately for expensive operations
