@@ -24,16 +24,16 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
   ];
 
   useEffect(() => {
-    // Play intro SFX when splash screen starts
-    playSFX("intro");
+    // Delay sound effect to avoid blocking initial render
+    const soundTimer = setTimeout(() => playSFX("intro"), 100);
 
-    // Show content after a brief delay for smooth entrance
-    const showTimer = setTimeout(() => setShowContent(true), 200);
+    // Show content immediately for better LCP
+    const showTimer = setTimeout(() => setShowContent(true), 50);
 
-    // Progress and phase animation
+    // Faster progress animation for quicker completion
     const progressInterval = setInterval(() => {
       setProgress((prev) => {
-        const newProgress = prev + 1.5;
+        const newProgress = prev + 2.5; // Increased speed
 
         // Change phases at different progress levels
         if (newProgress >= 50 && currentPhase === 0) {
@@ -46,23 +46,24 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
         }
         return newProgress;
       });
-    }, 35);
+    }, 25); // Faster interval
 
-    // Start fade out after 2 seconds (leaving 0.5s for fade out animation)
+    // Shorter duration for better LCP (1.5s instead of 2s)
     const fadeOutTimer = setTimeout(() => {
       setIsFadingOut(true);
       // Complete after fade out animation finishes
       setTimeout(() => {
         onComplete();
-      }, 500);
-    }, 2000);
+      }, 300); // Shorter fade out
+    }, 1500);
 
     return () => {
+      clearTimeout(soundTimer);
       clearTimeout(showTimer);
       clearTimeout(fadeOutTimer);
       clearInterval(progressInterval);
     };
-  }, [onComplete, currentPhase]);
+  }, [onComplete, currentPhase, playSFX]);
 
   return (
     <AnimatePresence>
@@ -79,49 +80,53 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
           }
         }}
       >
-        {/* Animated Squares Background */}
-        <div className="absolute inset-0">
-          <Squares
-            direction="diagonal"
-            speed={0.5}
-            borderColor="rgba(148, 163, 184, 0.1)"
-            squareSize={60}
-            hoverFillColor="rgba(59, 130, 246, 0.05)"
-          />
-        </div>
+        {/* Deferred Squares Background for LCP optimization */}
+        {showContent && (
+          <div className="absolute inset-0">
+            <Squares
+              direction="diagonal"
+              speed={0.3} // Reduced speed
+              borderColor="rgba(148, 163, 184, 0.08)" // More subtle
+              squareSize={80} // Larger squares, less processing
+              hoverFillColor="rgba(59, 130, 246, 0.03)" // More subtle
+            />
+          </div>
+        )}
 
         {/* Subtle gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/10 via-slate-900/20 to-purple-900/10" />
 
-        {/* Floating military icons */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[
-            { Icon: Shield, color: "text-blue-400", size: 20 },
-            { Icon: Target, color: "text-purple-400", size: 18 }
-          ].map(({ Icon, color, size }, i) => (
-            <motion.div
-              key={i}
-              className={`absolute ${color} opacity-10`}
-              initial={{
-                x: Math.random() * window.innerWidth,
-                y: window.innerHeight + 50,
-                opacity: 0
-              }}
-              animate={{
-                y: -50,
-                opacity: [0, 0.1, 0]
-              }}
-              transition={{
-                duration: 6 + Math.random() * 2,
-                repeat: Infinity,
-                delay: i * 2,
-                ease: "easeInOut"
-              }}
-            >
-              <Icon size={size} />
-            </motion.div>
-          ))}
-        </div>
+        {/* Simplified floating military icons for LCP */}
+        {showContent && (
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[
+              { Icon: Shield, color: "text-blue-400", size: 24 },
+              { Icon: Target, color: "text-purple-400", size: 20 }
+            ].map(({ Icon, color, size }, i) => (
+              <motion.div
+                key={i}
+                className={`absolute ${color} opacity-5`} // Reduced opacity
+                initial={{
+                  x: (i * 200) + 100, // Fixed positions instead of random
+                  y: window.innerHeight + 30,
+                  opacity: 0
+                }}
+                animate={{
+                  y: -30,
+                  opacity: [0, 0.08, 0]
+                }}
+                transition={{
+                  duration: 4, // Shorter duration
+                  repeat: Infinity,
+                  delay: i * 1.5, // Reduced delay
+                  ease: "linear" // Simpler easing
+                }}
+              >
+                <Icon size={size} />
+              </motion.div>
+            ))}
+          </div>
+        )}
 
         {/* Main content */}
         <div className="relative z-20 flex flex-col items-center justify-center min-h-screen px-4">
@@ -140,54 +145,16 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                   animate={{ y: 0, opacity: 1 }}
                   transition={{ delay: 0.3, duration: 0.8 }}
                 >
-                  {/* Animated Logo Container */}
+                  {/* Simplified Logo Container for LCP */}
                   <motion.div
                     className="relative"
-                    initial={{ scale: 0, opacity: 0 }}
+                    initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.2, duration: 0.6, type: "spring", stiffness: 200 }}
+                    transition={{ delay: 0.1, duration: 0.4 }} // Simplified animation
                   >
-                    <motion.div
-                      className="w-20 h-20 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-lg border border-white/20 rounded-2xl flex items-center justify-center"
-                      animate={{
-                        boxShadow: [
-                          "0 0 20px rgba(255, 255, 255, 0.1)",
-                          "0 0 30px rgba(59, 130, 246, 0.15)",
-                          "0 0 20px rgba(255, 255, 255, 0.1)"
-                        ]
-                      }}
-                      transition={{
-                        duration: 4,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                    >
-                      <motion.div
-                        animate={{
-                          rotate: [0, 5, -5, 0]
-                        }}
-                        transition={{
-                          duration: 3,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                          delay: 0.5
-                        }}
-                      >
-                        <Gamepad2 className="w-10 h-10 text-white" />
-                      </motion.div>
-                    </motion.div>
-
-                    {/* Single subtle pulsing ring */}
-                    <motion.div
-                      className="absolute inset-0 rounded-2xl border border-blue-400/20"
-                      animate={{ scale: [1, 1.1, 1] }}
-                      transition={{
-                        duration: 3,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: 1
-                      }}
-                    />
+                    <div className="w-20 h-20 bg-gradient-to-br from-white/15 to-white/5 backdrop-blur-lg border border-white/20 rounded-2xl flex items-center justify-center">
+                      <Gamepad2 className="w-10 h-10 text-white" />
+                    </div>
                   </motion.div>
 
                   {/* Title */}
@@ -234,33 +201,21 @@ export function SplashScreen({ onComplete }: SplashScreenProps) {
                     {phases[currentPhase]}
                   </motion.div>
 
-                  {/* Enhanced Progress Bar */}
+                  {/* Simplified Progress Bar for LCP */}
                   <motion.div
                     className="w-80 space-y-3"
-                    initial={{ scaleX: 0 }}
-                    animate={{ scaleX: 1 }}
-                    transition={{ delay: 1, duration: 0.5 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5, duration: 0.3 }} // Simplified animation
                   >
                     <div className="relative">
                       <Progress
                         value={progress}
                         className="h-2 bg-white/10"
                       />
-                      <motion.div
-                        className="absolute top-0 left-0 h-2 bg-gradient-to-r from-blue-500 via-purple-500 to-blue-500 rounded-full"
+                      <div
+                        className="absolute top-0 left-0 h-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-75 ease-linear"
                         style={{ width: `${progress}%` }}
-                        animate={{
-                          background: [
-                            "linear-gradient(to right, #3b82f6, #8b5cf6, #3b82f6)",
-                            "linear-gradient(to right, #8b5cf6, #3b82f6, #8b5cf6)",
-                            "linear-gradient(to right, #3b82f6, #8b5cf6, #3b82f6)"
-                          ]
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
                       />
                     </div>
                     <div className="flex justify-between text-sm text-white/60 font-mono">

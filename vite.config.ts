@@ -78,6 +78,10 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    // Optimize for production performance
+    minify: 'esbuild',
+    cssMinify: true,
+    sourcemap: false, // Disable sourcemaps in production for better performance
     rollupOptions: {
       output: {
         manualChunks: (id) => {
@@ -150,12 +154,8 @@ export default defineConfig(({ mode }) => ({
         }
       }
     },
-    // Enable source maps for debugging
-    sourcemap: mode === 'development',
     // Increase chunk size warning limit
     chunkSizeWarningLimit: 1000,
-    // Enable minification
-    minify: 'esbuild',
     // Optimize CSS
     cssCodeSplit: true,
     // Target modern browsers for better optimization

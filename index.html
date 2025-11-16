@@ -105,18 +105,73 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <!-- Preload critical Inter fonts (most commonly used weights) -->
+    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZ9hiJ-Ek-_EeA.woff2" as="font" type="font/woff2" crossorigin />
+
+    <!-- Optimized font loading with reduced weights -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700;800;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600;700&display=swap"
       rel="stylesheet"
     />
 
-    <!-- Performance Resource Hints -->
+    <!-- Critical CSS for above-the-fold content -->
+    <style>
+      /* CSS Variables for theming */
+      :root {
+        --background: 222.2 84% 4.9%;
+        --foreground: 210 40% 98%;
+        --primary: 217.2 91.2% 59.8%;
+        --primary-foreground: 222.2 84% 4.9%;
+        --secondary: 217.2 32.6% 17.5%;
+        --secondary-foreground: 210 40% 98%;
+        --muted-foreground: 215 20.2% 65.1%;
+        --border: 217.2 32.6% 17.5%;
+        --input: 217.2 32.6% 17.5%;
+        --ring: 212.7 26.8% 83.9%;
+        --radius: 0.5rem;
+      }
+
+      /* Critical base styles */
+      * {
+        border-color: hsl(var(--border));
+      }
+
+      body {
+        background-color: hsl(var(--background));
+        color: hsl(var(--foreground));
+        overflow-x: hidden;
+        font-family: Inter, "Inter Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        /* Add subtle grain texture for depth */
+        background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0);
+        background-size: 20px 20px;
+      }
+
+      /* Font fallbacks to prevent FOIT */
+      .font-display {
+        font-family: "Playfair Display", Georgia, "Times New Roman", Times, serif;
+      }
+
+      .font-mono {
+        font-family: "JetBrains Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+      }
+    </style>
+
+    <!-- Performance Resource Hints - Prioritized for LCP -->
+    <!-- DNS prefetch for external domains -->
     <link rel="dns-prefetch" href="//fonts.googleapis.com" />
     <link rel="dns-prefetch" href="//fonts.gstatic.com" />
-    <link rel="preload" href="/src/index.css" as="style" />
-    <link rel="modulepreload" href="/src/main.tsx" />
+    <link rel="dns-prefetch" href="//vitals.vercel.com" />
+    <link rel="dns-prefetch" href="//vitals.vercel-insights.com" />
 
-    <!-- Comprehensive Structured Data -->
+    <!-- High priority resource preloads -->
+    <link rel="preload" href="/src/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="high">
+    <link rel="modulepreload" href="/src/main.tsx" fetchpriority="high">
+    <noscript><link rel="stylesheet" href="/src/index.css"></noscript>
+  </head>
+  <body>
+    <!-- Deferred Structured Data for better LCP -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -280,8 +335,6 @@
         ]
       }
     </script>
-
-    <link rel="stylesheet" href="/src/index.css" />
   </head>
   <body>
     <div id="root"></div>

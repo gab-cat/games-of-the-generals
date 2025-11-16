@@ -65,6 +65,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   const [isSupportDialogOpen, setIsSupportDialogOpen] = useState(false);
   const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
   const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
+  const [showFooter, setShowFooter] = useState(false); // Defer footer for LCP
   const isMobile = useMobile();
   const { playBGM, stopBGM } = useSound();
 
@@ -98,23 +99,23 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   );
 
 
-  // Check tutorial status - tutorial status doesn't change frequently
+  // Defer tutorial and ban status queries for LCP optimization
   const { data: tutorialStatus } = useConvexQueryWithOptions(
     api.profiles.checkTutorialStatus,
     isAuthenticated ? {} : "skip",
     {
-      enabled: !!isAuthenticated,
+      enabled: !!isAuthenticated && profile !== undefined, // Wait for profile to load first
       staleTime: 300000, // 5 minutes - tutorial status doesn't change often
       gcTime: 600000, // 10 minutes cache
     }
   );
 
-  // Check if user is banned
+  // Defer ban check for better LCP - only load after profile is available
   const { data: isBanned } = useConvexQueryWithOptions(
     api.globalChat.isUserBanned,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated && profile ? {} : "skip", // Only when profile is loaded
     {
-      enabled: !!isAuthenticated,
+      enabled: !!isAuthenticated && profile !== undefined,
       staleTime: 30000, // 30 seconds - ban status can change
       gcTime: 60000, // 1 minute cache
     }
@@ -141,6 +142,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
         setIsFooterCollapsed(true);
       }
     }
+  }, []);
+
+  // Defer footer rendering for better LCP
+  useEffect(() => {
+    const footerTimer = setTimeout(() => {
+      setShowFooter(true);
+    }, 1000); // Show footer after 1 second
+    return () => clearTimeout(footerTimer);
   }, []);
 
   // Save footer collapse preference to localStorage when it changes
@@ -595,13 +604,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
         {isAuthenticated && isBanned ? <BanScreen /> : children}
       </main>
 
-      {/* Footer */}
-      <motion.footer
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
-        className=""
-      >
+      {/* Footer - Deferred for LCP optimization */}
+      {showFooter && (
+        <motion.footer
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className=""
+        >
         <div className={cn(
           "relative backdrop-blur-sm bg-black/40 border-t border-white/10 transition-all duration-300 w-full px-4 sm:px-6 lg:px-8 overflow-hidden",
           isFooterCollapsed ? "py-3" : "py-6 sm:py-8"
@@ -799,6 +809,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
         </div>
       </div>
     </motion.footer>
+      )}
 
       {/* Floating Global Chat Button - Desktop */}
       {isAuthenticated && !isBanned && (
