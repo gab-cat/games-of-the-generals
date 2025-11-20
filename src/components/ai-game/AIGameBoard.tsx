@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useMutation, useAction } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { useSound } from "../../lib/SoundProvider";
@@ -55,6 +55,8 @@ interface AIGameBoardProps {
 }
 
 export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardProps) {
+  const aiboardRef = useRef<HTMLDivElement>(null);
+  
   // Setup state
   const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() => createEmptyBoard());
   const [availablePieces, setAvailablePieces] = useState(() => [...INITIAL_PIECES]);
@@ -290,6 +292,14 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
 
     try {
       await setupPiecesMutation({ sessionId, pieces });
+
+      // Scroll to game board after setup completes
+      setTimeout(() => {
+        aiboardRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'center' 
+        });
+      }, 300);
     } catch (error) {
       console.error("Failed to setup pieces:", error);
       toast.error("Failed to setup pieces");
@@ -415,7 +425,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
 
   if (!session) {
     return (
-      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+      <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
         <CardContent className="p-8 text-center">
           <div className="text-white/90">Loading AI game session...</div>
         </CardContent>
@@ -428,12 +438,12 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
+        className="px-1 space-y-4 sm:space-y-6 sm:px-4 lg:px-0"
       >
         {/* Setup Header */}
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+        <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
           <CardHeader className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
               <motion.div 
                 initial={{ x: -20, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
@@ -443,15 +453,15 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ delay: 0.1, type: "spring" }}
-                  className="w-10 h-10 sm:w-12 sm:h-12 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
+                  className="flex items-center justify-center flex-shrink-0 w-10 h-10 border shadow-lg sm:w-12 sm:h-12 bg-red-500/20 backdrop-blur-sm border-red-500/30 rounded-xl"
                 >
-                  <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
+                  <Bot className="w-5 h-5 text-red-400 sm:h-6 sm:w-6" />
                 </motion.div>
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-white/90">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl text-white/90">
                     VS AI Setup
                   </CardTitle>
-                  <p className="text-white/60 mt-1 text-sm sm:text-base">
+                  <p className="mt-1 text-sm text-white/60 sm:text-base">
                     Strategically position your pieces against the AI
                   </p>
                 </div>
@@ -461,17 +471,17 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
         </Card>
 
         {/* Controls */}
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+        <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
           <CardContent className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-center">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <Button onClick={randomizeSetup} className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm hover:bg-blue-700/80 text-sm">
-                  <Shuffle className="h-4 w-4" />
+                <Button onClick={randomizeSetup} className="flex items-center gap-2 text-sm bg-blue-600/80 backdrop-blur-sm hover:bg-blue-700/80">
+                  <Shuffle className="w-4 h-4" />
                   <span className="hidden sm:inline">Randomize</span>
                   <span className="sm:hidden">Random</span>
                 </Button>
-                <Button onClick={clearSetup} variant="outline" className="flex items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-sm">
-                  <RefreshCw className="h-4 w-4" />
+                <Button onClick={clearSetup} variant="outline" className="flex items-center gap-2 text-sm bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
+                  <RefreshCw className="w-4 h-4" />
                   Clear
                 </Button>
                 {(availablePieces.length > 0 || (availablePieces.length === 0 && !isSwapMode)) && (
@@ -480,7 +490,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                     variant={isSwapMode ? "default" : "outline"}
                     className={`flex items-center gap-2 text-sm ${isSwapMode ? 'bg-green-600/80 backdrop-blur-sm hover:bg-green-700/80' : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20'}`}
                   >
-                    <ArrowRightLeft className="h-4 w-4" />
+                    <ArrowRightLeft className="w-4 h-4" />
                     <span className="hidden sm:inline">{isSwapMode ? 'Exit Swap Mode' : 'Swap Mode'}</span>
                     <span className="sm:hidden">Swap</span>
                   </Button>
@@ -488,7 +498,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
               </div>
               
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
+                <Badge variant="secondary" className="text-xs text-blue-300 bg-blue-500/20 border-blue-500/30 sm:text-sm">
                   {availablePieces.length === 0 ? 'All pieces placed - Swap Mode' : 
                    isSwapMode ? 'Swap Mode Active' : `${availablePieces.length} pieces remaining`}
                 </Badge>
@@ -497,10 +507,10 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 sm:gap-6">
           {/* Game Board */}
           <div className="lg:col-span-2">
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+            <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
               <CardContent className="p-2 sm:p-6">
                 <motion.div
                   initial={{ scale: 1, opacity: 0 }}
@@ -555,13 +565,13 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
           {/* Available Pieces & Controls */}
           <div className="space-y-4 sm:space-y-6">
             {availablePieces.length > 0 && (
-              <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+              <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
                 <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                    <Sword className="h-5 w-5 text-purple-400" />
+                  <CardTitle className="flex items-center gap-2 text-lg text-white/90 sm:text-xl">
+                    <Sword className="w-5 h-5 text-purple-400" />
                     Available Pieces ({availablePieces.length})
                   </CardTitle>
-                  <Badge variant="outline" className="w-fit bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs sm:text-sm">
+                  <Badge variant="outline" className="text-xs text-purple-300 w-fit bg-purple-500/20 border-purple-500/30 sm:text-sm">
                     Selected: {selectedPiece || "None"}
                   </Badge>
                 </CardHeader>
@@ -570,7 +580,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto"
+                    className="grid grid-cols-2 gap-2 overflow-y-auto max-h-80"
                   >
                     {availablePieces.map((piece, index) => (
                       <motion.button
@@ -587,14 +597,14 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                         `}
                       >
                         {/* Mobile: No labels, small size */}
-                        <div className="flex sm:hidden flex-col items-center justify-center gap-1">
-                          <div className="text-foreground flex items-center justify-center">{getPieceDisplay(piece, { showLabel: false, size: "small" })}</div>
+                        <div className="flex flex-col items-center justify-center gap-1 sm:hidden">
+                          <div className="flex items-center justify-center text-foreground">{getPieceDisplay(piece, { showLabel: false, size: "small" })}</div>
                           <div className="text-[10px] text-center font-medium text-muted-foreground truncate w-full leading-tight">{piece}</div>
                         </div>
                         {/* Desktop: With labels, medium size */}
                         <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:gap-1">
-                          <div className="text-foreground flex items-center justify-center">{getPieceDisplay(piece, { showLabel: false, size: "medium" })}</div>
-                          <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">{piece}</div>
+                          <div className="flex items-center justify-center text-foreground">{getPieceDisplay(piece, { showLabel: false, size: "medium" })}</div>
+                          <div className="w-full text-xs font-medium text-center truncate text-muted-foreground">{piece}</div>
                         </div>
                       </motion.button>
                     ))}
@@ -610,21 +620,21 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
             />
 
             {/* Legend */}
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+            <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                  <Info className="h-5 w-5 text-orange-400" />
+                <CardTitle className="flex items-center gap-2 text-lg text-white/90 sm:text-xl">
+                  <Info className="w-5 h-5 text-orange-400" />
                   Piece Legend
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
-                <div className="max-h-60 overflow-y-auto">
+                <div className="overflow-y-auto max-h-60">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/20">
-                        <th className="text-left py-1 px-1 font-medium text-white/70">Icon</th>
-                        <th className="text-left py-1 px-1 font-medium text-white/70">Piece</th>
-                        <th className="text-center py-1 px-1 font-medium text-white/70">Rank</th>
+                        <th className="px-1 py-1 font-medium text-left text-white/70">Icon</th>
+                        <th className="px-1 py-1 font-medium text-left text-white/70">Piece</th>
+                        <th className="px-1 py-1 font-medium text-center text-white/70">Rank</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -646,13 +656,13 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                         { piece: "Flag", rank: "🏁", short: "Flag" }
                       ].map(({ piece, rank, short }) => (
                         <tr key={piece} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="py-1 px-1">
+                          <td className="px-1 py-1">
                             <div className="flex justify-center">
                               {getPieceDisplay(piece, { size: "small" })}
                             </div>
                           </td>
-                          <td className="py-1 px-1 font-medium">{short}</td>
-                          <td className="py-1 px-1 text-muted-foreground text-center">{rank}</td>
+                          <td className="px-1 py-1 font-medium">{short}</td>
+                          <td className="px-1 py-1 text-center text-muted-foreground">{rank}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -669,10 +679,10 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
               >
                 <Button
                   onClick={() => void handleFinishSetup()}
-                  className="w-full py-3 sm:py-4 text-sm text-black rounded-full"
+                  className="w-full py-3 text-sm text-black rounded-full sm:py-4"
                   size="lg"
                 >
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  <CheckCircle className="w-4 h-4 mr-2 sm:h-5 sm:w-5" />
                   Finish Setup & Start Battle
                 </Button>
               </motion.div>
@@ -688,14 +698,15 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
+      className="px-1 space-y-4 sm:space-y-6 sm:px-4 lg:px-0"
     >
 
 
       {/* Game Board */}
-      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+      <Card className="border shadow-2xl bg-black/20 backdrop-blur-xl border-white/10 shadow-black/20">
         <CardContent className="p-2 sm:p-6">
           <motion.div
+            ref={aiboardRef}
             initial={{ scale: 1, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
@@ -736,8 +747,8 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                   >
                     {/* Arrow for last move from position */}
                     {isLastMoveFrom && ArrowComponent && (
-                      <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                        <ArrowComponent className="h-4 w-4 text-yellow-400" />
+                      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                        <ArrowComponent className="w-4 h-4 text-yellow-400" />
                       </div>
                     )}
                     
