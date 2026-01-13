@@ -51,6 +51,9 @@ const applicationTables = {
     aiSessionId: v.optional(v.id("aiGameSessions")),
     // Admin/Moderator role
     adminRole: v.optional(v.union(v.literal("moderator"), v.literal("admin"))),
+    // Donor status tracking
+    isDonor: v.optional(v.boolean()), // Whether the user has made at least one successful donation
+    totalDonated: v.optional(v.number()), // Total amount donated in centavos (sum of all successful donations)
   })
     .index("by_user", ["userId"])
     .index("by_wins", ["wins"])
@@ -605,6 +608,86 @@ const applicationTables = {
   })
     .index("by_pinned_created", ["isPinned", "createdAt"]) // For efficient ordering (pinned first, then by creation time)
     .index("by_created_at", ["createdAt"]), // For general ordering by creation time
+
+  // Subscription management (prepaid model)
+  subscriptions: defineTable({
+    userId: v.id("users"),
+    tier: v.union(v.literal("free"), v.literal("pro"), v.literal("pro_plus")),
+    status: v.union(
+      v.literal("active"),
+      v.literal("expired"),
+      v.literal("grace_period"),
+      v.literal("canceled")
+    ),
+    expiresAt: v.number(), // Timestamp when subscription expires
+    gracePeriodEndsAt: v.optional(v.number()), // Timestamp when grace period ends (expiresAt + 2 days)
+    createdAt: v.number(), // When first subscription was created
+    lastPaymentAt: v.optional(v.number()), // When last payment was processed
+    totalMonthsPaid: v.number(), // Total months ever paid (for analytics)
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_expires_at", ["expiresAt"]), // For expiry checks
+
+  // Subscription payment records
+  subscriptionPayments: defineTable({
+    userId: v.id("users"),
+    tier: v.union(v.literal("pro"), v.literal("pro_plus")), // Tier being paid for
+    amount: v.number(), // Payment amount in PHP (centavos)
+    months: v.number(), // Months added by this payment (typically 1)
+    paymongoPaymentId: v.string(), // PayMongo payment intent ID
+    paymongoPaymentIntentId: v.string(), // PayMongo payment intent ID (duplicate for clarity)
+    status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
+    expiresAtBefore: v.number(), // Expiry before this payment
+    expiresAtAfter: v.number(), // Expiry after this payment
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_paymongo_payment_id", ["paymongoPaymentId"]),
+
+  // Daily usage tracking for rate limiting
+  subscriptionUsage: defineTable({
+    userId: v.id("users"),
+    date: v.string(), // Date string (YYYY-MM-DD)
+    privateLobbiesCreated: v.number(), // Daily counter
+    aiReplaysSaved: v.number(), // Daily counter
+    lastResetAt: v.number(), // Timestamp of last reset
+  })
+    .index("by_user_date", ["userId", "date"])
+    .index("by_user", ["userId"]),
+
+  // Subscription expiry notifications
+  subscriptionNotifications: defineTable({
+    userId: v.id("users"),
+    type: v.union(
+      v.literal("expiry_warning_7d"),
+      v.literal("expiry_warning_3d"),
+      v.literal("expiry_warning_1d"),
+      v.literal("expiry_today"),
+      v.literal("expired")
+    ),
+    expiresAt: v.number(), // Subscription expiry date
+    sentAt: v.number(), // When notification was sent
+    readAt: v.optional(v.number()), // When user acknowledged
+    dismissed: v.boolean(), // If user dismissed the notification
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_type", ["userId", "type"])
+    .index("by_expires_at", ["expiresAt"]),
+
+  // Donations
+  donations: defineTable({
+    userId: v.id("users"),
+    amount: v.number(), // Amount in PHP (centavos)
+    paymongoPaymentId: v.string(), // PayMongo payment intent ID
+    status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
+    donorPerks: v.optional(v.array(v.string())), // Array of perk strings
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_paymongo_payment_id", ["paymongoPaymentId"]),
 };
 
 export default defineSchema({
