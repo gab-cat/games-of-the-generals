@@ -1,0 +1,26 @@
+# oxlint configuration
+# Migrated from ESLint - faster Rust-based linter
+
+# Ignore patterns matching ESLint config
+ignore = [
+  "dist/**",
+  "eslint.config.js",
+  "convex/_generated/**",
+  "postcss.config.js",
+  "postcss.config.cjs",
+  "tailwind.config.js",
+  "vite.config.ts",
+  "node_modules/**",
+  "dev-dist/**",
+  "*.lock",
+  "bun.lock",
+  "package-lock.json",
+]
+
+# Enable all rules by default (oxlint's default behavior)
+# oxlint has built-in TypeScript and React support
+# No need for separate plugins like ESLint
+
+# Allow unused variables starting with underscore (matching ESLint config)
+# Note: oxlint doesn't have the same rule system as ESLint
+# This is handled by oxlint's default behavior
