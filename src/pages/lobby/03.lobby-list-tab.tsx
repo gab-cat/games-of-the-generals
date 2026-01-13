@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
+import { useConvexMutationWithQuery, useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { LobbyCard } from "./LobbyCard";
 import { motion } from "framer-motion";
-import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock, Zap, X } from "lucide-react";
+import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock, Zap, X, AlertTriangle, Crown } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -16,6 +16,7 @@ import { GameModeSelector, type GameMode } from "../../components/GameModeSelect
 import generateName from "@scaleway/random-name";
 import { useQuery } from "convex-helpers/react/cache";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
+import { useNavigate } from "@tanstack/react-router";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -35,6 +36,7 @@ interface LobbyListTabProps {
 }
 
 export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMutation, onOpenMessaging }: LobbyListTabProps) {
+  const navigate = useNavigate();
   const listRef = useAutoAnimate();
   const [showCreateLobby, setShowCreateLobby] = useState(false);
   const [showJoinByCode, setShowJoinByCode] = useState(false);
@@ -46,6 +48,10 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
   const [joinCode, setJoinCode] = useState("");
   const [lobbiesCursor, setLobbiesCursor] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Subscription queries
+  const { data: privateLobbyLimit } = useConvexQuery(api.featureGating.checkPrivateLobbyLimit, {});
+  const { data: usage } = useConvexQuery(api.subscriptions.getSubscriptionUsage, {});
   const [gameStartData, setGameStartData] = useState<{
     isOpen: boolean;
     player1Username: string;
@@ -644,19 +650,83 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
                     </p>
                   </div>
                   
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="private-lobby"
-                      checked={isPrivate}
-                      onChange={(e) => setIsPrivate(e.target.checked)}
-                      disabled={createLobbyMutation.isPending}
-                      className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
-                    />
-                    <label htmlFor="private-lobby" className="text-sm flex items-center gap-2 text-white/80">
-                      <Lock className="h-4 w-4" />
-                      Private lobby (requires code to join)
-                    </label>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="private-lobby"
+                        checked={isPrivate}
+                        onChange={(e) => setIsPrivate(e.target.checked)}
+                        disabled={createLobbyMutation.isPending || (privateLobbyLimit && !privateLobbyLimit.canCreate)}
+                        className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
+                      />
+                      <label htmlFor="private-lobby" className="text-sm flex items-center gap-2 text-white/80">
+                        <Lock className="h-4 w-4" />
+                        Private lobby (requires code to join)
+                      </label>
+                    </div>
+                    {isPrivate && privateLobbyLimit && (
+                      <div className="ml-6 space-y-1">
+                        {!privateLobbyLimit.canCreate && (
+                          <div className={`rounded-lg p-2 text-xs ${
+                            privateLobbyLimit.reason === "subscription_expired"
+                              ? "bg-red-500/20 border border-red-500/30 text-red-300"
+                              : "bg-amber-500/20 border border-amber-500/30 text-amber-300"
+                          }`}>
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span className="font-medium">
+                                {privateLobbyLimit.reason === "subscription_expired"
+                                  ? "Subscription Expired"
+                                  : "Daily Limit Reached"}
+                              </span>
+                            </div>
+                            <p className="mt-1 font-light">
+                              {privateLobbyLimit.reason === "subscription_expired"
+                                ? "Your subscription has expired. Please renew to create private lobbies."
+                                : `You've reached your daily limit of ${privateLobbyLimit.limit} private lobbies for ${privateLobbyLimit.tier === "free" ? "Free" : privateLobbyLimit.tier === "pro" ? "Pro" : "Pro+"} tier.`}
+                            </p>
+                            {privateLobbyLimit.reason === "subscription_expired" ? (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => navigate({ to: "/subscription" })}
+                                className="text-xs p-0 h-auto mt-1 font-light underline"
+                              >
+                                Renew Now
+                              </Button>
+                            ) : privateLobbyLimit.tier === "free" ? (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => navigate({ to: "/pricing" })}
+                                className="text-xs p-0 h-auto mt-1 font-light underline"
+                              >
+                                Upgrade to Pro for 50/day, or Pro+ for unlimited
+                              </Button>
+                            ) : privateLobbyLimit.tier === "pro" ? (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => navigate({ to: "/pricing" })}
+                                className="text-xs p-0 h-auto mt-1 font-light underline"
+                              >
+                                Upgrade to Pro+ for unlimited private lobbies
+                              </Button>
+                            ) : null}
+                          </div>
+                        )}
+                        {privateLobbyLimit.canCreate && (
+                          <div className="text-xs text-white/60 font-light">
+                            {privateLobbyLimit.limit === Infinity ? (
+                              "Unlimited private lobbies"
+                            ) : (
+                              `${privateLobbyLimit.limit - privateLobbyLimit.today} remaining today (${privateLobbyLimit.today}/${privateLobbyLimit.limit})`
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center space-x-2">

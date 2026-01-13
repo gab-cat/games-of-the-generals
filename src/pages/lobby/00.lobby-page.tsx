@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { LobbyHeader } from "./01.lobby-header";
 import { LobbyTabs } from "./02.lobby-tabs";
 import { useQuery } from "convex-helpers/react/cache";
+import { UpgradeDonationCTA } from "../../components/subscription/UpgradeDonationCTA";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -62,22 +63,25 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 sm:space-y-6"
-    >
-      <LobbyHeader profile={profile} />
-      <LobbyTabs 
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        profile={profile}
-        onGameStart={handleGameStart}
-        onSpectateGame={handleSpectateGame}
-        startGameMutation={startGameMutation}
-        spectateByIdMutation={spectateByIdMutation}
-        onOpenMessaging={onOpenMessaging}
-      />
-    </motion.div>
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-4 sm:space-y-6"
+      >
+        <LobbyHeader profile={profile} />
+        <LobbyTabs 
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          profile={profile}
+          onGameStart={handleGameStart}
+          onSpectateGame={handleSpectateGame}
+          startGameMutation={startGameMutation}
+          spectateByIdMutation={spectateByIdMutation}
+          onOpenMessaging={onOpenMessaging}
+        />
+      </motion.div>
+      <UpgradeDonationCTA />
+    </>
   );
 }

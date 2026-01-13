@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useMutation } from "convex/react";
-import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
+import { useConvexQueryWithOptions, useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Bot, User, Star, Zap, Crown, Shield, Target, Feather, Eye, EyeOff } from "lucide-react";
+import { Loader2, Bot, User, Star, Zap, Crown, Shield, Target, Feather, Eye, EyeOff, Lock, AlertTriangle } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AIGameBoard } from "../../components/ai-game/AIGameBoard";
 import { motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
+import { UpgradeDonationCTA } from "../../components/subscription/UpgradeDonationCTA";
         
 type Difficulty = "easy" | "medium" | "hard";
 type Behavior = "aggressive" | "defensive" | "passive" | "balanced";
@@ -70,6 +72,7 @@ const behaviorConfig: Record<Behavior, { label: string; description: string; ico
 };
 
 export function AIGamePage() {
+  const navigate = useNavigate();
   const [selectedDifficulty, setSelectedDifficulty] = useState<Difficulty>("medium");
   const [selectedBehavior, setSelectedBehavior] = useState<Behavior>("balanced");
   const [isStarting, setIsStarting] = useState(false);
@@ -99,6 +102,11 @@ export function AIGamePage() {
     }
   );
 
+  // Check difficulty access
+  const { data: easyAccess } = useConvexQuery(api.featureGating.checkAIDifficultyAccess, { difficulty: "easy" });
+  const { data: mediumAccess } = useConvexQuery(api.featureGating.checkAIDifficultyAccess, { difficulty: "medium" });
+  const { data: hardAccess } = useConvexQuery(api.featureGating.checkAIDifficultyAccess, { difficulty: "hard" });
+
   // Check for existing session
   useEffect(() => {
     if (currentSession && currentSession.status === "finished") {
@@ -110,6 +118,19 @@ export function AIGamePage() {
   const handleStartGame = () => {
     if (!profile) return;
     
+    // Check if selected difficulty is accessible
+    const accessCheck = selectedDifficulty === "easy" ? easyAccess : selectedDifficulty === "medium" ? mediumAccess : hardAccess;
+    if (accessCheck && !accessCheck.hasAccess) {
+      if (accessCheck.reason === "subscription_expired") {
+        toast.error("Your subscription has expired. Please renew to access Hard difficulty.");
+        navigate({ to: "/subscription" });
+      } else {
+        toast.error("Hard difficulty is only available for Pro and Pro+ subscribers.");
+        navigate({ to: "/pricing" });
+      }
+      return;
+    }
+    
     setIsStarting(true);
     startAIGame({
       profileId: profile._id,
@@ -117,6 +138,7 @@ export function AIGamePage() {
       behavior: selectedBehavior,
     }).catch((error) => {
       console.error("Failed to start AI game:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to start AI game");
     }).finally(() => {
       setIsStarting(false);
     });
@@ -133,104 +155,107 @@ export function AIGamePage() {
   // Show game if session exists and is active
   if (currentSession && (currentSession.status === "setup" || currentSession.status === "playing")) {
     return (
-      <div className="min-h-screen">
-        <div className="mx-auto max-w-7xl p-3 sm:p-4 space-y-4 sm:space-y-6">
-          {/* Game Header */}
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-center gap-4">
-                  <Bot className="h-8 w-8 text-blue-400" />
-                  <div>
-                    <h1 className="text-2xl font-bold text-white">
-                      VS AI Battle
-                    </h1>
-                    <div className="flex flex-wrap items-center gap-2 mt-1">
-                      <Badge
-                        variant="secondary"
-                        className="bg-white/10 text-white/80 border-white/20"
-                      >
-                        {React.createElement(difficultyConfig[currentSession.difficulty as keyof typeof difficultyConfig].icon, { className: "h-4 w-4 mr-1" })}
-                        {difficultyConfig[currentSession.difficulty as keyof typeof difficultyConfig].label} AI
-                      </Badge>
-                      <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20">
-                        {React.createElement(behaviorConfig[currentSession.behavior as keyof typeof behaviorConfig].icon, { className: "h-4 w-4 mr-1" })}
-                        {behaviorConfig[currentSession.behavior as keyof typeof behaviorConfig].label}
-                      </Badge>
-                      <Badge variant="outline" className="bg-white/5 text-white/70 border-white/20">
-                        Move {currentSession.moveCount}
-                      </Badge>
+      <>
+        <div className="min-h-screen">
+          <div className="mx-auto max-w-7xl p-3 sm:p-4 space-y-4 sm:space-y-6">
+            {/* Game Header */}
+            <Card className="bg-black/20 backdrop-blur-xl border border-white/10">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    <Bot className="h-8 w-8 text-blue-400" />
+                    <div>
+                      <h1 className="text-2xl font-bold text-white">
+                        VS AI Battle
+                      </h1>
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        <Badge
+                          variant="secondary"
+                          className="bg-white/10 text-white/80 border-white/20"
+                        >
+                          {React.createElement(difficultyConfig[currentSession.difficulty as keyof typeof difficultyConfig].icon, { className: "h-4 w-4 mr-1" })}
+                          {difficultyConfig[currentSession.difficulty as keyof typeof difficultyConfig].label} AI
+                        </Badge>
+                        <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20">
+                          {React.createElement(behaviorConfig[currentSession.behavior as keyof typeof behaviorConfig].icon, { className: "h-4 w-4 mr-1" })}
+                          {behaviorConfig[currentSession.behavior as keyof typeof behaviorConfig].label}
+                        </Badge>
+                        <Badge variant="outline" className="bg-white/5 text-white/70 border-white/20">
+                          Move {currentSession.moveCount}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleQuitGame}
+                    className="bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30 hover:text-red-300 self-start sm:self-auto"
+                  >
+                    Quit Game
+                  </Button>
                 </div>
+              </CardContent>
+            </Card>
 
-                <Button
-                  variant="outline"
-                  onClick={handleQuitGame}
-                  className="bg-red-500/20 border-red-500/50 text-red-400 hover:bg-red-500/30 hover:text-red-300 self-start sm:self-auto"
-                >
-                  Quit Game
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Game Status */}
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10">
-            <CardContent className="p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className={cn(
-                  "flex items-center gap-3 px-4 py-2 rounded-lg self-start",
-                  currentSession.currentTurn === "player1"
-                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full"
-                    : "bg-red-500/20 text-red-400 border border-red-500/30"
-                )}>
-                  {currentSession.currentTurn === "player1" ? (
-                    <>
-                      <User className="h-4 w-4" />
-                      <span>Your Turn</span>
-                    </>
-                  ) : (
-                    <>
-                      <Bot className="h-4 w-4" />
-                      <span>AI Turn</span>
-                    </>
-                  )}
-                </div>
-
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 self-start sm:self-auto">
-                  <div className="text-white/60 text-sm">
-                    {currentSession.status === "setup" ? "Setting up pieces..." : "Battle in progress"}
+            {/* Game Status */}
+            <Card className="bg-black/20 backdrop-blur-xl border border-white/10">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div className={cn(
+                    "flex items-center gap-3 px-4 py-2 rounded-lg self-start",
+                    currentSession.currentTurn === "player1"
+                      ? "bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full"
+                      : "bg-red-500/20 text-red-400 border border-red-500/30"
+                  )}>
+                    {currentSession.currentTurn === "player1" ? (
+                      <>
+                        <User className="h-4 w-4" />
+                        <span>Your Turn</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bot className="h-4 w-4" />
+                        <span>AI Turn</span>
+                      </>
+                    )}
                   </div>
-                  {import.meta.env.DEV && currentSession.status === "playing" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRevealAIPieces(!revealAIPieces)}
-                      className="bg-yellow-500/20 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/30 hover:text-yellow-300 text-xs px-2 py-1 h-7"
-                    >
-                      {revealAIPieces ? (
-                        <>
-                          <EyeOff className="h-3 w-3 mr-1" />
-                          Hide AI
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="h-3 w-3 mr-1" />
-                          Reveal AI
-                        </>
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Game Board */}
-          <AIGameBoard sessionId={currentSession.sessionId} revealAIPieces={revealAIPieces} />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 self-start sm:self-auto">
+                    <div className="text-white/60 text-sm">
+                      {currentSession.status === "setup" ? "Setting up pieces..." : "Battle in progress"}
+                    </div>
+                    {import.meta.env.DEV && currentSession.status === "playing" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRevealAIPieces(!revealAIPieces)}
+                        className="bg-yellow-500/20 border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/30 hover:text-yellow-300 text-xs px-2 py-1 h-7"
+                      >
+                        {revealAIPieces ? (
+                          <>
+                            <EyeOff className="h-3 w-3 mr-1" />
+                            Hide AI
+                          </>
+                        ) : (
+                          <>
+                            <Eye className="h-3 w-3 mr-1" />
+                            Reveal AI
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Game Board */}
+            <AIGameBoard sessionId={currentSession.sessionId} revealAIPieces={revealAIPieces} />
+          </div>
         </div>
-      </div>
+        <UpgradeDonationCTA />
+      </>
     );
   }
 
@@ -261,72 +286,118 @@ export function AIGamePage() {
                 <div className="mb-3 text-sm uppercase tracking-wide text-white/60">Difficulty</div>
                 <Tabs value={selectedDifficulty} onValueChange={(value) => setSelectedDifficulty(value as Difficulty)}>
                   <TabsList className="flex flex-wrap w-full h-full gap-1 rounded-full bg-white/5 backdrop-blur-sm border border-white/10 mb-6 px-1">
-                    {(Object.entries(difficultyConfig) as [Difficulty, typeof difficultyConfig.easy][]).map(([key, config], index) => (
-                      <motion.div
-                        key={key}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: 0.3 + (index * 0.1) }}
-                        className="flex-1 min-w-0"
-                      >
-                        <TabsTrigger
-                          value={key}
-                          className="w-full data-[state=active]:bg-white/15 rounded-full data-[state=active]:text-white text-white/70 transition-all duration-200 px-3 py-2 text-sm"
+                    {(Object.entries(difficultyConfig) as [Difficulty, typeof difficultyConfig.easy][]).map(([key, config], index) => {
+                      const accessCheck = key === "easy" ? easyAccess : key === "medium" ? mediumAccess : hardAccess;
+                      const isLocked = accessCheck && !accessCheck.hasAccess;
+                      
+                      return (
+                        <motion.div
+                          key={key}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.4, delay: 0.3 + (index * 0.1) }}
+                          className="flex-1 min-w-0 relative"
                         >
-                          <config.icon className="mr-2 h-4 w-4" />
-                          {config.label}
-                        </TabsTrigger>
-                      </motion.div>
-                    ))}
-                  </TabsList>
-                  {(Object.entries(difficultyConfig) as [Difficulty, typeof difficultyConfig.easy][]).map(([key, config]) => (
-                    <TabsContent key={key} value={key} className="mt-0">
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.3 }}
-                        className="rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 p-6"
-                      >
-                        <div className="flex items-start gap-4">
-                          <motion.div 
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ duration: 0.4, type: "spring" }}
-                            className="p-3 rounded-lg bg-white/10 border border-white/20"
+                          {isLocked && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/50 rounded-full">
+                              <Lock className="w-4 h-4 text-white/60" />
+                            </div>
+                          )}
+                          <TabsTrigger
+                            value={key}
+                            disabled={isLocked}
+                            className={cn(
+                              "w-full data-[state=active]:bg-white/15 rounded-full data-[state=active]:text-white text-white/70 transition-all duration-200 px-3 py-2 text-sm",
+                              isLocked && "opacity-50 cursor-not-allowed"
+                            )}
                           >
-                            <config.icon className={`h-6 w-6 ${config.textColor}`} />
-                          </motion.div>
-                          <div className="flex-1">
-                            <motion.h3 
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ duration: 0.4, delay: 0.1 }}
-                              className={`text-xl font-bold mb-2 ${config.textColor}`}
-                            >
-                              {config.label} AI
-                            </motion.h3>
-                            <motion.p 
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{ duration: 0.4, delay: 0.2 }}
-                              className="text-white/70 mb-4"
-                            >
-                              {config.description}
-                            </motion.p>
+                            <config.icon className="mr-2 h-4 w-4" />
+                            {config.label}
+                            {isLocked && <Lock className="ml-2 h-3 w-3" />}
+                          </TabsTrigger>
+                        </motion.div>
+                      );
+                    })}
+                  </TabsList>
+                  {(Object.entries(difficultyConfig) as [Difficulty, typeof difficultyConfig.easy][]).map(([key, config]) => {
+                    const accessCheck = key === "easy" ? easyAccess : key === "medium" ? mediumAccess : hardAccess;
+                    const isLocked = accessCheck && !accessCheck.hasAccess;
+                    
+                    return (
+                      <TabsContent key={key} value={key} className="mt-0">
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ duration: 0.3 }}
+                          className="rounded-lg bg-white/5 backdrop-blur-sm border border-white/10 p-6"
+                        >
+                          <div className="flex items-start gap-4">
                             <motion.div 
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              transition={{ duration: 0.4, delay: 0.3 }}
-                              className="flex items-center gap-2 text-white/50"
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              transition={{ duration: 0.4, type: "spring" }}
+                              className="p-3 rounded-lg bg-white/10 border border-white/20"
                             >
-                              <Bot className="h-4 w-4" />
-                              <span>Perfect for {key === "easy" ? "learning the basics" : key === "medium" ? "improving your skills" : "testing your mastery"}</span>
+                              <config.icon className={`h-6 w-6 ${config.textColor}`} />
                             </motion.div>
+                            <div className="flex-1">
+                              <motion.h3 
+                                initial={{ opacity: 0, x: -10 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.4, delay: 0.1 }}
+                                className={`text-xl font-bold mb-2 ${config.textColor}`}
+                              >
+                                {config.label} AI
+                              </motion.h3>
+                              <motion.p 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.4, delay: 0.2 }}
+                                className="text-white/70 mb-4"
+                              >
+                                {config.description}
+                              </motion.p>
+                              {isLocked && (
+                                <motion.div 
+                                  initial={{ opacity: 0, y: 10 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ duration: 0.4, delay: 0.3 }}
+                                  className="bg-amber-500/20 border border-amber-500/30 rounded-lg p-3 mb-4"
+                                >
+                                  <div className="flex items-center gap-2 text-amber-300 text-sm mb-2">
+                                    <Lock className="w-4 h-4" />
+                                    <span className="font-medium">Premium Feature</span>
+                                  </div>
+                                  <p className="text-amber-300/80 text-xs font-light mb-3">
+                                    {accessCheck?.reason === "subscription_expired"
+                                      ? "Your subscription has expired. Please renew to access Hard difficulty."
+                                      : "Hard difficulty is only available for Pro and Pro+ subscribers."}
+                                  </p>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => navigate({ to: accessCheck?.reason === "subscription_expired" ? "/subscription" : "/pricing" })}
+                                    className="bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30 text-amber-300 text-xs"
+                                  >
+                                    {accessCheck?.reason === "subscription_expired" ? "Renew Now" : "Upgrade Now"}
+                                  </Button>
+                                </motion.div>
+                              )}
+                              <motion.div 
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.4, delay: 0.3 }}
+                                className="flex items-center gap-2 text-white/50"
+                              >
+                                <Bot className="h-4 w-4" />
+                                <span>Perfect for {key === "easy" ? "learning the basics" : key === "medium" ? "improving your skills" : "testing your mastery"}</span>
+                              </motion.div>
+                            </div>
                           </div>
-                        </div>
-                      </motion.div>
-                    </TabsContent>
-                  ))}
+                        </motion.div>
+                      </TabsContent>
+                    );
+                  })}
                 </Tabs>
               </div>
 
@@ -434,6 +505,7 @@ export function AIGamePage() {
           </Button>
         </motion.div>
       </div>
+      <UpgradeDonationCTA />
     </motion.div>
   );
 }

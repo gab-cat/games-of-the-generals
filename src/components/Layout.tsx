@@ -2,7 +2,7 @@
 
 import { useState, useEffect, lazy, Suspense } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, ChevronUp, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper, Headphones, Lock, ScrollText, Cog, Swords, Volume2 } from "lucide-react";
+import { User, LogOut, Trophy, Settings, Gamepad2, ChevronDown, ChevronUp, History, Bot, MessageCircle, HelpCircle, Shield, Newspaper, Headphones, Lock, ScrollText, Cog, Swords, Volume2, CreditCard } from "lucide-react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth } from "convex/react";
 import { useNavigate, useLocation } from "@tanstack/react-router";
@@ -32,6 +32,7 @@ import { MessageNotification } from "./messaging/MessageNotification";
 import { useQuery } from "convex-helpers/react/cache";
 import { useSound } from "../lib/SoundProvider";
 import packageJson from "../../package.json";
+import { ExpiryWarningBanner } from "./subscription/ExpiryWarningBanner";
 
 // Lazy load components
 const GlobalChatPanel = lazy(() => import("./global-chat/GlobalChatPanel").then(module => ({ default: module.GlobalChatPanel })));
@@ -503,6 +504,14 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                     </DropdownMenuItem>
 
                     <DropdownMenuItem
+                      onClick={() => void navigate({ to: "/subscription", search: { subscription: undefined } })}
+                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span>Subscriptions</span>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuItem
                       onClick={() => void navigate({ to: "/achievements" })}
                       className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
                     >
@@ -598,6 +607,13 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           )}
         </div>
       </motion.header>
+
+      {/* Expiry Warning Banner */}
+      {isAuthenticated && (
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 mt-4">
+          <ExpiryWarningBanner />
+        </div>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl min-h-[90vh] mx-auto mt-4 sm:mt-8 px-3 pb-4 sm:px-6">

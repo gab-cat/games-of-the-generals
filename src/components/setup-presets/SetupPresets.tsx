@@ -19,11 +19,15 @@ import {
   Plus,
   Edit,
   Check,
-  X
+  X,
+  AlertTriangle,
+  Crown
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
+import { useConvexQuery } from "@/lib/convex-query-hooks";
+import { useNavigate } from "@tanstack/react-router";
 
 interface SetupPresetsProps {
   currentSetup: (string | null)[][];
@@ -89,10 +93,13 @@ export const SetupPresets = React.memo(({
   const [editingName, setEditingName] = useState("");
   const hasAutoLoaded = useRef(false);
   
+  const navigate = useNavigate();
+  
   // Queries
   const presets = useQuery(api.setupPresets.getUserSetupPresets);
   const defaultPresets = useQuery(api.setupPresets.getDefaultPresets);
   const defaultPreset = useQuery(api.setupPresets.getDefaultPreset);
+  const { data: presetLimit } = useConvexQuery(api.featureGating.checkSetupPresetLimit, {});
   
   // Mutations
   const savePreset = useMutation(api.setupPresets.saveSetupPreset);
@@ -309,10 +316,33 @@ export const SetupPresets = React.memo(({
     <Card className={cn("bg-black/20 backdrop-blur-xl border border-white/10", className)}>
       <CardHeader className="p-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-white/90 text-lg">
-            <Bookmark className="h-5 w-5 text-blue-400" />
-            Setup Presets
-          </CardTitle>
+          <div className="flex-1">
+            <CardTitle className="flex items-center gap-2 text-white/90 text-lg">
+              <Bookmark className="h-5 w-5 text-blue-400" />
+              Setup Presets
+            </CardTitle>
+            {presetLimit && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs font-light text-white/60">
+                  {presetLimit.limit === Infinity ? (
+                    "Unlimited"
+                  ) : (
+                    `${presetLimit.current}/${presetLimit.limit} custom preset${presetLimit.limit !== 1 ? "s" : ""}`
+                  )}
+                </span>
+                {presetLimit.tier !== "free" && presetLimit.status === "grace_period" && (
+                  <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                    Grace Period
+                  </Badge>
+                )}
+                {presetLimit.tier !== "free" && presetLimit.status === "expired" && (
+                  <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                    Expired
+                  </Badge>
+                )}
+              </div>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {defaultPreset && onApplyDefault && (
               <Button
@@ -346,7 +376,60 @@ export const SetupPresets = React.memo(({
             </DialogTrigger>
             <DialogContent className="bg-gray-black/40 backdrop-blur-sm border-white/20">
               <DialogHeader>
-                <DialogTitle className="text-white">Save Setup Preset</DialogTitle>
+                  <DialogTitle className="text-white">Save Setup Preset</DialogTitle>
+                  {presetLimit && (
+                    <div className="mt-2">
+                      {!presetLimit.canCreate && presetLimit.reason === "limit_reached" && (
+                        <div className="bg-amber-500/20 border border-amber-500/30 rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2 text-amber-300 text-sm">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="font-medium">Limit Reached</span>
+                          </div>
+                          <p className="text-amber-300/80 text-xs mt-1 font-light">
+                            You've reached the limit of {presetLimit.limit} custom presets for {presetLimit.tier === "free" ? "Free" : presetLimit.tier === "pro" ? "Pro" : "Pro+"} tier.
+                            {presetLimit.tier === "free" && (
+                              <Button
+                                variant="link"
+                                size="sm"
+                                onClick={() => navigate({ to: "/pricing" })}
+                                className="text-amber-300 hover:text-amber-200 p-0 h-auto ml-1 font-light underline"
+                              >
+                                Upgrade to Pro for unlimited presets.
+                              </Button>
+                            )}
+                          </p>
+                        </div>
+                      )}
+                      {!presetLimit.canCreate && presetLimit.reason === "subscription_expired" && (
+                        <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mb-3">
+                          <div className="flex items-center gap-2 text-red-300 text-sm">
+                            <AlertTriangle className="w-4 h-4" />
+                            <span className="font-medium">Subscription Expired</span>
+                          </div>
+                          <p className="text-red-300/80 text-xs mt-1 font-light">
+                            Your subscription has expired. Please renew to create more custom presets.
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() => navigate({ to: "/subscription" })}
+                              className="text-red-300 hover:text-red-200 p-0 h-auto ml-1 font-light underline"
+                            >
+                              Renew Now
+                            </Button>
+                          </p>
+                        </div>
+                      )}
+                      {presetLimit.canCreate && (
+                        <div className="text-white/60 text-xs font-light">
+                          {presetLimit.limit === Infinity ? (
+                            "Unlimited custom presets"
+                          ) : (
+                            `You can save ${presetLimit.limit - presetLimit.current} more preset${presetLimit.limit - presetLimit.current !== 1 ? "s" : ""} (${presetLimit.current}/${presetLimit.limit})`
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
               </DialogHeader>
               <div className="space-y-4">
                 <Input

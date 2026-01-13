@@ -34,4 +34,9 @@ function PricingComponent() {
 
 export const Route = createFileRoute('/pricing')({
   component: PricingComponent,
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      donation: (search.donation as string | undefined) || undefined,
+    };
+  },
 })
