@@ -1,7 +1,6 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "./_generated/api";
 
 // Initial piece setup for each player (21 pieces total)
 const INITIAL_PIECES = [
@@ -369,7 +368,7 @@ export const loadSetupPreset = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const preset = await ctx.db.get(args.presetId);
+    const preset = await ctx.db.get("setupPresets", args.presetId);
     if (!preset) throw new Error("Preset not found");
 
     if (preset.userId !== userId) {
@@ -393,7 +392,7 @@ export const deleteSetupPreset = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const preset = await ctx.db.get(args.presetId);
+    const preset = await ctx.db.get("setupPresets", args.presetId);
     if (!preset) throw new Error("Preset not found");
 
     if (preset.userId !== userId) {
@@ -432,7 +431,7 @@ export const setDefaultPreset = mutation({
 
     // Set new default if provided
     if (args.presetId) {
-      const preset = await ctx.db.get(args.presetId);
+      const preset = await ctx.db.get("setupPresets", args.presetId);
       if (!preset) throw new Error("Preset not found");
 
       if (preset.userId !== userId) {
@@ -496,7 +495,7 @@ export const updateSetupPreset = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const preset = await ctx.db.get(args.presetId);
+    const preset = await ctx.db.get("setupPresets", args.presetId);
     if (!preset) throw new Error("Preset not found");
 
     if (preset.userId !== userId) {

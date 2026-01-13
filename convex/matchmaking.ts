@@ -2,6 +2,7 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
+import { isSubscriptionActive } from "./featureGating";
 
 // Rank weights for skill calculation
 const RANK_WEIGHTS = {
@@ -274,33 +275,31 @@ export const attemptMatch = internalMutation({
       return { success: false, matchesCreated: 0, playersMatched: 0 };
     }
 
-    // Get subscription status for all players to determine priority
+    // Get subscription status for all players to determine priority (parallelized)
     const playerSubscriptions = new Map<string, { tier: string; isActive: boolean }>();
-    for (const player of waitingPlayers) {
-      const subscription = await ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", player.userId))
-        .unique();
-
+    
+    // Fetch all subscriptions in parallel
+    const subscriptionResults = await Promise.all(
+      waitingPlayers.map(async (player) => {
+        const subscription = await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", player.userId))
+          .unique();
+        return { userId: player.userId, subscription };
+      })
+    );
+    
+    // Process subscription results
+    for (const { userId, subscription } of subscriptionResults) {
       const tier = subscription?.tier || "free";
       const status = subscription?.status || "active";
       const expiresAt = subscription?.expiresAt || null;
       const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-      // Check if subscription is active
-      const now = Date.now();
-      let isActive = true;
-      if (expiresAt && status !== "canceled") {
-        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-          isActive = false;
-        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-          isActive = true; // Still in grace period
-        } else if (expiresAt > now) {
-          isActive = true;
-        }
-      }
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
-      playerSubscriptions.set(player.userId, { tier, isActive });
+      playerSubscriptions.set(userId, { tier, isActive });
     }
 
     // Sort players: Pro/Pro+ with active subscriptions first

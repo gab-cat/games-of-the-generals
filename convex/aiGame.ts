@@ -2,6 +2,7 @@ import { query, mutation, action, internalMutation, internalQuery } from "./_gen
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
+import { isSubscriptionActive } from "./featureGating";
 
 // Game pieces and their ranks (same as regular games)
 const PIECES = {
@@ -93,7 +94,7 @@ export const startAIGameSession = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const profile = await ctx.db.get(args.profileId);
+    const profile = await ctx.db.get("profiles", args.profileId);
     if (!profile || profile.userId !== userId) {
       throw new Error("Invalid profile");
     }
@@ -109,25 +110,16 @@ export const startAIGameSession = mutation({
     const expiresAt = subscription?.expiresAt || null;
     const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-    // Check if subscription is active
-    const now = Date.now();
-    let isActive = true;
-    if (expiresAt && status !== "canceled") {
-      if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-        isActive = false;
-      } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-        isActive = true; // Still in grace period
-      } else if (expiresAt > now) {
-        isActive = true;
-      }
-    }
+    // Check if subscription is active using shared helper
+    const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
     // Check difficulty access
-    const allowedDifficulties: string[] = {
+    const ALLOWED_DIFFICULTIES: Record<string, readonly string[]> = {
       free: ["easy", "medium"],
       pro: ["easy", "medium", "hard"],
       pro_plus: ["easy", "medium", "hard"],
-    }[tier] || ["easy", "medium"];
+    } as const;
+    const allowedDifficulties = ALLOWED_DIFFICULTIES[tier] ?? ALLOWED_DIFFICULTIES.free;
 
     if (args.difficulty === "hard" && (!allowedDifficulties.includes("hard") || !isActive)) {
       if (!isActive && tier !== "free") {
@@ -599,7 +591,7 @@ export const getAISessionById = internalQuery({
     if (!profile?.aiSessionId) return null;
 
     // Direct lookup using aiSessionId
-    const session = await ctx.db.get(profile.aiSessionId);
+    const session = await ctx.db.get("aiGameSessions", profile.aiSessionId);
     
     // Verify session exists, belongs to user, and matches sessionId
     if (!session || session.playerId !== args.userId || session.sessionId !== args.sessionId) {
@@ -1121,7 +1113,7 @@ export const getCurrentUserAIGame = query({
     if (!profile?.aiSessionId) return null;
 
     // Direct lookup using aiSessionId - O(1) instead of index scan + filter
-    const session = await ctx.db.get(profile.aiSessionId);
+    const session = await ctx.db.get("aiGameSessions", profile.aiSessionId);
     
     // Verify session exists, belongs to user, and is active
     if (!session || session.playerId !== userId) {

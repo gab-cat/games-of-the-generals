@@ -16,7 +16,6 @@ export function ExpiryWarningBanner({ className = "", dismissible = true }: Expi
   const [dismissed, setDismissed] = useState(false);
   const navigate = useNavigate();
   const { data: subscription } = useConvexQuery(api.subscriptions.getCurrentSubscription, {});
-  const { data: notifications } = useConvexQuery(api.subscriptions.getExpiryNotifications, {});
 
   if (dismissed || !subscription || subscription.tier === "free") {
     return null;

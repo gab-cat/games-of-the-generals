@@ -4,6 +4,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { profanity, CensorType } from "@2toad/profanity";
 import { api, internal } from "./_generated/api";
+import { isSubscriptionActive } from "./featureGating";
 
 
 // Type for online user data from presence system
@@ -273,18 +274,8 @@ export const sendMessage = mutation({
       const expiresAt = subscription?.expiresAt || null;
       const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-      // Check if subscription is active
-      const now = Date.now();
-      let isActive = true;
-      if (expiresAt && status !== "canceled") {
-        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-          isActive = false;
-        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-          isActive = true; // Still in grace period
-        } else if (expiresAt > now) {
-          isActive = true;
-        }
-      }
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
       // Message length limits: Free (500), Pro/Pro+ (1000)
       const maxLength = (tier === "pro" || tier === "pro_plus") && isActive ? 1000 : 500;
@@ -537,18 +528,8 @@ export const updateChatSettings = mutation({
       const expiresAt = subscription?.expiresAt || null;
       const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-      // Check if subscription is active
-      const now = Date.now();
-      let isActive = true;
-      if (expiresAt && status !== "canceled") {
-        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-          isActive = false;
-        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-          isActive = true; // Still in grace period
-        } else if (expiresAt > now) {
-          isActive = true;
-        }
-      }
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
       // Custom username colors are Pro/Pro+ only
       if (tier === "free") {
@@ -794,7 +775,7 @@ export const sendMentionNotifications = internalMutation({
     timestamp: v.number(),
   },
   handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
+    const message = await ctx.db.get("globalChat", args.messageId);
     if (!message) return;
 
     // Create mention notifications for each mentioned user
@@ -1071,7 +1052,7 @@ export const muteUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendMuteEmail, {
           targetEmail: targetUser.email,
@@ -1144,7 +1125,7 @@ export const unmuteUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendUnmuteEmail, {
           targetEmail: targetUser.email,
@@ -1206,7 +1187,7 @@ export const banUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendBanEmail, {
           targetEmail: targetUser.email,
@@ -1278,7 +1259,7 @@ export const unbanUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendUnbanEmail, {
           targetEmail: targetUser.email,
@@ -1314,7 +1295,7 @@ export const deleteMessage = mutation({
     if (!profile?.adminRole) throw new Error("Insufficient permissions");
 
     // Get the message to ensure it exists
-    const message = await ctx.db.get(args.messageId);
+    const message = await ctx.db.get("globalChat", args.messageId);
     if (!message) throw new Error("Message not found");
 
     const timestamp = Date.now();

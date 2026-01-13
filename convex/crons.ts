@@ -95,7 +95,7 @@ crons.cron(
 // Run every hour to check and update expired subscriptions
 crons.cron(
   "Check and update expired subscriptions",
-  "0 * * * *", // Every hour
+  "5 * * * *", // Every hour at minute 5 (staggered from other hourly jobs)
   internal.subscriptions.checkAndUpdateExpiredSubscriptions,
   {}
 );

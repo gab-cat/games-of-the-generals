@@ -2,7 +2,7 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
-import { internal } from "./_generated/api";
+import { isSubscriptionActive } from "./featureGating";
 
 // Helper function to check if user is admin
 async function isUserAdmin(ctx: any, userId: Id<"users">): Promise<boolean> {
@@ -112,6 +112,9 @@ export const createLobby = mutation({
     let lobbyCode: string | undefined;
 
     // Check private lobby limits if creating a private lobby
+    let usage: any = null;
+    let todayCount = 0;
+    let today = "";
     if (isPrivate) {
       // Get subscription info
       const subscription = await ctx.db
@@ -124,18 +127,8 @@ export const createLobby = mutation({
       const expiresAt = subscription?.expiresAt || null;
       const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-      // Check if subscription is active
-      const now = Date.now();
-      let isActive = true;
-      if (expiresAt && status !== "canceled") {
-        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-          isActive = false;
-        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-          isActive = true; // Still in grace period
-        } else if (expiresAt > now) {
-          isActive = true;
-        }
-      }
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
       // Get daily limits
       const limits: Record<string, number> = {
@@ -146,13 +139,13 @@ export const createLobby = mutation({
       const limit = limits[tier] || 10;
 
       // Get today's usage
-      const today = new Date().toISOString().split("T")[0];
-      const usage = await ctx.db
+      today = new Date().toISOString().split("T")[0];
+      usage = await ctx.db
         .query("subscriptionUsage")
         .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", today))
         .unique();
 
-      const todayCount = usage?.privateLobbiesCreated || 0;
+      todayCount = usage?.privateLobbiesCreated || 0;
 
       if (!isActive && tier !== "free") {
         throw new Error("Your subscription has expired. Please renew to create private lobbies.");
@@ -161,21 +154,6 @@ export const createLobby = mutation({
       if (limit !== Infinity && todayCount >= limit) {
         const tierName = tier === "free" ? "Free" : tier === "pro" ? "Pro" : "Pro+";
         throw new Error(`Daily limit of ${limit} private lobbies reached for ${tierName} tier. ${tier === "free" ? "Upgrade to Pro for 50 per day, or Pro+ for unlimited." : tier === "pro" ? "Upgrade to Pro+ for unlimited private lobbies." : ""}`);
-      }
-
-      // Increment usage counter
-      if (usage) {
-        await ctx.db.patch(usage._id, {
-          privateLobbiesCreated: todayCount + 1,
-        });
-      } else {
-        await ctx.db.insert("subscriptionUsage", {
-          userId,
-          date: today,
-          privateLobbiesCreated: 1,
-          aiReplaysSaved: 0,
-          lastResetAt: Date.now(),
-        });
       }
     }
 
@@ -206,6 +184,23 @@ export const createLobby = mutation({
       gameMode,
       createdAt: Date.now(),
     });
+
+    // Update usage counter after successful lobby creation
+    if (isPrivate) {
+      if (usage) {
+        await ctx.db.patch(usage._id, {
+          privateLobbiesCreated: todayCount + 1,
+        });
+      } else {
+        await ctx.db.insert("subscriptionUsage", {
+          userId,
+          date: today,
+          privateLobbiesCreated: 1,
+          aiReplaysSaved: 0,
+          lastResetAt: Date.now(),
+        });
+      }
+    }
 
     // Update profile with lobbyId
     await ctx.db.patch(profile._id, {
@@ -294,7 +289,7 @@ export const joinLobby = mutation({
 
     if (!profile) throw new Error("Profile not found");
 
-    const lobby = await ctx.db.get(args.lobbyId);
+    const lobby = await ctx.db.get("lobbies", args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
     if (lobby.status !== "waiting") {
@@ -414,7 +409,7 @@ export const leaveLobby = mutation({
 
     if (!profile) throw new Error("Profile not found");
 
-    const lobby = await ctx.db.get(args.lobbyId);
+    const lobby = await ctx.db.get("lobbies", args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
     if (lobby.hostId === userId) {
@@ -474,7 +469,7 @@ export const spectateGameById = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     // Get the associated lobby to check spectator settings

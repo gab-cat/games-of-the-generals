@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { isSubscriptionActive } from "./featureGating";
 
 // ELO Rating System Functions
 
@@ -83,7 +84,7 @@ export async function updateEloRatings(
  * Quick match lobbies have name pattern: "Quick Match ${timestamp}"
  */
 export async function isQuickMatchGame(ctx: any, lobbyId: Id<"lobbies">): Promise<boolean> {
-  const lobby = await ctx.db.get(lobbyId);
+  const lobby = await ctx.db.get("lobbies", lobbyId);
   if (!lobby) return false;
   return lobby.name?.startsWith("Quick Match") ?? false;
 }
@@ -207,7 +208,7 @@ export const createOrUpdateProfile = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const authUser = await ctx.db.get(userId);
+    const authUser = await ctx.db.get("users", userId);
     const oauthImageUrl = authUser?.image;
 
     // Check if username is already taken
@@ -344,18 +345,8 @@ export const updateAvatar = mutation({
       const expiresAt = subscription?.expiresAt || null;
       const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-      // Check if subscription is active
-      const now = Date.now();
-      let isActive = true;
-      if (expiresAt && status !== "canceled") {
-        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-          isActive = false;
-        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-          isActive = true; // Still in grace period
-        } else if (expiresAt > now) {
-          isActive = true;
-        }
-      }
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
       // Free tier cannot upload custom avatars
       if (tier === "free") {

@@ -92,7 +92,7 @@ export const getSubscriptionsForUser = internalQuery({
 export const getMessageById = internalQuery({
   args: { messageId: v.id("messages") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.messageId);
+    return await ctx.db.get("messages", args.messageId);
   },
 });
 
@@ -100,7 +100,7 @@ export const getMessageById = internalQuery({
 export const getGlobalChatMessageById = internalQuery({
   args: { messageId: v.id("globalChat") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.messageId);
+    return await ctx.db.get("globalChat", args.messageId);
   },
 });
 

@@ -3,9 +3,17 @@ import { v } from "convex/values";
 
 // PayMongo API configuration
 const PAYMONGO_API_BASE = "https://api.paymongo.com/v1";
-const PAYMONGO_SECRET_KEY = process.env.PAYMONGO_SECRET_KEY || "";
-const PAYMONGO_PUBLIC_KEY = process.env.PAYMONGO_PUBLIC_KEY || "";
-const PAYMONGO_WEBHOOK_SECRET = process.env.PAYMONGO_WEBHOOK_SECRET || "";
+
+// Helper function to require environment variables with fail-fast errors
+function requireEnv(name: string, value: string | undefined): string {
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+const PAYMONGO_SECRET_KEY = requireEnv("PAYMONGO_SECRET_KEY", process.env.PAYMONGO_SECRET_KEY);
+const PAYMONGO_WEBHOOK_SECRET = requireEnv("PAYMONGO_WEBHOOK_SECRET", process.env.PAYMONGO_WEBHOOK_SECRET);
 
 // Helper function to base64 encode
 function base64Encode(str: string): string {
@@ -104,7 +112,7 @@ export async function attachPaymentMethod(
       data: {
         attributes: {
           payment_method: paymentMethodId,
-          return_url: process.env.PAYMONGO_RETURN_URL || "https://your-app.com/payment/return",
+          return_url: requireEnv("PAYMONGO_RETURN_URL", process.env.PAYMONGO_RETURN_URL),
         },
       },
     }
@@ -219,16 +227,14 @@ export async function verifyWebhookSignature(
     .map(b => b.toString(16).padStart(2, "0"))
     .join("");
   
-  // Compare signatures (constant-time comparison)
-  if (signature.length !== expectedSignature.length) {
-    return false;
+  // Constant-time comparison (pad shorter string to avoid length leak)
+  const maxLen = Math.max(signature.length, expectedSignature.length);
+  let result = signature.length ^ expectedSignature.length;
+  for (let i = 0; i < maxLen; i++) {
+    const a = i < signature.length ? signature.charCodeAt(i) : 0;
+    const b = i < expectedSignature.length ? expectedSignature.charCodeAt(i) : 0;
+    result |= a ^ b;
   }
-  
-  let result = 0;
-  for (let i = 0; i < signature.length; i++) {
-    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
-  }
-  
   return result === 0;
 }
 
@@ -252,6 +258,18 @@ export const createSubscriptionPaymentIntent = action({
     description: v.string(),
     metadata: v.optional(v.any()),
   },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      paymentIntentId: v.string(),
+      clientSecret: v.string(),
+      status: v.string(),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.string(),
+    })
+  ),
   handler: async (ctx, args) => {
     try {
       const paymentIntent = await createPaymentIntent(
@@ -260,7 +278,7 @@ export const createSubscriptionPaymentIntent = action({
         args.metadata
       );
       return {
-        success: true,
+        success: true as const,
         paymentIntentId: paymentIntent.id,
         clientSecret: paymentIntent.client_secret,
         status: paymentIntent.status,
@@ -268,7 +286,7 @@ export const createSubscriptionPaymentIntent = action({
     } catch (error) {
       console.error("Error creating payment intent:", error);
       return {
-        success: false,
+        success: false as const,
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
@@ -282,6 +300,18 @@ export const createDonationPaymentIntent = action({
     description: v.string(),
     metadata: v.optional(v.any()),
   },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      paymentIntentId: v.string(),
+      clientSecret: v.string(),
+      status: v.string(),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.string(),
+    })
+  ),
   handler: async (ctx, args) => {
     try {
       const paymentIntent = await createPaymentIntent(
@@ -290,7 +320,7 @@ export const createDonationPaymentIntent = action({
         args.metadata
       );
       return {
-        success: true,
+        success: true as const,
         paymentIntentId: paymentIntent.id,
         clientSecret: paymentIntent.client_secret,
         status: paymentIntent.status,
@@ -298,7 +328,7 @@ export const createDonationPaymentIntent = action({
     } catch (error) {
       console.error("Error creating donation payment intent:", error);
       return {
-        success: false,
+        success: false as const,
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
@@ -316,6 +346,17 @@ export const createDonationCheckout = action({
     customerName: v.optional(v.string()),
     customerEmail: v.optional(v.string()),
   },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      checkoutUrl: v.string(),
+      sessionId: v.string(),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.string(),
+    })
+  ),
   handler: async (ctx, args) => {
     try {
       const checkoutSession = await createCheckoutSession(
@@ -328,14 +369,14 @@ export const createDonationCheckout = action({
         args.customerEmail
       );
       return {
-        success: true,
+        success: true as const,
         checkoutUrl: checkoutSession.checkout_url,
         sessionId: checkoutSession.id,
       };
     } catch (error) {
       console.error("Error creating donation checkout:", error);
       return {
-        success: false,
+        success: false as const,
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
@@ -353,6 +394,17 @@ export const createSubscriptionCheckout = action({
     customerName: v.optional(v.string()),
     customerEmail: v.optional(v.string()),
   },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      checkoutUrl: v.string(),
+      sessionId: v.string(),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.string(),
+    })
+  ),
   handler: async (ctx, args) => {
     try {
       const checkoutSession = await createCheckoutSession(
@@ -365,14 +417,14 @@ export const createSubscriptionCheckout = action({
         args.customerEmail
       );
       return {
-        success: true,
+        success: true as const,
         checkoutUrl: checkoutSession.checkout_url,
         sessionId: checkoutSession.id,
       };
     } catch (error) {
       console.error("Error creating subscription checkout:", error);
       return {
-        success: false,
+        success: false as const,
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }
@@ -384,11 +436,24 @@ export const verifyPaymentIntent = action({
   args: {
     paymentIntentId: v.string(),
   },
+  returns: v.union(
+    v.object({
+      success: v.literal(true),
+      status: v.string(),
+      amount: v.number(),
+      currency: v.string(),
+      metadata: v.optional(v.any()),
+    }),
+    v.object({
+      success: v.literal(false),
+      error: v.string(),
+    })
+  ),
   handler: async (ctx, args) => {
     try {
       const paymentIntent = await getPaymentIntent(args.paymentIntentId);
       return {
-        success: true,
+        success: true as const,
         status: paymentIntent.attributes.status,
         amount: paymentIntent.attributes.amount,
         currency: paymentIntent.attributes.currency,
@@ -397,7 +462,7 @@ export const verifyPaymentIntent = action({
     } catch (error) {
       console.error("Error verifying payment intent:", error);
       return {
-        success: false,
+        success: false as const,
         error: error instanceof Error ? error.message : "Unknown error",
       };
     }

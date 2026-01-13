@@ -85,13 +85,13 @@ export const sendMessage = mutation({
 
     // Validate invites
     if (args.messageType === "lobby_invite" && args.lobbyId) {
-      const lobby = await ctx.db.get(args.lobbyId);
+      const lobby = await ctx.db.get("lobbies", args.lobbyId);
       if (!lobby) throw new Error("Lobby not found");
       if (lobby.status !== "waiting") throw new Error("Lobby is not available");
     }
 
     if (args.messageType === "game_invite" && args.gameId) {
-      const game = await ctx.db.get(args.gameId);
+      const game = await ctx.db.get("games", args.gameId);
       if (!game) throw new Error("Game not found");
       if (game.status !== "playing") throw new Error("Game is not active");
     }

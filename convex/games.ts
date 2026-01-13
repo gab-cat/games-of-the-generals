@@ -5,6 +5,7 @@ import { api } from "./_generated/api";
 import { presence } from "./presence";
 import { updateEloRatings, isQuickMatchGame } from "./profiles";
 import { Doc } from "./_generated/dataModel";
+import { isSubscriptionActive } from "./featureGating";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -71,7 +72,7 @@ export const startGame = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const lobby = await ctx.db.get(args.lobbyId);
+    const lobby = await ctx.db.get("lobbies", args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
     if (lobby.status !== "waiting" || !lobby.playerId) {
@@ -158,7 +159,7 @@ export const getGame = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     
     if (!game) return null;
 
@@ -220,7 +221,7 @@ export const setupPieces = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "setup") {
@@ -295,7 +296,7 @@ export const makeMove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -865,7 +866,7 @@ export const surrenderGame = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -986,7 +987,7 @@ export const timeoutGame = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -1114,7 +1115,7 @@ export const forfeitGame = mutation({
     reason: v.union(v.literal("disconnection_timeout"), v.literal("manual"))
   },
   handler: async (ctx, { gameId, reason }) => {
-    const game = await ctx.db.get(gameId);
+    const game = await ctx.db.get("games", gameId);
     if (!game || game.status !== "playing") {
       throw new Error("Game not found or not in playing state");
     }
@@ -1133,7 +1134,7 @@ export const forfeitGame = mutation({
     });
 
     // Update lobby status
-    const lobby = await ctx.db.get(game.lobbyId);
+    const lobby = await ctx.db.get("lobbies", game.lobbyId);
     if (lobby) {
       await ctx.db.patch(game.lobbyId, { status: "finished" });
     }
@@ -1268,7 +1269,7 @@ export const checkOpponentTimeout = mutation({
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -1411,7 +1412,7 @@ export const getMatchResult = query({
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) return null;
 
     if (game.status !== "finished") return null;
@@ -1506,18 +1507,8 @@ export const getMatchHistory = query({
     const expiresAt = subscription?.expiresAt || null;
     const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
-    // Check if subscription is active
-    const now = Date.now();
-    let isActive = true;
-    if (expiresAt && status !== "canceled") {
-      if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
-        isActive = false;
-      } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
-        isActive = true; // Still in grace period
-      } else if (expiresAt > now) {
-        isActive = true;
-      }
-    }
+    // Check if subscription is active using shared helper
+    const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
 
     // Replay limits: Free (1), Pro (50), Pro+ (100)
     const replayLimits: Record<string, number> = {
@@ -1633,7 +1624,7 @@ export const getGameReplay = query({
     moveLimit: v.optional(v.number()), // Allow limiting moves for large games
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "finished") {
@@ -1693,7 +1684,7 @@ export const acknowledgeGameResult = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "finished") {

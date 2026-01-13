@@ -43,7 +43,7 @@ const TIER_LIMITS = {
 } as const;
 
 // Helper function to check if subscription is active (not expired beyond grace period)
-function isSubscriptionActive(
+export function isSubscriptionActive(
   status: string,
   expiresAt: number | null,
   gracePeriodEndsAt: number | null

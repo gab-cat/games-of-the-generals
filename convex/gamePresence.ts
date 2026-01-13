@@ -50,7 +50,7 @@ export const heartbeat = mutation({
     // This includes both game lookup and presence heartbeat operations
     return await retryWithBackoff(async () => {
       // Verify the user is actually a player in this game or spectator
-      const game = await ctx.db.get(roomId as Id<"games">);
+      const game = await ctx.db.get("games", roomId as Id<"games">);
       if (!game) throw new Error("Game not found");
       
       const isPlayer = game.player1Id === authUserId || game.player2Id === authUserId;

@@ -384,7 +384,7 @@ export const updateSubscriptionStatus = internalMutation({
     subscriptionId: v.id("subscriptions"),
   },
   handler: async (ctx, args) => {
-    const subscription = await ctx.db.get(args.subscriptionId);
+    const subscription = await ctx.db.get("subscriptions", args.subscriptionId);
     if (!subscription) return;
 
     const now = Date.now();
@@ -475,10 +475,6 @@ export const incrementUsage = mutation({
 export const resetDailyUsage = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split("T")[0];
-
     // Delete old usage records (older than 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -507,7 +503,7 @@ export const markNotificationRead = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const notification = await ctx.db.get(args.notificationId);
+    const notification = await ctx.db.get("subscriptionNotifications", args.notificationId);
     if (!notification || notification.userId !== userId) {
       throw new Error("Notification not found");
     }
@@ -810,8 +806,6 @@ export const sendExpiryNotifications = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
     const oneDay = 24 * 60 * 60 * 1000;
-    const threeDays = 3 * oneDay;
-    const sevenDays = 7 * oneDay;
 
     const subscriptions = await ctx.db
       .query("subscriptions")
@@ -906,7 +900,7 @@ export const getDonationById = internalQuery({
     donationId: v.id("donations"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.donationId);
+    return await ctx.db.get("donations", args.donationId);
   },
 });
 
@@ -916,7 +910,7 @@ export const getUserForDonation = internalQuery({
     userId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db.get(args.userId);
+    const user = await ctx.db.get("users", args.userId);
     if (!user) return null;
 
     // Get user profile for username
@@ -939,7 +933,7 @@ export const getPaymentById = internalQuery({
     paymentId: v.id("subscriptionPayments"),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.paymentId);
+    return await ctx.db.get("subscriptionPayments", args.paymentId);
   },
 });
 

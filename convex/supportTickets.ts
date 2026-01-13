@@ -78,7 +78,7 @@ export const getSupportTicketWithUpdates = query({
     if (!userId) throw new Error("Not authenticated");
 
     // Get the ticket
-    const ticket = await ctx.db.get(args.ticketId);
+    const ticket = await ctx.db.get("supportTickets", args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
 
     // Verify user owns this ticket (or is admin)
@@ -122,7 +122,7 @@ export const addSupportTicketUpdate = mutation({
     if (!userId) throw new Error("Not authenticated");
 
     // Get the ticket
-    const ticket = await ctx.db.get(args.ticketId);
+    const ticket = await ctx.db.get("supportTickets", args.ticketId);
     if (!ticket) throw new Error("Ticket not found");
 
     // Get user profile

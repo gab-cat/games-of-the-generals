@@ -22,7 +22,7 @@ export const joinAsSpectator = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     // Only allow spectating active games (setup or playing)
@@ -39,7 +39,7 @@ export const joinAsSpectator = mutation({
 
     // If not admin, check lobby settings for spectator restrictions
     if (!userIsAdmin) {
-      const lobby = await ctx.db.get(game.lobbyId);
+      const lobby = await ctx.db.get("lobbies", game.lobbyId);
       if (!lobby?.allowSpectators || lobby?.isPrivate) {
         throw new Error("Spectators are not allowed in this game");
       }
@@ -62,7 +62,7 @@ export const leaveAsSpectator = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
 
     // Optimized: Only update if user is actually a spectator
     if (userId && game && game.spectators.includes(userId)) {
@@ -129,7 +129,7 @@ export const getSpectatableGames = query({
     // Get associated lobby information to check spectator settings
     const gamesWithLobbyInfo = await Promise.all(
       games.map(async (game) => {
-        const lobby = await ctx.db.get(game.lobbyId);
+        const lobby = await ctx.db.get("lobbies", game.lobbyId);
         return {
           ...game,
           gameId: game._id, // Explicitly include gameId for easy access
@@ -176,7 +176,7 @@ export const sendSpectatorChatMessage = mutation({
       throw new Error("Message must be between 1 and 500 characters");
     }
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     // Only allow chat in active games
@@ -236,7 +236,7 @@ export const getGameSpectators = query({
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game || game.spectators.length === 0) return [];
 
     // Optimized: Batch query spectator profiles more efficiently
@@ -298,7 +298,7 @@ export const getSpectatorCount = query({
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     return game ? game.spectators.length : 0;
   },
 });

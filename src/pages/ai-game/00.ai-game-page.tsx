@@ -6,7 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Badge } from "../../components/ui/badge";
-import { Loader2, Bot, User, Star, Zap, Crown, Shield, Target, Feather, Eye, EyeOff, Lock, AlertTriangle } from "lucide-react";
+import { Loader2, Bot, User, Star, Zap, Crown, Shield, Target, Feather, Eye, EyeOff, Lock } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AIGameBoard } from "../../components/ai-game/AIGameBoard";
 import { motion } from "framer-motion";

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { LobbyCard } from "./LobbyCard";
 import { motion } from "framer-motion";
-import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock, Zap, X, AlertTriangle, Crown } from "lucide-react";
+import { Plus, Users, Sword, Lock, Copy, ChevronDown, Key, Shuffle, Clock, Zap, X, AlertTriangle } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
@@ -51,7 +51,6 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
   
   // Subscription queries
   const { data: privateLobbyLimit } = useConvexQuery(api.featureGating.checkPrivateLobbyLimit, {});
-  const { data: usage } = useConvexQuery(api.subscriptions.getSubscriptionUsage, {});
   const [gameStartData, setGameStartData] = useState<{
     isOpen: boolean;
     player1Username: string;

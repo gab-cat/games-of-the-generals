@@ -2,6 +2,7 @@
 
 import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
+import { Id } from "./_generated/dataModel";
 
 /**
  * Migration function to assign initial ELO ratings to existing users
@@ -58,25 +59,34 @@ export const assignInitialEloRatings = internalMutation({
 export const backfillDonorStatus = internalMutation({
   args: {},
   handler: async (ctx) => {
-    // Get all successful donations
-    const successfulDonations = await ctx.db
-      .query("donations")
-      .withIndex("by_status", (q) => q.eq("status", "succeeded"))
-      .collect();
+    // Process successful donations in batches to avoid memory issues
+    const BATCH_SIZE = 500;
+    const donorTotals = new Map<Id<"users">, number>();
+    const donorUsers = new Set<Id<"users">>();
     
-    console.log(`[Migration] Found ${successfulDonations.length} successful donations`);
+    let hasMore = true;
+    let cursor: string | null = null;
+    let totalProcessed = 0;
     
-    // Group donations by userId and sum amounts
-    const donorTotals = new Map<string, number>();
-    const donorUsers = new Set<string>();
-    
-    for (const donation of successfulDonations) {
-      const userId = donation.userId;
-      donorUsers.add(userId);
-      const currentTotal = donorTotals.get(userId) || 0;
-      donorTotals.set(userId, currentTotal + donation.amount);
+    while (hasMore) {
+      const result = await ctx.db
+        .query("donations")
+        .withIndex("by_status", (q) => q.eq("status", "succeeded"))
+        .paginate({ numItems: BATCH_SIZE, cursor: cursor ?? null });
+      
+      for (const donation of result.page) {
+        const userId = donation.userId as Id<"users">;
+        donorUsers.add(userId);
+        const currentTotal = donorTotals.get(userId) || 0;
+        donorTotals.set(userId, currentTotal + donation.amount);
+      }
+      
+      totalProcessed += result.page.length;
+      hasMore = !result.isDone;
+      cursor = result.continueCursor;
     }
     
+    console.log(`[Migration] Processed ${totalProcessed} successful donations`);
     console.log(`[Migration] Found ${donorUsers.size} unique donors`);
     
     // Update profiles for users with successful donations
@@ -86,7 +96,7 @@ export const backfillDonorStatus = internalMutation({
     for (const userId of donorUsers) {
       const profile = await ctx.db
         .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", userId as any))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
       
       if (!profile) {

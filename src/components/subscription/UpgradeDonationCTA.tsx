@@ -6,7 +6,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Button } from "@/components/ui/button";
-import { X, Crown, Heart, Sparkles, ArrowRight, Zap, PlayCircle, Users } from "lucide-react";
+import { X, Crown, Heart, Zap, PlayCircle, Users } from "lucide-react";
 
 export function UpgradeDonationCTA() {
   const [isDismissed, setIsDismissed] = useState(false);

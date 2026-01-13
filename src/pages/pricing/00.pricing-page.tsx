@@ -161,7 +161,6 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
   const [selectedTier, setSelectedTier] = useState<"pro" | "pro_plus" | null>(null);
 
   const search = route.useSearch();
-  const navigate = useNavigate();
 
   // Get current subscription status
   const { data: subscription } = useConvexQuery(api.subscriptions.getCurrentSubscription, {});

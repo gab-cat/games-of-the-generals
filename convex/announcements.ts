@@ -107,7 +107,7 @@ export const updateAnnouncement = mutation({
     }
 
     // Verify announcement exists
-    const existingAnnouncement = await ctx.db.get(args.id);
+    const existingAnnouncement = await ctx.db.get("announcements", args.id);
     if (!existingAnnouncement) {
       throw new Error("Announcement not found");
     }
@@ -143,7 +143,7 @@ export const deleteAnnouncement = mutation({
     }
 
     // Verify announcement exists
-    const existingAnnouncement = await ctx.db.get(args.id);
+    const existingAnnouncement = await ctx.db.get("announcements", args.id);
     if (!existingAnnouncement) {
       throw new Error("Announcement not found");
     }

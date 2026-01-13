@@ -18,7 +18,6 @@ export function GracePeriodWarning({ className = "" }: GracePeriodWarningProps) 
     return null;
   }
 
-  const expiresAt = subscription.expiresAt;
   const gracePeriodEndsAt = subscription.gracePeriodEndsAt;
 
   if (!gracePeriodEndsAt) {
