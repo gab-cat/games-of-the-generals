@@ -82,7 +82,7 @@ export default defineConfig(({ mode }) => ({
     minify: 'esbuild',
     cssMinify: true,
     sourcemap: false, // Disable sourcemaps in production for better performance
-    rollupOptions: {
+    rolldownOptions: {
       output: {
         manualChunks: (id) => {
           // React ecosystem
