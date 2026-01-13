@@ -1495,8 +1495,40 @@ export const getMatchHistory = query({
     const userId = args.userId || await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
+    // Check subscription tier for replay limits
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    const tier = subscription?.tier || "free";
+    const status = subscription?.status || "active";
+    const expiresAt = subscription?.expiresAt || null;
+    const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+    // Check if subscription is active
+    const now = Date.now();
+    let isActive = true;
+    if (expiresAt && status !== "canceled") {
+      if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+        isActive = false;
+      } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+        isActive = true; // Still in grace period
+      } else if (expiresAt > now) {
+        isActive = true;
+      }
+    }
+
+    // Replay limits: Free (1), Pro (50), Pro+ (100)
+    const replayLimits: Record<string, number> = {
+      free: 1,
+      pro: 50,
+      pro_plus: 100,
+    };
+    const maxReplays = isActive ? replayLimits[tier] || 1 : 1;
+
     const { paginationOpts } = args;
-    const limit = Math.min(paginationOpts.numItems, 20);
+    const limit = Math.min(paginationOpts.numItems, Math.min(20, maxReplays));
 
     // Get user's profile once for rank info
     const profile = await ctx.db
@@ -1540,11 +1572,14 @@ export const getMatchHistory = query({
       filteredGames = allGames.filter(game => game._id > paginationOpts.cursor!);
     }
 
-    // Take the requested page size
-    const pageGames = filteredGames.slice(0, limit);
+    // Apply replay limit based on subscription tier
+    const limitedGames = filteredGames.slice(0, maxReplays);
+    
+    // Take the requested page size (within the replay limit)
+    const pageGames = limitedGames.slice(0, limit);
 
-    // Determine if we have more results
-    const hasMore = filteredGames.length > limit;
+    // Determine if we have more results (within replay limit)
+    const hasMore = limitedGames.length > limit;
 
     const result = {
       page: pageGames,

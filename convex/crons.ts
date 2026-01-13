@@ -92,6 +92,30 @@ crons.cron(
   {}
 );
 
+// Run every hour to check and update expired subscriptions
+crons.cron(
+  "Check and update expired subscriptions",
+  "0 * * * *", // Every hour
+  internal.subscriptions.checkAndUpdateExpiredSubscriptions,
+  {}
+);
+
+// Run daily at 00:10 UTC (08:10 Philippines time) to send expiry notifications
+crons.cron(
+  "Send subscription expiry notifications",
+  "10 0 * * *", // Daily at 00:10 UTC
+  internal.subscriptions.sendExpiryNotifications,
+  {}
+);
+
+// Run daily at 00:15 UTC (08:15 Philippines time) to reset daily usage counters
+crons.cron(
+  "Reset daily subscription usage counters",
+  "15 0 * * *", // Daily at 00:15 UTC
+  internal.subscriptions.resetDailyUsage,
+  {}
+);
+
 export default crons;
 
 

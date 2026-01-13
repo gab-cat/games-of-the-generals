@@ -332,6 +332,42 @@ export const updateAvatar = mutation({
       throw new Error("Profile not found");
     }
 
+    // Check subscription for custom avatar upload (if uploading a new avatar)
+    if (args.avatarUrl && args.avatarStorageId) {
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active
+      const now = Date.now();
+      let isActive = true;
+      if (expiresAt && status !== "canceled") {
+        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+          isActive = false;
+        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+          isActive = true; // Still in grace period
+        } else if (expiresAt > now) {
+          isActive = true;
+        }
+      }
+
+      // Free tier cannot upload custom avatars
+      if (tier === "free") {
+        throw new Error("Custom avatar upload is only available for Pro and Pro+ subscribers. Upgrade to unlock this feature.");
+      }
+
+      // Pro/Pro+ users need active subscription
+      if (!isActive) {
+        throw new Error("Your subscription has expired. Please renew to upload custom avatars.");
+      }
+    }
+
     // Delete old avatar file if it exists and either:
     // 1. Avatar URL is empty (removal)
     // 2. A new avatar is being set with a different storage ID

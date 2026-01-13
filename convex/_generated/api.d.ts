@@ -15,6 +15,7 @@ import type * as aiGame from "../aiGame.js";
 import type * as announcements from "../announcements.js";
 import type * as auth from "../auth.js";
 import type * as crons from "../crons.js";
+import type * as featureGating from "../featureGating.js";
 import type * as fileUpload from "../fileUpload.js";
 import type * as gamePresence from "../gamePresence.js";
 import type * as games from "../games.js";
@@ -27,6 +28,7 @@ import type * as messages from "../messages.js";
 import type * as migrations from "../migrations.js";
 import type * as moderationEmails from "../moderationEmails.js";
 import type * as notifications from "../notifications.js";
+import type * as paymongo from "../paymongo.js";
 import type * as performance from "../performance.js";
 import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
@@ -37,6 +39,7 @@ import type * as sendEmails from "../sendEmails.js";
 import type * as settings from "../settings.js";
 import type * as setupPresets from "../setupPresets.js";
 import type * as spectate from "../spectate.js";
+import type * as subscriptions from "../subscriptions.js";
 import type * as supportTickets from "../supportTickets.js";
 
 import type {
@@ -53,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   announcements: typeof announcements;
   auth: typeof auth;
   crons: typeof crons;
+  featureGating: typeof featureGating;
   fileUpload: typeof fileUpload;
   gamePresence: typeof gamePresence;
   games: typeof games;
@@ -65,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   migrations: typeof migrations;
   moderationEmails: typeof moderationEmails;
   notifications: typeof notifications;
+  paymongo: typeof paymongo;
   performance: typeof performance;
   presence: typeof presence;
   profiles: typeof profiles;
@@ -75,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   settings: typeof settings;
   setupPresets: typeof setupPresets;
   spectate: typeof spectate;
+  subscriptions: typeof subscriptions;
   supportTickets: typeof supportTickets;
 }>;
 

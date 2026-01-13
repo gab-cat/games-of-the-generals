@@ -2,6 +2,7 @@ import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 // Helper function to check if user is admin
 async function isUserAdmin(ctx: any, userId: Id<"users">): Promise<boolean> {
@@ -109,6 +110,74 @@ export const createLobby = mutation({
     const allowSpectators = args.allowSpectators ?? true;
     const maxSpectators = args.maxSpectators ?? undefined; // undefined means unlimited
     let lobbyCode: string | undefined;
+
+    // Check private lobby limits if creating a private lobby
+    if (isPrivate) {
+      // Get subscription info
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active
+      const now = Date.now();
+      let isActive = true;
+      if (expiresAt && status !== "canceled") {
+        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+          isActive = false;
+        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+          isActive = true; // Still in grace period
+        } else if (expiresAt > now) {
+          isActive = true;
+        }
+      }
+
+      // Get daily limits
+      const limits: Record<string, number> = {
+        free: 10,
+        pro: 50,
+        pro_plus: Infinity,
+      };
+      const limit = limits[tier] || 10;
+
+      // Get today's usage
+      const today = new Date().toISOString().split("T")[0];
+      const usage = await ctx.db
+        .query("subscriptionUsage")
+        .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", today))
+        .unique();
+
+      const todayCount = usage?.privateLobbiesCreated || 0;
+
+      if (!isActive && tier !== "free") {
+        throw new Error("Your subscription has expired. Please renew to create private lobbies.");
+      }
+
+      if (limit !== Infinity && todayCount >= limit) {
+        const tierName = tier === "free" ? "Free" : tier === "pro" ? "Pro" : "Pro+";
+        throw new Error(`Daily limit of ${limit} private lobbies reached for ${tierName} tier. ${tier === "free" ? "Upgrade to Pro for 50 per day, or Pro+ for unlimited." : tier === "pro" ? "Upgrade to Pro+ for unlimited private lobbies." : ""}`);
+      }
+
+      // Increment usage counter
+      if (usage) {
+        await ctx.db.patch(usage._id, {
+          privateLobbiesCreated: todayCount + 1,
+        });
+      } else {
+        await ctx.db.insert("subscriptionUsage", {
+          userId,
+          date: today,
+          privateLobbiesCreated: 1,
+          aiReplaysSaved: 0,
+          lastResetAt: Date.now(),
+        });
+      }
+    }
 
     // Generate unique lobby code for private lobbies
     if (isPrivate) {

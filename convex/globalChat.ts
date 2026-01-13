@@ -262,8 +262,39 @@ export const sendMessage = mutation({
         return { success: false, message: "Message cannot be empty" };
       }
 
-      if (trimmedMessage.length > 500) {
-        return { success: false, message: "Message must be 500 characters or less" };
+      // Check subscription for message length limit
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active
+      const now = Date.now();
+      let isActive = true;
+      if (expiresAt && status !== "canceled") {
+        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+          isActive = false;
+        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+          isActive = true; // Still in grace period
+        } else if (expiresAt > now) {
+          isActive = true;
+        }
+      }
+
+      // Message length limits: Free (500), Pro/Pro+ (1000)
+      const maxLength = (tier === "pro" || tier === "pro_plus") && isActive ? 1000 : 500;
+      if (trimmedMessage.length > maxLength) {
+        if (tier === "free") {
+          return { success: false, message: `Message must be 500 characters or less. Upgrade to Pro for longer messages (up to 1000 characters).` };
+        } else if (!isActive) {
+          return { success: false, message: `Your subscription has expired. Message limit is now 500 characters. Renew to restore extended messages.` };
+        }
+        return { success: false, message: `Message must be ${maxLength} characters or less` };
       }
 
       // Handle commands first
@@ -493,6 +524,41 @@ export const updateChatSettings = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    // Check subscription for custom username color
+    if (args.usernameColor) {
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active
+      const now = Date.now();
+      let isActive = true;
+      if (expiresAt && status !== "canceled") {
+        if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+          isActive = false;
+        } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+          isActive = true; // Still in grace period
+        } else if (expiresAt > now) {
+          isActive = true;
+        }
+      }
+
+      // Custom username colors are Pro/Pro+ only
+      if (tier === "free") {
+        throw new Error("Custom username colors are only available for Pro and Pro+ subscribers. Upgrade to unlock this feature.");
+      }
+
+      if (!isActive) {
+        throw new Error("Your subscription has expired. Please renew to use custom username colors.");
+      }
+    }
 
     // Process username color - adjust for readability if provided
     let processedColor = args.usernameColor;

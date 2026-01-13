@@ -98,6 +98,44 @@ export const startAIGameSession = mutation({
       throw new Error("Invalid profile");
     }
 
+    // Check subscription tier and expiry for difficulty access
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    const tier = subscription?.tier || "free";
+    const status = subscription?.status || "active";
+    const expiresAt = subscription?.expiresAt || null;
+    const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+    // Check if subscription is active
+    const now = Date.now();
+    let isActive = true;
+    if (expiresAt && status !== "canceled") {
+      if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+        isActive = false;
+      } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+        isActive = true; // Still in grace period
+      } else if (expiresAt > now) {
+        isActive = true;
+      }
+    }
+
+    // Check difficulty access
+    const allowedDifficulties: string[] = {
+      free: ["easy", "medium"],
+      pro: ["easy", "medium", "hard"],
+      pro_plus: ["easy", "medium", "hard"],
+    }[tier] || ["easy", "medium"];
+
+    if (args.difficulty === "hard" && (!allowedDifficulties.includes("hard") || !isActive)) {
+      if (!isActive && tier !== "free") {
+        throw new Error("Your subscription has expired. Please renew to access Hard difficulty.");
+      }
+      throw new Error("Hard difficulty is only available for Pro and Pro+ subscribers. Upgrade to unlock advanced AI opponents.");
+    }
+
     // Generate unique session ID
     const sessionId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
