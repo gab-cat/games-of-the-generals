@@ -89,7 +89,7 @@ export function UpgradeDonationCTA() {
                       <div className="p-1 rounded bg-blue-500/10 border border-blue-500/20">
                         <Heart className="w-3.5 h-3.5 text-blue-400/80 flex-shrink-0" />
                       </div>
-                      <h3 className="text-sm sm:text-base font-light text-white leading-tight">
+                      <h3 className="text-sm sm:text-base font-display font-light text-white leading-tight">
                         Help Keep the Server Alive
                       </h3>
                     </div>
@@ -118,7 +118,7 @@ export function UpgradeDonationCTA() {
                       variant="outline"
                       onClick={handleUpgrade}
                       size="sm"
-                      className="font-light px-4 py-2 h-auto text-xs sm:text-sm flex-1 sm:flex-none"
+                      className="font-light font-mono px-4 py-2 h-auto text-xs sm:text-sm flex-1 sm:flex-none"
                     >
                       <Crown className="w-3.5 h-3.5 mr-1.5" />
                       Upgrade
@@ -128,7 +128,7 @@ export function UpgradeDonationCTA() {
                       variant="outline"
                       onClick={handleDonate}
                       size="sm"
-                      className="font-light px-4 py-2 h-auto text-xs sm:text-sm flex-1 sm:flex-none border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 hover:border-pink-500/40"
+                      className="font-light font-mono px-4 py-2 h-auto text-xs sm:text-sm flex-1 sm:flex-none border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 hover:border-pink-500/40"
                     >
                       <Heart className="w-3.5 h-3.5 mr-1.5 text-pink-400/80" />
                       Donate
