@@ -6,36 +6,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 
 export const presence = new Presence(components.presence);
 
-// Retry helper with exponential backoff for handling write conflicts
-async function retryWithBackoff<T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 100
-): Promise<T> {
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      // Check if it's a write conflict error
-      const isWriteConflict = error instanceof Error && 
-        (error.message.includes("write conflict") || 
-         error.message.includes("retried") ||
-         error.message.includes("concurrent modification"));
-      
-      if (!isWriteConflict || attempt === maxRetries) {
-        // If it's not a write conflict or we've exhausted retries, throw
-        throw error;
-      }
-      
-      // Exponential backoff: 100ms, 300ms, 900ms
-      const delay = baseDelay * Math.pow(3, attempt);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error("Max retries exceeded");
-}
-
 // Heartbeat mutation for presence tracking
+// Note: Convex's built-in OCC (Optimistic Concurrency Control) handles retries automatically
 export const heartbeat = mutation({
   args: { 
     roomId: v.string(), 
@@ -53,12 +25,8 @@ export const heartbeat = mutation({
     // For security, we could verify that authUserId matches userId if needed
     // For now, we'll trust the client but this could be enhanced
     
-    // Retry with exponential backoff to handle write conflicts
-    return await retryWithBackoff(
-      () => presence.heartbeat(ctx, roomId, userId, sessionId, interval),
-      3,
-      100
-    );
+    // Let Convex OCC handle retries natively - no custom retry wrapper needed
+    return await presence.heartbeat(ctx, roomId, userId, sessionId, interval);
   },
 });
 
@@ -78,16 +46,13 @@ export const list = query({
 });
 
 // Disconnect user from presence
+// Note: Convex's built-in OCC handles retries automatically
 export const disconnect = mutation({
   args: { sessionToken: v.string() },
   handler: async (ctx, { sessionToken }) => {
     // if all users in a room are offline, the room is automatically removed
-    // Retry with exponential backoff to handle write conflicts
-    return await retryWithBackoff(
-      () => presence.disconnect(ctx, sessionToken),
-      3,
-      100
-    );
+    // Let Convex OCC handle retries natively - no custom retry wrapper needed
+    return await presence.disconnect(ctx, sessionToken);
   },
 });
 

@@ -29,7 +29,8 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
   const [activeTab, setActiveTab] = useState<"lobbies" | "spectate">("lobbies");
   const navigate = useNavigate();
 
-  const activeGame = useQuery(api.games.getCurrentUserGame);
+  // BANDWIDTH OPTIMIZED: Use lightweight query that returns only game ID
+  const activeGameId = useQuery(api.games.getCurrentUserGameId);
 
   const startGameMutation = useConvexMutationWithQuery(api.games.startGame, {
     onError: () => {
@@ -57,8 +58,8 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
   };
 
   // Check if user has an active game and redirect if needed
-  if (activeGame?._id) {
-    void navigate({ to: "/game", search: { gameId: activeGame._id } });
+  if (activeGameId) {
+    void navigate({ to: "/game", search: { gameId: activeGameId } });
     return null;
   }
 

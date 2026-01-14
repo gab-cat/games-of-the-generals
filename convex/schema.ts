@@ -195,6 +195,8 @@ const applicationTables = {
     .index("by_status_finished", ["status", "finishedAt"])
     .index("by_player1_finished", ["player1Id", "status", "finishedAt"]) // Player history optimization
     .index("by_player2_finished", ["player2Id", "status", "finishedAt"]) // Player history optimization
+    .index("by_player1_status", ["player1Id", "status"]) // BANDWIDTH OPTIMIZED: For efficient active game lookup
+    .index("by_player2_status", ["player2Id", "status"]) // BANDWIDTH OPTIMIZED: For efficient active game lookup
     .index("by_status_setup_time", ["status", "setupTimeStarted"]) // For finding stale setup games
     .index("by_status_game_time", ["status", "gameTimeStarted"]), // For finding stale playing games
 
