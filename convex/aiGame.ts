@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { isSubscriptionActive } from "./featureGating";
+import { Doc } from "./_generated/dataModel";
 
 // Game pieces and their ranks (same as regular games)
 const PIECES = {
@@ -94,7 +95,7 @@ export const startAIGameSession = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const profile = await ctx.db.get("profiles", args.profileId);
+    const profile = await ctx.db.get(args.profileId);
     if (!profile || profile.userId !== userId) {
       throw new Error("Invalid profile");
     }
@@ -406,7 +407,7 @@ export const makeAIGameMove = mutation({
     }
 
     const toPiece = session.board[args.toRow][args.toCol];
-    const newBoard = session.board.map((row: any) => [...row]);
+    const newBoard = session.board.map((row) => [...row]);
 
     let challengeResult: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" } | null = null;
     let gameWinner: "player1" | "player2" | null = null;
@@ -453,7 +454,7 @@ export const makeAIGameMove = mutation({
     }
 
     // Check if either player has only the flag remaining
-    const hasOnlyFlag = (board: any[][], player: "player1" | "player2"): boolean => {
+    const hasOnlyFlag = (board: Doc<"aiGameSessions">["board"], player: "player1" | "player2"): boolean => {
       const pieces = [];
       for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 9; col++) {
@@ -474,7 +475,7 @@ export const makeAIGameMove = mutation({
     }
 
     // Update session
-    const updates: any = {
+    const updates: Partial<Doc<"aiGameSessions">> = {
       board: newBoard,
       currentTurn: "player2", // Switch to AI turn
       lastMoveTime: Date.now(),
@@ -591,7 +592,7 @@ export const getAISessionById = internalQuery({
     if (!profile?.aiSessionId) return null;
 
     // Direct lookup using aiSessionId
-    const session = await ctx.db.get("aiGameSessions", profile.aiSessionId);
+    const session = await ctx.db.get(profile.aiSessionId);
     
     // Verify session exists, belongs to user, and matches sessionId
     if (!session || session.playerId !== args.userId || session.sessionId !== args.sessionId) {
@@ -848,7 +849,7 @@ export const executeAIMove = mutation({
     }
 
     const toPiece = session.board[args.toRow][args.toCol];
-    const newBoard = session.board.map((row: any) => [...row]);
+    const newBoard = session.board.map((row) => [...row]);
 
     let challengeResult: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" } | null = null;
     let gameWinner: "player1" | "player2" | null = null;
@@ -914,7 +915,7 @@ export const executeAIMove = mutation({
     }
 
     // Update session
-    const updates: any = {
+    const updates: Partial<Doc<"aiGameSessions">> = {
       board: newBoard,
       currentTurn: "player1", // Switch back to player
       lastMoveTime: Date.now(),
@@ -1113,7 +1114,7 @@ export const getCurrentUserAIGame = query({
     if (!profile?.aiSessionId) return null;
 
     // Direct lookup using aiSessionId - O(1) instead of index scan + filter
-    const session = await ctx.db.get("aiGameSessions", profile.aiSessionId);
+    const session = await ctx.db.get(profile.aiSessionId);
     
     // Verify session exists, belongs to user, and is active
     if (!session || session.playerId !== userId) {

@@ -1,7 +1,7 @@
 import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { api } from "./_generated/api";
 
@@ -126,7 +126,7 @@ export const checkFeatureAccess = query({
   args: {
     feature: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, _args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { hasAccess: false, reason: "not_authenticated" };
 
@@ -298,7 +298,7 @@ export const extendSubscription = mutation({
     newExpiresAt: v.number(),
   }),
   handler: async (ctx, args): Promise<{ success: boolean; newExpiresAt: number }> => {
-    const result = await ctx.runMutation((internal as any).subscriptions.extendSubscriptionInternal, args) as { success: boolean; newExpiresAt: number };
+    const result = await ctx.runMutation(internal.subscriptions.extendSubscriptionInternal, args) as { success: boolean; newExpiresAt: number };
     return result;
   },
 });
@@ -550,17 +550,17 @@ export const createPayMongoPayment = action({
     const { discountedPrice: amount } = calculateDiscountedPrice(args.tier, months); // Amount in centavos (with discount applied)
 
     // Get current subscription to calculate new expiry
-    const subscription = await ctx.runQuery((internal as any).subscriptions.getCurrentSubscriptionForAction, { userId });
+    const subscription = await ctx.runQuery(internal.subscriptions.getCurrentSubscriptionForAction, { userId });
 
     const currentExpiresAt = subscription?.expiresAt || null;
     const newExpiresAt = calculateExpiryDate(currentExpiresAt, months);
 
     // Get user information for billing details
-    const user = await ctx.runQuery((internal as any).subscriptions.getUserForDonation, { userId });
+    const user = await ctx.runQuery(internal.subscriptions.getUserForDonation, { userId });
     if (!user) throw new Error("User not found");
 
     // Create payment record
-    const paymentId = await ctx.runMutation((internal as any).subscriptions.createPaymentRecord, {
+    const paymentId = await ctx.runMutation(internal.subscriptions.createPaymentRecord, {
       userId,
       tier: args.tier,
       amount,
@@ -579,7 +579,7 @@ export const createPayMongoPayment = action({
     const customerName = user.username || user.name || "Customer";
     const customerEmail = user.email;
 
-    const checkoutResult = await ctx.runAction((api as any).paymongo.createSubscriptionCheckout, {
+    const checkoutResult = await ctx.runAction(api.paymongo.createSubscriptionCheckout, {
       amount,
       description,
       successUrl,
@@ -643,11 +643,11 @@ export const createPayMongoDonation = action({
     const amountInCentavos = args.amount * 100;
 
     // Get user information for billing details
-    const user = await ctx.runQuery((internal as any).subscriptions.getUserForDonation, { userId });
+    const user = await ctx.runQuery(internal.subscriptions.getUserForDonation, { userId });
     if (!user) throw new Error("User not found");
 
     // Create donation record
-    const donationId = await ctx.runMutation((internal as any).subscriptions.createDonationRecord, {
+    const donationId = await ctx.runMutation(internal.subscriptions.createDonationRecord, {
       userId,
       amount: amountInCentavos,
     });
@@ -662,7 +662,7 @@ export const createPayMongoDonation = action({
     const customerName = user.username || user.name || "Customer";
     const customerEmail = user.email;
 
-    const checkoutResult = await ctx.runAction((api as any).paymongo.createDonationCheckout, {
+    const checkoutResult = await ctx.runAction(api.paymongo.createDonationCheckout, {
       amount: amountInCentavos,
       description,
       successUrl,
@@ -831,18 +831,20 @@ export const sendExpiryNotifications = internalMutation({
         notificationType = "expired";
       }
 
+      type SubscriptionNotificationType = Doc<"subscriptionNotifications">["type"];
+
       if (notificationType) {
         // Check if notification already sent
         const existing = await ctx.db
           .query("subscriptionNotifications")
-          .withIndex("by_user_type", (q) => q.eq("userId", subscription.userId).eq("type", notificationType as any))
+          .withIndex("by_user_type", (q) => q.eq("userId", subscription.userId).eq("type", notificationType as SubscriptionNotificationType))
           .filter((q) => q.eq(q.field("expiresAt"), subscription.expiresAt))
           .first();
 
         if (!existing) {
           await ctx.db.insert("subscriptionNotifications", {
             userId: subscription.userId,
-            type: notificationType as any,
+            type: notificationType as SubscriptionNotificationType,
             expiresAt: subscription.expiresAt,
             sentAt: Date.now(),
             dismissed: false,

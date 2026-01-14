@@ -68,19 +68,34 @@ function sanitizeMetadata(metadata?: Record<string, any>): Record<string, string
   return sanitized;
 }
 
+// Helper to get allowed payment methods based on environment
+function getAllowedPaymentMethods(): string[] {
+  const isProduction = process.env.ENV === "production";
+  
+  if (isProduction) {
+    // Production: only allow QR PH
+    return ["qrph"];
+  }
+  
+  // Development: allow all payment methods
+  return ["card", "paymaya", "gcash", "qrph"];
+}
+
 // Create a payment intent
 export async function createPaymentIntent(
   amount: number, // Amount in centavos
   description: string,
   metadata?: Record<string, any>,
-  paymentMethodAllowed: string[] = ["card", "paymaya", "gcash", "qrph"]
+  paymentMethodAllowed?: string[]
 ): Promise<{ id: string; client_secret: string; status: string }> {
+  // Use environment-based payment methods if not explicitly provided
+  const allowedMethods = paymentMethodAllowed ?? getAllowedPaymentMethods();
   const response = await paymongoRequest("/payment_intents", "POST", {
     data: {
       attributes: {
         amount,
         currency: "PHP",
-        payment_method_allowed: paymentMethodAllowed,
+        payment_method_allowed: allowedMethods,
         description,
         metadata: sanitizeMetadata(metadata),
       },
@@ -139,7 +154,7 @@ export async function createCheckoutSession(
         quantity: 1,
       },
     ],
-    payment_method_types: ["card", "paymaya", "gcash", "qrph"],
+    payment_method_types: getAllowedPaymentMethods(),
     success_url: successUrl,
     cancel_url: cancelUrl,
     metadata: sanitizeMetadata(metadata),
@@ -200,7 +215,7 @@ export async function verifyWebhookSignature(
   payload: string,
   signature: string,
   timestamp: string,
-  isLiveMode: boolean = false
+  _isLiveMode: boolean = false
 ): Promise<boolean> {
   if (!PAYMONGO_WEBHOOK_SECRET) {
     console.warn("PayMongo webhook secret not configured");
