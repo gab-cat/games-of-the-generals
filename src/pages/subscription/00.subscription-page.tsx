@@ -8,11 +8,12 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { Clock, Crown, Zap, ArrowRight, Calendar, CreditCard, History, Heart, Sparkles, CheckCircle2, Infinity, Star, Gift, Users, Gamepad2, BarChart3, TrendingUp } from "lucide-react";
+import { Clock, Crown, Zap, ArrowRight, Calendar, CreditCard, History, Heart, Sparkles, CheckCircle2, Infinity as InfinityIcon, Star, Gift, Users, Gamepad2, BarChart3, TrendingUp } from "lucide-react";
 import { SubscriptionPaymentModal } from "@/components/subscription/SubscriptionPaymentModal";
-import { useSearch } from "@tanstack/react-router";
+import { useSearch, useNavigate } from "@tanstack/react-router";
 
 export function SubscriptionPage() {
+  const navigate = useNavigate();
   const [extendDialogOpen, setExtendDialogOpen] = useState(false);
   const [successModalOpen, setSuccessModalOpen] = useState(false);
   const search = useSearch({ from: "/subscription" });
@@ -171,7 +172,7 @@ export function SubscriptionPage() {
                       variant="gradient"
                       className="w-full mt-4"
                       onClick={() => {
-                        window.location.href = "/pricing";
+                        navigate({ to: "/pricing", search: { donation: undefined} });
                       }}
                     >
                       Upgrade to Pro
@@ -209,7 +210,7 @@ export function SubscriptionPage() {
                       {[
                         "All Pro Features",
                         <span key="unlimited" className="flex items-center gap-1">
-                          <Infinity className="w-3 h-3" />
+                          <InfinityIcon className="w-3 h-3" />
                           Unlimited private lobbies
                         </span>,
                         "100 game replays saved",
@@ -229,7 +230,7 @@ export function SubscriptionPage() {
                       variant="gradient"
                       className="w-full mt-4"
                       onClick={() => {
-                        window.location.href = "/pricing";
+                        navigate({ to: "/pricing", search: { donation: undefined } });
                       }}
                     >
                       Upgrade to Pro+
@@ -321,16 +322,16 @@ export function SubscriptionPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {(tier === "pro" ? [
-                      { icon: Infinity, text: "Unlimited presets", color: "text-blue-400" },
+                      { icon: InfinityIcon, text: "Unlimited presets", color: "text-blue-400" },
                       { icon: Zap, text: "Priority matchmaking", color: "text-purple-400" },
                       { icon: BarChart3, text: "Game analysis tools", color: "text-pink-400" },
                       { icon: Crown, text: "Advanced AI opponents", color: "text-blue-300" },
                     ] : [
-                      { icon: Infinity, text: "Unlimited everything", color: "text-yellow-400" },
+                      { icon: InfinityIcon, text: "Unlimited everything", color: "text-yellow-400" },
                       { icon: Star, text: "Elite AI opponents", color: "text-amber-400" },
                       { icon: TrendingUp, text: "Advanced analytics", color: "text-orange-400" },
                       { icon: Gift, text: "Beta feature access", color: "text-yellow-300" },
-                    ]).map((benefit, index) => {
+                    ] as { icon: React.ElementType; text: React.ReactNode; color: string }[]).map((benefit, index) => {
                       const IconComponent = benefit.icon;
                       return (
                         <motion.div
@@ -449,7 +450,7 @@ export function SubscriptionPage() {
                           {tier === "pro" && "/ 50"}
                           {tier === "pro_plus" && (
                             <span className="flex items-center gap-1">
-                              <Infinity className="w-3 h-3" />
+                              <InfinityIcon className="w-3 h-3" />
                               Unlimited
                             </span>
                           )}
@@ -534,7 +535,7 @@ export function SubscriptionPage() {
                       variant="gradient"
                       className="w-full"
                       onClick={() => {
-                        window.location.href = "/pricing";
+                        navigate({ to: "/pricing", search: { donation: undefined } });
                       }}
                     >
                       <Sparkles className="w-4 h-4 mr-2" />

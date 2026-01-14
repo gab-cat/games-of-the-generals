@@ -19,7 +19,7 @@ import { api } from "../../../convex/_generated/api";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { toast } from "sonner";
 import { useConvexAction } from "@convex-dev/react-query";
-import { getRouteApi, useNavigate } from "@tanstack/react-router";
+import { getRouteApi } from "@tanstack/react-router";
 import { SubscriptionPaymentModal } from "@/components/subscription/SubscriptionPaymentModal";
 
 const route = getRouteApi("/pricing");

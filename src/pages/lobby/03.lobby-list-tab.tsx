@@ -84,7 +84,7 @@ export function LobbyListTab({ profile, onGameStart: _onGameStart, startGameMuta
 
   // Quick Match queries
   const queueStatus = useQuery(api.matchmaking.getQueueStatus);
-  const queueCount = useQuery(api.matchmaking.getQueueCount);
+  // const queueCount = useQuery(api.matchmaking.getQueueCount);
 
   // Update queue status state
   useEffect(() => {

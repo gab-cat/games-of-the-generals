@@ -1,9 +1,7 @@
 "use client";
 
 import { forwardRef, useState, useRef, useCallback, useEffect } from "react";
-import { useQuery } from "convex/react";
 import { useDebounce } from "use-debounce";
-import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
 

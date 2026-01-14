@@ -4,10 +4,9 @@ import { TanStackRouterVite } from '@tanstack/router-vite-plugin';
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 import path from "path";
-import fs from "fs";
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(() => ({
   plugins: [
     react(),
     TanStackRouterVite(),
@@ -84,57 +83,45 @@ export default defineConfig(({ mode }) => ({
     sourcemap: false, // Disable sourcemaps in production for better performance
     rolldownOptions: {
       output: {
-        manualChunks: (id) => {
-          // React ecosystem
-          if (id.includes('react') && !id.includes('node_modules')) {
-            return 'react-vendor';
-          }
-          // Router and state management
-          if (id.includes('@tanstack/react-router') || id.includes('@tanstack/router')) {
-            return 'router';
-          }
-          // Query libraries
-          if (id.includes('@tanstack/react-query') || id.includes('@convex-dev/react-query')) {
-            return 'query';
-          }
-          // Convex backend
-          if (id.includes('convex') && !id.includes('@convex-dev/react-query')) {
-            return 'convex';
-          }
-          // UI components (Radix UI)
-          if (id.includes('@radix-ui')) {
-            return 'ui-components';
-          }
-          // Animation and graphics
-          if (id.includes('framer-motion')) {
-            return 'animations';
-          }
-          // FormKit auto-animate
-          if (id.includes('@formkit/auto-animate')) {
-            return 'formkit-animate';
-          }
-          // Heavy libraries that should be dynamically imported
-          if (id.includes('jimp') || id.includes('node_modules/jimp')) {
-            return 'image-processing';
-          }
-          // Utilities and smaller deps
-          if (id.includes('clsx') || id.includes('class-variance-authority') ||
-              id.includes('tailwind-merge') || id.includes('cmdk') ||
-              id.includes('sonner') || id.includes('use-debounce')) {
-            return 'utils';
-          }
-          // Icons
-          if (id.includes('lucide-react')) {
-            return 'icons';
-          }
-          // Email and other features
-          if (id.includes('@react-email') || id.includes('resend')) {
-            return 'email';
-          }
-          // Default chunk for other vendor libraries
-          if (id.includes('node_modules')) {
-            return 'vendor';
-          }
+        // Use advancedChunks instead of deprecated manualChunks
+        // This provides better cache invalidation and loading performance
+        advancedChunks: {
+          groups: [
+            // React ecosystem - separate chunk for better caching
+            { name: 'react-vendor', test: /node_modules\/react(?!-dom|-)/ },
+            { name: 'react-dom', test: /node_modules\/react-dom/ },
+            
+            // Router and state management
+            { name: 'router', test: /node_modules\/@tanstack\/(react-)?router/ },
+            
+            // Query libraries
+            { name: 'query', test: /node_modules\/(@tanstack\/react-query|@convex-dev\/react-query)/ },
+            
+            // Convex backend (excluding react-query integration)
+            { name: 'convex', test: /node_modules\/convex(?!.*react-query)/ },
+            
+            // UI components (Radix UI)
+            { name: 'ui-components', test: /node_modules\/@radix-ui/ },
+            
+            // Animation libraries
+            { name: 'animations', test: /node_modules\/framer-motion/ },
+            { name: 'formkit-animate', test: /node_modules\/@formkit\/auto-animate/ },
+            
+            // Heavy image processing library
+            { name: 'image-processing', test: /node_modules\/jimp/ },
+            
+            // Utility libraries
+            { name: 'utils', test: /node_modules\/(clsx|class-variance-authority|tailwind-merge|cmdk|sonner|use-debounce)/ },
+            
+            // Icons
+            { name: 'icons', test: /node_modules\/lucide-react/ },
+            
+            // Email libraries
+            { name: 'email', test: /node_modules\/(@react-email|resend)/ },
+            
+            // Catch-all for other vendor libraries
+            { name: 'vendor', test: /node_modules/ },
+          ],
         },
         // Optimize chunk file names
         chunkFileNames: (chunkInfo) => {

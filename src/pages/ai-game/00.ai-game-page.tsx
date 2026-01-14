@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import { useConvexQueryWithOptions, useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -123,10 +124,10 @@ export function AIGamePage() {
     if (accessCheck && !accessCheck.hasAccess) {
       if (accessCheck.reason === "subscription_expired") {
         toast.error("Your subscription has expired. Please renew to access Hard difficulty.");
-        navigate({ to: "/subscription" });
+        navigate({ to: "/subscription", search: { subscription: undefined} });
       } else {
         toast.error("Hard difficulty is only available for Pro and Pro+ subscribers.");
-        navigate({ to: "/pricing" });
+        navigate({ to: "/pricing", search: { donation: undefined } });
       }
       return;
     }
@@ -376,7 +377,7 @@ export function AIGamePage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => navigate({ to: accessCheck?.reason === "subscription_expired" ? "/subscription" : "/pricing" })}
+                                    onClick={() => navigate({ to: accessCheck?.reason === "subscription_expired" ? "/subscription" : "/pricing", search: { donation: undefined } })}
                                     className="bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30 text-amber-300 text-xs"
                                   >
                                     {accessCheck?.reason === "subscription_expired" ? "Renew Now" : "Upgrade Now"}

@@ -1,4 +1,4 @@
-"use client";
+
 
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";

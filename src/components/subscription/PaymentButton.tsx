@@ -20,7 +20,7 @@ export function PaymentButton({
   months = 1,
   className = "",
   variant = "gradient",
-  onSuccess,
+  onSuccess: _onSuccess,
 }: PaymentButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const createPayment = useConvexAction(api.subscriptions.createPayMongoPayment);

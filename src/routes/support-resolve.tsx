@@ -5,7 +5,7 @@ import { SignInForm } from '@/auth/SignInForm'
 import { useConvexQuery } from '@/lib/convex-query-hooks'
 import { api } from '../../convex/_generated/api'
 import { Card, CardContent } from '@/components/ui/card'
-import { Shield, AlertCircle } from 'lucide-react'
+import { AlertCircle } from 'lucide-react'
 
 // Lazy load the SupportResolvePage component
 const SupportResolvePage = lazy(() => import('../pages/support/resolve').then(module => ({ default: module.SupportResolvePage })))

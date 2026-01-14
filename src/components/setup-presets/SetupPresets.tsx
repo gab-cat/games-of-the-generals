@@ -20,8 +20,7 @@ import {
   Edit,
   Check,
   X,
-  AlertTriangle,
-  Crown
+  AlertTriangle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
