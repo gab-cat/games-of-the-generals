@@ -259,7 +259,7 @@ export const setupPieces = mutation({
     }
 
     // Update game state
-    const updates: any = {
+    const updates: Partial<Doc<"games">> = {
       board: newBoard,
     };
 
@@ -950,8 +950,8 @@ export const surrenderGame = mutation({
 
     if (winnerProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
-        await ctx.db.patch(winnerProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
+        ctx.db.patch(winnerProfile._id, {
           gameId: undefined,
         })
       ]);
@@ -960,8 +960,8 @@ export const surrenderGame = mutation({
     
     if (loserProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
-        await ctx.db.patch(loserProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
+        ctx.db.patch(loserProfile._id, {
           gameId: undefined,
         })
       ]);
@@ -1080,8 +1080,8 @@ export const timeoutGame = mutation({
 
     if (winnerProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
-        await ctx.db.patch(winnerProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
+        ctx.db.patch(winnerProfile._id, {
           gameId: undefined,
         })
       ]);
@@ -1089,8 +1089,8 @@ export const timeoutGame = mutation({
     
     if (loserProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
-        await ctx.db.patch(loserProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
+        ctx.db.patch(loserProfile._id, {
           gameId: undefined,
         })
       ]);
@@ -1364,8 +1364,8 @@ export const checkOpponentTimeout = mutation({
 
       if (winnerProfile) {
         void Promise.all([
-          await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
-          await ctx.db.patch(winnerProfile._id, {
+          ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
+          ctx.db.patch(winnerProfile._id, {
             gameId: undefined,
           })
         ]);
@@ -1374,8 +1374,8 @@ export const checkOpponentTimeout = mutation({
       
       if (loserProfile) {
         void Promise.all([
-          await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
-          await ctx.db.patch(loserProfile._id, {
+          ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
+          ctx.db.patch(loserProfile._id, {
             gameId: undefined,
           })
         ]);

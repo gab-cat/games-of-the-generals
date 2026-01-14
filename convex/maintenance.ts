@@ -1,6 +1,7 @@
 import { internalMutation } from "./_generated/server";
 import { components, internal } from "./_generated/api";
 import { Presence } from "@convex-dev/presence";
+import { Doc } from "./_generated/dataModel";
 
 // Internal: Delete all anonymous users and clean up dependent data that could break UIs
 // - Does NOT touch games or moves to keep replays safe
@@ -209,7 +210,7 @@ export const fixUnreadCounts = internalMutation({
       if (participant1NeedsFix || participant2NeedsFix) {
         conversationsFixed++;
 
-        const updateData: any = {};
+        const updateData: Partial<Doc<"conversations">> = {};
 
         if (participant1NeedsFix) {
           updateData.participant1UnreadCount = actualParticipant1UnreadCount;

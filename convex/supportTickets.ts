@@ -2,6 +2,7 @@ import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { Doc } from "./_generated/dataModel";
 
 // Create a new support ticket
 export const createSupportTicket = mutation({
@@ -224,7 +225,7 @@ export const updateSupportTicketStatus = mutation({
     if (!currentTicket) throw new Error("Ticket not found");
 
     const now = Date.now();
-    const updateData: any = {
+    const updateData: Partial<Doc<"supportTickets">> = {
       status: args.status,
       updatedAt: now,
       assignedToId: userId,

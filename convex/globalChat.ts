@@ -91,12 +91,20 @@ function formatRemainingTime(remainingMs: number): string {
 
 
 // Handle chat commands
-async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userId: Id<"users">, profile: Doc<"profiles">): Promise<any> {
+async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userId: Id<"users">, profile: Doc<"profiles">): Promise<{
+  commandResponse?: string;
+  isSystemMessage?: boolean;
+  success: boolean;
+  formattedMessage?: string;
+  isRoleplay?: boolean;
+}> {
   const message = args.message.trim();
 
   // Check if message is a command (starts with /)
   if (!message.startsWith('/')) {
-    return null; // Not a command, handle as regular message
+    return {
+      success: false,
+    }; // Not a command, handle as regular message
   }
 
   const commandParts = message.split(' ');
@@ -121,7 +129,7 @@ async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userI
     case '/rules': {
       const activeRules = await ctx.db
         .query("chatRules")
-        .withIndex("by_active", (q: any) => q.eq("isActive", true))
+        .withIndex("by_active", (q) => q.eq("isActive", true))
         .unique();
 
       if (activeRules) {
@@ -301,7 +309,7 @@ export const sendMessage = mutation({
         }
         // If it's a /me command, replace the original message with the formatted one
         if (commandResult.isRoleplay) {
-          args.message = commandResult.formattedMessage;
+          args.message = commandResult.formattedMessage ?? '';
         }
       }
 

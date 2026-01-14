@@ -48,15 +48,25 @@ export function isSubscriptionActive(
   expiresAt: number | null,
   gracePeriodEndsAt: number | null
 ): boolean {
-  if (!expiresAt) return true; // Free tier or no expiry
+  // Free tier or no expiry - always active
+  if (!expiresAt) return true;
+  
+  // Explicitly canceled or expired
   if (status === "canceled") return false;
   if (status === "expired") return false;
+  
+  const now = Date.now();
+  
+  // Grace period status - check if still within grace period
   if (status === "grace_period") {
-    // In grace period - still active
-    return gracePeriodEndsAt ? gracePeriodEndsAt > Date.now() : false;
+    return gracePeriodEndsAt ? gracePeriodEndsAt > now : false;
   }
-  // Active status - check expiry
-  return expiresAt > Date.now();
+  
+  // Active status - check expiry, but also allow grace period if expiry passed
+  if (expiresAt > now) return true;
+  
+  // Expiry passed but may still be in grace period (before cron updates status)
+  return gracePeriodEndsAt ? gracePeriodEndsAt > now : false;
 }
 
 // Check if subscription is active

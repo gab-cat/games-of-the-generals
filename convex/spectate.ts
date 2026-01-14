@@ -7,7 +7,7 @@ import { Id } from "./_generated/dataModel";
 async function isUserAdmin(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
   const profile = await ctx.db
     .query("profiles")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
 
   return profile?.adminRole === "admin" || profile?.adminRole === "moderator";

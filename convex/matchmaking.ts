@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { isSubscriptionActive } from "./featureGating";
+import { Doc } from "./_generated/dataModel";
 
 // Rank weights for skill calculation
 const RANK_WEIGHTS = {
@@ -23,7 +24,7 @@ const RANK_WEIGHTS = {
 };
 
 // Calculate skill rating from player profile
-function calculateSkillRating(profile: any): number {
+function calculateSkillRating(profile: Doc<"profiles">): number {
   const winRate = profile.gamesPlayed > 0 ? profile.wins / profile.gamesPlayed : 0;
   const rankWeight = RANK_WEIGHTS[profile.rank as keyof typeof RANK_WEIGHTS] || 0;
   const gamesPlayed = profile.gamesPlayed;
@@ -320,7 +321,7 @@ export const attemptMatch = internalMutation({
 
     // Skill-based matching algorithm
     const matchedUsers = new Set<string>();
-    const matches: Array<{ player1: any; player2: any }> = [];
+    const matches: Array<{ player1: Doc<"matchmakingQueue">; player2: Doc<"matchmakingQueue"> }> = [];
 
     for (let i = 0; i < waitingPlayers.length; i++) {
       if (matchedUsers.has(waitingPlayers[i].userId)) continue;

@@ -2,6 +2,7 @@ import { query, mutation, internalMutation, internalQuery } from "./_generated/s
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { Doc } from "./_generated/dataModel";
 
 // Helper function for batch profile fetching to eliminate N+1 queries
 export const batchGetProfiles = internalQuery({
@@ -268,7 +269,7 @@ export const getConversationMessages = query({
     // Handle notification conversations (where otherUserId === userId) specially to avoid duplicates
     const isNotificationConversation = args.otherUserId === userId;
 
-    let allMessages: any[] = [];
+    let allMessages: Doc<"messages">[] = [];
 
     if (paginationOpts && paginationOpts.cursor) {
       // For cursor-based pagination, use a more efficient approach
@@ -561,12 +562,15 @@ export const setTyping = mutation({
     if (conversation) {
       const isParticipant1 = conversation.participant1Id === userId;
       
-      await ctx.db.patch(conversation._id, {
-        ...(isParticipant1 
-          ? { participant1TypingAt: timestamp }
-          : { participant2TypingAt: timestamp }
-        ),
-      });
+      if (isParticipant1) {
+        await ctx.db.patch(conversation._id, {
+          participant1TypingAt: timestamp,
+        });
+      } else {
+        await ctx.db.patch(conversation._id, {
+          participant2TypingAt: timestamp,
+        });
+      }
     } else if (args.isTyping) {
       // Create conversation if it doesn't exist and user is starting to type
       const userProfile = await ctx.db
@@ -682,7 +686,7 @@ export const searchUsers = query({
 });
 
 // Create lobby invite message
-export const sendLobbyInvite: any = mutation({
+export const sendLobbyInvite = mutation({
   args: {
     recipientUsername: v.string(),
     lobbyId: v.id("lobbies"),
@@ -713,7 +717,7 @@ export const sendLobbyInvite: any = mutation({
 });
 
 // Create game spectate invite message
-export const sendGameInvite: any = mutation({
+export const sendGameInvite = mutation({
   args: {
     recipientUsername: v.string(),
     gameId: v.id("games"),
@@ -897,18 +901,17 @@ export const updateConversationReadStatus = internalMutation({
     if (conversation) {
       const isParticipant1 = conversation.participant1Id === args.userId;
       
-      await ctx.db.patch(conversation._id, {
-        ...(isParticipant1 
-          ? { 
-              participant1LastRead: args.readAt,
-              participant1UnreadCount: 0,
-            }
-          : { 
-              participant2LastRead: args.readAt,
-              participant2UnreadCount: 0,
-            }
-        ),
-      });
+      if (isParticipant1) {
+        await ctx.db.patch(conversation._id, {
+          participant1LastRead: args.readAt,
+          participant1UnreadCount: 0,
+        });
+      } else {
+        await ctx.db.patch(conversation._id, {
+          participant2LastRead: args.readAt,
+          participant2UnreadCount: 0,
+        });
+      }
     }
   },
 });

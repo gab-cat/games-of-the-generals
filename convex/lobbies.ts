@@ -1,14 +1,14 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
 
 // Helper function to check if user is admin
-async function isUserAdmin(ctx: any, userId: Id<"users">): Promise<boolean> {
+async function isUserAdmin(ctx: QueryCtx | MutationCtx, userId: Id<"users">): Promise<boolean> {
   const profile = await ctx.db
     .query("profiles")
-    .withIndex("by_user", (q: any) => q.eq("userId", userId))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .unique();
 
   return profile?.adminRole === "admin" || profile?.adminRole === "moderator";
@@ -112,7 +112,7 @@ export const createLobby = mutation({
     let lobbyCode: string | undefined;
 
     // Check private lobby limits if creating a private lobby
-    let usage: any = null;
+    let usage = null;
     let todayCount = 0;
     let today = "";
     if (isPrivate) {
@@ -138,8 +138,11 @@ export const createLobby = mutation({
       };
       const limit = limits[tier] || 10;
 
-      // Get today's usage
-      today = new Date().toISOString().split("T")[0];
+      // Get today's usage (use UTC to avoid timezone issues)
+      const now = new Date();
+      const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+        .toISOString()
+        .split("T")[0];
       usage = await ctx.db
         .query("subscriptionUsage")
         .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", today))
@@ -289,7 +292,7 @@ export const joinLobby = mutation({
 
     if (!profile) throw new Error("Profile not found");
 
-    const lobby = await ctx.db.get("lobbies", args.lobbyId);
+    const lobby = await ctx.db.get(args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
     if (lobby.status !== "waiting") {
@@ -469,7 +472,7 @@ export const spectateGameById = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get("games", args.gameId);
+    const game = await ctx.db.get(args.gameId);
     if (!game) throw new Error("Game not found");
 
     // Get the associated lobby to check spectator settings

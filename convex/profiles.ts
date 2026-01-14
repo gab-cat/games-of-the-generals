@@ -1,8 +1,8 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
 
 // ELO Rating System Functions
@@ -42,7 +42,7 @@ function calculateNewElo(playerElo: number, opponentElo: number, actualScore: nu
  * @param loserGamesPlayed Loser's total games played (for K-factor)
  */
 export async function updateEloRatings(
-  ctx: any,
+  ctx: MutationCtx,
   winnerId: Id<"users">,
   loserId: Id<"users">,
   winnerElo: number,
@@ -62,11 +62,11 @@ export async function updateEloRatings(
   const [winnerProfile, loserProfile] = await Promise.all([
     ctx.db
       .query("profiles")
-      .withIndex("by_user", (q: any) => q.eq("userId", winnerId))
+      .withIndex("by_user", (q) => q.eq("userId", winnerId))
       .unique(),
     ctx.db
       .query("profiles")
-      .withIndex("by_user", (q: any) => q.eq("userId", loserId))
+      .withIndex("by_user", (q) => q.eq("userId", loserId))
       .unique(),
   ]);
 
@@ -83,7 +83,7 @@ export async function updateEloRatings(
  * Check if a game is a quick match by checking the lobby name pattern
  * Quick match lobbies have name pattern: "Quick Match ${timestamp}"
  */
-export async function isQuickMatchGame(ctx: any, lobbyId: Id<"lobbies">): Promise<boolean> {
+export async function isQuickMatchGame(ctx: QueryCtx | MutationCtx, lobbyId: Id<"lobbies">): Promise<boolean> {
   const lobby = await ctx.db.get("lobbies", lobbyId);
   if (!lobby) return false;
   return lobby.name?.startsWith("Quick Match") ?? false;
@@ -229,7 +229,7 @@ export const createOrUpdateProfile = mutation({
 
     if (currentProfile) {
       // Update existing profile
-      const patchData: any = { username: args.username };
+      const patchData: Partial<Doc<"profiles">> = { username: args.username };
       if (!currentProfile.avatarUrl && oauthImageUrl) {
         patchData.avatarUrl = oauthImageUrl;
       }

@@ -20,6 +20,7 @@ import type * as fileUpload from "../fileUpload.js";
 import type * as gamePresence from "../gamePresence.js";
 import type * as games from "../games.js";
 import type * as globalChat from "../globalChat.js";
+import type * as helpers_subscriptionHelpers from "../helpers/subscriptionHelpers.js";
 import type * as http from "../http.js";
 import type * as lobbies from "../lobbies.js";
 import type * as maintenance from "../maintenance.js";
@@ -61,6 +62,7 @@ declare const fullApi: ApiFromModules<{
   gamePresence: typeof gamePresence;
   games: typeof games;
   globalChat: typeof globalChat;
+  "helpers/subscriptionHelpers": typeof helpers_subscriptionHelpers;
   http: typeof http;
   lobbies: typeof lobbies;
   maintenance: typeof maintenance;

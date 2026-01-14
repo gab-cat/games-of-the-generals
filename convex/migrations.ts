@@ -1,7 +1,7 @@
 // Migration functionality has been removed - online status is now handled by presence system
 
 import { internalMutation } from "./_generated/server";
-import { v } from "convex/values";
+// import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 
 /**

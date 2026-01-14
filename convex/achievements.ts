@@ -282,7 +282,7 @@ export const checkAchievements = mutation({
     profileId: v.id("profiles"),
   },
   handler: async (ctx, args) => {
-    const profile = await ctx.db.get("profiles", args.profileId);
+    const profile = await ctx.db.get(args.profileId);
     if (!profile) return;
 
     const newAchievements: string[] = [];
@@ -411,7 +411,7 @@ export const checkGameSpecificAchievements = mutation({
     loserId: v.id("users"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get("games", args.gameId);
+    const game = await ctx.db.get(args.gameId);
     if (!game || game.status !== "finished") return [];
 
     const newAchievements: string[] = [];
