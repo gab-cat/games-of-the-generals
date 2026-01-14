@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { Doc } from "./_generated/dataModel";
 
 // Initial piece setup for each player (21 pieces total)
 const INITIAL_PIECES = [
@@ -20,6 +21,9 @@ const INITIAL_PIECES = [
   "4 Star General",
   "5 Star General"
 ];
+
+// Maximum number of presets to fetch for checking limits (to avoid unbounded queries)
+const MAX_PRESETS_CHECK_LIMIT = 1000;
 
 // Default preset formations - these are standard presets available to all users
 const DEFAULT_PRESETS = [
@@ -278,7 +282,7 @@ export const saveSetupPreset = mutation({
     const userCustomPresets = await ctx.db
       .query("setupPresets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(limit === Infinity ? 1000 : limit + 1); // Reasonable limit for checking
+      .take(limit === Infinity ? MAX_PRESETS_CHECK_LIMIT : limit + 1); // Reasonable limit for checking
 
     if (!isActive && tier !== "free") {
       throw new Error("Your subscription has expired. Please renew to create more custom presets.");
@@ -368,7 +372,7 @@ export const loadSetupPreset = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const preset = await ctx.db.get("setupPresets", args.presetId);
+    const preset = await ctx.db.get(args.presetId);
     if (!preset) throw new Error("Preset not found");
 
     if (preset.userId !== userId) {
@@ -392,7 +396,7 @@ export const deleteSetupPreset = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const preset = await ctx.db.get("setupPresets", args.presetId);
+    const preset = await ctx.db.get(args.presetId);
     if (!preset) throw new Error("Preset not found");
 
     if (preset.userId !== userId) {
@@ -431,7 +435,7 @@ export const setDefaultPreset = mutation({
 
     // Set new default if provided
     if (args.presetId) {
-      const preset = await ctx.db.get("setupPresets", args.presetId);
+      const preset = await ctx.db.get(args.presetId);
       if (!preset) throw new Error("Preset not found");
 
       if (preset.userId !== userId) {
@@ -495,14 +499,14 @@ export const updateSetupPreset = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const preset = await ctx.db.get("setupPresets", args.presetId);
+    const preset = await ctx.db.get(args.presetId);
     if (!preset) throw new Error("Preset not found");
 
     if (preset.userId !== userId) {
       throw new Error("Not authorized to update this preset");
     }
 
-    const updates: any = {};
+    const updates: Partial<Doc<"setupPresets">> = {};
 
     if (args.name && args.name !== preset.name) {
       // Check if new name already exists
