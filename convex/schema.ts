@@ -613,6 +613,7 @@ const applicationTables = {
     createdByUsername: v.string(),
     createdAt: v.number(),
     updatedAt: v.number(),
+    commentCount: v.optional(v.number()), // Number of comments on this announcement
   })
     .index("by_pinned_created", ["isPinned", "createdAt"]) // For efficient ordering (pinned first, then by creation time)
     .index("by_created_at", ["createdAt"]), // For general ordering by creation time
@@ -698,12 +699,42 @@ const applicationTables = {
     .index("by_status", ["status"])
     .index("by_paymongo_payment_id", ["paymongoPaymentId"]),
 
+  // User customizations for premium features (cosmetics, colors, frames, etc.)
+  userCustomizations: defineTable({
+    userId: v.id("users"),
+    // Username styling
+    usernameColor: v.optional(v.string()), // Hex color for username display
+    // Avatar frame customization
+    avatarFrame: v.optional(v.string()), // Frame ID: "none" | "gold" | "silver" | "bronze" | "diamond" | "fire" | "rainbow" | "donor"
+    // Badge visibility
+    showBadges: v.optional(v.boolean()), // Whether to show tier/donor badges (default true)
+    // Future cosmetic customizations (extensible)
+    profileBackground: v.optional(v.string()), // Future: profile background theme
+    chatBubbleStyle: v.optional(v.string()), // Future: chat message styling
+    nameEffect: v.optional(v.string()), // Future: animated name effects
+    // Metadata
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
+
   // Webhook events for idempotency
   webhookEvents: defineTable({
     eventId: v.string(), // PayMongo event ID (evt_...)
     processedAt: v.number(),
   })
     .index("by_event_id", ["eventId"]),
+
+  // Comments/replies on announcements
+  comments: defineTable({
+    announcementId: v.id("announcements"),
+    userId: v.id("users"),
+    content: v.string(), // Text/markdown content
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_announcement", ["announcementId"])
+    .index("by_user", ["userId"])
+    .index("by_announcement_created", ["announcementId", "createdAt"]),
 };
 
 export default defineSchema({
