@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
 import { useConvexMutationWithQuery } from "../lib/convex-query-hooks";
-import { useQuery } from "convex-helpers/react/cache";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../convex/_generated/dataModel";
@@ -328,7 +328,61 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
     }
   });
 
+  // Mutations for opponent disconnection tracking
+  const reportOpponentDisconnect = useMutation(api.games.reportOpponentDisconnect);
+  const reportOpponentReconnect = useMutation(api.games.reportOpponentReconnect);
+
+  // Track opponent's online status and report disconnection/reconnection to backend
+  // This enables the automatic 2-minute forfeit timer
+  const prevOpponentOnlineRef = useRef<boolean | null>(null);
+  
+  useEffect(() => {
+    if (!game || game.status !== "playing") return;
+    
+    // Determine who the opponent is and check their presence
+    const isPlayer1 = profile.userId === game.player1Id;
+    const opponentUsername = isPlayer1 ? game.player2Username : game.player1Username;
+    const opponentPresence = getPlayerPresence(opponentUsername);
+    
+    // If we can't determine opponent presence, skip
+    if (!opponentPresence) return;
+    
+    const isOpponentOnline = opponentPresence.online;
+    const wasOpponentOnline = prevOpponentOnlineRef.current;
+    
+    // Update previous state
+    prevOpponentOnlineRef.current = isOpponentOnline;
+    
+    // On initial mount or when we don't have previous data, don't trigger anything
+    if (wasOpponentOnline === null) return;
+    
+    // Opponent went offline
+    if (wasOpponentOnline && !isOpponentOnline) {
+      console.log(`[GameBoard] Opponent ${opponentUsername} went offline, reporting disconnection`);
+      reportOpponentDisconnect({ gameId })
+        .then((result) => {
+          if (result.scheduled) {
+            toast.warning(`Opponent disconnected. Game will forfeit in 2 minutes if they don't return.`, {
+              duration: 5000,
+            });
+          }
+        })
+        .catch(console.error);
+    }
+    
+    // Opponent came back online
+    if (!wasOpponentOnline && isOpponentOnline) {
+      console.log(`[GameBoard] Opponent ${opponentUsername} came back online, clearing disconnection`);
+      reportOpponentReconnect({ gameId })
+        .then(() => {
+          toast.success(`Opponent reconnected!`, { duration: 3000 });
+        })
+        .catch(console.error);
+    }
+  }, [game, profile.userId, getPlayerPresence, gameId, reportOpponentDisconnect, reportOpponentReconnect]);
+
   // Get player profiles for avatars - conditional queries
+
   const player1Profile = useQuery(
     api.profiles.getProfileByUsername,
     game?.player1Username ? { username: game.player1Username } : "skip"
@@ -1095,13 +1149,29 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
               <p className="text-white/70">
                 Your army is ready! Waiting for your opponent to finish their setup...
               </p>
-              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full p-4">
-                <div className="flex items-center justify-center gap-2 text-sm text-white/70">
-                  <CheckCircle className="h-4 w-4 text-green-400" />
-                  <span>Your setup is complete</span>
+              
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-full max-w-[200px]">
+                  <Timer
+                    duration={300} // 5 minutes for setup
+                    onTimeout={() => {}} // No-op for the waiting player, server handles it
+                    label="Opponent Time"
+                    variant="setup"
+                    isActive={true}
+                    timeUsed={game.setupTimeStarted ? Math.floor((Date.now() - game.setupTimeStarted) / 1000) : 0}
+                    turnStartTime={game.setupTimeStarted}
+                  />
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-full p-4 w-full">
+                  <div className="flex items-center justify-center gap-2 text-sm text-white/70">
+                    <CheckCircle className="h-4 w-4 text-green-400" />
+                    <span>Your setup is complete</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
+
           </Card>
         </motion.div>
         

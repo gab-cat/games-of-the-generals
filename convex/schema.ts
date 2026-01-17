@@ -98,6 +98,10 @@ const applicationTables = {
       v.literal("blitz"),
       v.literal("reveal")
     )), // Game mode: classic (15 min), blitz (6 min), or reveal (15 min with winner reveals)
+    // Activity tracking for abandonment detection
+    hostLastActiveAt: v.optional(v.number()),   // Last heartbeat from host
+    playerLastActiveAt: v.optional(v.number()), // Last heartbeat from joiner
+
   })
     .index("by_status", ["status"])
     .index("by_host", ["hostId"])
@@ -157,6 +161,8 @@ const applicationTables = {
     createdAt: v.number(),
     finishedAt: v.optional(v.number()),
     setupTimeStarted: v.optional(v.number()),
+    setupDeadline: v.optional(v.number()), // Hard deadline for setup phase (5 minutes from start)
+
     gameTimeStarted: v.optional(v.number()),
     lastMoveTime: v.optional(v.number()),
     lastMoveFrom: v.optional(v.object({

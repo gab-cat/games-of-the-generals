@@ -1,7 +1,7 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { presence } from "./presence";
 import { updateEloRatings, isQuickMatchGame } from "./profiles";
 import { Doc } from "./_generated/dataModel";
@@ -95,6 +95,9 @@ export const startGame = mutation({
 
     // Create new game
     const gameMode = lobby.gameMode ?? "classic"; // Default to classic if not set (for legacy lobbies)
+    const now = Date.now();
+    const SETUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for setup phase
+    
     const gameId = await ctx.db.insert("games", {
       lobbyId: args.lobbyId,
       lobbyName: lobby.name,
@@ -108,14 +111,18 @@ export const startGame = mutation({
       player1Setup: false,
       player2Setup: false,
       spectators: [],
-      createdAt: Date.now(),
-      setupTimeStarted: Date.now(),
+      createdAt: now,
+      setupTimeStarted: now,
+      setupDeadline: now + SETUP_TIMEOUT_MS, // Hard deadline for setup
       player1TimeUsed: 0,
       player2TimeUsed: 0,
       moveCount: 0, // Initialize move count
       disconnectionGracePeriod: 120 * 1000, // 120 seconds in milliseconds
       gameMode, // Copy game mode from lobby
     });
+
+    // Schedule setup timeout check
+    await ctx.scheduler.runAfter(SETUP_TIMEOUT_MS, internal.games.handleSetupTimeout, { gameId });
 
     // Update lobby with game reference and change status to playing
     await ctx.db.patch(args.lobbyId, {
@@ -151,6 +158,7 @@ export const startGame = mutation({
     return gameId;
   },
 });
+
 
 // Get game state
 export const getGame = query({
@@ -1319,7 +1327,231 @@ export const forfeitGame = mutation({
   },
 });
 
+// Constants for disconnection handling
+const DISCONNECTION_GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 minutes
+
+// Report that opponent has disconnected - schedules auto-forfeit after grace period
+export const reportOpponentDisconnect = mutation({
+  args: { 
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, { gameId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const game = await ctx.db.get(gameId);
+    if (!game) throw new Error("Game not found");
+    
+    // Only handle during playing status
+    if (game.status !== "playing") {
+      return { scheduled: false, reason: "game_not_playing" };
+    }
+    
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+    
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+    
+    // Determine which player disconnected (the opponent)
+    const opponentDisconnectedField = isPlayer1 ? "player2DisconnectedAt" : "player1DisconnectedAt";
+    const currentDisconnectedAt = isPlayer1 ? game.player2DisconnectedAt : game.player1DisconnectedAt;
+    
+    // If already tracking disconnection, don't schedule again
+    if (currentDisconnectedAt) {
+      return { scheduled: false, reason: "already_tracking", disconnectedAt: currentDisconnectedAt };
+    }
+    
+    const now = Date.now();
+    
+    // Record the disconnection timestamp
+    await ctx.db.patch(gameId, { 
+      [opponentDisconnectedField]: now 
+    });
+    
+    // Schedule the auto-forfeit after grace period
+    await ctx.scheduler.runAfter(
+      DISCONNECTION_GRACE_PERIOD_MS, 
+      internal.games.handleDisconnectionForfeit, 
+      { 
+        gameId, 
+        disconnectedPlayer: isPlayer1 ? "player2" : "player1",
+        disconnectedAt: now,
+      }
+    );
+    
+    console.log(`[reportOpponentDisconnect] Scheduled forfeit for game ${gameId} in ${DISCONNECTION_GRACE_PERIOD_MS / 1000}s`);
+    
+    return { 
+      scheduled: true, 
+      disconnectedAt: now, 
+      forfeitAt: now + DISCONNECTION_GRACE_PERIOD_MS 
+    };
+  },
+});
+
+// Report that opponent has reconnected - cancels the pending forfeit
+export const reportOpponentReconnect = mutation({
+  args: { 
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, { gameId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+    
+    const game = await ctx.db.get(gameId);
+    if (!game) throw new Error("Game not found");
+    
+    // Only handle during playing status
+    if (game.status !== "playing") {
+      return { cleared: false, reason: "game_not_playing" };
+    }
+    
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+    
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+    
+    // Clear the opponent's disconnection timestamp
+    const opponentDisconnectedField = isPlayer1 ? "player2DisconnectedAt" : "player1DisconnectedAt";
+    
+    await ctx.db.patch(gameId, { 
+      [opponentDisconnectedField]: undefined 
+    });
+    
+    console.log(`[reportOpponentReconnect] Cleared disconnection for game ${gameId}`);
+    
+    return { cleared: true };
+  },
+});
+
+// Internal mutation to handle disconnection forfeit after grace period
+export const handleDisconnectionForfeit = internalMutation({
+  args: { 
+    gameId: v.id("games"),
+    disconnectedPlayer: v.union(v.literal("player1"), v.literal("player2")),
+    disconnectedAt: v.number(),
+  },
+  handler: async (ctx, { gameId, disconnectedPlayer, disconnectedAt }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game) {
+      console.log(`[handleDisconnectionForfeit] Game ${gameId} not found, already cleaned up`);
+      return { handled: false, reason: "game_not_found" };
+    }
+    
+    // If game is not in playing status, nothing to do
+    if (game.status !== "playing") {
+      console.log(`[handleDisconnectionForfeit] Game ${gameId} already in ${game.status} status, skipping`);
+      return { handled: false, reason: "game_not_playing" };
+    }
+    
+    // Check if the disconnection is still active (opponent didn't reconnect)
+    const currentDisconnectedAt = disconnectedPlayer === "player1" 
+      ? game.player1DisconnectedAt 
+      : game.player2DisconnectedAt;
+    
+    // If disconnection was cleared (opponent reconnected), don't forfeit
+    if (!currentDisconnectedAt || currentDisconnectedAt !== disconnectedAt) {
+      console.log(`[handleDisconnectionForfeit] Game ${gameId} - opponent reconnected, skipping forfeit`);
+      return { handled: false, reason: "opponent_reconnected" };
+    }
+    
+    // Forfeit the game - the connected player wins
+    const winner = disconnectedPlayer === "player1" ? "player2" : "player1";
+    const winnerId = disconnectedPlayer === "player1" ? game.player2Id : game.player1Id;
+    const loserId = disconnectedPlayer === "player1" ? game.player1Id : game.player2Id;
+    
+    console.log(`[handleDisconnectionForfeit] Game ${gameId} - ${winner} wins by disconnection timeout`);
+    
+    // Calculate game duration
+    const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
+    
+    // Update game status
+    await ctx.db.patch(gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: "timeout",
+    });
+    
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, { status: "finished" });
+    
+    // Clean up presence
+    await presence.removeRoom(ctx, gameId as string);
+    await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
+    
+    // Update profiles
+    const [winnerProfile, loserProfile] = await Promise.all([
+      ctx.db.query("profiles").withIndex("by_user", (q) => q.eq("userId", winnerId)).unique(),
+      ctx.db.query("profiles").withIndex("by_user", (q) => q.eq("userId", loserId)).unique(),
+    ]);
+    
+    if (winnerProfile) {
+      await ctx.db.patch(winnerProfile._id, {
+        wins: winnerProfile.wins + 1,
+        gamesPlayed: winnerProfile.gamesPlayed + 1,
+        winStreak: (winnerProfile.winStreak || 0) + 1,
+        bestWinStreak: Math.max(winnerProfile.bestWinStreak || 0, (winnerProfile.winStreak || 0) + 1),
+        gameId: undefined,
+      });
+      
+      // Update profile stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, { 
+        userId: winnerId, 
+        won: true,
+        gameTime: gameDuration
+      });
+    }
+    
+    if (loserProfile) {
+      await ctx.db.patch(loserProfile._id, {
+        losses: loserProfile.losses + 1,
+        gamesPlayed: loserProfile.gamesPlayed + 1,
+        winStreak: 0,
+        gameId: undefined,
+      });
+      
+      // Update profile stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, { 
+        userId: loserId, 
+        won: false,
+        gameTime: gameDuration
+      });
+    }
+    
+    // Update ELO ratings for quick match games only
+    const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+    if (isQuickMatch && winnerProfile && loserProfile) {
+      await updateEloRatings(
+        ctx,
+        winnerId,
+        loserId,
+        winnerProfile.elo ?? 1500,
+        loserProfile.elo ?? 1500,
+        winnerProfile.gamesPlayed,
+        loserProfile.gamesPlayed
+      );
+    }
+    
+    // Check achievements
+    if (winnerProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+    }
+    if (loserProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+    }
+    
+    return { handled: true, winner };
+  },
+});
+
 // Get current user's active game - Optimized to reduce queries
+
 export const getCurrentUserGame = query({
   args: {},
   handler: async (ctx) => {
@@ -1880,22 +2112,24 @@ export const acknowledgeGameResult = mutation({
   },
 });
 
-// Internal function to cleanup stale games (setup >40 mins, playing >40 mins)
+// Internal function to cleanup stale games (failsafe - primary cleanup via scheduled handlers)
+// Threshold reduced since scheduled handleSetupTimeout handles most cases
 export const cleanupStaleGames = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const fortyMinutesAgo = Date.now() - (40 * 60 * 1000); // 40 minutes in milliseconds
+    const tenMinutesAgo = Date.now() - (10 * 60 * 1000); // 10 minutes in milliseconds
     let deletedSetupGames = 0;
     let forfeitedPlayingGames = 0;
 
-    // Handle stale setup games (>40 minutes old)
+    // Handle stale setup games (>10 minutes old - should have been handled by scheduled timeout)
     // OPTIMIZED: Added limit to prevent excessive document scanning
     const staleSetupGames = await ctx.db
       .query("games")
       .withIndex("by_status_setup_time", (q) =>
-        q.eq("status", "setup").lt("setupTimeStarted", fortyMinutesAgo)
+        q.eq("status", "setup").lt("setupTimeStarted", tenMinutesAgo)
       )
       .take(100); // Process in batches to avoid timeout
+
 
     for (const game of staleSetupGames) {
       try {
@@ -1943,14 +2177,16 @@ export const cleanupStaleGames = internalMutation({
       }
     }
 
-    // Handle stale playing games (>40 minutes old)
+    // Handle stale playing games (>20 minutes old - games should finish within time limit + buffer)
+    const twentyMinutesAgo = Date.now() - (20 * 60 * 1000); // 20 minutes in milliseconds
     // OPTIMIZED: Added limit to prevent excessive document scanning
     const stalePlayingGames = await ctx.db
       .query("games")
       .withIndex("by_status_game_time", (q) =>
-        q.eq("status", "playing").lt("gameTimeStarted", fortyMinutesAgo)
+        q.eq("status", "playing").lt("gameTimeStarted", twentyMinutesAgo)
       )
       .take(100); // Process in batches to avoid timeout
+
 
     for (const game of stalePlayingGames) {
       try {
@@ -1969,5 +2205,113 @@ export const cleanupStaleGames = internalMutation({
 
     console.log(`Cleaned up ${deletedSetupGames} stale setup games and ${forfeitedPlayingGames} stale playing games`);
     return { deletedSetupGames, forfeitedPlayingGames };
+  },
+});
+
+// Handle setup phase timeout - called 5 minutes after game starts
+export const handleSetupTimeout = internalMutation({
+  args: { 
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, { gameId }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game) {
+      console.log(`[handleSetupTimeout] Game ${gameId} not found, already cleaned up`);
+      return { handled: false, reason: "game_not_found" };
+    }
+    
+    // If game already progressed past setup, nothing to do
+    if (game.status !== "setup") {
+      console.log(`[handleSetupTimeout] Game ${gameId} already in ${game.status} status, skipping`);
+      return { handled: false, reason: "already_progressed" };
+    }
+    
+    const player1Ready = game.player1Setup;
+    const player2Ready = game.player2Setup;
+    
+    // Both players completed setup (shouldn't happen but handle gracefully)
+    if (player1Ready && player2Ready) {
+      console.log(`[handleSetupTimeout] Game ${gameId} both players ready, transitioning to playing`);
+      await ctx.db.patch(gameId, { status: "playing", gameTimeStarted: Date.now() });
+      return { handled: true, reason: "both_ready" };
+    }
+    
+    // Determine outcome based on who completed setup
+    if (!player1Ready && !player2Ready) {
+      // Both abandoned - delete the game
+      console.log(`[handleSetupTimeout] Game ${gameId} both players abandoned setup`);
+      
+      // Clear gameId from profiles
+      const [player1Profile, player2Profile] = await Promise.all([
+        ctx.db.query("profiles").withIndex("by_user", (q) => q.eq("userId", game.player1Id)).unique(),
+        ctx.db.query("profiles").withIndex("by_user", (q) => q.eq("userId", game.player2Id)).unique(),
+      ]);
+      
+      if (player1Profile) await ctx.db.patch(player1Profile._id, { gameId: undefined, lobbyId: undefined });
+      if (player2Profile) await ctx.db.patch(player2Profile._id, { gameId: undefined, lobbyId: undefined });
+      
+      // Delete lobby and game
+      await ctx.db.delete(game.lobbyId);
+      await ctx.db.delete(gameId);
+      
+      // Cleanup presence
+      await presence.removeRoom(ctx, gameId as string);
+      await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+      await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
+      
+      return { handled: true, reason: "both_abandoned" };
+    }
+    
+    // One player ready - they win by default
+    const winner = player1Ready ? "player1" : "player2";
+    const winnerId = player1Ready ? game.player1Id : game.player2Id;
+    const loserId = player1Ready ? game.player2Id : game.player1Id;
+    
+    console.log(`[handleSetupTimeout] Game ${gameId} - ${winner} wins by default (opponent didn't complete setup)`);
+    
+    // Update game status
+    await ctx.db.patch(gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: "timeout", // Setup timeout counts as timeout
+    });
+    
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, { status: "finished" });
+    
+    // Update profiles
+    const [winnerProfile, loserProfile] = await Promise.all([
+      ctx.db.query("profiles").withIndex("by_user", (q) => q.eq("userId", winnerId)).unique(),
+      ctx.db.query("profiles").withIndex("by_user", (q) => q.eq("userId", loserId)).unique(),
+    ]);
+    
+    if (winnerProfile) {
+      await ctx.db.patch(winnerProfile._id, {
+        wins: winnerProfile.wins + 1,
+        gamesPlayed: winnerProfile.gamesPlayed + 1,
+        winStreak: (winnerProfile.winStreak || 0) + 1,
+        bestWinStreak: Math.max(winnerProfile.bestWinStreak || 0, (winnerProfile.winStreak || 0) + 1),
+        gameId: undefined,
+        lobbyId: undefined,
+      });
+    }
+    
+    if (loserProfile) {
+      await ctx.db.patch(loserProfile._id, {
+        losses: loserProfile.losses + 1,
+        gamesPlayed: loserProfile.gamesPlayed + 1,
+        winStreak: 0,
+        gameId: undefined,
+        lobbyId: undefined,
+      });
+    }
+    
+    // Cleanup presence
+    await presence.removeRoom(ctx, gameId as string);
+    await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
+    
+    return { handled: true, reason: "one_abandoned", winner };
   },
 });

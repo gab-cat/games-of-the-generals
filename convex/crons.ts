@@ -60,10 +60,11 @@ crons.cron(
   {}
 );
 
-// Run every hour to delete inactive waiting lobbies (>30 minutes)
+// Run every 5 minutes to delete inactive waiting lobbies (>5 minutes without activity)
+// This is a failsafe - primary cleanup happens via heartbeat-based abandonment detection
 crons.cron(
-  "Delete inactive waiting lobbies (>30 minutes)",
-  "0 * * * *", // Every hour
+  "Delete inactive waiting lobbies (>5 minutes)",
+  "*/5 * * * *", // Every 5 minutes
   internal.lobbies.deleteInactiveLobbies,
   {}
 );
@@ -76,10 +77,11 @@ crons.cron(
   {}
 );
 
-// Run every hour to cleanup stale games (>40 minutes)
+// Run every 10 minutes to cleanup stale games (>10 minutes)
+// This is a failsafe - primary cleanup happens via scheduled handleSetupTimeout
 crons.cron(
-  "Cleanup stale games (>40 minutes)",
-  "0 * * * *", // Every hour
+  "Cleanup stale games (>10 minutes)",
+  "*/10 * * * *", // Every 10 minutes
   internal.games.cleanupStaleGames,
   {}
 );
