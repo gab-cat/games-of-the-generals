@@ -83,7 +83,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
 
   const supportLinks = [
     { icon: Headphones, label: "Support Center", path: "/support", search: { ticketId: undefined } },
-    { icon: User, label: "Profile", path: "/profile" },
+    { icon: User, label: "Pricing", path: "/pricing" },
     { icon: Lock, label: "Privacy Policy", path: "/privacy" },
     { icon: ScrollText, label: "Terms of Service", path: "/terms" },
     { icon: Cog, label: "Settings", path: "/settings" },
@@ -249,18 +249,41 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
   }, [onOpenMessagingWithLobby]);
 
   const unreadCount = useQuery(api.messages.getUnreadCount, {}) || 0;
+  const latestAnnouncement = useQuery(api.announcements.getLatestAnnouncementInfo);
+  const [hasSeenLatest, setHasSeenLatest] = useState(true);
+
+  // Check if there's a new announcement
+  useEffect(() => {
+    if (latestAnnouncement) {
+      const lastSeenId = localStorage.getItem("lastSeenAnnouncementId");
+      setHasSeenLatest(lastSeenId === latestAnnouncement.id);
+    }
+  }, [latestAnnouncement]);
+
+  // Mark as seen when on the announcements page
+  useEffect(() => {
+    if (location.pathname === "/announcements" && latestAnnouncement) {
+      localStorage.setItem("lastSeenAnnouncementId", latestAnnouncement.id);
+      setHasSeenLatest(true);
+    }
+  }, [location.pathname, latestAnnouncement]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 pb-16 lg:pb-0 no-scrollbar">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-800 pb-16 lg:pb-0 no-scrollbar relative selection:bg-blue-500/30">
+      {/* Global Background Grid */}
+      <div className="fixed inset-0 pointer-events-none select-none z-0">
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+          <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/10 via-transparent to-transparent opacity-50" />
+      </div>
       {/* Minimalist Header */}
       <motion.header
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         className={cn(
-          "sticky top-2 z-50 backdrop-blur-md border-b  transition-all duration-300 max-w-7xl mx-auto rounded-full border border-white/10",
+          "sticky top-2 z-50 transition-all duration-300 max-w-7xl mx-auto rounded-lg border border-white/5",
           isScrolled 
-            ? "bg-black/50" 
-            : "bg-black/40"
+            ? "bg-[#050505]/80 backdrop-blur-md shadow-2xl shadow-black/50" 
+            : "bg-[#050505]/40 backdrop-blur-sm"
         )}
       >
         {/* Floating particles effect */}
@@ -295,63 +318,43 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0"
+            className="flex items-center gap-4 flex-1 min-w-0"
           >
-            {/* Minimalist Logo */}
+            {/* Tactical Logo */}
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
               whileHover={{ scale: 1.05 }}
-              className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200 flex-shrink-0"
+              onClick={() => void navigate({ to: "/", search: { lobbyId: undefined } })}
+              className="relative w-10 h-10 flex items-center justify-center shrink-0 cursor-pointer group"
             >
-              <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-white/90 group-hover:text-white transition-colors" />
+               <div className="absolute inset-0 m-auto w-7 h-7 bg-blue-500/10 rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500 border border-blue-500/30" />
+               <div className="absolute inset-0 m-auto w-7 h-7 border border-white/10 rounded-sm rotate-45 group-hover:rotate-0 transition-transform duration-500" />
+               <Gamepad2 className="w-4 h-4 text-white/90 group-hover:text-white transition-colors relative z-10" />
             </motion.div>
             
             {/* Clean Title */}
-            <motion.div
-              initial={{ y: -10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
+            <div
               className="flex flex-col cursor-pointer min-w-0 group"
               onClick={() => void navigate({ to: "/", search: { lobbyId: undefined } })}
             >
-              <motion.h1
-                whileHover={{
-                  scale: 1.02,
-                  textShadow: "0 0 8px rgba(255, 255, 255, 0.3)"
-                }}
-                transition={{ duration: 0.2 }}
-                className="text-lg sm:text-xl font-display font-semibold text-white/95 tracking-tight truncate relative group-hover:text-white transition-colors duration-200"
-              >
-                <motion.span
-                  className="hidden sm:inline relative"
-                  whileHover={{ scale: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  Games of the Generals
-                </motion.span>
-                <motion.span
-                  className="sm:hidden relative"
-                  whileHover={{ scale: 1 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  GoG
-                  {/* Animated underline for mobile */}
-                  <motion.div
-                    initial={{ scaleX: 0 }}
-                    whileHover={{ scaleX: 1 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
-                    className="absolute -bottom-1 left-0 right-0 h-1 bg-white origin-left rounded-full"
-                  />
-                </motion.span>
-                <motion.span
-                  className="relative text-xs font-mono text-gray-400 ml-2"
-                >
-                  v{version}
-                </motion.span>
-              </motion.h1>
-            </motion.div>
+              <h1 className="text-lg font-display font-medium text-white tracking-wide leading-none group-hover:text-blue-400 transition-colors duration-300">
+                <span className="tracking-[0.05em]">GAMES</span>
+                <span className="mx-1.5 text-white/40 text-sm font-light italic">of the</span>
+                <span className="tracking-[0.05em]">GENERALS</span>
+              </h1>
+              <div className="flex items-center gap-3 mt-1">
+                  <span className="text-[9px] font-mono text-white/30 uppercase tracking-[0.2em]">
+                    System v{version}
+                  </span>
+                  <div className="flex gap-1">
+                     <span className="w-0.5 h-0.5 rounded-full bg-blue-500/50" />
+                     <span className="w-0.5 h-0.5 rounded-full bg-blue-500/50" />
+                     <span className="w-0.5 h-0.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
+                  </div>
+              </div>
+            </div>
           </motion.div>
 
           {/* Middle Section - Navigation */}
@@ -360,11 +363,12 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               initial={{ y: -10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="hidden lg:flex items-center gap-2 flex-1 justify-center"
+              className="hidden lg:flex items-center gap-1 flex-1 justify-center"
             >
-              <div className="flex items-center bg-white/1 backdrop-blur-sm border border-white/20 rounded-full p-1">
+              <div className="flex items-center bg-white/5 backdrop-blur-md border border-white/10 rounded-lg p-1">
                 {navigationItems.map((item) => {
                   const Icon = item.icon;
+                  const active = isActiveTab(item.path);
                   return (
                     <Button
                       key={item.path}
@@ -372,14 +376,33 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                       size="sm"
                       onClick={() => void navigate({ to: item.path })}
                       className={cn(
-                        "rounded-full px-4 py-2 text-white/70 transition-all duration-200 flex items-center gap-2",
-                        isActiveTab(item.path)
-                          ? "bg-white/20 text-white hover:bg-white/25"
-                          : "bg-transparent hover:text-white"
+                        "rounded-md px-3 py-1.5 transition-all duration-300 flex items-center gap-2 relative h-8 mx-0.5",
+                        active
+                          ? "bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)] border border-white/5"
+                          : "bg-transparent text-white/50 hover:text-white hover:bg-white/5 border border-transparent"
                       )}
                     >
-                      <Icon className="w-4 h-4" />
-                      <span className="hidden xl:inline">{item.label}</span>
+                      <Icon className={cn("w-3.5 h-3.5", active ? "text-blue-400" : "opacity-70")} />
+                      <span className={cn(
+                        "hidden xl:inline text-xs font-mono uppercase tracking-wider",
+                        active ? "font-bold" : "font-medium"
+                      )}>
+                        {item.label}
+                      </span>
+                      {item.path === "/announcements" && !hasSeenLatest && (
+                        <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                        </span>
+                      )}
+                      
+                      {/* Active Indicator Line */}
+                      {active && (
+                          <motion.div 
+                            layoutId="activeTabIndicator"
+                            className="absolute bottom-0 left-2 right-2 h-[2px] bg-blue-400/50 rounded-full"
+                          />
+                      )}
                     </Button>
                   );
                 })}
@@ -395,17 +418,25 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
               transition={{ delay: 0.2 }}
               className="flex-1 flex justify-end items-center gap-2 sm:gap-3 min-w-0"
             >
-              {/* Tutorial Button */}
-              <TutorialButton variant="icon" size="md" />
+              {/* Tutorial Button Wrapper */}
+              <div className="w-9 h-9 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors">
+                  <TutorialButton variant="icon" size="sm" className="bg-transparent border-0 p-0 hover:bg-transparent" />
+              </div>
 
-              {/* Message Button */}
-              <Suspense fallback={<div className="w-10 h-10 bg-white/10 rounded-full animate-pulse" />}>
-                <MessageButton
-                  unreadCount={unreadCount}
-                  isActive={isMessagingOpen}
-                  onClick={() => setIsMessagingOpen(!isMessagingOpen)}
-                />
-              </Suspense>
+              {/* Message Button Wrapper */}
+              <div className="w-9 h-9 flex items-center justify-center rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 transition-colors relative">
+                 <Suspense fallback={<div className="w-4 h-4 bg-white/10 rounded-full animate-pulse" />}>
+                    <MessageButton
+                      unreadCount={unreadCount}
+                      isActive={isMessagingOpen}
+                      onClick={() => setIsMessagingOpen(!isMessagingOpen)}
+                      className="bg-transparent border-0 p-0 w-full h-full flex items-center justify-center hover:bg-transparent"
+                    />
+                 </Suspense>
+              </div>
+
+              {/* Separator */}
+              <div className="w-px h-6 bg-white/10 mx-1" />
 
               {/* User Dropdown */}
               <DropdownMenu>
@@ -416,165 +447,191 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
                   >
                     <Button
                       variant="ghost"
-                      className="bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-200 flex items-center gap-2 sm:gap-3 px-3 sm:px-6 py-2 rounded-full group h-10 sm:h-12 min-w-0"
+                      className="bg-white/5 backdrop-blur-md border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-200 flex items-center gap-3 px-3 py-1.5 rounded-lg group h-9 min-w-0"
                     >
-                      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
                         <div className="text-right hidden sm:block">
-                          <div className="text-white/90 font-medium text-sm truncate">{user.username}</div>
-                          <div className="flex items-center gap-1 justify-end">
-                            {(() => {
-                              const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
-                              const node = getStatusIndicatorNode(status);
-                              return node ? (
-                                <div className="flex items-center justify-center">{node}</div>
-                              ) : (
-                                <div className="w-2 h-2 bg-white/30 rounded-full"></div>
-                              );
-                            })()}
-                            {(() => {
-                              const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
-                              const text = getStatusText(status) ?? "Online";
-                              const color = getStatusColorClass(status);
-                              return (
-                                <span className={"text-xs " + color}>{text}</span>
-                              );
-                            })()}
-                          </div>
+                           <div className="flex items-center justify-end gap-1.5">
+                              <span className="text-white/90 font-mono text-xs font-medium tracking-wide truncate">{user.username}</span>
+                           </div>
                         </div>
                         <UserAvatar
                           username={user.username}
                           avatarUrl={profile?.avatarUrl}
                           rank={profile?.rank}
-                          size="sm"
-                          className="ring-1 ring-white/30 flex-shrink-0"
+                          size="xs"
+                          frame={profile?.avatarFrame}
+                          className="flex-shrink-0 w-6 h-6 border-white/10"
                         />
                       </div>
-                      <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4 text-white/60 group-hover:text-white/90 transition-colors flex-shrink-0" />
+                      <ChevronDown className="w-3 h-3 text-white/40 group-hover:text-white/80 transition-colors flex-shrink-0" />
                     </Button>
                   </motion.div>
                 </DropdownMenuTrigger>
 
                 <DropdownMenuContent
                   align="end"
-                  className="w-56 bg-black/50 backdrop-blur-lg border border-white/20 shadow-2xl rounded-2xl mt-2"
+                  className="w-72 bg-[#080808] border border-white/10 shadow-2xl rounded-xl mt-2 p-1.5"
                 >
-                  {/* User Header */}
-                  <div className="px-3 py-3 border-b border-white/10">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar
-                        username={user.username}
-                        avatarUrl={profile?.avatarUrl}
-                        rank={profile?.rank}
-                        size="md"
-                        className="ring-1 ring-white/20"
-                      />
-                      <div>
-                        <div className="text-white font-medium text-sm">{user.username}</div>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          {(() => {
-                            const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
-                            const node = getStatusIndicatorNode(status);
-                            return node ? (
-                              <div className="flex items-center justify-center">{node}</div>
-                            ) : (
-                              <div className="w-1.5 h-1.5 bg-white/30 rounded-full"></div>
-                            );
-                          })()}
-                          {(() => {
-                            const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
-                            const text = getStatusText(status) ?? "Online";
-                            const color = getStatusColorClass(status);
-                            return (
-                              <span className={"text-xs " + color}>{text}</span>
-                            );
-                          })()}
+                  {/* User Identity Card */}
+                  <div className="relative mb-2 overflow-hidden rounded-lg border border-white/5 bg-white/5 p-3">
+                    <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(68,107,158,0.1)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] bg-[position:-100%_0,0_0] bg-no-repeat transition-[background-position_0s_ease] hover:bg-[position:200%_0,0_0] duration-1000 pointer-events-none" />
+                    <div className="flex items-start justify-between">
+                       <div className="flex items-center gap-3">
+                        <UserAvatar
+                          username={user.username}
+                          avatarUrl={profile?.avatarUrl}
+                          rank={profile?.rank}
+                          size="md"
+                          frame={profile?.avatarFrame}
+                          className="ring-2 ring-black/50"
+                        />
+                        <div>
+                          <div className="text-white font-bold text-sm tracking-wide">{user.username}</div>
+                          <div className="flex items-center gap-2 mt-1">
+                             <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                                {(() => {
+                                  const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
+                                  const node = getStatusIndicatorNode(status);
+                                  return node ? (
+                                    <div className="flex items-center justify-center scale-75">{node}</div>
+                                  ) : (
+                                    <div className="w-1.5 h-1.5 bg-white/30 rounded-full"></div>
+                                  );
+                                })()}
+                                {(() => {
+                                  const status = deriveStatus({ username: user.username, gameId: profile?.gameId, lobbyId: profile?.lobbyId, aiGameId: profile?.aiSessionId });
+                                  const text = getStatusText(status) ?? "Online";
+                                  const color = getStatusColorClass(status);
+                                  return (
+                                    <span className={cn("text-[10px] font-mono uppercase tracking-wider", color)}>{text}</span>
+                                  );
+                                })()}
+                             </div>
+                          </div>
                         </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                          <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest">RANK</span>
+                          <span className="text-xs font-bold text-blue-400">{profile?.rank || "UNRANKED"}</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Menu Items */}
-                  <div className="py-1">
-                    <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/profile" })}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <User className="h-4 w-4" />
-                      <span>Profile</span>
-                    </DropdownMenuItem>
+                  {/* Menu Groups */}
+                  <div className="space-y-1">
+                    
+                    {/* Operations Group */}
+                    <div className="px-2 py-1.5">
+                        <h4 className="text-[9px] font-mono uppercase tracking-widest text-white/30 mb-1 pl-1">Operations</h4>
+                        <div className="space-y-0.5">
+                            <DropdownMenuItem
+                              onClick={() => void navigate({ to: "/profile" })}
+                              className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <User className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                <span>Profile Profile</span>
+                              </div>
+                              <div className="w-1 h-1 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/subscription", search: { subscription: undefined } })}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <CreditCard className="h-4 w-4" />
-                      <span>Subscriptions</span>
-                    </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void navigate({ to: "/achievements" })}
+                              className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <Trophy className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                <span>Achievements</span>
+                              </div>
+                            </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/achievements" })}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <Trophy className="h-4 w-4" />
-                      <span>Achievements</span>
-                    </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void navigate({ to: "/match-history" })}
+                              className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                  <History className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                  <span>Match Logs</span>
+                                </div>
+                            </DropdownMenuItem>
+                        </div>
+                    </div>
 
-                    <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/match-history" })}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <History className="h-4 w-4" />
-                      <span>Match History</span>
-                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/5 mx-2" />
 
-                    <DropdownMenuItem
-                      onClick={() => setIsSoundSettingsOpen(true)}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <Volume2 className="h-4 w-4" />
-                      <span>Sound</span>
-                    </DropdownMenuItem>
+                    {/* System Group */}
+                    <div className="px-2 py-1.5">
+                        <h4 className="text-[9px] font-mono uppercase tracking-widest text-white/30 mb-1 pl-1">System</h4>
+                        <div className="space-y-0.5">
+                            <DropdownMenuItem
+                              onClick={() => void navigate({ to: "/subscription", search: { subscription: undefined } })}
+                              className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-2">
+                                <CreditCard className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                <span>Subscription</span>
+                              </div>
+                              <span className="text-[9px] font-mono text-amber-500/80 uppercase">Manage</span>
+                            </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/settings" })}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <Settings className="h-4 w-4" />
-                      <span>Settings</span>
-                    </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setIsSoundSettingsOpen(true)}
+                              className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                  <Volume2 className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                  <span>Audio Config</span>
+                                </div>
+                            </DropdownMenuItem>
 
-                    <DropdownMenuItem
-                      onClick={() => void navigate({ to: "/support", search: { ticketId: undefined } })}
-                      className="flex items-center gap-3 text-white/90 hover:bg-white/10 mx-1 rounded-md cursor-pointer"
-                    >
-                      <HelpCircle className="h-4 w-4" />
-                      <span>Support</span>
-                    </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void navigate({ to: "/settings" })}
+                              className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                            >
+                                <div className="flex items-center gap-2">
+                                  <Settings className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                  <span>Settings</span>
+                                </div>
+                            </DropdownMenuItem>
+                             <DropdownMenuItem
+                                onClick={() => void navigate({ to: "/support", search: { ticketId: undefined } })}
+                                className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                              >
+                                  <div className="flex items-center gap-2">
+                                    <HelpCircle className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                                    <span>Support Protocol</span>
+                                  </div>
+                              </DropdownMenuItem>
 
-                    {/* Admin Support Center - Only show for admins/mods */}
-                    {profile?.adminRole && (
+                              {/* Admin Support Center - Only show for admins/mods */}
+                              {profile?.adminRole && (
+                                <DropdownMenuItem
+                                  onClick={() => void navigate({ to: "/support-resolve" })}
+                                  className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-md cursor-pointer transition-colors border border-dashed border-purple-500/20 mt-1"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Shield className="h-3.5 w-3.5" />
+                                    <span>Admin Console</span>
+                                  </div>
+                                </DropdownMenuItem>
+                              )}
+                        </div>
+                    </div>
+                    
+                    <DropdownMenuSeparator className="bg-white/5 mx-2" />
+
+                    <div className="p-1">
                       <DropdownMenuItem
-                        onClick={() => void navigate({ to: "/support-resolve" })}
-                        className="flex items-center gap-3 text-purple-400 hover:bg-purple-500/10 mx-1 rounded-md cursor-pointer"
+                        onClick={() => { 
+                          void signOut();
+                        }}
+                        className="group flex items-center justify-center gap-2 px-2 py-2 text-xs font-bold text-red-500/80 hover:text-red-400 hover:bg-red-500/10 rounded-md cursor-pointer transition-colors border border-transparent hover:border-red-500/20"
                       >
-                        <Shield className="h-4 w-4" />
-                        <span>Admin Support</span>
+                        <LogOut className="h-3.5 w-3.5" />
+                        <span>TERMINATE SESSION</span>
                       </DropdownMenuItem>
-                    )}
-                  </div>
-
-                  <DropdownMenuSeparator className="bg-white/10" />
-
-                  <div className="py-1">
-                    <DropdownMenuItem
-                      onClick={() => { 
-                        void signOut();
-                      }}
-                      className="flex items-center gap-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 mx-1 rounded-md"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span>Sign out</span>
-                    </DropdownMenuItem>
+                    </div>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -626,205 +683,174 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
           initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5 }}
-          className=""
+          className="mt-auto"
         >
         <div className={cn(
-          "relative backdrop-blur-sm bg-black/40 border-t border-white/10 transition-all duration-300 w-full px-4 sm:px-6 lg:px-8 overflow-hidden",
-          isFooterCollapsed ? "py-3" : "py-6 sm:py-8"
+          "relative backdrop-blur-xl bg-[#050505]/90 border-t border-white/5 transition-all duration-500 w-full px-4 sm:px-6 lg:px-8 overflow-hidden",
+          isFooterCollapsed ? "py-2" : "py-8 sm:py-12"
         )}>
-          {/* Animated Squares Background */}
-          <div className="absolute inset-0 overflow-hidden opacity-10">
+           {/* Ambient Light/Grid */}
+          <div className="absolute inset-0 overflow-hidden opacity-5 pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
             <Squares
               direction="diagonal"
-              speed={0.3}
-              squareSize={60}
-              borderColor="rgba(255,255,255,0.15)"
+              speed={0.2}
+              squareSize={40}
+              borderColor="rgba(255,255,255,0.1)"
             />
           </div>
-          {/* Floating particles effect */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(12)].map((_, i) => (
-              <motion.div
-                key={i}
-                className="absolute w-1 h-1 bg-white/30 rounded-full"
-                initial={{
-                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
-                  y: Math.random() * 120,
-                  opacity: 0
-                }}
-                animate={{
-                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
-                  y: Math.random() * 120,
-                  opacity: [0, 1, 0]
-                }}
-                transition={{
-                  duration: 6 + Math.random() * 4,
-                  repeat: Infinity,
-                  delay: i * 0.6
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="relative max-w-7xl mx-auto z-10">
-            {/* Collapse/Expand Button */}
-            <div className="flex justify-center mb-2">
-              <Button
+          
+           {/* Control Tab */}
+           <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-[1px]">
+             <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsFooterCollapsed(!isFooterCollapsed)}
-                className="text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200 rounded-full px-3 py-1.5"
-                aria-label={isFooterCollapsed ? "Expand footer" : "Collapse footer"}
+                className="h-5 px-6 rounded-b-lg rounded-t-none border-b border-x border-white/5 bg-[#050505] hover:bg-white/5 hover:border-white/10 transition-all text-[10px] text-white/30 hover:text-white/60 tracking-widest uppercase font-mono"
               >
-                <motion.div
-                  animate={{ rotate: isFooterCollapsed ? 180 : 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
-                >
-                  {isFooterCollapsed ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronUp className="w-4 h-4" />
-                  )}
-                </motion.div>
+                  {isFooterCollapsed ? "EXPAND_SYSTEM" : "COLLAPSE_SYSTEM"}
               </Button>
-            </div>
-            {/* Main Footer Content */}
+           </div>
+
+          <div className="relative max-w-7xl mx-auto z-10">
             <AnimatePresence initial={false}>
               {!isFooterCollapsed && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: "auto", opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.3, ease: "easeInOut" }}
+                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-                    {/* Brand Section */}
-                    <div className="lg:col-span-2 space-y-4">
-                      <div className="flex items-center gap-3">
-                        {/* Logo */}
-                        <div className="w-8 h-8 sm:w-10 sm:h-10 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full flex items-center justify-center group cursor-pointer hover:bg-white/20 transition-all duration-200">
-                          <Gamepad2 className="w-4 h-4 sm:w-5 sm:h-5 text-white/90 group-hover:text-white transition-colors" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-12 lg:gap-8 pb-8">
+                    {/* Brand Section (Col 1-4) */}
+                    <div className="lg:col-span-4 space-y-6">
+                      <div className="flex flex-col gap-4">
+                        {/* Logo Lockup */}
+                        <div className="flex items-center gap-4 group cursor-pointer" onClick={() => void navigate({ to: "/", search: { lobbyId: undefined } })}>
+                          <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
+                             <div className="absolute inset-0 m-auto w-8 h-8 bg-blue-500/10 rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500" />
+                             <div className="absolute inset-0 m-auto w-8 h-8 border border-white/10 rounded-sm rotate-45 group-hover:rotate-0 transition-transform duration-500" />
+                             <Gamepad2 className="w-5 h-5 text-white/80" />
+                          </div>
+                          <div>
+                            <h2 className="text-xl font-display font-medium text-white tracking-tight leading-none mb-1">
+                              Games of Generals
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[10px] font-mono text-blue-400 uppercase tracking-wider bg-blue-500/10 px-1.5 py-0.5 rounded-sm">
+                                    System v{version}
+                                </span>
+                                <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
+                            </div>
+                          </div>
                         </div>
 
-                        {/* Title */}
-                        <div className="flex flex-col cursor-pointer group" onClick={() => void navigate({ to: "/", search: { lobbyId: undefined } })}>
-                          <h2 className="text-lg sm:text-xl font-display font-semibold text-white/95 tracking-tight group-hover:text-white transition-colors duration-200">
-                            Games of the Generals
-                          </h2>
-                          <span className="text-xs font-mono text-gray-400">
-                            v{version}
-                          </span>
-                        </div>
+                        <p className="text-white/40 text-xs leading-relaxed font-light max-w-sm">
+                           Advanced tactical warfare simulation. Engage in real-time strategy battles, analyze combat data, and dominate the global rankings.
+                        </p>
                       </div>
 
-                      {/* Description */}
-                      <div className="space-y-3">
-                        <p className="text-white/80 text-sm leading-relaxed">
-                          Experience the classic strategy board game reimagined for the digital age. Command your army, outmaneuver your opponents, and become the ultimate tactician in this timeless game of military strategy.
-                        </p>
-                        <p className="text-white/60 text-xs leading-relaxed">
-                          Features real-time multiplayer battles, AI opponents, tournament play, and a vibrant community of strategic minds from around the world.
-                        </p>
-                      </div>
-
-                      {/* Game Stats */}
-                      <div className="flex flex-wrap gap-4 pt-2">
-                        <div className="text-center">
-                          <div className="text-white/90 font-semibold text-sm">1K+</div>
-                          <div className="text-white/60 text-xs">Active Players</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-white/90 font-semibold text-sm">2K+</div>
-                          <div className="text-white/60 text-xs">Games Played</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-white/90 font-semibold text-sm">24/7</div>
-                          <div className="text-white/60 text-xs">Online Play</div>
-                        </div>
+                      {/* Network Stats */}
+                      <div className="grid grid-cols-3 gap-px bg-white/5 border border-white/5 rounded-sm overflow-hidden max-w-sm">
+                           {[
+                               { label: "NODES", value: "1.2K" },
+                               { label: "BATTLES", value: "24K" },
+                               { label: "UPTIME", value: "99.9%" }
+                           ].map((stat) => (
+                               <div key={stat.label} className="bg-[#050505] p-3 text-center group hover:bg-white/5 transition-colors">
+                                   <div className="text-xs font-mono text-white/30 mb-1">{stat.label}</div>
+                                   <div className="text-sm font-bold text-white/80 group-hover:text-blue-400">{stat.value}</div>
+                               </div>
+                           ))}
                       </div>
                     </div>
 
-                    {/* Quick Links */}
-                    <div className="space-y-3">
-                      <h3 className="text-white/90 font-semibold text-xs uppercase tracking-wider">Quick Links</h3>
-                      <nav className="flex flex-col space-y-0.5">
-                        {quickLinks.map((link) => {
-                          const Icon = link.icon;
-                          return (
-                            <motion.button
+                    {/* Navigation (Col 5-8) */}
+                    <div className="lg:col-span-2 lg:col-start-6 space-y-4">
+                      <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 border-b border-white/5 pb-2">
+                          Navigation
+                      </h3>
+                      <nav className="flex flex-col space-y-1">
+                        {quickLinks.map((link) => (
+                            <button
                               key={link.path}
                               onClick={() => void navigate({ to: link.path })}
-                              className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 text-xs text-left"
-                              whileHover={{ x: 1 }}
-                              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                              className="group flex items-center gap-3 py-1.5 text-sm text-white/50 hover:text-white transition-colors text-left"
                             >
-                              <Icon className="w-3.5 h-3.5 text-white/60 group-hover:text-white transition-colors flex-shrink-0" />
-                              <span className="font-medium">{link.label}</span>
-                            </motion.button>
-                          );
-                        })}
+                              <span className="w-1 h-1 bg-white/20 rounded-full group-hover:bg-blue-400 transition-colors" />
+                              {link.label}
+                            </button>
+                        ))}
                       </nav>
                     </div>
 
-                    {/* Support & Legal */}
-                    <div className="space-y-3">
-                      <h3 className="text-white/90 font-semibold text-xs uppercase tracking-wider">Support & Legal</h3>
-                      <nav className="flex flex-col space-y-0.5">
-                        {supportLinks.map((link) => {
-                          const Icon = link.icon;
-                          return (
-                            <motion.button
+                    {/* Legal/Support (Col 9-10) */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 border-b border-white/5 pb-2">
+                          Protocol
+                      </h3>
+                      <nav className="flex flex-col space-y-1">
+                        {supportLinks.map((link) => (
+                            <button
                               key={link.path}
                               onClick={() => void navigate({ to: link.path, search: link.search })}
-                              className="group flex items-center gap-2 px-2 py-1.5 rounded-md text-white/70 hover:text-white hover:bg-white/5 transition-all duration-200 text-xs text-left"
-                              whileHover={{ x: 1 }}
-                              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                              className="group flex items-center gap-3 py-1.5 text-sm text-white/50 hover:text-white transition-colors text-left"
                             >
-                              <Icon className="w-3.5 h-3.5 text-white/60 group-hover:text-white transition-colors flex-shrink-0" />
-                              <span className="font-medium">{link.label}</span>
-                            </motion.button>
-                          );
-                        })}
+                              <span className="w-1 h-1 bg-white/20 rounded-full group-hover:bg-amber-400 transition-colors" />
+                              {link.label}
+                            </button>
+                        ))}
                       </nav>
                     </div>
+                    
+                     {/* Connect (Col 11-12) */}
+                    <div className="lg:col-span-2 space-y-4">
+                        <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-white/30 border-b border-white/5 pb-2">
+                          Comm-Link
+                        </h3>
+                        <div className="flex gap-2">
+                            {/* Social Placeholders / External Links */}
+                            <Button size="icon" variant="outline" className="w-8 h-8 rounded-sm bg-transparent border-white/10 hover:bg-white/5 hover:text-white text-white/40">
+                                <MessageCircle className="w-4 h-4" />
+                            </Button>
+                            <Button size="icon" variant="outline" className="w-8 h-8 rounded-sm bg-transparent border-white/10 hover:bg-white/5 hover:text-white text-white/40">
+                                <Swords className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+
                   </div>
 
-                  {/* Bottom Section */}
-                  <div className="mt-8 pt-6 border-t border-white/10">
-                    <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                      <div className="text-white/60 text-xs sm:text-sm">
-                        © 2025 Games of the Generals. All rights reserved.
-                      </div>
-                      <div className="flex items-center gap-4 text-white/50 text-xs">
-                        <span>Made with ❤️ for strategy enthusiasts</span>
-                        <div className="flex items-center gap-1">
-                          <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
-                          <span>All systems operational</span>
-                        </div>
-                      </div>
+                  {/* Copyright / Status Line */}
+                  <div className="border-t border-white/5 pt-6 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-mono text-white/30 uppercase tracking-widest">
+                    <div>
+                        © 2025 // GAMES OF THE GENERALS // ALL RIGHTS RESERVED
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <span className="hover:text-white/50 cursor-pointer transition-colors">PRIVACY_PROTOCOL</span>
+                        <span className="w-px h-3 bg-white/10" />
+                        <span className="hover:text-white/50 cursor-pointer transition-colors">TERM_AGREEMENT</span>
                     </div>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-          {/* Collapsed Footer - Show minimal content */}
-          {isFooterCollapsed && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.2 }}
-              className="text-center pt-2"
-            >
-              <div className="text-white/60 text-xs sm:text-sm">
-                © 2025 Games of the Generals. All rights reserved.
-              </div>
-            </motion.div>
-          )}
+            {/* Collapsed State */}
+             {isFooterCollapsed && (
+                <motion.div 
+                    initial={{ opacity: 0 }} 
+                    animate={{ opacity: 1 }} 
+                    className="flex justify-between items-center text-[10px] font-mono text-white/20 uppercase tracking-widest px-2"
+                >
+                    <span>SYSTEM_ONLINE</span>
+                    <span>© 2025 GOG</span>
+                </motion.div>
+             )}
+          </div>
         </div>
-      </div>
-    </motion.footer>
+      </motion.footer>
       )}
 
       {/* Floating Global Chat Button - Desktop */}
