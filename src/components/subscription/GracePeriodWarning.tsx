@@ -24,7 +24,18 @@ export function GracePeriodWarning({ className = "" }: GracePeriodWarningProps) 
     return null;
   }
 
-  const hoursRemaining = Math.ceil((gracePeriodEndsAt - Date.now()) / (1000 * 60 * 60));
+  const deltaMs = gracePeriodEndsAt - Date.now();
+  const hoursRemaining = Math.max(0, Math.ceil(deltaMs / (1000 * 60 * 60)));
+
+  const getWarningMessage = () => {
+    if (deltaMs <= 0) {
+      return "Your subscription and grace period have expired. Please renew now to restore access to premium features.";
+    }
+    if (deltaMs < 1000 * 60 * 60) {
+      return "Your subscription has expired, and you have less than 1 hour remaining in your grace period. Renew now to avoid losing access to premium features.";
+    }
+    return `Your subscription has expired but you're still in the 2-day grace period. You have approximately ${hoursRemaining} hour${hoursRemaining !== 1 ? "s" : ""} remaining before premium features are locked.`;
+  };
 
   return (
     <div
@@ -35,17 +46,17 @@ export function GracePeriodWarning({ className = "" }: GracePeriodWarningProps) 
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-300">Grace Period Active</span>
+            <span className="font-medium text-amber-300">
+              {deltaMs <= 0 ? "Grace Period Expired" : "Grace Period Active"}
+            </span>
           </div>
           <p className="text-sm font-light text-amber-300/80 mb-3">
-            Your subscription has expired but you're still in the 2-day grace period. 
-            You have approximately {hoursRemaining} hour{hoursRemaining !== 1 ? "s" : ""} remaining before 
-            premium features are locked.
+            {getWarningMessage()}
           </p>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate({ to: "/subscription" })}
+            onClick={() => navigate({ to: "/subscription", search: { subscription: undefined} })}
             className="font-light border-amber-500/50 text-amber-300 hover:bg-amber-500/20"
           >
             Renew Now

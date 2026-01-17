@@ -886,11 +886,21 @@ export const makeMove = mutation({
       // Check and unlock achievements for both players
 
       if (winnerProfile) {
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+        void Promise.all([
+          ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
+          ctx.db.patch(winnerProfile._id, {
+            gameId: undefined,
+          })
+        ]);
       }
       
       if (loserProfile) {
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+        void Promise.all([
+          ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
+          ctx.db.patch(loserProfile._id, {
+            gameId: undefined,
+          })
+        ]);
       }
 
       // Check game-specific achievements (like Perfectionist, Comeback King)
@@ -1245,6 +1255,9 @@ export const forfeitGame = mutation({
     const winnerId = game.currentTurn === "player1" ? game.player2Id : game.player1Id;
     const loserId = game.currentTurn === "player1" ? game.player1Id : game.player2Id;
 
+    // Calculate game duration
+    const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
+
     // Update game status
     await ctx.db.patch(gameId, {
       status: "finished",
@@ -1279,20 +1292,27 @@ export const forfeitGame = mutation({
 
     if (winnerProfile) {
       await ctx.db.patch(winnerProfile._id, {
-        wins: winnerProfile.wins + 1,
-        gamesPlayed: winnerProfile.gamesPlayed + 1,
-        winStreak: (winnerProfile.winStreak || 0) + 1,
-        bestWinStreak: Math.max(winnerProfile.bestWinStreak || 0, (winnerProfile.winStreak || 0) + 1),
         gameId: undefined,
+      });
+
+      // Update player stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, { 
+        userId: winnerId, 
+        won: true,
+        gameTime: gameDuration
       });
     }
 
     if (loserProfile) {
       await ctx.db.patch(loserProfile._id, {
-        losses: loserProfile.losses + 1,
-        gamesPlayed: loserProfile.gamesPlayed + 1,
-        winStreak: 0,
         gameId: undefined,
+      });
+
+      // Update player stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, { 
+        userId: loserId, 
+        won: false,
+        gameTime: gameDuration
       });
     }
 
@@ -1493,10 +1513,6 @@ export const handleDisconnectionForfeit = internalMutation({
     
     if (winnerProfile) {
       await ctx.db.patch(winnerProfile._id, {
-        wins: winnerProfile.wins + 1,
-        gamesPlayed: winnerProfile.gamesPlayed + 1,
-        winStreak: (winnerProfile.winStreak || 0) + 1,
-        bestWinStreak: Math.max(winnerProfile.bestWinStreak || 0, (winnerProfile.winStreak || 0) + 1),
         gameId: undefined,
       });
       
@@ -1510,9 +1526,6 @@ export const handleDisconnectionForfeit = internalMutation({
     
     if (loserProfile) {
       await ctx.db.patch(loserProfile._id, {
-        losses: loserProfile.losses + 1,
-        gamesPlayed: loserProfile.gamesPlayed + 1,
-        winStreak: 0,
         gameId: undefined,
       });
       

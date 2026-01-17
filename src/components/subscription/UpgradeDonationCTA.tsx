@@ -18,13 +18,17 @@ export function UpgradeDonationCTA() {
   // Check donor status via profile
   const { data: profile } = useConvexQuery(api.profiles.getCurrentProfile, {});
 
-  // Determine if user should see the CTA
+  // Wait for data before determining eligibility to prevent flashing
+  const isLoading = subscription === undefined || profile === undefined;
+  
+  // Determine persistent eligibility (should this ever be shown to this user?)
   const tier = subscription?.tier || "free";
   const isDonor = profile?.isDonor || false;
-  const shouldShow = !isDismissed && tier === "free" && !isDonor;
+  const isEligible = !isLoading && tier === "free" && !isDonor;
 
-  // Don't render if user is pro/pro+/donator
-  if (!shouldShow) {
+  // Don't render if user is definitely not eligible (pro/donator)
+  // We keep it mounted if still loading OR if eligible, so AnimatePresence can handle the transition
+  if (!isLoading && !isEligible) {
     return null;
   }
 
@@ -41,7 +45,6 @@ export function UpgradeDonationCTA() {
       search: { donation: undefined },
       hash: "#donate"
     });
-    // Scroll to donation section after navigation (handled by pricing page)
   };
 
   const handleDismiss = () => {
@@ -50,7 +53,7 @@ export function UpgradeDonationCTA() {
 
   return (
     <AnimatePresence>
-      {shouldShow && (
+      {isEligible && !isDismissed && (
         <motion.div
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

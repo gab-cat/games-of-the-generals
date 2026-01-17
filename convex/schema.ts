@@ -663,7 +663,8 @@ const applicationTables = {
     lastResetAt: v.number(), // Timestamp of last reset
   })
     .index("by_user_date", ["userId", "date"])
-    .index("by_user", ["userId"]),
+    .index("by_user", ["userId"])
+    .index("by_date", ["date"]),
 
   // Subscription expiry notifications
   subscriptionNotifications: defineTable({
@@ -696,6 +697,13 @@ const applicationTables = {
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
     .index("by_paymongo_payment_id", ["paymongoPaymentId"]),
+
+  // Webhook events for idempotency
+  webhookEvents: defineTable({
+    eventId: v.string(), // PayMongo event ID (evt_...)
+    processedAt: v.number(),
+  })
+    .index("by_event_id", ["eventId"]),
 };
 
 export default defineSchema({

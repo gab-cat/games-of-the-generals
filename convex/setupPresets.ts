@@ -267,6 +267,9 @@ export const saveSetupPreset = mutation({
         isActive = true; // Still in grace period
       } else if (expiresAt > now) {
         isActive = true;
+      } else if (expiresAt < now && !gracePeriodEndsAt) {
+        // Expired with no grace period defined
+        isActive = false;
       }
     }
 

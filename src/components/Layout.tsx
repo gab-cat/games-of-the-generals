@@ -609,7 +609,7 @@ export function Layout({ children, user, onOpenMessagingWithLobby }: LayoutProps
       </motion.header>
 
       {/* Expiry Warning Banner */}
-      {isAuthenticated && (
+      {isAuthenticated && !isBanned && (
         <div className="max-w-7xl mx-auto px-3 sm:px-6 mt-4">
           <ExpiryWarningBanner />
         </div>

@@ -24,7 +24,7 @@ function calculateExpiryDate(currentExpiresAt: number | null, months: number): n
 function getDaysUntilExpiry(expiresAt: number): number {
   const now = Date.now();
   const diff = expiresAt - now;
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
 // Helper function to calculate discounted price
@@ -192,19 +192,10 @@ export const getPaymentHistory = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc");
 
-    if (args.paginationOpts?.cursor) {
-      return await queryBuilder.paginate({
-        numItems: limit,
-        cursor: args.paginationOpts.cursor,
-      });
-    } else {
-      const payments = await queryBuilder.take(limit);
-      return {
-        page: payments,
-        isDone: payments.length < limit,
-        continueCursor: payments.length > 0 ? payments[payments.length - 1]._id : null,
-      };
-    }
+    return await queryBuilder.paginate({
+      numItems: limit,
+      cursor: args.paginationOpts?.cursor ?? null,
+    });
   },
 });
 
@@ -229,19 +220,10 @@ export const getDonationHistory = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc");
 
-    if (args.paginationOpts?.cursor) {
-      return await queryBuilder.paginate({
-        numItems: limit,
-        cursor: args.paginationOpts.cursor,
-      });
-    } else {
-      const donations = await queryBuilder.take(limit);
-      return {
-        page: donations,
-        isDone: donations.length < limit,
-        continueCursor: donations.length > 0 ? donations[donations.length - 1]._id : null,
-      };
-    }
+    return await queryBuilder.paginate({
+      numItems: limit,
+      cursor: args.paginationOpts?.cursor ?? null,
+    });
   },
 });
 
@@ -250,10 +232,13 @@ export const createOrUpdateSubscription = mutation({
   args: {
     tier: v.union(v.literal("free"), v.literal("pro"), v.literal("pro_plus")),
     expiresAt: v.number(),
+    months: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    const months = args.months || 1;
 
     const existing = await ctx.db
       .query("subscriptions")
@@ -267,7 +252,7 @@ export const createOrUpdateSubscription = mutation({
         expiresAt: args.expiresAt,
         status: args.expiresAt > Date.now() ? "active" : "expired",
         lastPaymentAt: Date.now(),
-        totalMonthsPaid: existing.totalMonthsPaid + 1,
+        totalMonthsPaid: existing.totalMonthsPaid + months,
       });
       return existing._id;
     } else {
@@ -280,7 +265,7 @@ export const createOrUpdateSubscription = mutation({
         gracePeriodEndsAt: args.expiresAt > Date.now() ? args.expiresAt + 2 * 24 * 60 * 60 * 1000 : undefined,
         createdAt: Date.now(),
         lastPaymentAt: Date.now(),
-        totalMonthsPaid: 1,
+        totalMonthsPaid: months,
       });
       return subscriptionId;
     }
@@ -482,13 +467,11 @@ export const resetDailyUsage = internalMutation({
 
     const oldUsage = await ctx.db
       .query("subscriptionUsage")
-      .withIndex("by_user")
+      .withIndex("by_date", (q) => q.lt("date", sevenDaysAgoStr))
       .collect();
 
     for (const usage of oldUsage) {
-      if (usage.date < sevenDaysAgoStr) {
-        await ctx.db.delete(usage._id);
-      }
+      await ctx.db.delete(usage._id);
     }
   },
 });
@@ -570,7 +553,7 @@ export const createPayMongoPayment = action({
     });
 
     // Get the current origin for success/cancel URLs
-    const origin = process.env.VITE_APP_URL || "http://localhost:5173";
+    const origin = (ctx as any).request?.headers?.get("origin") || process.env.VITE_APP_URL || "http://localhost:5173";
     const successUrl = `${origin}/subscription?subscription=success`;
     const cancelUrl = `${origin}/subscription?subscription=cancelled`;
 
@@ -653,7 +636,7 @@ export const createPayMongoDonation = action({
     });
 
     // Get the current origin for success/cancel URLs
-    const origin = process.env.VITE_APP_URL || "http://localhost:5173";
+    const origin = (ctx as any).request?.headers?.get("origin") || process.env.VITE_APP_URL || "http://localhost:5173";
     const successUrl = `${origin}/pricing?donation=success`;
     const cancelUrl = `${origin}/pricing?donation=cancelled`;
 
@@ -816,7 +799,7 @@ export const sendExpiryNotifications = internalMutation({
     for (const subscription of subscriptions) {
       if (!subscription.expiresAt) continue;
 
-      const daysUntilExpiry = Math.floor((subscription.expiresAt - now) / oneDay);
+      const daysUntilExpiry = getDaysUntilExpiry(subscription.expiresAt);
       let notificationType: string | null = null;
 
       if (daysUntilExpiry === 7) {
@@ -993,5 +976,32 @@ export const updateDonorStatus = internalMutation({
     });
 
     console.log(`[Donor Status] Updated profile ${profile._id}: isDonor=true, totalDonated=${newTotal} (added ${args.donationAmount})`);
+  },
+});
+
+// Internal action query to check if webhook event was processed
+export const checkWebhookEvent = internalQuery({
+  args: {
+    eventId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("webhookEvents")
+      .withIndex("by_event_id", (q) => q.eq("eventId", args.eventId))
+      .unique();
+    return !!existing;
+  },
+});
+
+// Internal action mutation to record processed webhook event
+export const recordWebhookEvent = internalMutation({
+  args: {
+    eventId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("webhookEvents", {
+      eventId: args.eventId,
+      processedAt: Date.now(),
+    });
   },
 });

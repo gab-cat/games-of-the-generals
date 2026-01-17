@@ -140,7 +140,7 @@ export const createLobby = mutation({
 
       // Get today's usage (use UTC to avoid timezone issues)
       const now = new Date();
-      const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+      today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
         .toISOString()
         .split("T")[0];
       usage = await ctx.db

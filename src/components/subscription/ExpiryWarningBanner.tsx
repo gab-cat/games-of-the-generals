@@ -103,7 +103,7 @@ export function ExpiryWarningBanner({ className = "", dismissible = true }: Expi
         <Button
           variant="outline"
           size="sm"
-          onClick={() => navigate({ to: "/subscription" })}
+          onClick={() => navigate({ to: "/subscription", search: { subscription: undefined} })}
           className="font-light"
         >
           {content.actionText}
@@ -114,6 +114,7 @@ export function ExpiryWarningBanner({ className = "", dismissible = true }: Expi
             size="sm"
             onClick={() => setDismissed(true)}
             className="text-white/60 hover:text-white"
+            aria-label="Dismiss banner"
           >
             <X className="w-4 h-4" />
           </Button>

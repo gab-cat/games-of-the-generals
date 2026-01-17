@@ -216,7 +216,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
       
     } catch (error) {
       console.error("Donation error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create donation");
+      toast.error("Failed to process donation. Please try again.");
       setPaymentProcessing(false);
     }
   };

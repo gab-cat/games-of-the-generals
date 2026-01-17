@@ -121,12 +121,14 @@ export function AIGamePage() {
     
     // Check if selected difficulty is accessible
     const accessCheck = selectedDifficulty === "easy" ? easyAccess : selectedDifficulty === "medium" ? mediumAccess : hardAccess;
+    const difficultyLabel = difficultyConfig[selectedDifficulty].label;
+    
     if (accessCheck && !accessCheck.hasAccess) {
       if (accessCheck.reason === "subscription_expired") {
-        toast.error("Your subscription has expired. Please renew to access Hard difficulty.");
-        navigate({ to: "/subscription", search: { subscription: undefined} });
+        toast.error(`Your subscription has expired. Please renew to access ${difficultyLabel} difficulty.`);
+        navigate({ to: "/subscription", search: { subscription: undefined } });
       } else {
-        toast.error("Hard difficulty is only available for Pro and Pro+ subscribers.");
+        toast.error(`${difficultyLabel} difficulty is only available for Pro and Pro+ subscribers.`);
         navigate({ to: "/pricing", search: { donation: undefined } });
       }
       return;
@@ -371,13 +373,19 @@ export function AIGamePage() {
                                   </div>
                                   <p className="text-amber-300/80 text-xs font-light mb-3">
                                     {accessCheck?.reason === "subscription_expired"
-                                      ? "Your subscription has expired. Please renew to access Hard difficulty."
-                                      : "Hard difficulty is only available for Pro and Pro+ subscribers."}
+                                      ? `Your subscription has expired. Please renew to access ${config.label} difficulty.`
+                                      : `${config.label} difficulty is only available for Pro and Pro+ subscribers.`}
                                   </p>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => navigate({ to: accessCheck?.reason === "subscription_expired" ? "/subscription" : "/pricing", search: { donation: undefined } })}
+                                    onClick={() => {
+                                      if (accessCheck?.reason === "subscription_expired") {
+                                        navigate({ to: "/subscription", search: { subscription: undefined } });
+                                      } else {
+                                        navigate({ to: "/pricing", search: { donation: undefined } });
+                                      }
+                                    }}
                                     className="bg-amber-500/20 hover:bg-amber-500/30 border-amber-500/30 text-amber-300 text-xs"
                                   >
                                     {accessCheck?.reason === "subscription_expired" ? "Renew Now" : "Upgrade Now"}

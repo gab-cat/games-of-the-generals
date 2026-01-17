@@ -40,9 +40,11 @@ export function SubscriptionPage() {
     if (search.subscription === "success") {
       setSuccessModalOpen(true);
       // Clean up URL by removing query parameter
-      const url = new URL(window.location.href);
-      url.searchParams.delete("subscription");
-      window.history.replaceState({}, "", url.pathname + url.search);
+      navigate({
+        to: "/subscription",
+        search: (prev: any) => ({ ...prev, subscription: undefined }),
+        replace: true,
+      });
     }
   }, [search.subscription]);
 
@@ -222,7 +224,7 @@ export function SubscriptionPage() {
                       ].map((feature, index) => (
                         <div key={index} className="flex items-start gap-2 text-white/80 text-sm font-light">
                           <CheckCircle2 className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                          <span>{typeof feature === "string" ? feature : feature}</span>
+                          <span>{feature}</span>
                         </div>
                       ))}
                     </div>
@@ -458,12 +460,12 @@ export function SubscriptionPage() {
                       </div>
                       {tier === "free" && (
                         <div className="text-xs text-white/50 font-light mt-2">
-                          {10 - usage.privateLobbiesCreated} remaining today
+                          {Math.max(0, 10 - usage.privateLobbiesCreated)} remaining today
                         </div>
                       )}
                       {tier !== "free" && (
                         <div className={`text-xs font-light mt-2 ${tier === "pro" ? "text-blue-300/70" : "text-yellow-300/70"}`}>
-                          {tier === "pro" && `${50 - usage.privateLobbiesCreated} remaining today`}
+                          {tier === "pro" && `${Math.max(0, 50 - usage.privateLobbiesCreated)} remaining today`}
                           {tier === "pro_plus" && "No limits"}
                         </div>
                       )}
@@ -501,8 +503,8 @@ export function SubscriptionPage() {
                       )}
                       {tier !== "free" && (
                         <div className={`text-xs font-light mt-2 ${tier === "pro" ? "text-purple-300/70" : "text-orange-300/70"}`}>
-                          {tier === "pro" && `${50 - usage.aiReplaysSaved} slots remaining`}
-                          {tier === "pro_plus" && `${100 - usage.aiReplaysSaved} slots remaining`}
+                          {tier === "pro" && `${Math.max(0, 50 - usage.aiReplaysSaved)} slots remaining`}
+                          {tier === "pro_plus" && `${Math.max(0, 100 - usage.aiReplaysSaved)} slots remaining`}
                         </div>
                       )}
                     </motion.div>

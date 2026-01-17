@@ -106,12 +106,24 @@ export function useLobbyPresence(
             break;
         }
       }
-    } catch (error) {
-      // Lobby might have been deleted, trigger callback
-      if (!calledRef.current.lobbyDeleted) {
+    } catch (error: any) {
+      console.error("Error checking lobby abandonment:", error);
+      
+      // Only treat as deleted if the error explicitly indicates the resource is missing.
+      // We check for various error signatures that suggest the lobby doesn't exist.
+      const isNotFoundError = 
+        error.status === 404 || 
+        error.response?.status === 404 ||
+        error.message?.toLowerCase().includes("not found") ||
+        error.message?.toLowerCase().includes("failed to find");
+
+      if (isNotFoundError && !calledRef.current.lobbyDeleted) {
         calledRef.current.lobbyDeleted = true;
         onLobbyDeleted?.();
       }
+      
+      // For other errors (network issues, timeouts, 429s), we don't call onLobbyDeleted.
+      // The hook will retry automatically on the next interval.
     }
   }, [lobbyId, checkLobbyAbandonment, onHostAbandoned, onPlayerAbandoned, onLobbyDeleted]);
   
