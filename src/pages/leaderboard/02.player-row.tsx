@@ -1,13 +1,6 @@
 import { motion } from "framer-motion";
-import {
-  Trophy,
-  Medal,
-  Crown,
-  Target,
-  Crosshair,
-  ChevronDown,
-} from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Trophy, Medal, Crown, Crosshair, ChevronDown } from "lucide-react";
+
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserNameWithBadge } from "@/components/UserNameWithBadge";
 import { ExpandableCard } from "@/components/ExpandableCard";

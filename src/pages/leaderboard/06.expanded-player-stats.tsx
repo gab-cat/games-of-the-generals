@@ -1,18 +1,13 @@
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+
 import { UserAvatar } from "@/components/UserAvatar";
 import {
-  Flame,
-  Clock,
   Timer,
   Flag,
   Swords,
-  TrendingUp,
   Gamepad2,
-  Trophy,
   Eye,
-  Skull,
   Crosshair,
   Activity,
   Target,

@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { Trophy, ShieldCheck, Activity } from "lucide-react";
 
 export function LeaderboardHeader() {
   return (
