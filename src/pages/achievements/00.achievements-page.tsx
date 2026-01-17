@@ -1,32 +1,17 @@
 import { motion } from "framer-motion";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../../components/ui/card";
+
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import {
-  Trophy,
-  Award,
-  CheckCircle2,
-  Shield,
-  Flame,
-  Star,
-  Zap,
-  Target,
-} from "lucide-react";
+import { Trophy, Award, Flame, Star, Zap, Target } from "lucide-react";
 import { AchievementsHeader } from "./01.achievements-header";
 import { AchievementCard } from "./02.achievement-card";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
-import { cn } from "../../lib/utils";
 
 export function AchievementsPage() {
   const categoryGridRef = useAutoAnimate();

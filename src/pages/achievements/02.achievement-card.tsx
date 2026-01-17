@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Progress } from "../../components/ui/progress";
-import { Lock, Scan, CheckCircle2 } from "lucide-react";
+import { Lock, Scan } from "lucide-react";
 
 interface Achievement {
   id: string;

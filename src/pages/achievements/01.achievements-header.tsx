@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
-import { Trophy, Target, Lock, Unlock } from "lucide-react";
-import { Progress } from "../../components/ui/progress";
+import { Lock, Unlock } from "lucide-react";
 
 interface AchievementsHeaderProps {
   unlockedCount: number;
