@@ -445,8 +445,8 @@ export const getMessages = query({
       };
     }
 
-    // Batch fetch all user settings and profiles in parallel
-    const [userSettings, userProfiles] = await Promise.all([
+    // Batch fetch all user settings, profiles, and subscriptions in parallel
+    const [userSettings, userProfiles, userSubscriptions] = await Promise.all([
       Promise.all(
         userIds.map(id =>
           ctx.db
@@ -459,6 +459,14 @@ export const getMessages = query({
         userIds.map(id =>
           ctx.db
             .query("profiles")
+            .withIndex("by_user", (q) => q.eq("userId", id))
+            .unique()
+        )
+      ),
+      Promise.all(
+        userIds.map(id =>
+          ctx.db
+            .query("subscriptions")
             .withIndex("by_user", (q) => q.eq("userId", id))
             .unique()
         )
@@ -480,12 +488,27 @@ export const getMessages = query({
       }
     });
 
+    const subscriptionsMap = new Map();
+    userSubscriptions.forEach(sub => {
+      if (sub) {
+        subscriptionsMap.set(sub.userId, sub);
+      }
+    });
+
     // Enhance messages with batched user data
-    const enhancedMessages = messages.map(message => ({
-      ...message,
-      usernameColor: message.userId ? settingsMap.get(message.userId)?.usernameColor : undefined,
-      adminRole: message.userId ? profilesMap.get(message.userId)?.adminRole : undefined,
-    }));
+    const enhancedMessages = messages.map(message => {
+      const profile = message.userId ? profilesMap.get(message.userId) : undefined;
+      const sub = message.userId ? subscriptionsMap.get(message.userId) : undefined;
+      const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
+
+      return {
+        ...message,
+        usernameColor: message.userId ? settingsMap.get(message.userId)?.usernameColor : undefined,
+        adminRole: profile?.adminRole,
+        tier: isActive ? (sub?.tier || "free") : "free",
+        isDonor: profile?.isDonor || false,
+      };
+    });
 
     return {
       messages: enhancedMessages,
@@ -650,10 +673,34 @@ export const getAllUsernames = query({
       .query("profiles")
       .take(1000); // Reduced limit - enough for mention autocomplete
 
-    return profiles.map(profile => ({
-      userId: profile.userId,
-      username: profile.username,
-    }));
+    // Batch fetch subscriptions for these users
+    const userIds = profiles.map(p => p.userId);
+    const subscriptions = await Promise.all(
+      userIds.map(id =>
+        ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .unique()
+      )
+    );
+
+    const subscriptionsMap = new Map();
+    subscriptions.forEach(sub => {
+      if (sub) {
+        subscriptionsMap.set(sub.userId, sub);
+      }
+    });
+
+    return profiles.map(profile => {
+      const sub = subscriptionsMap.get(profile.userId);
+      const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
+      return {
+        userId: profile.userId,
+        username: profile.username,
+        tier: isActive ? (sub?.tier || "free") : "free",
+        isDonor: profile.isDonor || false,
+      };
+    });
   },
 });
 

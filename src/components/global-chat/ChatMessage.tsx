@@ -10,6 +10,7 @@ import { Loader2, Shield, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MessageModerationMenu } from "./MessageModerationMenu";
 import { toast } from "sonner";
+import { UserNameWithBadge } from "../UserNameWithBadge";
 
 interface ChatMessageProps {
   message: {
@@ -22,6 +23,8 @@ interface ChatMessageProps {
     mentions?: Id<"users">[];
     usernameColor?: string;
     adminRole?: "moderator" | "admin";
+    tier?: "free" | "pro" | "pro_plus";
+    isDonor?: boolean;
   };
   currentUserSettings?: {
     usernameColor?: string;
@@ -158,31 +161,30 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     >
       <div className="flex items-start">
         {/* Username */}
-        <div className="flex items-start gap-1 flex-shrink-0">
-          <button
-            onClick={handleUsernameClick}
-            className={cn(
-              "text-xs font-medium hover:underline transition-colors",
-              isOptimistic && "cursor-not-allowed"
-            )}
-            style={{ color: usernameColor }}
-            disabled={isOptimistic}
-          >
-            {message.username}
-          </button>
+        {/* Username with Badges */}
+        <div className="flex items-start gap-1 flex-shrink-0 min-w-0 max-w-[150px] sm:max-w-[200px]">
+          <UserNameWithBadge
+            username={message.username}
+            tier={message.tier}
+            isDonor={message.isDonor}
+            usernameColor={message.usernameColor}
+            size="sm"
+            onClick={!isOptimistic ? handleUsernameClick : undefined}
+            className={cn(isOptimistic && "opacity-70")}
+          />
 
           {/* Admin Badge */}
           {message.adminRole && (
             <div className={cn(
-              "flex items-center gap-0.5 px-1 rounded text-xs font-medium",
+              "flex items-center gap-0.5 px-1 rounded text-[10px] h-4 font-medium flex-shrink-0",
               message.adminRole === "admin"
                 ? "bg-red-500/20 text-red-300"
                 : "bg-blue-500/20 text-blue-300"
             )}>
               {message.adminRole === "admin" ? (
-                <ShieldCheck className="w-3 h-3" />
+                <ShieldCheck className="w-2.5 h-2.5" />
               ) : (
-                <Shield className="w-3 h-3" />
+                <Shield className="w-2.5 h-2.5" />
               )}
               <span className="capitalize">{message.adminRole === "admin" ? "Admin" : "Mod"}</span>
             </div>

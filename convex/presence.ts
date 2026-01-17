@@ -3,6 +3,7 @@ import { components } from "./_generated/api";
 import { v } from "convex/values";
 import { Presence } from "@convex-dev/presence";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { isSubscriptionActive } from "./featureGating";
 
 export const presence = new Presence(components.presence);
 
@@ -83,6 +84,10 @@ export const listRoom = query({
       aiGameId: v.optional(v.id("aiGameSessions")),
       online: v.boolean(),
       lastDisconnected: v.number(),
+      tier: v.union(v.literal("free"), v.literal("pro"), v.literal("pro_plus")),
+      isDonor: v.boolean(),
+      avatarFrame: v.optional(v.string()),
+      usernameColor: v.optional(v.string()),
     }),
     v.null()
   )),
@@ -91,8 +96,14 @@ export const listRoom = query({
     const list = await presence.listRoom(ctx, roomId, true);
     // Remove if userId is "Anonymous"
     const listWithProfileData = await Promise.all(list.map(async (user) => {
+      if (user.userId === "Anonymous") return null;
+      
       const profile = await ctx.db.query("profiles").withIndex("by_username", (q) => q.eq("username", user.userId)).unique();
-      return user.userId !== "Anonymous" ? {
+      const sub = profile ? await ctx.db.query("subscriptions").withIndex("by_user", (q) => q.eq("userId", profile.userId)).unique() : null;
+      const customization = profile ? await ctx.db.query("userCustomizations").withIndex("by_user", (q) => q.eq("userId", profile.userId)).first() : null;
+      const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
+
+      return {
         userId: user.userId,
         username: profile?.username || user.userId,
         rank: profile?.rank,
@@ -104,7 +115,11 @@ export const listRoom = query({
         aiGameId: profile?.aiSessionId,
         online: user.online,
         lastDisconnected: user.lastDisconnected,
-      } : null;
+        tier: isActive ? (sub?.tier || "free") : "free",
+        isDonor: profile?.isDonor || false,
+        avatarFrame: customization?.avatarFrame,
+        usernameColor: customization?.usernameColor,
+      };
     }));
     
     return listWithProfileData;

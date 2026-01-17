@@ -193,11 +193,24 @@ export const getConversations = query({
       )
     );
 
+    // Batch fetch customizations for all profiles
+    const customizations = await Promise.all(
+      uniqueParticipantIds.map(id =>
+        ctx.db
+          .query("userCustomizations")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .first()
+      )
+    );
+
     // Create a map for O(1) profile lookups
     const profilesMap = new Map();
-    profiles.forEach(profile => {
+    profiles.forEach((profile, idx) => {
       if (profile) {
-        profilesMap.set(profile.userId, profile);
+        profilesMap.set(profile.userId, {
+          ...profile,
+          customization: customizations[idx]
+        });
       }
     });
 
@@ -234,6 +247,8 @@ export const getConversations = query({
           username: otherUsername,
           avatarUrl: otherParticipantProfile?.avatarUrl,
           rank: otherParticipantProfile?.rank,
+          avatarFrame: otherParticipantProfile?.customization?.avatarFrame,
+          usernameColor: otherParticipantProfile?.customization?.usernameColor,
         },
         unreadCount: isParticipant1 ? conv.participant1UnreadCount : conv.participant2UnreadCount,
         lastReadAt: isParticipant1 ? conv.participant1LastRead : conv.participant2LastRead,
@@ -513,19 +528,39 @@ export const getRecentUnreadMessages = query({
     // Return early if no messages to avoid unnecessary processing
     if (messages.length === 0) return [];
 
+    // OPTIMIZED: Fetch sender customizations
+    const senderIds = [...new Set(messages.map(msg => msg.senderId))];
+    const senderCustomizations = await Promise.all(
+      senderIds.map(id =>
+        ctx.db
+          .query("userCustomizations")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .first()
+      )
+    );
+    const customizationMap = new Map();
+    senderIds.forEach((id, idx) => {
+      customizationMap.set(id, senderCustomizations[idx]);
+    });
+
     // OPTIMIZED: Only return essential fields for notifications to reduce data transfer
-    return messages.map(msg => ({
-      _id: msg._id,
-      senderId: msg.senderId,
-      senderUsername: msg.senderUsername,
-      senderAvatarUrl: msg.senderAvatarUrl,
-      content: msg.content,
-      messageType: msg.messageType,
-      timestamp: msg.timestamp,
-      lobbyId: msg.lobbyId,
-      lobbyName: msg.lobbyName,
-      gameId: msg.gameId,
-    }));
+    return messages.map(msg => {
+      const customization = customizationMap.get(msg.senderId);
+      return {
+        _id: msg._id,
+        senderId: msg.senderId,
+        senderUsername: msg.senderUsername,
+        senderAvatarUrl: msg.senderAvatarUrl,
+        senderAvatarFrame: customization?.avatarFrame,
+        senderUsernameColor: customization?.usernameColor,
+        content: msg.content,
+        messageType: msg.messageType,
+        timestamp: msg.timestamp,
+        lobbyId: msg.lobbyId,
+        lobbyName: msg.lobbyName,
+        gameId: msg.gameId,
+      };
+    });
   },
 });
 
@@ -675,13 +710,26 @@ export const searchUsers = query({
       .filter((q) => q.neq(q.field("userId"), userId))
       .take(limit);
 
-    return profiles.map(profile => ({
-      userId: profile.userId,
-      username: profile.username,
-      avatarUrl: profile.avatarUrl,
-      rank: profile.rank,
-      gamesPlayed: profile.gamesPlayed,
-    }));
+    const profilesWithCustomizations = await Promise.all(
+      profiles.map(async (profile) => {
+        const customization = await ctx.db
+          .query("userCustomizations")
+          .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+          .first();
+        
+        return {
+          userId: profile.userId,
+          username: profile.username,
+          avatarUrl: profile.avatarUrl,
+          rank: profile.rank,
+          gamesPlayed: profile.gamesPlayed,
+          avatarFrame: customization?.avatarFrame,
+          usernameColor: customization?.usernameColor,
+        };
+      })
+    );
+
+    return profilesWithCustomizations;
   },
 });
 

@@ -20,6 +20,8 @@ interface Message {
   lobbyName?: string;
   gameId?: string;
   isExiting?: boolean;
+  senderAvatarFrame?: string;
+  senderUsernameColor?: string;
 }
 
 interface MessageNotificationProps {
@@ -348,6 +350,7 @@ export function MessageNotification({
                     username={message.senderUsername}
                     avatarUrl={message.senderAvatarUrl}
                     size="md"
+                    frame={message.senderAvatarFrame}
                     className="ring-2 ring-green-500/20"
                   />
                 ) : (

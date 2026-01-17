@@ -779,6 +779,7 @@ export function ConversationView({
                   avatarUrl={otherUserProfile?.avatarUrl}
                   rank={otherUserProfile?.rank}
                   size="sm"
+                  frame={otherUserProfile?.avatarFrame}
                   className="mb-1"
                 />
               )
@@ -985,7 +986,6 @@ export function ConversationView({
                 username={otherUserProfile?.username || ""}
                 avatarUrl={otherUserProfile?.avatarUrl}
                 size="md"
-                className="ring-1 ring-white/20"
               />
             )}
             {!isNotificationConversation && (() => {

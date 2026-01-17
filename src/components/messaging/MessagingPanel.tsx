@@ -45,6 +45,8 @@ interface SearchResult {
   username: string;
   avatarUrl?: string;
   rank?: string;
+  avatarFrame?: string;
+  usernameColor?: string;
 }
 
 function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isSubscribing, onEnablePush, getOnlineStatusIndicator }: NewMessageViewProps) {
@@ -137,7 +139,7 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                             username={conversation.otherParticipant.username}
                             avatarUrl={conversation.otherParticipant.avatarUrl}
                             size="md"
-                            className="ring-1 ring-white/20"
+                            frame={conversation.otherParticipant.avatarFrame}
                           />
                         )}
                         {/* Online status indicator - hide for Notifications */}
@@ -200,7 +202,7 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                     username={user.username}
                     avatarUrl={user.avatarUrl}
                     size="md"
-                    className="ring-1 ring-white/20"
+                    frame={user.avatarFrame}
                   />
                   {/* Online status indicator */}
                   {getOnlineStatusIndicator(user.username) && (
@@ -603,7 +605,7 @@ export function MessagingPanel({
                                 username={conversation.otherParticipant.username}
                                 avatarUrl={conversation.otherParticipant.avatarUrl}
                                 size="md"
-                                className="ring-1 ring-white/20"
+                                frame={conversation.otherParticipant.avatarFrame}
                               />
                             )}
                             {/* Online status indicator - hide for Notifications */}
