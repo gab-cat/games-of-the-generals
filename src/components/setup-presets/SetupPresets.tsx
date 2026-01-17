@@ -371,7 +371,7 @@ export const SetupPresets = React.memo(
       return (
         <Card
           className={cn(
-            "bg-black/20 backdrop-blur-xl border border-white/10",
+            "bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm",
             className,
           )}
         >
@@ -385,7 +385,7 @@ export const SetupPresets = React.memo(
     return (
       <Card
         className={cn(
-          "bg-black/20 backdrop-blur-xl border border-white/10",
+          "bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm",
           className,
         )}
       >
@@ -405,13 +405,13 @@ export const SetupPresets = React.memo(
                   </span>
                   {presetLimit.tier !== "free" &&
                     presetLimit.status === "grace_period" && (
-                      <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                      <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] font-mono rounded-sm px-2">
                         Grace Period
                       </Badge>
                     )}
                   {presetLimit.tier !== "free" &&
                     presetLimit.status === "expired" && (
-                      <Badge className="bg-red-500/20 text-red-400 border-red-500/30 text-xs">
+                      <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[10px] font-mono rounded-sm px-2">
                         Expired
                       </Badge>
                     )}
@@ -450,13 +450,13 @@ export const SetupPresets = React.memo(
               <DialogTrigger asChild>
                 <Button
                   size="sm"
-                  className="bg-green-600/80 hover:bg-green-700/80"
+                  className="bg-emerald-600/80 hover:bg-emerald-500/80 text-white font-mono text-xs rounded-sm border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
                 >
                   <Save className="h-4 w-4 mr-1" />
                   Save Current
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-gray-black/40 backdrop-blur-sm border-white/20">
+              <DialogContent className="bg-zinc-950 border border-white/10 rounded-sm shadow-2xl">
                 <DialogHeader>
                   <DialogTitle className="text-white">
                     Save Setup Preset
@@ -544,7 +544,7 @@ export const SetupPresets = React.memo(
                     placeholder="Enter preset name..."
                     value={newPresetName}
                     onChange={(e) => setNewPresetName(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                    className="bg-zinc-900/50 border-white/10 text-white placeholder:text-white/30 font-mono text-sm focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50"
                     maxLength={30}
                   />
                   <div className="flex justify-end gap-2">
@@ -562,7 +562,7 @@ export const SetupPresets = React.memo(
                       Save Preset
                     </Button>
                   </div>
-                  <div className="text-xs text-white/60">
+                  <div className="text-xs text-white/40 font-mono">
                     You can save up to 5 custom presets. ({customPresets.length}
                     /5)
                   </div>
@@ -594,12 +594,12 @@ export const SetupPresets = React.memo(
                           key={preset._id}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
+                          className="flex items-center justify-between p-2 rounded-sm bg-zinc-900/40 border border-white/5 hover:border-white/10 transition-colors"
                         >
                           <div className="flex items-center gap-2 flex-1">
                             <Badge
                               variant="outline"
-                              className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30 text-xs"
+                              className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-[10px] font-mono rounded-sm px-2"
                             >
                               Popular
                             </Badge>
@@ -648,7 +648,7 @@ export const SetupPresets = React.memo(
                           key={preset._id}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10"
+                          className="flex items-center justify-between p-2 rounded-sm bg-zinc-900/40 border border-white/5 hover:border-white/10 transition-colors"
                         >
                           <div className="flex items-center gap-2 flex-1">
                             {editingPresetId === preset._id ? (
