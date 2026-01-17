@@ -1,8 +1,10 @@
 import { motion } from "framer-motion";
 import { Target, Trophy, HelpCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import { UserBadge } from "../../components/UserBadge";
 import { Id } from "../../../convex/_generated/dataModel";
 import Squares from "../../components/backgrounds/Squares/Squares";
 
@@ -15,6 +17,8 @@ interface Profile {
   gamesPlayed: number;
   rank: string;
   elo?: number;
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
 }
 
 interface LobbyHeaderProps {
@@ -23,15 +27,32 @@ interface LobbyHeaderProps {
 
 export function LobbyHeader({ profile }: LobbyHeaderProps) {
   const winRate = profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
+  const tier = profile.tier || "free";
+  const isPro = tier === "pro";
+  const isProPlus = tier === "pro_plus";
+  const isDonor = profile.isDonor;
 
   return (
-    <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 relative overflow-hidden">
+    <Card className={cn(
+      "bg-black/20 backdrop-blur-xl border shadow-2xl shadow-black/20 relative overflow-hidden transition-all duration-500",
+      isPro && "border-blue-500/40 shadow-blue-500/10",
+      isProPlus && "border-amber-500/50 shadow-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.15)]",
+      !isPro && !isProPlus && "border-white/10"
+    )}>
+      {isProPlus && (
+        <motion.div
+          animate={{
+            opacity: [0.1, 0.2, 0.1],
+          }}
+          transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+          className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 pointer-events-none"
+        />
+      )}
       {/* Animated Squares Background */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-20">
         <Squares
           direction="diagonal"
           speed={0.3}
-          squareSize={40}
           borderColor="rgba(255,255,255,0.08)"
         />
       </div>
@@ -47,15 +68,28 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
               initial={{ scale: 0, rotateY: -180 }}
               animate={{ scale: 1, rotateY: 0 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 120 }}
-              className="w-12 h-12 sm:w-16 sm:h-16 bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-cyan-500/20 backdrop-blur-sm border border-blue-500/30 rounded-2xl flex items-center justify-center shadow-lg relative overflow-hidden mx-auto sm:mx-0 flex-shrink-0"
+              className={cn(
+                "w-12 h-12 sm:w-16 sm:h-16 backdrop-blur-sm border rounded-2xl flex items-center justify-center shadow-lg relative overflow-hidden mx-auto sm:mx-0 flex-shrink-0 transition-colors duration-500",
+                isProPlus 
+                  ? "bg-gradient-to-br from-amber-500/30 via-orange-500/30 to-yellow-500/30 border-amber-400/40" 
+                  : isPro
+                    ? "bg-gradient-to-br from-blue-500/30 via-indigo-500/30 to-purple-500/30 border-blue-400/40"
+                    : "bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-cyan-500/20 border-white/10"
+              )}
             >
               {/* Animated background pattern */}
               <motion.div
                 animate={{ rotate: 360 }}
                 transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-2xl"
+                className={cn(
+                  "absolute inset-0 opacity-20 rounded-2xl",
+                  isProPlus ? "bg-gradient-to-br from-amber-500 to-orange-500" : "bg-gradient-to-br from-blue-500 to-purple-500"
+                )}
               />
-              <Target className="h-6 w-6 sm:h-8 sm:w-8 text-blue-400 relative z-10" />
+              <Target className={cn(
+                "h-6 w-6 sm:h-8 sm:w-8 relative z-10",
+                isProPlus ? "text-amber-300" : isPro ? "text-blue-300" : "text-blue-400"
+              )} />
             </motion.div>
             
             <div className="flex flex-col text-center sm:text-left">
@@ -75,9 +109,25 @@ export function LobbyHeader({ profile }: LobbyHeaderProps) {
                 initial={{ y: 10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
+                className="flex items-center gap-2"
               >
-                <CardTitle className="text-lg sm:text-xl font-bold text-white/90">Commander Profile</CardTitle>
-                <p className="text-xs sm:text-xs text-white/60 mt-1">Battle Statistics & Performance</p>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg sm:text-xl font-bold text-white/90">Commander Profile</CardTitle>
+                    {(isPro || isProPlus) && (
+                      <UserBadge type={isProPlus ? "pro_plus" : "pro"} size="sm" showText />
+                    )}
+                    {isDonor && (
+                      <UserBadge type="donor" size="sm" />
+                    )}
+                  </div>
+                  <p className={cn(
+                    "text-xs sm:text-xs mt-1 transition-colors duration-500",
+                    isProPlus ? "text-amber-300/80" : isPro ? "text-blue-300/80" : "text-white/60"
+                  )}>
+                    {isProPlus ? "Elite Global Commander" : isPro ? "Professional Commander" : "Battle Statistics & Performance"}
+                  </p>
+                </div>
               </motion.div>
             </div>
           </motion.div>

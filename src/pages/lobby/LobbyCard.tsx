@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserAvatar } from "@/components/UserAvatar";
+import { UserNameWithBadge } from "@/components/UserNameWithBadge";
 import { useQuery } from "convex-helpers/react/cache";
 import { motion } from "framer-motion";
 import { Users, MessageCircle, Clock, Zap, Eye } from "lucide-react";
@@ -88,26 +89,41 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
                 avatarUrl={hostProfile?.avatarUrl}
                 rank={hostProfile?.rank}
                 size="sm"
-                className="ring-1 ring-white/20 flex-shrink-0"
+                frame={hostProfile?.avatarFrame}
+                className="flex-shrink-0"
               />
               <div className="min-w-0 flex-1">
                 <h4 className="font-semibold text-sm sm:text-base text-white/90 truncate">{lobby.name}</h4>
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                  <p className="text-xs sm:text-sm text-white/60 truncate">
-                    Host: {lobby.hostUsername}
-                  </p>
+                  <div className="flex items-center gap-1 text-xs sm:text-sm text-white/60">
+                    <span>Host:</span>
+                    <UserNameWithBadge
+                      username={lobby.hostUsername}
+                      tier={hostProfile?.tier}
+                      isDonor={hostProfile?.isDonor}
+                      usernameColor={hostProfile?.usernameColor}
+                      size="xs"
+                    />
+                  </div>
                   {lobby.playerUsername && playerProfile && (
                     <>
                       <span className="hidden sm:inline text-white/40">•</span>
                       <div className="flex items-center gap-1">
                         <UserAvatar 
-                          username={lobby.playerUsername}
-                          avatarUrl={playerProfile.avatarUrl}
-                          rank={playerProfile.rank}
+                          username={lobby.playerUsername!}
+                          avatarUrl={playerProfile!.avatarUrl}
+                          rank={playerProfile!.rank}
                           size="sm"
-                          className="ring-1 ring-white/20 w-4 h-4 sm:w-5 sm:h-5"
+                          frame={playerProfile!.avatarFrame}
+                          className="w-4 h-4 sm:w-5 sm:h-5"
                         />
-                        <span className="text-xs sm:text-sm text-white/60 truncate">{lobby.playerUsername}</span>
+                        <UserNameWithBadge
+                          username={lobby.playerUsername!}
+                          tier={playerProfile!.tier}
+                          isDonor={playerProfile!.isDonor}
+                          usernameColor={playerProfile!.usernameColor}
+                          size="xs"
+                        />
                       </div>
                     </>
                   )}

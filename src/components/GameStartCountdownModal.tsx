@@ -135,6 +135,7 @@ export const GameStartCountdownModal = memo(function GameStartCountdownModal({
                   avatarUrl={player1Profile?.avatarUrl}
                   rank={player1Profile?.rank}
                   size="lg"
+                  frame={player1Profile?.avatarFrame}
                   className={`mx-auto ${
                     currentUsername === player1Username
                       ? 'ring-2 ring-blue-400'
@@ -173,6 +174,7 @@ export const GameStartCountdownModal = memo(function GameStartCountdownModal({
                   avatarUrl={player2Profile?.avatarUrl}
                   rank={player2Profile?.rank}
                   size="lg"
+                  frame={player2Profile?.avatarFrame}
                   className={`mx-auto ${
                     currentUsername === player2Username 
                       ? 'ring-2 ring-red-400' 
