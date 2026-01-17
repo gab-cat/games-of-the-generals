@@ -100,8 +100,28 @@ export const getCurrentProfile = query({
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
+    if (!profile) return null;
 
-    return profile;
+    const [subscription, customization] = await Promise.all([
+      ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first(),
+      ctx.db
+        .query("userCustomizations")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first(),
+    ]);
+
+    const isActive = subscription ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null) : true;
+
+    return {
+      ...profile,
+      tier: isActive ? (subscription?.tier || "free") : "free",
+      usernameColor: customization?.usernameColor,
+      avatarFrame: customization?.avatarFrame,
+      showBadges: customization?.showBadges ?? true,
+    };
   },
 });
 
@@ -116,8 +136,28 @@ export const getProfileByUsername = query({
       .query("profiles")
       .withIndex("by_username", (q) => q.eq("username", args.username as string))
       .unique();
+    if (!profile) return null;
 
-    return profile;
+    const [subscription, customization] = await Promise.all([
+      ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first(),
+      ctx.db
+        .query("userCustomizations")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first(),
+    ]);
+
+    const isActive = subscription ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null) : true;
+
+    return {
+      ...profile,
+      tier: isActive ? (subscription?.tier || "free") : "free",
+      usernameColor: customization?.usernameColor,
+      avatarFrame: customization?.avatarFrame,
+      showBadges: customization?.showBadges ?? true,
+    };
   },
 });
 
@@ -194,8 +234,28 @@ export const getProfileByUserId = query({
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", args.userId))
       .unique();
+    if (!profile) return null;
 
-    return profile;
+    const [subscription, customization] = await Promise.all([
+      ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first(),
+      ctx.db
+        .query("userCustomizations")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first(),
+    ]);
+
+    const isActive = subscription ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null) : true;
+
+    return {
+      ...profile,
+      tier: isActive ? (subscription?.tier || "free") : "free",
+      usernameColor: customization?.usernameColor,
+      avatarFrame: customization?.avatarFrame,
+      showBadges: customization?.showBadges ?? true,
+    };
   },
 });
 
@@ -463,8 +523,28 @@ export const getProfileStats = query({
       computedFastestWin = minDurationMs;
     }
 
+    // Get subscription and customization data
+    const [subscription, customization] = await Promise.all([
+      ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first(),
+      ctx.db
+        .query("userCustomizations")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first(),
+    ]);
+
+    const isActive = subscription
+      ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null)
+      : true;
+
     return {
       ...profile,
+      tier: isActive ? (subscription?.tier || "free") : "free",
+      usernameColor: customization?.usernameColor,
+      avatarFrame: customization?.avatarFrame,
+      showBadges: customization?.showBadges ?? true,
       winRate,
       avgGameTime,
       recentGames,
@@ -518,8 +598,28 @@ export const getProfileStatsByUsername = query({
       .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
       .slice(0, 5);
 
+    // Get customization and subscription data
+    const [subscription, customization] = await Promise.all([
+      ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first(),
+      ctx.db
+        .query("userCustomizations")
+        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+        .first(),
+    ]);
+
+    const isActive = subscription
+      ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null)
+      : true;
+
     return {
       ...profile,
+      tier: isActive ? (subscription?.tier || "free") : "free",
+      avatarFrame: customization?.avatarFrame,
+      usernameColor: customization?.usernameColor,
+      showBadges: customization?.showBadges ?? true,
       winRate,
       avgGameTime,
       recentGames,
@@ -582,11 +682,44 @@ export const getLeaderboard = query({
       profiles = await queryBuilder.take(limit);
     }
 
-    // Calculate win rates and handle winRate sorting
-    const profilesWithStats = profiles.map((profile) => ({
-      ...profile,
-      winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
-    }));
+    // Batch fetch subscriptions and customizations for all profiles
+    const [subscriptions, customizations] = await Promise.all([
+      Promise.all(
+        profiles.map((profile) =>
+          ctx.db
+            .query("subscriptions")
+            .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+            .first()
+        )
+      ),
+      Promise.all(
+        profiles.map((profile) =>
+          ctx.db
+            .query("userCustomizations")
+            .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+            .first()
+        )
+      ),
+    ]);
+
+    // Calculate win rates, tier, donor status, and customization
+    const profilesWithStats = profiles.map((profile, idx) => {
+      const subscription = subscriptions[idx];
+      const customization = customizations[idx];
+      const isActive = subscription
+        ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null)
+        : true;
+      const tier = isActive ? (subscription?.tier || "free") : "free";
+
+      return {
+        ...profile,
+        winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
+        tier,
+        isDonor: profile.isDonor ?? false,
+        usernameColor: customization?.usernameColor,
+        avatarFrame: customization?.avatarFrame,
+      };
+    });
 
     // Sort by winRate if requested (requires in-memory sorting)
     if (sortBy === "winRate") {

@@ -2,109 +2,109 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>http://localhost:5173/</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>http://localhost:5173/achievements</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/ai-game</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/announcements</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/auth</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/game</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/leaderboard</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/match-history</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/pricing</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/privacy</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/profile</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/replay</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/settings</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/spectate</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/subscription</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/support</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/support-resolve</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>http://localhost:5173/terms</loc>
-    <lastmod>2026-01-14T16:37:39.133Z</lastmod>
+    <lastmod>2026-01-17T10:44:11.406Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
