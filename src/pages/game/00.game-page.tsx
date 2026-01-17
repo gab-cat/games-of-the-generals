@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Id } from "../../../convex/_generated/dataModel";
+import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { lazy, Suspense } from "react";
 
 // Lazy load the heavy GameBoard component
@@ -16,7 +16,7 @@ interface Profile {
 }
 
 interface GamePageProps {
-  profile: Profile;
+  profile: Doc<"profiles">;
   gameId: string;
 }
 

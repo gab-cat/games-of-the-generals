@@ -239,7 +239,7 @@ export const getGameSpectators = query({
     const game = await ctx.db.get("games", args.gameId);
     if (!game || game.spectators.length === 0) return [];
 
-    // Optimized: Batch query spectator profiles more efficiently
+    // OPTIMIZED: Batch query spectator profiles more efficiently
     const spectatorProfiles = await Promise.all(
       game.spectators.map(async (userId) => {
         try {
@@ -247,7 +247,14 @@ export const getGameSpectators = query({
             .query("profiles")
             .withIndex("by_user", (q) => q.eq("userId", userId))
             .unique();
-          return profile;
+          if (!profile) return null;
+
+          const customization = await ctx.db
+            .query("userCustomizations")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+
+          return { ...profile, avatarFrame: customization?.avatarFrame, usernameColor: customization?.usernameColor };
         } catch (error) {
           // Handle potential errors gracefully
           console.warn(`Failed to get profile for user ${userId}:`, error);
@@ -265,6 +272,8 @@ export const getGameSpectators = query({
         username: profile.username,
         rank: profile.rank,
         avatarUrl: profile.avatarUrl,
+        avatarFrame: profile.avatarFrame,
+        usernameColor: profile.usernameColor,
       }));
   },
 });

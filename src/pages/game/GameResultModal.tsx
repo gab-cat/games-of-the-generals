@@ -27,6 +27,7 @@ interface Profile {
   losses: number;
   gamesPlayed: number;
   rank: string;
+  avatarFrame?: string;
 }
 
 interface GameResultModalProps {
@@ -229,6 +230,7 @@ export function GameResultModal({
                     avatarUrl={isPlayer1 ? player1Profile?.avatarUrl : player2Profile?.avatarUrl}
                     rank={isPlayer1 ? player1Profile?.rank : player2Profile?.rank}
                     size="sm"
+                    frame={isPlayer1 ? player1Profile?.avatarFrame : player2Profile?.avatarFrame}
                   />
                   <div className="flex-1">
                     <div className="font-semibold text-white/90 text-sm">
@@ -262,6 +264,7 @@ export function GameResultModal({
                     avatarUrl={isPlayer1 ? player2Profile?.avatarUrl : player1Profile?.avatarUrl}
                     rank={isPlayer1 ? player2Profile?.rank : player1Profile?.rank}
                     size="sm"
+                    frame={isPlayer1 ? player2Profile?.avatarFrame : player1Profile?.avatarFrame}
                   />
                   <div className="flex-1">
                     <div className="font-semibold text-white/90 text-sm">

@@ -39,6 +39,9 @@ interface Profile {
   losses: number;
   gamesPlayed: number;
   rank: string;
+  avatarFrame?: string;
+  usernameColor?: string;
+  avatarUrl?: string;
 }
 
 interface OptimisticMessage {
@@ -536,11 +539,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                       avatarUrl={player1Profile?.avatarUrl}
                       rank={player1Profile?.rank}
                       size="md"
-                      className={`border-2 ${
-                        game.status === "finished" && game.winner === "player1" 
-                          ? 'border-yellow-400' 
-                          : 'border-blue-500/50'
-                      }`}
+                      frame={player1Profile?.avatarFrame}
                     />
                     <div>
                       <div className="flex items-center gap-2">
@@ -579,11 +578,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                       avatarUrl={player2Profile?.avatarUrl}
                       rank={player2Profile?.rank}
                       size="md"
-                      className={`border-2 ${
-                        game.status === "finished" && game.winner === "player2" 
-                          ? 'border-yellow-400' 
-                          : 'border-red-500/50'
-                      }`}
+                      frame={player2Profile?.avatarFrame}
                     />
                     <div>
                       <div className="flex items-center gap-2">
@@ -691,7 +686,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                           avatarUrl={player1Profile?.avatarUrl}
                           rank={player1Profile?.rank}
                           size="sm"
-                          className={game.winner === "player1" ? 'border-2 border-yellow-400' : ''}
+                          frame={player1Profile?.avatarFrame}
                         />
                         <span className="font-semibold text-sm">{game.player1Username}</span>
                         {game.winner === "player1" && <Crown className="h-4 w-4 text-yellow-400" />}
@@ -705,7 +700,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                           avatarUrl={player2Profile?.avatarUrl}
                           rank={player2Profile?.rank}
                           size="sm"
-                          className={game.winner === "player2" ? 'border-2 border-yellow-400' : ''}
+                          frame={player2Profile?.avatarFrame}
                         />
                         <span className="font-semibold text-sm">{game.player2Username}</span>
                         {game.winner === "player2" && <Crown className="h-4 w-4 text-yellow-400" />}
@@ -933,6 +928,7 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                         avatarUrl={spectator.avatarUrl}
                         rank={spectator.rank}
                         size="sm" 
+                        frame={(spectator as any).avatarFrame}
                       />
                       <span className="text-sm text-white/80">{spectator.username}</span>
                       {spectator.userId === profile.userId && (

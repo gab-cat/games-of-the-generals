@@ -148,9 +148,38 @@ export const deleteAnnouncement = mutation({
       throw new Error("Announcement not found");
     }
 
+    // Delete all comments associated with this announcement
+    const comments = await ctx.db
+      .query("comments")
+      .withIndex("by_announcement", (q) => q.eq("announcementId", args.id))
+      .collect();
+
+    for (const comment of comments) {
+      await ctx.db.delete(comment._id);
+    }
+
     await ctx.db.delete(args.id);
 
     return args.id;
+  },
+});
+
+// Get only the latest announcement's basic info for "new" indicators
+export const getLatestAnnouncementInfo = query({
+  args: {},
+  handler: async (ctx) => {
+    const latest = await ctx.db
+      .query("announcements")
+      .withIndex("by_created_at")
+      .order("desc")
+      .first();
+
+    if (!latest) return null;
+
+    return {
+      id: latest._id,
+      createdAt: latest.createdAt,
+    };
   },
 });
 

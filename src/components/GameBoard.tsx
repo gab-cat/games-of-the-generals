@@ -3,7 +3,7 @@ import { useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { toast } from "sonner";
-import { Id } from "../../convex/_generated/dataModel";
+import { Doc, Id } from "../../convex/_generated/dataModel";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Shuffle,
@@ -44,21 +44,13 @@ import { UserAvatar } from "./UserAvatar";
 import { getPieceDisplay } from "../lib/piece-display";
 import { SetupPresets } from "./setup-presets/SetupPresets";
 import { useSound } from "../lib/SoundProvider";
+import { UserNameWithBadge } from "./UserNameWithBadge";
 import usePresence from "@convex-dev/presence/react";
 
-interface Profile {
-  _id: Id<"profiles">;
-  userId: Id<"users">;
-  username: string;
-  wins: number;
-  losses: number;
-  gamesPlayed: number;
-  rank: string;
-}
 
 interface GameBoardProps {
   gameId: Id<"games">;
-  profile: Profile;
+  profile: Doc<"profiles">;
   onBackToLobby: () => void;
 }
 
@@ -1644,6 +1636,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   avatarUrl={player1Profile?.avatarUrl}
                   rank={player1Profile?.rank}
                   size="md"
+                  frame={player1Profile?.avatarFrame}
                   className={`border-2 ${
                     game.status === "finished" && game.winner === "player1" 
                       ? 'border-yellow-400' 
@@ -1651,8 +1644,15 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   }`}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white/90 text-sm sm:text-base truncate">{game.player1Username}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <UserNameWithBadge
+                      username={game.player1Username}
+                      tier={player1Profile?.tier}
+                      isDonor={player1Profile?.isDonor}
+                      usernameColor={player1Profile?.usernameColor}
+                      size="md"
+                      className="max-w-[120px] sm:max-w-[200px]"
+                    />
                     {(() => {
                       const player1Presence = getPlayerPresence(game.player1Username);
                       return player1Presence ? (
@@ -1705,6 +1705,7 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   avatarUrl={player2Profile?.avatarUrl}
                   rank={player2Profile?.rank}
                   size="md"
+                  frame={player2Profile?.avatarFrame}
                   className={`border-2 ${
                     game.status === "finished" && game.winner === "player2" 
                       ? 'border-yellow-400' 
@@ -1712,8 +1713,15 @@ const GameBoard = memo(function GameBoard({ gameId, profile, onBackToLobby }: Ga
                   }`}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white/90 text-sm sm:text-base truncate">{game.player2Username}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <UserNameWithBadge
+                      username={game.player2Username}
+                      tier={player2Profile?.tier}
+                      isDonor={player2Profile?.isDonor}
+                      usernameColor={player2Profile?.usernameColor}
+                      size="md"
+                      className="max-w-[120px] sm:max-w-[200px]"
+                    />
                     {(() => {
                       const player2Presence = getPlayerPresence(game.player2Username);
                       return player2Presence ? (
