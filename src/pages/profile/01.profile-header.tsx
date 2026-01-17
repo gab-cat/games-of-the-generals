@@ -1,15 +1,19 @@
 import { motion } from "framer-motion";
 import { Badge } from "../../components/ui/badge";
 import { UserAvatar } from "../../components/UserAvatar";
-import { Settings, Ban, VolumeX } from "lucide-react";
+import { UserNameWithBadge } from "../../components/UserNameWithBadge";
+import { UserBadge } from "../../components/UserBadge";
+import { Settings, Ban, VolumeX, Shield, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
-import { useConvexMutationWithQuery, useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
+import {
+  useConvexMutationWithQuery,
+  useConvexQueryWithOptions,
+} from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { MessageModerationMenu } from "../../components/global-chat/MessageModerationMenu";
 import { Id } from "../../../convex/_generated/dataModel";
 import { useConvexAuth } from "convex/react";
-import Squares from "../../components/backgrounds/Squares/Squares";
 
 interface ProfileStats {
   username: string;
@@ -23,6 +27,10 @@ interface ProfileStats {
   elo: number;
   bio?: string;
   userId?: Id<"users">;
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
+  usernameColor?: string;
+  avatarFrame?: string;
 }
 
 interface ProfileHeaderProps {
@@ -31,7 +39,11 @@ interface ProfileHeaderProps {
   isOwnProfile?: boolean;
 }
 
-export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfile = true }: ProfileHeaderProps) {
+export function ProfileHeader({
+  profileStats,
+  onAvatarSettingsToggle,
+  isOwnProfile = true,
+}: ProfileHeaderProps) {
   const { isAuthenticated } = useConvexAuth();
   const [isEditingBio, setIsEditingBio] = useState(false);
   const [bioValue, setBioValue] = useState(profileStats.bio || "");
@@ -41,285 +53,242 @@ export function ProfileHeader({ profileStats, onAvatarSettingsToggle, isOwnProfi
     },
   });
 
-  // Check if current user is admin/moderator
   const { data: adminRole } = useConvexQueryWithOptions(
     api.globalChat.getUserAdminRole,
-    isAuthenticated && !isOwnProfile ? {} : "skip", // Only check admin status when authenticated and viewing others' profiles
-    {
-      staleTime: 300000, // 5 minutes - admin status doesn't change often
-      gcTime: 600000, // 10 minutes cache
-    }
+    isAuthenticated && !isOwnProfile ? {} : "skip",
+    { staleTime: 300000, gcTime: 600000 },
   );
-
-  // Get user's moderation status (ban/mute)
-  const { data: moderationStatus } = useConvexQueryWithOptions(
-    api.globalChat.getUserModerationStatus,
-    profileStats.userId ? { userId: profileStats.userId } : "skip",
-    {
-      staleTime: 60000, // 1 minute - moderation status can change
-      gcTime: 300000, // 5 minutes cache
-    }
-  );
-
-  // Debug logging (remove in production)
-  console.log("Profile Header Debug:", {
-    isAuthenticated,
-    isOwnProfile,
-    adminRole,
-    userId: profileStats.userId,
-    username: profileStats.username,
-    moderationStatus
-  });
 
   useEffect(() => {
     setBioValue(profileStats.bio || "");
   }, [profileStats.bio]);
 
-  const formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffTime = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    // For very recent dates (less than 30 days), show full date
-    if (diffDays < 30) {
-      return date.toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-    // For older dates, show just month and year
-    else {
-      return date.toLocaleDateString('en-US', {
-        month: 'long',
-        year: 'numeric'
-      });
-    }
-  };
-
-  const formatRemainingTime = (expiresAt: number) => {
-    const now = Date.now();
-    const remainingMs = expiresAt - now;
-
-    if (remainingMs <= 0) return "Expired";
-
-    const seconds = Math.floor(remainingMs / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) {
-      return `${days} day${days > 1 ? 's' : ''}`;
-    } else if (hours > 0) {
-      return `${hours} hour${hours > 1 ? 's' : ''}`;
-    } else if (minutes > 0) {
-      return `${minutes} minute${minutes > 1 ? 's' : ''}`;
-    } else {
-      return `${seconds} second${seconds > 1 ? 's' : ''}`;
-    }
-  };
-
   const getRankColor = (rank: string) => {
     switch (rank) {
-      case "General": return "from-yellow-500 to-amber-600";
-      case "Colonel": return "from-purple-500 to-violet-600";
-      case "Major": return "from-blue-500 to-indigo-600";
-      case "Captain": return "from-green-500 to-emerald-600";
-      case "Lieutenant": return "from-orange-500 to-red-600";
-      case "Sergeant": return "from-red-500 to-pink-600";
-      default: return "from-gray-500 to-gray-600";
+      case "General":
+        return "from-yellow-500 to-amber-600";
+      case "Colonel":
+        return "from-purple-500 to-violet-600";
+      case "Major":
+        return "from-blue-500 to-indigo-600";
+      case "Captain":
+        return "from-green-500 to-emerald-600";
+      case "Lieutenant":
+        return "from-orange-500 to-red-600";
+      case "Sergeant":
+        return "from-red-500 to-pink-600";
+      default:
+        return "from-gray-500 to-gray-600";
     }
+  };
+
+  const getProgressToNextRank = (rank: string, wins: number) => {
+    if (rank === "Colonel") return Math.min((wins / 50) * 100, 100);
+    if (rank === "Major") return Math.min((wins / 30) * 100, 100);
+    if (rank === "Captain") return Math.min((wins / 20) * 100, 100);
+    if (rank === "Lieutenant") return Math.min((wins / 10) * 100, 100);
+    if (rank === "Sergeant") return Math.min((wins / 5) * 100, 100);
+    return Math.min((wins / 3) * 100, 100);
   };
 
   return (
     <motion.div
-      initial={{ y: -20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      className="rounded-xl border border-white/10 bg-black/30 p-4 sm:p-6 mb-6 relative overflow-hidden"
+      initial={{ x: -20, opacity: 0 }}
+      animate={{ x: 0, opacity: 1 }}
+      className="rounded-sm border border-white/10 bg-zinc-900/60 backdrop-blur-md overflow-hidden flex flex-col relative group/rail"
     >
-      {/* Animated Squares Background */}
-      <div className="absolute inset-0 rounded-xl overflow-hidden opacity-20">
-        <Squares
-          direction="diagonal"
-          speed={0.3}
-          squareSize={35}
-          borderColor="rgba(255,255,255,0.1)"
-        />
-      </div>
+      {/* Corner Accents */}
+      <div className="absolute top-0 left-0 w-2 h-2 border-l border-t border-white/20" />
+      <div className="absolute top-0 right-0 w-2 h-2 border-r border-t border-white/20" />
+      <div className="absolute bottom-0 left-0 w-2 h-2 border-l border-b border-white/20" />
+      <div className="absolute bottom-0 right-0 w-2 h-2 border-r border-b border-white/20" />
 
-      <div className="relative z-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Left side - Avatar and Info */}
-        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-          <div className="relative">
+      {/* Rail Decor: Top Status Bar */}
+      <div className="h-0.5 w-full bg-gradient-to-r from-blue-500/50 via-purple-500/50 to-blue-500/50" />
+
+      <div className="p-6 flex flex-col items-center text-center relative z-10">
+        {/* 1. Avatar Section */}
+        <div className="relative mb-4 group">
+          <div className="absolute -inset-6 bg-blue-500/20 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+          <div className="relative p-2 rounded-full border border-white/10 bg-black/40 shadow-2xl">
             <UserAvatar
               username={profileStats.username}
               avatarUrl={profileStats.avatarUrl}
               rank={profileStats.rank}
               size="xl"
-              className="ring-1 ring-white/20 shadow-lg"
+              frame={profileStats.avatarFrame}
+              className="w-32 h-32"
             />
-            {isOwnProfile && (
-              <button
-                onClick={onAvatarSettingsToggle}
-                className="absolute -bottom-0.5 -right-0.5 bg-gray-900/90 backdrop-blur-sm rounded-full p-1.5 ring-1 ring-white/20 hover:bg-gray-800/90 transition-colors"
-                title="Change avatar"
-              >
-                <Settings className="w-4 h-4 text-white" />
-              </button>
-            )}
-
           </div>
-        
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight truncate">
-              {profileStats.username}
-            </h1>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="outline" className={`text-xs px-2 py-0.5 bg-gradient-to-r ${getRankColor(profileStats.rank)} text-white border-0 font-medium`}>
-                {profileStats.rank}
-              </Badge>
+          {/* Level Badge Overlay */}
+          <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-black border border-white/20 px-3 py-1 rounded-sm text-[10px] font-mono font-bold tracking-widest text-white shadow-lg z-20">
+            LVL.{profileStats.rank === "General" ? "100" : "50"}
+          </div>
 
-              {/* Moderation Status Badges */}
-              {moderationStatus?.banStatus && (
-                <Badge variant="destructive" className="text-xs px-2 py-0.5 bg-red-600/20 border-red-500/50 text-red-300 border font-medium">
-                  <Ban className="w-3 h-3 mr-1" />
-                  Banned {moderationStatus.banStatus.expiresAt ? `for ${formatRemainingTime(moderationStatus.banStatus.expiresAt)}` : 'permanently'}
-                </Badge>
+          {isOwnProfile && (
+            <button
+              onClick={onAvatarSettingsToggle}
+              className="absolute top-0 right-0 bg-zinc-900 border border-white/20 rounded-full p-2 hover:bg-blue-600 hover:border-blue-500 hover:text-white transition-all text-zinc-400 shadow-lg z-20"
+              title="Edit Identity"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* 2. Identity Block */}
+        <div className="space-y-3 mb-6 w-full px-2">
+          <div className="flex justify-center w-full">
+            <UserNameWithBadge
+              username={profileStats.username}
+              tier={profileStats.tier}
+              isDonor={profileStats.isDonor}
+              usernameColor={profileStats.usernameColor}
+              showBadges={false}
+              size="lg"
+              className="justify-center text-xl sm:text-2xl font-display tracking-tight flex-wrap break-words text-center w-full leading-tight [&>span]:truncate-0 [&>span]:whitespace-normal"
+            />
+          </div>
+
+          <div className="flex items-center justify-center gap-3">
+            <Badge
+              variant="outline"
+              className={`text-[10px] px-2 py-0.5 bg-gradient-to-r ${getRankColor(profileStats.rank)} text-white border-white/10 font-mono tracking-wider shadow-sm uppercase rounded-sm`}
+            >
+              {profileStats.rank}
+            </Badge>
+            <div className="h-3 w-px bg-white/10" />
+            <span className="text-[10px] text-zinc-500 font-mono flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              {new Date(profileStats.createdAt).toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </div>
+
+          {/* Badges Row (Moved below General/Date) */}
+          {(profileStats.tier !== "free" || profileStats.isDonor) && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              {(profileStats.tier === "pro" ||
+                profileStats.tier === "pro_plus") && (
+                <UserBadge type={profileStats.tier} size="sm" showText={true} />
               )}
-
-              {moderationStatus?.muteStatus && (
-                <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-orange-600/20 border-orange-500/50 text-orange-300 border font-medium">
-                  <VolumeX className="w-3 h-3 mr-1" />
-                  Muted for {formatRemainingTime(moderationStatus.muteStatus.mutedUntil)}
-                </Badge>
+              {profileStats.isDonor && (
+                <UserBadge type="donor" size="sm" showText={true} />
               )}
+            </div>
+          )}
+        </div>
 
-              <div className="text-gray-500 text-xs">Member since {formatDate(profileStats.createdAt)}</div>
+        {/* 3. Rank Progression */}
+        <div className="w-full mb-6">
+          <div className="flex justify-between text-[10px] font-mono text-zinc-500 mb-1.5 uppercase tracking-wider">
+            <span>Clearance Progress</span>
+            <span>
+              {Math.round(
+                getProgressToNextRank(profileStats.rank, profileStats.wins),
+              )}
+              %
+            </span>
+          </div>
+          <div className="h-1.5 w-full bg-black/40 rounded-sm overflow-hidden border border-white/5">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{
+                width: `${getProgressToNextRank(profileStats.rank, profileStats.wins)}%`,
+              }}
+              transition={{ duration: 1.5, delay: 0.5 }}
+              className="h-full bg-gradient-to-r from-blue-600 to-purple-500"
+            />
+          </div>
+        </div>
 
-              {/* Moderation Menu for Admins/Moderators */}
-              {isAuthenticated && !isOwnProfile && adminRole && (adminRole === "admin" || adminRole === "moderator") && profileStats.userId && (
+        {/* 4. Bio Section */}
+        <div className="w-full bg-black/20 rounded-sm border border-white/5 p-4 text-left relative overflow-hidden group/bio">
+          <div className="absolute top-0 left-0 w-0.5 h-full bg-white/10 group-hover/bio:bg-blue-500/50 transition-colors" />
+          <span className="text-[9px] text-zinc-600 font-mono uppercase tracking-widest block mb-2">
+            Service Record / Bio
+          </span>
+
+          {isOwnProfile && isEditingBio ? (
+            <div className="space-y-2">
+              <textarea
+                value={bioValue}
+                onChange={(e) => setBioValue(e.target.value)}
+                placeholder="ENTER_OPERATIVE_BIO..."
+                className="w-full min-h-[100px] rounded-sm bg-black/40 border border-blue-500/30 text-white p-2 text-xs outline-none focus:ring-1 focus:ring-blue-500/50 font-mono placeholder:text-zinc-700 resize-none"
+                maxLength={280}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 w-full font-mono uppercase rounded-sm"
+                  onClick={() =>
+                    updateBio.mutate({ bio: bioValue.trim() || undefined })
+                  }
+                  disabled={updateBio.isPending}
+                >
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-[10px] hover:bg-white/10 text-zinc-500 w-full font-mono uppercase rounded-sm"
+                  onClick={() => {
+                    setIsEditingBio(false);
+                    setBioValue(profileStats.bio || "");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="group/editbio relative min-h-[40px]">
+              <p className="text-zinc-400 text-xs leading-relaxed font-mono">
+                {bioValue || "// NO DATA FILED"}
+              </p>
+              {isOwnProfile && (
+                <button
+                  className="absolute right-0 top-0 text-[10px] text-zinc-600 hover:text-blue-400 opacity-0 group-hover/editbio:opacity-100 transition-opacity font-mono uppercase tracking-wider"
+                  onClick={() => setIsEditingBio(true)}
+                >
+                  [EDIT]
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Moderation */}
+        {isAuthenticated &&
+          !isOwnProfile &&
+          adminRole &&
+          (adminRole === "admin" || adminRole === "moderator") &&
+          profileStats.userId && (
+            <div className="w-full mt-4 border-t border-white/5 pt-4">
+              <div className="flex justify-center">
                 <MessageModerationMenu
                   messageId="profile-moderation"
                   userId={profileStats.userId}
                   username={profileStats.username}
-                  size="md"
+                  size="sm"
                   showText={true}
-                  text="Actions"
+                  text="ADMIN_PROTOCOLS"
                 />
-              )}
+              </div>
             </div>
+          )}
+      </div>
 
-            {/* Bio inline below name/date */}
-            <div className="mt-4 text-xs text-white/50">
-              {isOwnProfile ? (
-                isEditingBio ? (
-                  <div className="space-y-2">
-                    <textarea
-                      value={bioValue}
-                      onChange={(e) => setBioValue(e.target.value)}
-                      placeholder="Tell others about yourself"
-                      className="w-full min-h-20 rounded-lg bg-white/10 border border-white/20 text-white p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/50"
-                      maxLength={280}
-                    />
-                    <div className="flex gap-2">
-                      <Button
-                        variant="gradient"
-                        size="sm"
-                        onClick={() => updateBio.mutate({ bio: bioValue.trim() || undefined })}
-                        disabled={updateBio.isPending}
-                      >
-                        {updateBio.isPending ? "Saving..." : "Save"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setIsEditingBio(false);
-                          setBioValue(profileStats.bio || "");
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="group">
-                    {bioValue ? (
-                      <p className="text-white/90 text-sm whitespace-pre-wrap">{bioValue}</p>
-                    ) : (
-                      <p className="text-white/40 text-sm italic">Add a short bio...</p>
-                    )}
-                    <button
-                      className="mt-1 text-xs text-blue-400 hover:text-blue-300 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={() => setIsEditingBio(true)}
-                    >
-                      Edit
-                    </button>
-                  </div>
-                )
-              ) : profileStats.bio ? (
-                <p className="text-white/90 text-sm whitespace-pre-wrap">{profileStats.bio}</p>
-              ) : null}
-            </div>
-          </div>
-        </div>
-
-        {/* Right side - Main Stats */}
-        <div className="grid grid-cols-2 gap-4 sm:flex sm:gap-8 sm:items-center w-full sm:w-auto">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-center sm:text-right"
-          >
-            <div className="text-2xl font-bold text-green-400">{profileStats.wins}</div>
-            <div className="text-gray-500 text-xs uppercase tracking-wider">Wins</div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-center sm:text-right"
-          >
-            <div className="text-2xl font-bold text-red-400">{profileStats.losses}</div>
-            <div className="text-gray-500 text-xs uppercase tracking-wider">Losses</div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-center sm:text-right"
-          >
-            <div className="text-2xl font-bold text-blue-400">{profileStats.gamesPlayed}</div>
-            <div className="text-gray-500 text-xs uppercase tracking-wider">Games</div>
-          </motion.div>
-          
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.4 }}
-            className="text-center sm:text-right"
-          >
-            <div className="text-2xl font-bold text-purple-400">{profileStats.winRate}%</div>
-            <div className="text-gray-500 text-xs uppercase tracking-wider">Win Rate</div>
-          </motion.div>
-
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.5 }}
-            className="text-center sm:text-right"
-          >
-            <div className="text-2xl font-bold text-yellow-400">{profileStats.elo ?? 1500}</div>
-            <div className="text-gray-500 text-xs uppercase tracking-wider">ELO</div>
-          </motion.div>
+      <div className="mt-auto p-3 text-center border-t border-white/5 bg-black/20">
+        <div className="text-[9px] font-mono text-zinc-700 uppercase tracking-[0.2em] select-none">
+          ID: {profileStats.userId?.slice(0, 12) || "UNKNOWN"}
         </div>
       </div>
-    </div>
     </motion.div>
   );
 }

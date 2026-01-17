@@ -1,15 +1,13 @@
 import { motion } from "framer-motion";
-import { Progress } from "../../components/ui/progress";
-import { 
-  Flame, 
-  Clock, 
-  Zap, 
-  Timer, 
-  Flag, 
-  Swords, 
-  Target, 
-  TrendingUp, 
-  Crown 
+import {
+  Flame,
+  Clock,
+  Zap,
+  Flag,
+  Swords,
+  Target,
+  TrendingUp,
+  Crown,
 } from "lucide-react";
 
 interface BattleStatsProps {
@@ -34,186 +32,122 @@ export function BattleStats({ profileStats }: BattleStatsProps) {
     const minutes = Math.floor(ms / 60000);
     const seconds = Math.floor((ms % 60000) / 1000);
     const hours = Math.floor(minutes / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m`;
-    }
-    if (minutes > 0) {
-      return `${minutes}m`;
-    }
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m`;
     return `${seconds}s`;
   };
 
   return (
-    <motion.div
-      initial={{ y: 20, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ delay: 0.3 }}
-      className="rounded-xl border border-white/10 bg-black/30 p-6 mb-6"
-    >
-      <h2 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
-        <Flame className="w-5 h-5 text-orange-400" />
-        Battle Stats
-      </h2>
-      
-      <div className="grid grid-cols-2 gap-4 mb-4">
+    <div className="space-y-6">
+      {/* 1. Primary KPI Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* ELO Rating */}
-        <div className="text-center">
-          <div className="w-10 h-10 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-lg flex items-center justify-center mx-auto mb-2">
-            <TrendingUp className="w-5 h-5 text-white" />
+        <div className="p-4 rounded-sm border border-yellow-500/20 bg-yellow-500/5 hover:bg-yellow-500/10 transition-colors group relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <TrendingUp className="w-8 h-8 text-yellow-500 -rotate-12" />
           </div>
-          <div className="text-lg font-bold text-yellow-400">{profileStats.elo ?? 1500}</div>
-          <div className="text-gray-500 text-xs">ELO Rating</div>
+          <span className="text-[10px] text-yellow-500/60 font-mono uppercase tracking-widest block mb-1">
+            Combat Rating
+          </span>
+          <div className="text-3xl font-mono font-bold text-yellow-400 tracking-tighter">
+            {profileStats.elo ?? 1500}
+          </div>
         </div>
 
         {/* Win Streak */}
-        <div className="text-center">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center mx-auto mb-2">
-            <Flame className="w-5 h-5 text-white" />
+        <div className="p-4 rounded-sm border border-orange-500/20 bg-orange-500/5 hover:bg-orange-500/10 transition-colors group relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <Flame className="w-8 h-8 text-orange-500" />
           </div>
-          <div className="text-lg font-bold text-orange-400">{profileStats.winStreak || 0}</div>
-          <div className="text-gray-500 text-xs">Streak</div>
-          <div className="text-xs text-gray-600">Best: {profileStats.bestWinStreak || 0}</div>
+          <span className="text-[10px] text-orange-500/60 font-mono uppercase tracking-widest block mb-1">
+            Streak
+          </span>
+          <div className="flex items-baseline gap-2">
+            <div className="text-3xl font-mono font-bold text-orange-400 tracking-tighter">
+              {profileStats.winStreak || 0}
+            </div>
+            <div className="text-[9px] text-orange-500/50 font-mono uppercase">
+              (Best: {profileStats.bestWinStreak || 0})
+            </div>
+          </div>
         </div>
 
         {/* Play Time */}
-        <div className="text-center">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center mx-auto mb-2">
-            <Clock className="w-5 h-5 text-white" />
+        <div className="p-4 rounded-sm border border-blue-500/20 bg-blue-500/5 hover:bg-blue-500/10 transition-colors group relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <Clock className="w-8 h-8 text-blue-500" />
           </div>
-          <div className="text-lg font-bold text-blue-400">
-            {profileStats.totalPlayTime ? formatTime(profileStats.totalPlayTime) : "0m"}
+          <span className="text-[10px] text-blue-500/60 font-mono uppercase tracking-widest block mb-1">
+            Field Time
+          </span>
+          <div className="text-2xl font-mono font-bold text-blue-400 tracking-tighter">
+            {profileStats.totalPlayTime
+              ? formatTime(profileStats.totalPlayTime)
+              : "0m"}
           </div>
-          <div className="text-gray-500 text-xs">Total</div>
-          <div className="text-xs text-gray-600">
-            Avg: {profileStats.avgGameTime ? formatTime(profileStats.avgGameTime) : "0m"}
+          <div className="text-[9px] text-blue-400/40 font-mono mt-0.5">
+            Avg:{" "}
+            {profileStats.avgGameTime
+              ? formatTime(profileStats.avgGameTime)
+              : "0m"}
           </div>
         </div>
 
         {/* Fastest Win */}
-        <div className="text-center">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2 ${
-            profileStats.fastestWin 
-              ? "bg-gradient-to-br from-yellow-500 to-orange-600" 
-              : "bg-gray-700"
-          }`}>
-            <Zap className={`w-5 h-5 ${profileStats.fastestWin ? "text-white" : "text-gray-500"}`} />
+        <div className="p-4 rounded-sm border border-green-500/20 bg-green-500/5 hover:bg-green-500/10 transition-colors group relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-3 opacity-20">
+            <Zap className="w-8 h-8 text-green-500" />
           </div>
-          <div className={`text-lg font-bold ${profileStats.fastestWin ? "text-yellow-400" : "text-gray-500"}`}>
-            {profileStats.fastestWin ? formatTime(profileStats.fastestWin) : "--"}
+          <span className="text-[10px] text-green-500/60 font-mono uppercase tracking-widest block mb-1">
+            Quickest Op
+          </span>
+          <div className="text-2xl font-mono font-bold text-green-400 tracking-tighter">
+            {profileStats.fastestWin
+              ? formatTime(profileStats.fastestWin)
+              : "--"}
           </div>
-          <div className="text-gray-500 text-xs">Fastest</div>
-        </div>
-
-        {/* Longest Game */}
-        <div className="text-center">
-          <div className={`w-10 h-10 rounded-lg flex items-center justify-center mx-auto mb-2 ${
-            profileStats.longestGame 
-              ? "bg-gradient-to-br from-purple-500 to-pink-600" 
-              : "bg-gray-700"
-          }`}>
-            <Timer className={`w-5 h-5 ${profileStats.longestGame ? "text-white" : "text-gray-500"}`} />
-          </div>
-          <div className={`text-lg font-bold ${profileStats.longestGame ? "text-purple-400" : "text-gray-500"}`}>
-            {profileStats.longestGame ? formatTime(profileStats.longestGame) : "--"}
-          </div>
-          <div className="text-gray-500 text-xs">Longest</div>
         </div>
       </div>
 
-      {/* Combat Stats - Compact */}
-      {((profileStats.capturedFlags || 0) > 0 || (profileStats.piecesEliminated || 0) > 0 || (profileStats.spiesRevealed || 0) > 0) && (
-        <div className="pt-3 border-t border-white/5">
-          <div className="text-sm font-medium text-white mb-2">Combat</div>
-          <div className="space-y-2">
-            {(profileStats.capturedFlags || 0) > 0 && (
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-red-400">
-                  <Flag className="w-3 h-3" />
-                  <span>Flags</span>
-                </div>
-                <span className="font-bold text-red-400">{profileStats.capturedFlags}</span>
-              </div>
-            )}
-            
-            {(profileStats.piecesEliminated || 0) > 0 && (
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-orange-400">
-                  <Swords className="w-3 h-3" />
-                  <span>Eliminated</span>
-                </div>
-                <span className="font-bold text-orange-400">{profileStats.piecesEliminated}</span>
-              </div>
-            )}
-            
-            {(profileStats.spiesRevealed || 0) > 0 && (
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1 text-cyan-400">
-                  <Target className="w-3 h-3" />
-                  <span>Spies</span>
-                </div>
-                <span className="font-bold text-cyan-400">{profileStats.spiesRevealed}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Rank Progress */}
-      <div className="pt-4 border-t border-white/5 mt-4">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-4 h-4 text-purple-400" />
-          <h3 className="text-sm font-bold text-white">Rank Progress</h3>
+      {/* 2. Combat Efficiency Logs */}
+      <div className="rounded-sm border border-white/5 bg-white/5 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Swords className="w-4 h-4 text-zinc-400" />
+          <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-400">
+            Combat Efficiency Log
+          </h3>
         </div>
 
-        {profileStats.rank !== "General" ? (
-          <div className="space-y-2">
-            <div className="text-center">
-              <div className="text-xs text-gray-500 mb-1">
-                Next: <span className="text-purple-400 font-medium">
-                  {
-                    profileStats.wins >= 30 ? "General" :
-                    profileStats.wins >= 20 ? "Colonel" :
-                    profileStats.wins >= 10 ? "Major" :
-                    profileStats.wins >= 5 ? "Captain" :
-                    profileStats.wins >= 3 ? "Lieutenant" : "Sergeant"
-                  }
-                </span>
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-black/20 p-3 rounded-sm border border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Flag className="w-3.5 h-3.5 text-red-500/70" />
+              <span className="text-xs text-zinc-400">Flags Captured</span>
             </div>
-
-            <Progress 
-              value={
-                profileStats.rank === "Colonel" ? (profileStats.wins / 50) * 100 :
-                profileStats.rank === "Major" ? (profileStats.wins / 30) * 100 :
-                profileStats.rank === "Captain" ? (profileStats.wins / 20) * 100 :
-                profileStats.rank === "Lieutenant" ? (profileStats.wins / 10) * 100 :
-                profileStats.rank === "Sergeant" ? (profileStats.wins / 5) * 100 :
-                (profileStats.wins / 3) * 100
-              }
-              className="h-1.5 bg-gray-700"
-            />
-            <div className="text-center">
-              <span className="text-sm font-bold text-purple-400">
-                {
-                  profileStats.rank === "Colonel" ? 50 - profileStats.wins :
-                  profileStats.rank === "Major" ? 30 - profileStats.wins :
-                  profileStats.rank === "Captain" ? 20 - profileStats.wins :
-                  profileStats.rank === "Lieutenant" ? 10 - profileStats.wins :
-                  profileStats.rank === "Sergeant" ? 5 - profileStats.wins :
-                  3 - profileStats.wins
-                }
-              </span>
-              <div className="text-gray-500 text-xs">more wins</div>
+            <span className="font-mono font-bold text-white">
+              {profileStats.capturedFlags || 0}
+            </span>
+          </div>
+          <div className="bg-black/20 p-3 rounded-sm border border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Swords className="w-3.5 h-3.5 text-orange-500/70" />
+              <span className="text-xs text-zinc-400">Enemies Eliminated</span>
             </div>
+            <span className="font-mono font-bold text-white">
+              {profileStats.piecesEliminated || 0}
+            </span>
           </div>
-        ) : (
-          <div className="text-center py-4">
-            <Crown className="w-8 h-8 mx-auto mb-2 text-yellow-400" />
-            <div className="text-sm font-bold text-yellow-400">Max Rank!</div>
-            <div className="text-gray-500 text-xs">Excellence achieved</div>
+          <div className="bg-black/20 p-3 rounded-sm border border-white/5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Target className="w-3.5 h-3.5 text-cyan-500/70" />
+              <span className="text-xs text-zinc-400">Spies Identified</span>
+            </div>
+            <span className="font-mono font-bold text-white">
+              {profileStats.spiesRevealed || 0}
+            </span>
           </div>
-        )}
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import { AvatarSection } from "./02.avatar-section";
 import { UsernameSection } from "./03.username-section";
 import { PasswordSection } from "./04.password-section";
 import { EmailSection } from "./05.email-section";
+import { CustomizationSection } from "./07.customization-section";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -145,6 +146,7 @@ export function SettingsList() {
         </div>
         
         <div className="space-y-6">
+          <CustomizationSection />
           <PasswordSection />
           <EmailSection currentEmail={userSettings?.email} />
         </div>
