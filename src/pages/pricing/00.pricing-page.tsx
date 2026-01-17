@@ -5,20 +5,14 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
-  Clock,
-  X,
   Heart,
   ArrowRight,
   Sparkles,
   Crown,
   Star,
-  Gift,
-  BadgeCheck,
-  Zap,
   CheckCircle2,
   Shield,
   Target,
-  Swords,
   Terminal,
   Activity,
 } from "lucide-react";
@@ -26,7 +20,8 @@ import {
 import { api } from "../../../convex/_generated/api";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { toast } from "sonner";
-import { getRouteApi } from "@tanstack/react-router";
+import { useNavigate, getRouteApi } from "@tanstack/react-router";
+import { useConvexAuth } from "convex/react";
 import { cn } from "@/lib/utils";
 import { SubscriptionPaymentModal } from "@/components/subscription/SubscriptionPaymentModal";
 import { DonationPaymentModal } from "@/components/subscription/DonationPaymentModal";
@@ -115,20 +110,20 @@ const comparisonFeatures = [
 
 const faqs = [
   {
-    q: "Can I cancel my commission status?",
-    a: "Affirmative. You may abort your subscription at any time via the Command Dashboard. Your clearance level will remain active until the end of the current billing cycle.",
+    q: "Can I cancel my subscription anytime?",
+    a: "Of course. You're in total control of your account. You can cancel through your dashboard whenever you like, and you'll keep your features until the end of your billing cycle.",
   },
   {
-    q: "Are funding transfers secure?",
-    a: "All transactions are encrypted via global banking protocols (Stripe/PayMongo). No financial data is stored on our tactical servers.",
+    q: "Is my payment information safe?",
+    a: "Absolutely. We use industry-standard encryption through Stripe and PayMongo. We never even see your credit card details, let alone store them.",
   },
   {
-    q: "Does my rank reset if I downgrade?",
-    a: "Negative. Your service record, rank, and achievements are permanently archived. However, access to advanced analytic tools will be restricted.",
+    q: "Will I lose my rank if I downgrade?",
+    a: "Not at all. Your match history, rank, and achievements are yours forever. You'll just lose access to the premium features until you decide to upgrade again.",
   },
   {
-    q: "Can I upgrade my clearance level mid-operation?",
-    a: "Confirmed. Upgrading from Officer (Pro) to General (Pro+) is effective immediately. The cost difference will be prorated based on remaining service time.",
+    q: "Can I upgrade my plan later?",
+    a: "Definitely! If you're on Pro and want to go Pro+, you can upgrade instantly. We'll even prorate the cost so you only pay the difference for the remaining time.",
   },
 ];
 
@@ -139,6 +134,9 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
   const [selectedTier, setSelectedTier] = useState<"pro" | "pro_plus" | null>(
     null,
   );
+
+  const { isAuthenticated } = useConvexAuth();
+  const navigate = useNavigate();
 
   const search = route.useSearch();
 
@@ -160,6 +158,10 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
   }, [search.donation]);
 
   const handleUpgrade = (tier: string) => {
+    if (!isAuthenticated) {
+      navigate({ to: "/auth" });
+      return;
+    }
     const tierLower = tier.toLowerCase();
     if (tierLower === "standard") {
       // Formerly Free
@@ -173,6 +175,10 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
   };
 
   const handleDonateOpen = () => {
+    if (!isAuthenticated) {
+      navigate({ to: "/auth" });
+      return;
+    }
     setDonateDialogOpen(true);
   };
 
@@ -188,7 +194,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
           >
             <div className="flex items-center gap-3 text-blue-400/60 font-mono text-xs tracking-[0.2em] uppercase bg-blue-500/5 border border-blue-500/10 px-3 py-1 rounded-full">
               <Terminal className="w-3.5 h-3.5" />
-              <span>Clearance Protocols</span>
+              <span>Choosing Your Path</span>
             </div>
           </motion.div>
 
@@ -198,7 +204,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
             transition={{ delay: 0.1 }}
             className="text-4xl md:text-5xl lg:text-6xl font-display font-medium text-white tracking-tight"
           >
-            Tactical Support <span className="text-zinc-600">Packages</span>
+            Unlock the Full <span className="text-zinc-600">Experience</span>
           </motion.h1>
 
           <motion.p
@@ -207,8 +213,9 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
             transition={{ delay: 0.2 }}
             className="text-zinc-500 text-sm max-w-2xl mx-auto leading-relaxed font-mono"
           >
-            Standard operations are fully funded. Advanced tactical modules
-            require upgraded security clearance. Choose your operational tier.
+            The core game is always free. Upgrade your account to unlock
+            advanced features, better AI training, and more ways to customize
+            your game.
           </motion.p>
         </div>
 
@@ -217,7 +224,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
           {pricingTiers.map((tier, index) => {
             const isBlue = tier.color === "blue";
             const isAmber = tier.color === "amber";
-            const themeColor = isBlue ? "blue" : isAmber ? "amber" : "zinc";
+
             const borderClass = isBlue
               ? "border-blue-500/30"
               : isAmber
@@ -264,7 +271,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
 
                   {tier.popular && (
                     <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-500 text-[#050505] text-[10px] font-bold font-mono uppercase tracking-wider rounded-sm">
-                      Recommended Issue
+                      Best Value
                     </div>
                   )}
 
@@ -563,7 +570,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
             <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/10 group-hover:border-white/20 transition-colors" />
             <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/10 group-hover:border-white/20 transition-colors" />
             <div className="grid grid-cols-4 bg-black/40 border-b border-white/5 p-4 text-xs font-mono uppercase tracking-wider text-zinc-500">
-              <div>Feature Protocol</div>
+              <div>Feature Comparison</div>
               <div className="text-center font-bold text-zinc-400">
                 Standard
               </div>
@@ -647,7 +654,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
               <Terminal className="w-5 h-5 text-blue-400" />
             </div>
             <h2 className="text-xl font-display text-white tracking-wide">
-              Mission Briefing / FAQs
+              Got Questions? We Have Answers.
             </h2>
           </div>
 
@@ -660,7 +667,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
                 <details className="w-full">
                   <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
                     <span className="font-mono text-sm text-zinc-300 group-hover:text-white transition-colors">
-                      <span className="text-blue-500 mr-2">Q_0{i + 1} //</span>
+                      <span className="text-blue-500 mr-2">#{i + 1} //</span>
                       {faq.q}
                     </span>
                     <div className="text-blue-500 opacity-50 group-hover:opacity-100 transition-opacity">
@@ -670,7 +677,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
                   <div className="px-4 pb-4 pl-10">
                     <p className="text-sm text-zinc-400 font-light leading-relaxed border-l-2 border-blue-500/20 pl-4">
                       <span className="text-[10px] text-zinc-600 font-mono uppercase block mb-1">
-                        Response Protocol:
+                        The Details:
                       </span>
                       {faq.a}
                     </p>
@@ -696,11 +703,12 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
               <CheckCircle2 className="w-8 h-8 text-green-500" />
             </div>
             <h2 className="text-2xl font-display text-white">
-              Transfer Complete
+              You're Awesome!
             </h2>
             <p className="text-zinc-400 text-sm max-w-xs">
-              Funding received. Command HQ acknowledges your support. Medals
-              have been awarded to your profile.
+              Thank you for supporting the game! Your contribution helps us keep
+              things running and growing. Check your profile for your new
+              rewards!
             </p>
             <Button
               onClick={() => setThankYouModalOpen(false)}

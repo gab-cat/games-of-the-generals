@@ -13,27 +13,14 @@ import {
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import {
-  Clock,
   Crown,
   Zap,
-  ArrowRight,
-  Calendar,
   CreditCard,
-  History,
   Heart,
-  Sparkles,
   CheckCircle2,
-  Infinity as InfinityIcon,
   Star,
-  Gift,
-  Users,
-  Gamepad2,
-  BarChart3,
-  TrendingUp,
   Terminal,
   Activity,
-  Lock,
-  ChevronRight,
   AlertTriangle,
 } from "lucide-react";
 import { SubscriptionPaymentModal } from "@/components/subscription/SubscriptionPaymentModal";
@@ -41,8 +28,6 @@ import { DonationPaymentModal } from "@/components/subscription/DonationPaymentM
 import { useSearch, useNavigate } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import { pricingTiers } from "@/lib/pricing-tiers";
-import { useConvexAction } from "@convex-dev/react-query";
-import { toast } from "sonner";
 
 export function SubscriptionPage() {
   const navigate = useNavigate();
@@ -278,17 +263,17 @@ export function SubscriptionPage() {
               </motion.div>
             </section>
 
-            {/* Donor Status (If applicable) */}
-            {profile?.isDonor && (
-              <section>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px bg-white/10 flex-1" />
-                  <h2 className="font-mono text-xs uppercase tracking-widest text-pink-500/40">
-                    Phase 1B // Supporter Status
-                  </h2>
-                  <div className="h-px bg-white/10 w-8" />
-                </div>
+            {/* Donor Status & CTA */}
+            <section>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="h-px bg-white/10 flex-1" />
+                <h2 className="font-mono text-xs uppercase tracking-widest text-pink-500/40">
+                  Phase 1B // Supporter Status
+                </h2>
+                <div className="h-px bg-white/10 w-8" />
+              </div>
 
+              {profile?.isDonor ? (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -329,8 +314,66 @@ export function SubscriptionPage() {
                     </div>
                   </div>
                 </motion.div>
-              </section>
-            )}
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  whileHover={{ y: -5 }}
+                  className="group relative overflow-hidden rounded-sm border border-dashed border-pink-500/20 bg-pink-900/5 hover:bg-pink-900/10 transition-all duration-300 p-6 md:p-8"
+                >
+                  {/* Decorative corners */}
+                  <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors" />
+                  <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors" />
+
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Heart className="w-4 h-4 text-pink-500/70" />
+                          <span className="font-mono text-xs text-pink-500/70 uppercase tracking-widest">
+                            Volunteer Opportunity
+                          </span>
+                        </div>
+                        <h3 className="text-2xl font-display font-medium text-white">
+                          Become a Supporter
+                        </h3>
+                        <p className="text-sm text-pink-200/60 font-mono max-w-lg">
+                          Direct contributions sustain server operations and
+                          accelerate feature deployment.
+                        </p>
+                      </div>
+
+                      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          "Exclusive Supporter Badge",
+                          "Profile Recognition",
+                          "Direct Dev Support",
+                        ].map((item, i) => (
+                          <li
+                            key={i}
+                            className="flex items-center gap-2 text-xs font-mono text-pink-300/60"
+                          >
+                            <div className="p-0.5 rounded-full bg-pink-500/20 text-pink-400">
+                              <CheckCircle2 className="w-2.5 h-2.5" />
+                            </div>
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="flex flex-shrink-0">
+                      <Button
+                        onClick={() => setDonateDialogOpen(true)}
+                        className="h-12 px-8 bg-pink-600 hover:bg-pink-500 text-white font-mono text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(219,39,119,0.3)] hover:shadow-[0_0_30px_rgba(219,39,119,0.5)] transition-all"
+                      >
+                        Initialize Donation
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </section>
 
             {/* Upgrade Options OR Active Capabilities */}
             <section>

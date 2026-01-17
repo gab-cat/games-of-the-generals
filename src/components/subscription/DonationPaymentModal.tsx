@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { useConvexAction } from "@convex-dev/react-query";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
-import { Heart, Loader2, CreditCard, Sparkles } from "lucide-react";
+import { Heart, Loader2, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DonationPaymentModalProps {
