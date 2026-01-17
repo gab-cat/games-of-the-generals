@@ -1,4 +1,10 @@
-import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
+import {
+  query,
+  mutation,
+  action,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Doc, Id } from "./_generated/dataModel";
@@ -12,9 +18,27 @@ const TIER_PRICING = {
 } as const;
 
 // Helper function to calculate expiry date
-function calculateExpiryDate(currentExpiresAt: number | null, months: number): number {
+// When upgrading tiers: start from now (don't carry over remaining time from old tier)
+// When extending same tier: add to existing expiry
+function calculateExpiryDate(
+  currentExpiresAt: number | null,
+  months: number,
+  currentTier?: string | null,
+  newTier?: string | null,
+): number {
   const now = Date.now();
-  const baseDate = currentExpiresAt && currentExpiresAt > now ? currentExpiresAt : now;
+
+  // If upgrading to a different tier, always start from now
+  const isTierUpgrade = currentTier && newTier && currentTier !== newTier;
+
+  // For upgrades: start from now
+  // For extensions (same tier): add to existing expiry if it's in the future
+  const baseDate = isTierUpgrade
+    ? now
+    : currentExpiresAt && currentExpiresAt > now
+      ? currentExpiresAt
+      : now;
+
   const expiryDate = new Date(baseDate);
   expiryDate.setMonth(expiryDate.getMonth() + months);
   return expiryDate.getTime();
@@ -32,7 +56,7 @@ function getDaysUntilExpiry(expiresAt: number): number {
 // 3 months: pay 2.55 months, 6 months: pay 4.8 months, 12 months: pay 9 months
 function calculateDiscountedPrice(
   tier: "pro" | "pro_plus",
-  months: number
+  months: number,
 ): {
   originalPrice: number; // in centavos
   discountedPrice: number; // in centavos
@@ -44,17 +68,26 @@ function calculateDiscountedPrice(
   const originalPrice = basePrice * months;
 
   let monthsToPay = months;
-  if (months === 12) monthsToPay = 9;      // 25% discount
-  else if (months === 6) monthsToPay = 4.8; // 20% discount
+  if (months === 12)
+    monthsToPay = 9; // 25% discount
+  else if (months === 6)
+    monthsToPay = 4.8; // 20% discount
   else if (months === 3) monthsToPay = 2.55; // 15% discount
 
   const discountedPrice = Math.round(basePrice * monthsToPay);
   const savings = originalPrice - discountedPrice;
-  const discountPercent = months > 1 && (months === 12 || months === 6 || months === 3)
-    ? (savings / originalPrice) * 100
-    : 0;
+  const discountPercent =
+    months > 1 && (months === 12 || months === 6 || months === 3)
+      ? (savings / originalPrice) * 100
+      : 0;
 
-  return { originalPrice, discountedPrice, savings, discountPercent, monthsToPay };
+  return {
+    originalPrice,
+    discountedPrice,
+    savings,
+    discountPercent,
+    monthsToPay,
+  };
 }
 
 // Get current user's subscription
@@ -72,6 +105,8 @@ export const getCurrentSubscription = query({
     if (!subscription) {
       // Return default free subscription
       return {
+        _id: "",
+        _creationTime: 0,
         userId,
         tier: "free" as const,
         status: "active" as const,
@@ -84,7 +119,9 @@ export const getCurrentSubscription = query({
       };
     }
 
-    const daysUntilExpiry = subscription.expiresAt ? getDaysUntilExpiry(subscription.expiresAt) : null;
+    const daysUntilExpiry = subscription.expiresAt
+      ? getDaysUntilExpiry(subscription.expiresAt)
+      : null;
 
     return {
       ...subscription,
@@ -104,7 +141,9 @@ export const getSubscriptionUsage = query({
 
     const usage = await ctx.db
       .query("subscriptionUsage")
-      .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", today))
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).eq("date", today),
+      )
       .unique();
 
     if (!usage) {
@@ -142,8 +181,18 @@ export const checkFeatureAccess = query({
     // Check if subscription is expired (beyond grace period)
     const now = Date.now();
     if (expiresAt && status !== "canceled") {
-      if (status === "expired" || (expiresAt < now && subscription.gracePeriodEndsAt && subscription.gracePeriodEndsAt < now)) {
-        return { hasAccess: false, reason: "subscription_expired", tier, status };
+      if (
+        status === "expired" ||
+        (expiresAt < now &&
+          subscription.gracePeriodEndsAt &&
+          subscription.gracePeriodEndsAt < now)
+      ) {
+        return {
+          hasAccess: false,
+          reason: "subscription_expired",
+          tier,
+          status,
+        };
       }
     }
 
@@ -178,14 +227,16 @@ export const getPaymentHistory = query({
       v.object({
         numItems: v.number(),
         cursor: v.optional(v.string()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { page: [], isDone: true, continueCursor: null };
 
-    const limit = args.paginationOpts ? Math.min(args.paginationOpts.numItems, 50) : 20;
+    const limit = args.paginationOpts
+      ? Math.min(args.paginationOpts.numItems, 50)
+      : 20;
 
     const queryBuilder = ctx.db
       .query("subscriptionPayments")
@@ -206,14 +257,16 @@ export const getDonationHistory = query({
       v.object({
         numItems: v.number(),
         cursor: v.optional(v.string()),
-      })
+      }),
     ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { page: [], isDone: true, continueCursor: null };
 
-    const limit = args.paginationOpts ? Math.min(args.paginationOpts.numItems, 50) : 20;
+    const limit = args.paginationOpts
+      ? Math.min(args.paginationOpts.numItems, 50)
+      : 20;
 
     const queryBuilder = ctx.db
       .query("donations")
@@ -262,7 +315,10 @@ export const createOrUpdateSubscription = mutation({
         tier: args.tier,
         status: args.expiresAt > Date.now() ? "active" : "expired",
         expiresAt: args.expiresAt,
-        gracePeriodEndsAt: args.expiresAt > Date.now() ? args.expiresAt + 2 * 24 * 60 * 60 * 1000 : undefined,
+        gracePeriodEndsAt:
+          args.expiresAt > Date.now()
+            ? args.expiresAt + 2 * 24 * 60 * 60 * 1000
+            : undefined,
         createdAt: Date.now(),
         lastPaymentAt: Date.now(),
         totalMonthsPaid: months,
@@ -282,8 +338,14 @@ export const extendSubscription = mutation({
     success: v.boolean(),
     newExpiresAt: v.number(),
   }),
-  handler: async (ctx, args): Promise<{ success: boolean; newExpiresAt: number }> => {
-    const result = await ctx.runMutation(internal.subscriptions.extendSubscriptionInternal, args) as { success: boolean; newExpiresAt: number };
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; newExpiresAt: number }> => {
+    const result = (await ctx.runMutation(
+      internal.subscriptions.extendSubscriptionInternal,
+      args,
+    )) as { success: boolean; newExpiresAt: number };
     return result;
   },
 });
@@ -302,19 +364,25 @@ export const extendSubscriptionInternal = internalMutation({
     // Find payment record by payment ID
     let payment = await ctx.db
       .query("subscriptionPayments")
-      .withIndex("by_paymongo_payment_id", (q) => q.eq("paymongoPaymentId", args.paymongoPaymentId))
+      .withIndex("by_paymongo_payment_id", (q) =>
+        q.eq("paymongoPaymentId", args.paymongoPaymentId),
+      )
       .unique();
 
     // If not found, try finding by payment intent ID (fallback)
     if (!payment) {
       payment = await ctx.db
         .query("subscriptionPayments")
-        .filter((q) => q.eq(q.field("paymongoPaymentIntentId"), args.paymongoPaymentId))
+        .filter((q) =>
+          q.eq(q.field("paymongoPaymentIntentId"), args.paymongoPaymentId),
+        )
         .first();
     }
 
     if (!payment) {
-      throw new Error(`Payment record not found for PayMongo ID: ${args.paymongoPaymentId}`);
+      throw new Error(
+        `Payment record not found for PayMongo ID: ${args.paymongoPaymentId}`,
+      );
     }
 
     if (payment.status !== "pending") {
@@ -328,7 +396,13 @@ export const extendSubscriptionInternal = internalMutation({
       .unique();
 
     const currentExpiresAt = subscription?.expiresAt || null;
-    const newExpiresAt = calculateExpiryDate(currentExpiresAt, args.months);
+    const currentTier = subscription?.tier || null;
+    const newExpiresAt = calculateExpiryDate(
+      currentExpiresAt,
+      args.months,
+      currentTier,
+      payment.tier,
+    );
 
     // Update subscription
     if (subscription) {
@@ -423,7 +497,10 @@ export const cancelSubscription = mutation({
 // Increment usage counter
 export const incrementUsage = mutation({
   args: {
-    usageType: v.union(v.literal("privateLobbiesCreated"), v.literal("aiReplaysSaved")),
+    usageType: v.union(
+      v.literal("privateLobbiesCreated"),
+      v.literal("aiReplaysSaved"),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -433,7 +510,9 @@ export const incrementUsage = mutation({
 
     const usage = await ctx.db
       .query("subscriptionUsage")
-      .withIndex("by_user_date", (q) => q.eq("userId", userId).eq("date", today))
+      .withIndex("by_user_date", (q) =>
+        q.eq("userId", userId).eq("date", today),
+      )
       .unique();
 
     if (usage) {
@@ -446,7 +525,8 @@ export const incrementUsage = mutation({
       const newUsage = {
         userId,
         date: today,
-        privateLobbiesCreated: args.usageType === "privateLobbiesCreated" ? 1 : 0,
+        privateLobbiesCreated:
+          args.usageType === "privateLobbiesCreated" ? 1 : 0,
         aiReplaysSaved: args.usageType === "aiReplaysSaved" ? 1 : 0,
         lastResetAt: Date.now(),
       };
@@ -486,7 +566,10 @@ export const markNotificationRead = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const notification = await ctx.db.get("subscriptionNotifications", args.notificationId);
+    const notification = await ctx.db.get(
+      "subscriptionNotifications",
+      args.notificationId,
+    );
     if (!notification || notification.userId !== userId) {
       throw new Error("Notification not found");
     }
@@ -516,7 +599,10 @@ export const createPayMongoPayment = action({
     currentExpiresAt: v.union(v.number(), v.null()),
     newExpiresAt: v.number(),
   }),
-  handler: async (ctx, args): Promise<{
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
     paymentId: Id<"subscriptionPayments">;
     checkoutUrl: string;
     sessionId: string;
@@ -530,30 +616,50 @@ export const createPayMongoPayment = action({
     if (!userId) throw new Error("Not authenticated");
 
     const months = args.months || 1;
-    const { discountedPrice: amount } = calculateDiscountedPrice(args.tier, months); // Amount in centavos (with discount applied)
+    const { discountedPrice: amount } = calculateDiscountedPrice(
+      args.tier,
+      months,
+    ); // Amount in centavos (with discount applied)
 
     // Get current subscription to calculate new expiry
-    const subscription = await ctx.runQuery(internal.subscriptions.getCurrentSubscriptionForAction, { userId });
+    const subscription = await ctx.runQuery(
+      internal.subscriptions.getCurrentSubscriptionForAction,
+      { userId },
+    );
 
     const currentExpiresAt = subscription?.expiresAt || null;
-    const newExpiresAt = calculateExpiryDate(currentExpiresAt, months);
+    const currentTier = subscription?.tier || null;
+    const newExpiresAt = calculateExpiryDate(
+      currentExpiresAt,
+      months,
+      currentTier,
+      args.tier,
+    );
 
     // Get user information for billing details
-    const user = await ctx.runQuery(internal.subscriptions.getUserForDonation, { userId });
+    const user = await ctx.runQuery(internal.subscriptions.getUserForDonation, {
+      userId,
+    });
     if (!user) throw new Error("User not found");
 
     // Create payment record
-    const paymentId = await ctx.runMutation(internal.subscriptions.createPaymentRecord, {
-      userId,
-      tier: args.tier,
-      amount,
-      months,
-      expiresAtBefore: currentExpiresAt || Date.now(),
-      expiresAtAfter: newExpiresAt,
-    });
+    const paymentId = await ctx.runMutation(
+      internal.subscriptions.createPaymentRecord,
+      {
+        userId,
+        tier: args.tier,
+        amount,
+        months,
+        expiresAtBefore: currentExpiresAt || Date.now(),
+        expiresAtAfter: newExpiresAt,
+      },
+    );
 
     // Get the current origin for success/cancel URLs
-    const origin = (ctx as any).request?.headers?.get("origin") || process.env.VITE_APP_URL || "http://localhost:5173";
+    const origin =
+      (ctx as any).request?.headers?.get("origin") ||
+      process.env.VITE_APP_URL ||
+      "http://localhost:5173";
     const successUrl = `${origin}/subscription?subscription=success`;
     const cancelUrl = `${origin}/subscription?subscription=cancelled`;
 
@@ -562,33 +668,41 @@ export const createPayMongoPayment = action({
     const customerName = user.username || user.name || "Customer";
     const customerEmail = user.email;
 
-    const checkoutResult = await ctx.runAction(api.paymongo.createSubscriptionCheckout, {
-      amount,
-      description,
-      successUrl,
-      cancelUrl,
-      metadata: {
-        userId: userId.toString(),
-        tier: args.tier,
-        months,
-        paymentId: paymentId.toString(),
-        currentExpiresAt: currentExpiresAt || 0,
-        newExpiresAt,
+    const checkoutResult = await ctx.runAction(
+      api.paymongo.createSubscriptionCheckout,
+      {
+        amount,
+        description,
+        successUrl,
+        cancelUrl,
+        metadata: {
+          userId: userId.toString(),
+          tier: args.tier,
+          months,
+          paymentId: paymentId.toString(),
+          currentExpiresAt: currentExpiresAt || 0,
+          newExpiresAt,
+        },
+        customerName: customerEmail ? customerName : undefined,
+        customerEmail: customerEmail || undefined,
       },
-      customerName: customerEmail ? customerName : undefined,
-      customerEmail: customerEmail || undefined,
-    });
+    );
 
     if (!checkoutResult.success) {
-      throw new Error(checkoutResult.error || "Failed to create checkout session");
+      throw new Error(
+        checkoutResult.error || "Failed to create checkout session",
+      );
     }
 
     // Update payment record with PayMongo session ID
-    await ctx.runMutation(internal.subscriptions.updatePaymentRecordWithPayMongoIds, {
-      paymentId,
-      paymongoPaymentId: checkoutResult.sessionId,
-      paymongoPaymentIntentId: checkoutResult.sessionId,
-    });
+    await ctx.runMutation(
+      internal.subscriptions.updatePaymentRecordWithPayMongoIds,
+      {
+        paymentId,
+        paymongoPaymentId: checkoutResult.sessionId,
+        paymongoPaymentIntentId: checkoutResult.sessionId,
+      },
+    );
 
     return {
       paymentId,
@@ -614,7 +728,10 @@ export const createPayMongoDonation = action({
     sessionId: v.string(),
     amount: v.number(),
   }),
-  handler: async (ctx, args): Promise<{
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
     donationId: Id<"donations">;
     checkoutUrl: string;
     sessionId: string;
@@ -626,17 +743,25 @@ export const createPayMongoDonation = action({
     const amountInCentavos = args.amount * 100;
 
     // Get user information for billing details
-    const user = await ctx.runQuery(internal.subscriptions.getUserForDonation, { userId });
+    const user = await ctx.runQuery(internal.subscriptions.getUserForDonation, {
+      userId,
+    });
     if (!user) throw new Error("User not found");
 
     // Create donation record
-    const donationId = await ctx.runMutation(internal.subscriptions.createDonationRecord, {
-      userId,
-      amount: amountInCentavos,
-    });
+    const donationId = await ctx.runMutation(
+      internal.subscriptions.createDonationRecord,
+      {
+        userId,
+        amount: amountInCentavos,
+      },
+    );
 
     // Get the current origin for success/cancel URLs
-    const origin = (ctx as any).request?.headers?.get("origin") || process.env.VITE_APP_URL || "http://localhost:5173";
+    const origin =
+      (ctx as any).request?.headers?.get("origin") ||
+      process.env.VITE_APP_URL ||
+      "http://localhost:5173";
     const successUrl = `${origin}/pricing?donation=success`;
     const cancelUrl = `${origin}/pricing?donation=cancelled`;
 
@@ -645,29 +770,37 @@ export const createPayMongoDonation = action({
     const customerName = user.username || user.name || "Customer";
     const customerEmail = user.email;
 
-    const checkoutResult = await ctx.runAction(api.paymongo.createDonationCheckout, {
-      amount: amountInCentavos,
-      description,
-      successUrl,
-      cancelUrl,
-      metadata: {
-        userId: userId.toString(),
-        donationId: donationId.toString(),
-        amount: args.amount,
+    const checkoutResult = await ctx.runAction(
+      api.paymongo.createDonationCheckout,
+      {
+        amount: amountInCentavos,
+        description,
+        successUrl,
+        cancelUrl,
+        metadata: {
+          userId: userId.toString(),
+          donationId: donationId.toString(),
+          amount: args.amount,
+        },
+        customerName: customerEmail ? customerName : undefined,
+        customerEmail: customerEmail || undefined,
       },
-      customerName: customerEmail ? customerName : undefined,
-      customerEmail: customerEmail || undefined,
-    });
+    );
 
     if (!checkoutResult.success) {
-      throw new Error(checkoutResult.error || "Failed to create checkout session");
+      throw new Error(
+        checkoutResult.error || "Failed to create checkout session",
+      );
     }
 
     // Update donation record with PayMongo session ID
-    await ctx.runMutation(internal.subscriptions.updateDonationRecordWithPayMongoId, {
-      donationId,
-      paymongoPaymentId: checkoutResult.sessionId,
-    });
+    await ctx.runMutation(
+      internal.subscriptions.updateDonationRecordWithPayMongoId,
+      {
+        donationId,
+        paymongoPaymentId: checkoutResult.sessionId,
+      },
+    );
 
     return {
       donationId,
@@ -814,13 +947,18 @@ export const sendExpiryNotifications = internalMutation({
         notificationType = "expired";
       }
 
-      type SubscriptionNotificationType = Doc<"subscriptionNotifications">["type"];
+      type SubscriptionNotificationType =
+        Doc<"subscriptionNotifications">["type"];
 
       if (notificationType) {
         // Check if notification already sent
         const existing = await ctx.db
           .query("subscriptionNotifications")
-          .withIndex("by_user_type", (q) => q.eq("userId", subscription.userId).eq("type", notificationType as SubscriptionNotificationType))
+          .withIndex("by_user_type", (q) =>
+            q
+              .eq("userId", subscription.userId)
+              .eq("type", notificationType as SubscriptionNotificationType),
+          )
           .filter((q) => q.eq(q.field("expiresAt"), subscription.expiresAt))
           .first();
 
@@ -846,7 +984,9 @@ export const findPaymentByPayMongoId = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("subscriptionPayments")
-      .withIndex("by_paymongo_payment_id", (q) => q.eq("paymongoPaymentId", args.paymongoPaymentId))
+      .withIndex("by_paymongo_payment_id", (q) =>
+        q.eq("paymongoPaymentId", args.paymongoPaymentId),
+      )
       .unique();
   },
 });
@@ -861,7 +1001,9 @@ export const findPaymentByPayMongoIntentId = internalQuery({
     // This should be optimized with an index if this becomes a common query pattern
     return await ctx.db
       .query("subscriptionPayments")
-      .filter((q) => q.eq(q.field("paymongoPaymentIntentId"), args.paymongoPaymentIntentId))
+      .filter((q) =>
+        q.eq(q.field("paymongoPaymentIntentId"), args.paymongoPaymentIntentId),
+      )
       .first();
   },
 });
@@ -874,7 +1016,9 @@ export const findDonationByPayMongoId = internalQuery({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("donations")
-      .withIndex("by_paymongo_payment_id", (q) => q.eq("paymongoPaymentId", args.paymongoPaymentId))
+      .withIndex("by_paymongo_payment_id", (q) =>
+        q.eq("paymongoPaymentId", args.paymongoPaymentId),
+      )
       .unique();
   },
 });
@@ -926,7 +1070,11 @@ export const getPaymentById = internalQuery({
 export const updatePaymentStatus = internalMutation({
   args: {
     paymentId: v.id("subscriptionPayments"),
-    status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+    ),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.paymentId, {
@@ -939,7 +1087,11 @@ export const updatePaymentStatus = internalMutation({
 export const updateDonationStatus = internalMutation({
   args: {
     donationId: v.id("donations"),
-    status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("succeeded"),
+      v.literal("failed"),
+    ),
   },
   handler: async (ctx, args) => {
     await ctx.db.patch(args.donationId, {
@@ -968,14 +1120,20 @@ export const updateDonorStatus = internalMutation({
 
     // Update donor status and total donated
     const currentTotal = profile.totalDonated || 0;
-    const newTotal = currentTotal + args.donationAmount;
+    const donationAmount = args.donationAmount;
+    const newTotal = currentTotal + donationAmount;
+
+    // Minimum ₱50 (5000 centavos) to be considered a donor
+    const isNowDonor = newTotal >= 5000;
 
     await ctx.db.patch(profile._id, {
-      isDonor: true,
+      isDonor: isNowDonor || profile.isDonor, // Stay donor if already one
       totalDonated: newTotal,
     });
 
-    console.log(`[Donor Status] Updated profile ${profile._id}: isDonor=true, totalDonated=${newTotal} (added ${args.donationAmount})`);
+    console.log(
+      `[Donor Status] Updated profile ${profile._id}: isDonor=${isNowDonor || profile.isDonor}, totalDonated=${newTotal} (added ${donationAmount})`,
+    );
   },
 });
 
