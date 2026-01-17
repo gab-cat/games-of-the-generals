@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -174,6 +174,8 @@ export function ProfilePage() {
                     username={profileStats.username}
                     currentAvatarUrl={profileStats.avatarUrl}
                     rank={profileStats.rank}
+                    tier={profileStats.tier as "free" | "pro" | "pro_plus"}
+                    isDonor={profileStats.isDonor}
                   />
                 </motion.div>
               )}

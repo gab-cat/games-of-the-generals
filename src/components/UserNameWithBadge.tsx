@@ -1,7 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
 import { UserBadge } from "./UserBadge";
-import { type Doc } from "../../convex/_generated/dataModel";
 
 interface UserNameWithBadgeProps {
   username: string;
@@ -31,11 +30,17 @@ export const UserNameWithBadge: React.FC<UserNameWithBadgeProps> = ({
     lg: "text-base",
   }[size];
 
-  const badgeSize = (size === "lg" ? "md" : size === "xs" ? "xs" : "sm") as "xs" | "sm" | "md";
+  const badgeSize = (size === "lg" ? "md" : size === "xs" ? "xs" : "sm") as
+    | "xs"
+    | "sm"
+    | "md";
 
   return (
-    <div 
-      className={cn("inline-flex items-center gap-1.5 min-w-0 max-w-full", className)}
+    <div
+      className={cn(
+        "inline-flex items-center gap-1.5 min-w-0 max-w-full",
+        className,
+      )}
       onClick={(e) => {
         if (onClick) {
           e.stopPropagation();
@@ -48,7 +53,7 @@ export const UserNameWithBadge: React.FC<UserNameWithBadgeProps> = ({
           "font-medium truncate transition-opacity",
           textSize,
           onClick && "cursor-pointer hover:opacity-80 active:opacity-70",
-          !usernameColor && "text-white"
+          !usernameColor && "text-white",
         )}
         style={usernameColor ? { color: usernameColor } : undefined}
       >
@@ -60,9 +65,7 @@ export const UserNameWithBadge: React.FC<UserNameWithBadgeProps> = ({
           {(tier === "pro" || tier === "pro_plus") && (
             <UserBadge type={tier} size={badgeSize} />
           )}
-          {isDonor && (
-            <UserBadge type="donor" size={badgeSize} />
-          )}
+          {isDonor && <UserBadge type="donor" size={badgeSize} />}
         </div>
       )}
     </div>

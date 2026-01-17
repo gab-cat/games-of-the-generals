@@ -1,13 +1,11 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
-import { User, Save } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import { User, Save, AlertCircle } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Separator } from "../../components/ui/separator";
 import { useConvexMutationWithQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
+import { SettingsCard } from "./components/SettingsCard";
 
 interface UsernameSectionProps {
   currentUsername: string;
@@ -16,14 +14,19 @@ interface UsernameSectionProps {
 export function UsernameSection({ currentUsername }: UsernameSectionProps) {
   const [username, setUsername] = useState(currentUsername);
 
-  const updateUsernameMutation = useConvexMutationWithQuery(api.profiles.updateUsername, {
-    onSuccess: () => {
-      toast.success("Username updated successfully!");
+  const updateUsernameMutation = useConvexMutationWithQuery(
+    api.profiles.updateUsername,
+    {
+      onSuccess: () => {
+        toast.success("Callsign updated successfully");
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error ? error.message : "Failed to update username",
+        );
+      },
     },
-    onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Failed to update username");
-    }
-  });
+  );
 
   const handleUsernameUpdate = async () => {
     if (!username.trim()) {
@@ -32,7 +35,7 @@ export function UsernameSection({ currentUsername }: UsernameSectionProps) {
     }
 
     if (username === currentUsername) {
-      toast.info("Username is the same as current");
+      toast.info("Username is unchanged");
       return;
     }
 
@@ -40,57 +43,61 @@ export function UsernameSection({ currentUsername }: UsernameSectionProps) {
   };
 
   return (
-    <motion.div
-      initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ delay: 0.2 }}
+    <SettingsCard
+      title="Callsign Designation"
+      description="Modify your public display identifier."
+      icon={<User className="w-5 h-5" />}
+      delay={0.15}
     >
-      <Card className="rounded-xl border border-white/10 bg-black/30">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <User className="w-5 h-5" />
-            Username
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm text-gray-300">Current Username</label>
-            <div className="text-white font-medium">{currentUsername}</div>
+      <div className="space-y-6">
+        <div className="grid gap-2">
+          <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
+            Current Callsign
+          </label>
+          <div className="bg-black/40 border border-white/5 p-3 rounded-sm text-zinc-300 font-mono">
+            {currentUsername}
           </div>
+        </div>
 
-          <Separator className="bg-gray-700" />
+        <div className="space-y-3">
+          <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
+            New Designation
+          </label>
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter new username"
+            className="bg-black/20 border-white/10 text-white placeholder:text-white/20 focus:border-blue-500/50 font-mono"
+            maxLength={20}
+          />
+          <div className="flex items-start gap-2 text-[10px] text-zinc-500 font-mono">
+            <AlertCircle className="w-3 h-3 mt-0.5 text-zinc-600" />
+            <span>
+              REQUIREMENTS: 3-20 CHARACTERS, ALPHANUMERIC & UNDERSCORES ONLY
+            </span>
+          </div>
+        </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm text-gray-300">New Username</label>
-              <Input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter new username"
-                className="bg-gray-700/50 border-gray-600 text-white"
-                maxLength={20}
-              />
-              <div className="text-xs text-gray-400">
-                3-20 characters, letters, numbers, and underscores only
-              </div>
+        <Button
+          onClick={() => void handleUsernameUpdate()}
+          disabled={
+            updateUsernameMutation.isPending || username === currentUsername
+          }
+          className="w-full bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs uppercase tracking-wider h-10 shadow-[0_0_20px_rgba(37,99,235,0.2)]"
+        >
+          {updateUsernameMutation.isPending ? (
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>UPDATING RECORDS...</span>
             </div>
-
-            <Button
-              onClick={() => void handleUsernameUpdate()}
-              disabled={updateUsernameMutation.isPending || username === currentUsername}
-              className="w-full flex-1"
-              variant="gradient"
-            >
-              {updateUsernameMutation.isPending ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              Update Username
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Save className="w-3.5 h-3.5" />
+              <span>UPDATE CALLSIGN</span>
+            </div>
+          )}
+        </Button>
+      </div>
+    </SettingsCard>
   );
 }

@@ -3,7 +3,7 @@ import { Badge } from "../../components/ui/badge";
 import { UserAvatar } from "../../components/UserAvatar";
 import { UserNameWithBadge } from "../../components/UserNameWithBadge";
 import { UserBadge } from "../../components/UserBadge";
-import { Settings, Ban, VolumeX, Shield, Clock } from "lucide-react";
+import { Settings, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../../components/ui/button";
 import {

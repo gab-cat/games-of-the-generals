@@ -1,12 +1,5 @@
 import { motion } from "framer-motion";
-import {
-  PieChart as PieChartIcon,
-  Target,
-  BarChart2,
-  Cpu,
-  Zap,
-  Activity,
-} from "lucide-react";
+import { Target, BarChart2, Cpu, Zap, Activity } from "lucide-react";
 
 interface PerformanceInsightsProps {
   profileStats: {

@@ -6,9 +6,17 @@ interface AvatarSettingsProps {
   username: string;
   currentAvatarUrl?: string;
   rank: string;
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
 }
 
-export function AvatarSettings({ username, currentAvatarUrl, rank }: AvatarSettingsProps) {
+export function AvatarSettings({
+  username,
+  currentAvatarUrl,
+  rank,
+  tier,
+  isDonor,
+}: AvatarSettingsProps) {
   return (
     <motion.div
       initial={{ opacity: 0, height: 0 }}
@@ -20,10 +28,12 @@ export function AvatarSettings({ username, currentAvatarUrl, rank }: AvatarSetti
         <Settings className="w-5 h-5 text-blue-400" />
         <h2 className="text-lg font-bold text-white">Avatar Settings</h2>
       </div>
-      <AvatarUpload 
+      <AvatarUpload
         username={username}
         currentAvatarUrl={currentAvatarUrl}
         rank={rank}
+        tier={tier}
+        isDonor={isDonor}
       />
     </motion.div>
   );

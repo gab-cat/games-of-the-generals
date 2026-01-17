@@ -1,4 +1,3 @@
-import { motion } from "framer-motion";
 import {
   Flame,
   Clock,
@@ -7,7 +6,6 @@ import {
   Swords,
   Target,
   TrendingUp,
-  Crown,
 } from "lucide-react";
 
 interface BattleStatsProps {
