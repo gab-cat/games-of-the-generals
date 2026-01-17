@@ -1,51 +1,60 @@
-import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
+import {
+  query,
+  mutation,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
+import { isSubscriptionActive } from "./featureGating";
 
 // Helper function for batch profile fetching to eliminate N+1 queries
 export const batchGetProfiles = internalQuery({
-  args: { 
-    userIds: v.array(v.id("users")) 
+  args: {
+    userIds: v.array(v.id("users")),
   },
-  returns: v.array(v.union(
-    v.object({
-      _id: v.id("profiles"),
-      _creationTime: v.number(),
-      userId: v.id("users"),
-      username: v.string(),
-      wins: v.number(),
-      losses: v.number(),
-      gamesPlayed: v.number(),
-      rank: v.string(),
-      createdAt: v.number(),
-      avatarUrl: v.optional(v.string()),
-      avatarStorageId: v.optional(v.id("_storage")),
-      totalPlayTime: v.optional(v.number()),
-      fastestWin: v.optional(v.number()),
-      longestGame: v.optional(v.number()),
-      winStreak: v.optional(v.number()),
-      bestWinStreak: v.optional(v.number()),
-      capturedFlags: v.optional(v.number()),
-      piecesEliminated: v.optional(v.number()),
-      spiesRevealed: v.optional(v.number()),
-      hasSeenTutorial: v.optional(v.boolean()),
-      tutorialCompletedAt: v.optional(v.number()),
-    }),
-    v.null()
-  )),
+  returns: v.array(
+    v.union(
+      v.object({
+        _id: v.id("profiles"),
+        _creationTime: v.number(),
+        userId: v.id("users"),
+        username: v.string(),
+        wins: v.number(),
+        losses: v.number(),
+        gamesPlayed: v.number(),
+        rank: v.string(),
+        createdAt: v.number(),
+        avatarUrl: v.optional(v.string()),
+        avatarStorageId: v.optional(v.id("_storage")),
+        totalPlayTime: v.optional(v.number()),
+        fastestWin: v.optional(v.number()),
+        longestGame: v.optional(v.number()),
+        winStreak: v.optional(v.number()),
+        bestWinStreak: v.optional(v.number()),
+        capturedFlags: v.optional(v.number()),
+        piecesEliminated: v.optional(v.number()),
+        spiesRevealed: v.optional(v.number()),
+        hasSeenTutorial: v.optional(v.boolean()),
+        tutorialCompletedAt: v.optional(v.number()),
+      }),
+      v.null(),
+    ),
+  ),
   handler: async (ctx, args) => {
     if (args.userIds.length === 0) return [];
-    
+
     const profiles = await Promise.all(
-      args.userIds.map(id => 
-        ctx.db.query("profiles")
+      args.userIds.map((id) =>
+        ctx.db
+          .query("profiles")
           .withIndex("by_user", (q) => q.eq("userId", id))
-          .unique()
-      )
+          .unique(),
+      ),
     );
-    
+
     return profiles;
   },
 });
@@ -55,7 +64,11 @@ export const sendMessage = mutation({
   args: {
     recipientUsername: v.string(),
     content: v.string(),
-    messageType: v.union(v.literal("text"), v.literal("lobby_invite"), v.literal("game_invite")),
+    messageType: v.union(
+      v.literal("text"),
+      v.literal("lobby_invite"),
+      v.literal("game_invite"),
+    ),
     lobbyId: v.optional(v.id("lobbies")),
     lobbyCode: v.optional(v.string()),
     lobbyName: v.optional(v.string()),
@@ -138,10 +151,12 @@ export const sendMessage = mutation({
 // Get conversations for current user with optimized pagination
 export const getConversations = query({
   args: {
-    paginationOpts: v.optional(v.object({
-      numItems: v.number(),
-      cursor: v.optional(v.string()),
-    })),
+    paginationOpts: v.optional(
+      v.object({
+        numItems: v.number(),
+        cursor: v.optional(v.string()),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -153,12 +168,16 @@ export const getConversations = query({
     // Use optimized indexes with proper ordering
     const conversations1Query = ctx.db
       .query("conversations")
-      .withIndex("by_participant1_last_message", (q) => q.eq("participant1Id", userId))
+      .withIndex("by_participant1_last_message", (q) =>
+        q.eq("participant1Id", userId),
+      )
       .order("desc");
 
     const conversations2Query = ctx.db
       .query("conversations")
-      .withIndex("by_participant2_last_message", (q) => q.eq("participant2Id", userId))
+      .withIndex("by_participant2_last_message", (q) =>
+        q.eq("participant2Id", userId),
+      )
       .order("desc");
 
     // Execute both queries and combine results
@@ -169,7 +188,7 @@ export const getConversations = query({
 
     // Combine and deduplicate conversations by _id, then sort by lastMessageAt
     const conversationMap = new Map();
-    [...conversations1, ...conversations2].forEach(conv => {
+    [...conversations1, ...conversations2].forEach((conv) => {
       conversationMap.set(conv._id, conv);
     });
     const allConversations = Array.from(conversationMap.values())
@@ -177,7 +196,7 @@ export const getConversations = query({
       .slice(0, limit);
 
     // FIXED: Batch fetch all profiles to eliminate N+1 queries
-    const participantIds = allConversations.map(conv => {
+    const participantIds = allConversations.map((conv) => {
       const isParticipant1 = conv.participant1Id === userId;
       return isParticipant1 ? conv.participant2Id : conv.participant1Id;
     });
@@ -185,60 +204,86 @@ export const getConversations = query({
     // Batch fetch all participant profiles at once
     const uniqueParticipantIds = [...new Set(participantIds)];
     const profiles = await Promise.all(
-      uniqueParticipantIds.map(id =>
+      uniqueParticipantIds.map((id) =>
         ctx.db
           .query("profiles")
           .withIndex("by_user", (q) => q.eq("userId", id))
-          .unique()
-      )
+          .unique(),
+      ),
     );
 
     // Batch fetch customizations for all profiles
     const customizations = await Promise.all(
-      uniqueParticipantIds.map(id =>
+      uniqueParticipantIds.map((id) =>
         ctx.db
           .query("userCustomizations")
           .withIndex("by_user", (q) => q.eq("userId", id))
-          .first()
-      )
+          .first(),
+      ),
+    );
+
+    // Batch fetch subscriptions for all profiles
+    const subscriptions = await Promise.all(
+      uniqueParticipantIds.map((id) =>
+        ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .first(),
+      ),
     );
 
     // Create a map for O(1) profile lookups
     const profilesMap = new Map();
     profiles.forEach((profile, idx) => {
       if (profile) {
+        const subscription = subscriptions[idx];
+        const isActive = subscription
+          ? isSubscriptionActive(
+              subscription.status,
+              subscription.expiresAt,
+              subscription.gracePeriodEndsAt || null,
+            )
+          : true;
         profilesMap.set(profile.userId, {
           ...profile,
-          customization: customizations[idx]
+          customization: customizations[idx],
+          tier: isActive ? subscription?.tier || "free" : "free",
+          isDonor: profile.isDonor ?? false,
         });
       }
     });
 
     // Batch fetch last messages if needed
     const validMessageIds = allConversations
-      .map(conv => conv.lastMessageId)
+      .map((conv) => conv.lastMessageId)
       .filter((id): id is NonNullable<typeof id> => id != null);
-    
+
     const lastMessages = await Promise.all(
-      validMessageIds.map(id => ctx.db.get(id))
+      validMessageIds.map((id) => ctx.db.get(id)),
     );
-    
+
     const messagesMap = new Map();
-    lastMessages.forEach(msg => {
+    lastMessages.forEach((msg) => {
       if (msg) {
         messagesMap.set(msg._id, msg);
       }
     });
 
     // Enhance conversations with batched data
-    const enhanced = allConversations.map(conv => {
+    const enhanced = allConversations.map((conv) => {
       const isParticipant1 = conv.participant1Id === userId;
-      const otherParticipantId = isParticipant1 ? conv.participant2Id : conv.participant1Id;
-      const otherUsername = isParticipant1 ? conv.participant2Username : conv.participant1Username;
-      
+      const otherParticipantId = isParticipant1
+        ? conv.participant2Id
+        : conv.participant1Id;
+      const otherUsername = isParticipant1
+        ? conv.participant2Username
+        : conv.participant1Username;
+
       const otherParticipantProfile = profilesMap.get(otherParticipantId);
-      const lastMessage = conv.lastMessageId ? messagesMap.get(conv.lastMessageId) : null;
-      
+      const lastMessage = conv.lastMessageId
+        ? messagesMap.get(conv.lastMessageId)
+        : null;
+
       return {
         ...conv,
         lastMessage,
@@ -249,16 +294,23 @@ export const getConversations = query({
           rank: otherParticipantProfile?.rank,
           avatarFrame: otherParticipantProfile?.customization?.avatarFrame,
           usernameColor: otherParticipantProfile?.customization?.usernameColor,
+          tier: otherParticipantProfile?.tier,
+          isDonor: otherParticipantProfile?.isDonor,
         },
-        unreadCount: isParticipant1 ? conv.participant1UnreadCount : conv.participant2UnreadCount,
-        lastReadAt: isParticipant1 ? conv.participant1LastRead : conv.participant2LastRead,
+        unreadCount: isParticipant1
+          ? conv.participant1UnreadCount
+          : conv.participant2UnreadCount,
+        lastReadAt: isParticipant1
+          ? conv.participant1LastRead
+          : conv.participant2LastRead,
       };
     });
 
     return {
       page: enhanced,
       isDone: enhanced.length < limit,
-      continueCursor: enhanced.length > 0 ? enhanced[enhanced.length - 1]._id : "",
+      continueCursor:
+        enhanced.length > 0 ? enhanced[enhanced.length - 1]._id : "",
     };
   },
 });
@@ -268,10 +320,12 @@ export const getConversationMessages = query({
   args: {
     otherUserId: v.id("users"),
     beforeTimestamp: v.optional(v.number()),
-    paginationOpts: v.optional(v.object({
-      numItems: v.number(),
-      cursor: v.optional(v.string()),
-    })),
+    paginationOpts: v.optional(
+      v.object({
+        numItems: v.number(),
+        cursor: v.optional(v.string()),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -293,7 +347,7 @@ export const getConversationMessages = query({
         const messages = await ctx.db
           .query("messages")
           .withIndex("by_conversation_timestamp", (q) =>
-            q.eq("senderId", userId).eq("recipientId", userId)
+            q.eq("senderId", userId).eq("recipientId", userId),
           )
           .order("desc")
           .paginate({
@@ -306,7 +360,10 @@ export const getConversationMessages = query({
         return {
           page: allMessages,
           isDone: messages.isDone,
-          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+          continueCursor:
+            allMessages.length > 0
+              ? allMessages[allMessages.length - 1]._id
+              : "",
         };
       } else {
         // Regular conversation - query both directions
@@ -314,7 +371,7 @@ export const getConversationMessages = query({
           ctx.db
             .query("messages")
             .withIndex("by_conversation_timestamp", (q) =>
-              q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+              q.eq("senderId", userId).eq("recipientId", args.otherUserId),
             )
             .order("desc")
             .paginate({
@@ -325,13 +382,13 @@ export const getConversationMessages = query({
           ctx.db
             .query("messages")
             .withIndex("by_conversation_timestamp", (q) =>
-              q.eq("senderId", args.otherUserId).eq("recipientId", userId)
+              q.eq("senderId", args.otherUserId).eq("recipientId", userId),
             )
             .order("desc")
             .paginate({
               numItems: Math.ceil(limit / 2),
               cursor: paginationOpts.cursor,
-            })
+            }),
         ]);
 
         // Combine paginated results
@@ -342,7 +399,10 @@ export const getConversationMessages = query({
         return {
           page: allMessages,
           isDone: sentMessages.isDone && receivedMessages.isDone,
-          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+          continueCursor:
+            allMessages.length > 0
+              ? allMessages[allMessages.length - 1]._id
+              : "",
         };
       }
     } else {
@@ -354,13 +414,15 @@ export const getConversationMessages = query({
         query = ctx.db
           .query("messages")
           .withIndex("by_conversation_timestamp", (q) =>
-            q.eq("senderId", userId).eq("recipientId", userId)
+            q.eq("senderId", userId).eq("recipientId", userId),
           )
           .order("desc");
 
         // Apply timestamp filter if provided
         if (beforeTimestamp) {
-          query = query.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
+          query = query.filter((q) =>
+            q.lt(q.field("timestamp"), beforeTimestamp),
+          );
         }
 
         allMessages = await query.take(limit);
@@ -368,7 +430,10 @@ export const getConversationMessages = query({
         return {
           page: allMessages,
           isDone: allMessages.length < limit,
-          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+          continueCursor:
+            allMessages.length > 0
+              ? allMessages[allMessages.length - 1]._id
+              : "",
           hasMore: allMessages.length >= limit,
         };
       } else {
@@ -376,26 +441,30 @@ export const getConversationMessages = query({
         let sentQuery = ctx.db
           .query("messages")
           .withIndex("by_conversation_timestamp", (q) =>
-            q.eq("senderId", userId).eq("recipientId", args.otherUserId)
+            q.eq("senderId", userId).eq("recipientId", args.otherUserId),
           )
           .order("desc");
 
         let receivedQuery = ctx.db
           .query("messages")
           .withIndex("by_conversation_timestamp", (q) =>
-            q.eq("senderId", args.otherUserId).eq("recipientId", userId)
+            q.eq("senderId", args.otherUserId).eq("recipientId", userId),
           )
           .order("desc");
 
         // Apply timestamp filter if provided
         if (beforeTimestamp) {
-          sentQuery = sentQuery.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
-          receivedQuery = receivedQuery.filter((q) => q.lt(q.field("timestamp"), beforeTimestamp));
+          sentQuery = sentQuery.filter((q) =>
+            q.lt(q.field("timestamp"), beforeTimestamp),
+          );
+          receivedQuery = receivedQuery.filter((q) =>
+            q.lt(q.field("timestamp"), beforeTimestamp),
+          );
         }
 
         const [sentMessages, receivedMessages] = await Promise.all([
           sentQuery.take(limit),
-          receivedQuery.take(limit)
+          receivedQuery.take(limit),
         ]);
 
         // Combine and sort by timestamp
@@ -404,12 +473,16 @@ export const getConversationMessages = query({
           .slice(0, limit);
 
         // Check if there are more messages
-        const hasMoreMessages = sentMessages.length >= limit || receivedMessages.length >= limit;
+        const hasMoreMessages =
+          sentMessages.length >= limit || receivedMessages.length >= limit;
 
         return {
           page: allMessages,
           isDone: !hasMoreMessages,
-          continueCursor: allMessages.length > 0 ? allMessages[allMessages.length - 1]._id : "",
+          continueCursor:
+            allMessages.length > 0
+              ? allMessages[allMessages.length - 1]._id
+              : "",
           hasMore: hasMoreMessages,
         };
       }
@@ -433,8 +506,8 @@ export const markMessagesAsRead = mutation({
     // Get only unread messages to minimize unnecessary updates
     const unreadMessages = await ctx.db
       .query("messages")
-      .withIndex("by_unread_messages", (q) => 
-        q.eq("recipientId", userId).eq("readAt", undefined)
+      .withIndex("by_unread_messages", (q) =>
+        q.eq("recipientId", userId).eq("readAt", undefined),
       )
       .filter((q) => q.eq(q.field("senderId"), args.otherUserId))
       .take(100); // Limit batch size for performance
@@ -444,9 +517,9 @@ export const markMessagesAsRead = mutation({
     for (let i = 0; i < unreadMessages.length; i += batchSize) {
       const batch = unreadMessages.slice(i, i + batchSize);
       await Promise.all(
-        batch.map(message => 
-          ctx.db.patch(message._id, { readAt: timestamp })
-        )
+        batch.map((message) =>
+          ctx.db.patch(message._id, { readAt: timestamp }),
+        ),
       );
     }
 
@@ -474,26 +547,26 @@ export const getUnreadCount = query({
     const [unreadConversations1, unreadConversations2] = await Promise.all([
       ctx.db
         .query("conversations")
-        .withIndex("by_participant1_unread", (q) => 
-          q.eq("participant1Id", userId).gt("participant1UnreadCount", 0)
+        .withIndex("by_participant1_unread", (q) =>
+          q.eq("participant1Id", userId).gt("participant1UnreadCount", 0),
         )
         .take(50), // Limit to prevent excessive data transfer
       ctx.db
         .query("conversations")
-        .withIndex("by_participant2_unread", (q) => 
-          q.eq("participant2Id", userId).gt("participant2UnreadCount", 0)
+        .withIndex("by_participant2_unread", (q) =>
+          q.eq("participant2Id", userId).gt("participant2UnreadCount", 0),
         )
-        .take(50) // Limit to prevent excessive data transfer
+        .take(50), // Limit to prevent excessive data transfer
     ]);
 
     let totalUnread = 0;
-    
+
     // Sum unread counts efficiently with early termination for large counts
     for (const conv of unreadConversations1) {
       totalUnread += conv.participant1UnreadCount;
       if (totalUnread > 999) break; // Cap at 999+ for UI purposes
     }
-    
+
     for (const conv of unreadConversations2) {
       totalUnread += conv.participant2UnreadCount;
       if (totalUnread > 999) break; // Cap at 999+ for UI purposes
@@ -518,8 +591,8 @@ export const getRecentUnreadMessages = query({
     // OPTIMIZED: Use the most efficient index and add early filtering
     const messages = await ctx.db
       .query("messages")
-      .withIndex("by_unread_messages", (q) => 
-        q.eq("recipientId", userId).eq("readAt", undefined)
+      .withIndex("by_unread_messages", (q) =>
+        q.eq("recipientId", userId).eq("readAt", undefined),
       )
       .filter((q) => q.gte(q.field("timestamp"), args.sinceTimestamp))
       .order("desc")
@@ -529,14 +602,14 @@ export const getRecentUnreadMessages = query({
     if (messages.length === 0) return [];
 
     // OPTIMIZED: Fetch sender customizations
-    const senderIds = [...new Set(messages.map(msg => msg.senderId))];
+    const senderIds = [...new Set(messages.map((msg) => msg.senderId))];
     const senderCustomizations = await Promise.all(
-      senderIds.map(id =>
+      senderIds.map((id) =>
         ctx.db
           .query("userCustomizations")
           .withIndex("by_user", (q) => q.eq("userId", id))
-          .first()
-      )
+          .first(),
+      ),
     );
     const customizationMap = new Map();
     senderIds.forEach((id, idx) => {
@@ -544,7 +617,7 @@ export const getRecentUnreadMessages = query({
     });
 
     // OPTIMIZED: Only return essential fields for notifications to reduce data transfer
-    return messages.map(msg => {
+    return messages.map((msg) => {
       const customization = customizationMap.get(msg.senderId);
       return {
         _id: msg._id,
@@ -580,23 +653,23 @@ export const setTyping = mutation({
     // Find the conversation
     let conversation = await ctx.db
       .query("conversations")
-      .withIndex("by_participants", (q) => 
-        q.eq("participant1Id", userId).eq("participant2Id", args.otherUserId)
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", userId).eq("participant2Id", args.otherUserId),
       )
       .unique();
 
     if (!conversation) {
       conversation = await ctx.db
         .query("conversations")
-        .withIndex("by_participants", (q) => 
-          q.eq("participant1Id", args.otherUserId).eq("participant2Id", userId)
+        .withIndex("by_participants", (q) =>
+          q.eq("participant1Id", args.otherUserId).eq("participant2Id", userId),
         )
         .unique();
     }
 
     if (conversation) {
       const isParticipant1 = conversation.participant1Id === userId;
-      
+
       if (isParticipant1) {
         await ctx.db.patch(conversation._id, {
           participant1TypingAt: timestamp,
@@ -612,7 +685,7 @@ export const setTyping = mutation({
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .unique();
-      
+
       const otherUserProfile = await ctx.db
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", args.otherUserId))
@@ -653,16 +726,16 @@ export const getTypingStatus = query({
     // Find the conversation
     let conversation = await ctx.db
       .query("conversations")
-      .withIndex("by_participants", (q) => 
-        q.eq("participant1Id", userId).eq("participant2Id", args.otherUserId)
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", userId).eq("participant2Id", args.otherUserId),
       )
       .unique();
 
     if (!conversation) {
       conversation = await ctx.db
         .query("conversations")
-        .withIndex("by_participants", (q) => 
-          q.eq("participant1Id", args.otherUserId).eq("participant2Id", userId)
+        .withIndex("by_participants", (q) =>
+          q.eq("participant1Id", args.otherUserId).eq("participant2Id", userId),
         )
         .unique();
     }
@@ -672,15 +745,15 @@ export const getTypingStatus = query({
     }
 
     const isParticipant1 = conversation.participant1Id === userId;
-    const otherUserTypingAt = isParticipant1 
-      ? conversation.participant2TypingAt 
+    const otherUserTypingAt = isParticipant1
+      ? conversation.participant2TypingAt
       : conversation.participant1TypingAt;
 
     // Consider typing indicator expired after 5 seconds
     const now = Date.now();
-    const isTyping = otherUserTypingAt ? (now - otherUserTypingAt < 5000) : false;
+    const isTyping = otherUserTypingAt ? now - otherUserTypingAt < 5000 : false;
 
-    return { 
+    return {
       isTyping,
       typingAt: otherUserTypingAt,
     };
@@ -705,18 +778,32 @@ export const searchUsers = query({
     const profiles = await ctx.db
       .query("profiles")
       .withSearchIndex("search_username", (q) =>
-        q.search("username", trimmedSearchTerm)
+        q.search("username", trimmedSearchTerm),
       )
       .filter((q) => q.neq(q.field("userId"), userId))
       .take(limit);
 
     const profilesWithCustomizations = await Promise.all(
       profiles.map(async (profile) => {
-        const customization = await ctx.db
-          .query("userCustomizations")
-          .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-          .first();
-        
+        const [customization, subscription] = await Promise.all([
+          ctx.db
+            .query("userCustomizations")
+            .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+            .first(),
+          ctx.db
+            .query("subscriptions")
+            .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+            .first(),
+        ]);
+
+        const isActive = subscription
+          ? isSubscriptionActive(
+              subscription.status,
+              subscription.expiresAt,
+              subscription.gracePeriodEndsAt || null,
+            )
+          : true;
+
         return {
           userId: profile.userId,
           username: profile.username,
@@ -725,8 +812,10 @@ export const searchUsers = query({
           gamesPlayed: profile.gamesPlayed,
           avatarFrame: customization?.avatarFrame,
           usernameColor: customization?.usernameColor,
+          tier: isActive ? subscription?.tier || "free" : "free",
+          isDonor: profile.isDonor ?? false,
         };
-      })
+      }),
     );
 
     return profilesWithCustomizations;
@@ -747,7 +836,8 @@ export const sendLobbyInvite = mutation({
     // Get lobby details
     const lobby = await ctx.db.get(args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
-    if (lobby.hostId !== userId) throw new Error("Only lobby host can send invites");
+    if (lobby.hostId !== userId)
+      throw new Error("Only lobby host can send invites");
     if (lobby.status !== "waiting") throw new Error("Lobby is not available");
 
     const content = args.message || `Join my lobby: ${lobby.name}`;
@@ -778,15 +868,17 @@ export const sendGameInvite = mutation({
     // Get game details
     const game = await ctx.db.get(args.gameId);
     if (!game) throw new Error("Game not found");
-    
+
     // Check if user is a player in the game
     if (game.player1Id !== userId && game.player2Id !== userId) {
       throw new Error("Only players can send game invites");
     }
-    
+
     if (game.status !== "playing") throw new Error("Game is not active");
 
-    const content = args.message || `Watch my game! ${game.player1Username} vs ${game.player2Username}`;
+    const content =
+      args.message ||
+      `Watch my game! ${game.player1Username} vs ${game.player2Username}`;
 
     return await ctx.runMutation(internal.messages.sendMessageInternal, {
       senderId: userId,
@@ -804,7 +896,11 @@ export const sendMessageInternal = internalMutation({
     senderId: v.id("users"),
     recipientUsername: v.string(),
     content: v.string(),
-    messageType: v.union(v.literal("text"), v.literal("lobby_invite"), v.literal("game_invite")),
+    messageType: v.union(
+      v.literal("text"),
+      v.literal("lobby_invite"),
+      v.literal("game_invite"),
+    ),
     lobbyId: v.optional(v.id("lobbies")),
     lobbyCode: v.optional(v.string()),
     lobbyName: v.optional(v.string()),
@@ -877,32 +973,40 @@ export const updateConversation = internalMutation({
     // Find existing conversation (either direction)
     let conversation = await ctx.db
       .query("conversations")
-      .withIndex("by_participants", (q) => 
-        q.eq("participant1Id", args.participant1Id).eq("participant2Id", args.participant2Id)
+      .withIndex("by_participants", (q) =>
+        q
+          .eq("participant1Id", args.participant1Id)
+          .eq("participant2Id", args.participant2Id),
       )
       .unique();
 
     if (!conversation) {
       conversation = await ctx.db
         .query("conversations")
-        .withIndex("by_participants", (q) => 
-          q.eq("participant1Id", args.participant2Id).eq("participant2Id", args.participant1Id)
+        .withIndex("by_participants", (q) =>
+          q
+            .eq("participant1Id", args.participant2Id)
+            .eq("participant2Id", args.participant1Id),
         )
         .unique();
     }
 
     if (conversation) {
       // Update existing conversation
-      const isParticipant1Sender = conversation.participant1Id === args.participant1Id;
-      
+      const isParticipant1Sender =
+        conversation.participant1Id === args.participant1Id;
+
       await ctx.db.patch(conversation._id, {
         lastMessageId: args.messageId,
         lastMessageAt: args.timestamp,
         // Increment unread count for recipient
-        ...(isParticipant1Sender 
-          ? { participant2UnreadCount: conversation.participant2UnreadCount + 1 }
-          : { participant1UnreadCount: conversation.participant1UnreadCount + 1 }
-        ),
+        ...(isParticipant1Sender
+          ? {
+              participant2UnreadCount: conversation.participant2UnreadCount + 1,
+            }
+          : {
+              participant1UnreadCount: conversation.participant1UnreadCount + 1,
+            }),
       });
     } else {
       // Create new conversation
@@ -932,23 +1036,27 @@ export const updateConversationReadStatus = internalMutation({
     // Find the conversation
     let conversation = await ctx.db
       .query("conversations")
-      .withIndex("by_participants", (q) => 
-        q.eq("participant1Id", args.userId).eq("participant2Id", args.otherUserId)
+      .withIndex("by_participants", (q) =>
+        q
+          .eq("participant1Id", args.userId)
+          .eq("participant2Id", args.otherUserId),
       )
       .unique();
 
     if (!conversation) {
       conversation = await ctx.db
         .query("conversations")
-        .withIndex("by_participants", (q) => 
-          q.eq("participant1Id", args.otherUserId).eq("participant2Id", args.userId)
+        .withIndex("by_participants", (q) =>
+          q
+            .eq("participant1Id", args.otherUserId)
+            .eq("participant2Id", args.userId),
         )
         .unique();
     }
 
     if (conversation) {
       const isParticipant1 = conversation.participant1Id === args.userId;
-      
+
       if (isParticipant1) {
         await ctx.db.patch(conversation._id, {
           participant1LastRead: args.readAt,

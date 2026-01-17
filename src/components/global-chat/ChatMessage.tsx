@@ -32,7 +32,10 @@ interface ChatMessageProps {
   isOptimistic?: boolean;
 }
 
-export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps) {
+export function ChatMessage({
+  message,
+  isOptimistic = false,
+}: ChatMessageProps) {
   const navigate = useNavigate();
   const { isAuthenticated } = useConvexAuth();
 
@@ -43,7 +46,7 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     {
       staleTime: 120000, // 2 minutes - profile data changes infrequently
       gcTime: 600000, // 10 minutes cache
-    }
+    },
   );
 
   // Get all usernames for validation - usernames change infrequently
@@ -53,7 +56,7 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     {
       staleTime: 300000, // 5 minutes - usernames don't change often
       gcTime: 600000, // 10 minutes cache
-    }
+    },
   );
 
   // Check if current user is admin/moderator
@@ -63,7 +66,7 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     {
       staleTime: 300000, // 5 minutes - admin status doesn't change often
       gcTime: 600000, // 10 minutes cache
-    }
+    },
   );
 
   // Check if current user is banned
@@ -73,7 +76,7 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     {
       staleTime: 30000, // 30 seconds - ban status can change
       gcTime: 60000, // 1 minute cache
-    }
+    },
   );
 
   const formatTimestamp = (timestamp: number) => {
@@ -81,13 +84,17 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     const now = new Date();
     const diff = now.getTime() - date.getTime();
 
-    if (diff < 60000) { // Less than 1 minute
+    if (diff < 60000) {
+      // Less than 1 minute
       return "now";
-    } else if (diff < 3600000) { // Less than 1 hour
+    } else if (diff < 3600000) {
+      // Less than 1 hour
       return `${Math.floor(diff / 60000)}m`;
-    } else if (diff < 86400000) { // Less than 1 day
+    } else if (diff < 86400000) {
+      // Less than 1 day
       return `${Math.floor(diff / 3600000)}h`;
-    } else if (diff < 604800000) { // Less than 7 days
+    } else if (diff < 604800000) {
+      // Less than 7 days
       return `${Math.floor(diff / 86400000)}d`;
     } else {
       return date.toLocaleDateString();
@@ -103,22 +110,30 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
   const handleMessageClick = () => {
     if (isAuthenticated && isCurrentUserBanned) {
       // For banned users, show a helpful message about contacting admin
-      toast.info("Use the 'Message Administrator' button in your ban screen to appeal your suspension", {
-        duration: 5000,
-      });
+      toast.info(
+        "Use the 'Message Administrator' button in your ban screen to appeal your suspension",
+        {
+          duration: 5000,
+        },
+      );
     }
   };
 
   const renderMessageWithMentions = (text: string) => {
     const mentionRegex = /(@[\w-]+)/g;
     const parts = text.split(mentionRegex);
-    const validUsernames = new Set(allProfiles.map((profile: { username: string; }) => profile.username.toLowerCase()));
+    const validUsernames = new Set(
+      allProfiles.map((profile: { username: string }) =>
+        profile.username.toLowerCase(),
+      ),
+    );
 
     return parts.map((part, index) => {
       if (part.startsWith("@")) {
         const username = part.slice(1).toLowerCase(); // Remove @ and convert to lowercase
         const isValidUser = validUsernames.has(username);
-        const isCurrentUser = currentUser && username === currentUser.username.toLowerCase();
+        const isCurrentUser =
+          currentUser && username === currentUser.username.toLowerCase();
 
         if (!isValidUser) {
           // Not a valid user, render as plain text
@@ -132,7 +147,7 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
               "px-1 py-0.5 rounded text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity",
               isCurrentUser
                 ? "bg-yellow-500/20 text-yellow-300" // Yellow for self-mentions
-                : "bg-blue-500/20 text-blue-300" // Blue for other mentions
+                : "bg-blue-500/20 text-blue-300", // Blue for other mentions
             )}
             onClick={() => {
               // Navigate to the mentioned user's profile
@@ -147,16 +162,13 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
     });
   };
 
-  // Use custom username color if available, otherwise use a default
-  const usernameColor = message.usernameColor || "#ffffff";
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: isOptimistic ? 0.7 : 1, y: 0 }}
       className={cn(
         "group hover:bg-white/5 rounded-lg p-1 -m-1 transition-colors",
-        isOptimistic && "bg-white/5"
+        isOptimistic && "bg-white/5",
       )}
     >
       <div className="flex items-start">
@@ -175,18 +187,22 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
 
           {/* Admin Badge */}
           {message.adminRole && (
-            <div className={cn(
-              "flex items-center gap-0.5 px-1 rounded text-[10px] h-4 font-medium flex-shrink-0",
-              message.adminRole === "admin"
-                ? "bg-red-500/20 text-red-300"
-                : "bg-blue-500/20 text-blue-300"
-            )}>
+            <div
+              className={cn(
+                "flex items-center gap-0.5 px-1 rounded text-[10px] h-4 font-medium flex-shrink-0",
+                message.adminRole === "admin"
+                  ? "bg-red-500/20 text-red-300"
+                  : "bg-blue-500/20 text-blue-300",
+              )}
+            >
               {message.adminRole === "admin" ? (
                 <ShieldCheck className="w-2.5 h-2.5" />
               ) : (
                 <Shield className="w-2.5 h-2.5" />
               )}
-              <span className="capitalize">{message.adminRole === "admin" ? "Admin" : "Mod"}</span>
+              <span className="capitalize">
+                {message.adminRole === "admin" ? "Admin" : "Mod"}
+              </span>
             </div>
           )}
         </div>
@@ -201,10 +217,15 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
               className={cn(
                 "text-white/90 text-xs leading-tight break-words flex-1",
                 isOptimistic && "opacity-75",
-                isCurrentUserBanned && "cursor-pointer hover:bg-white/10 rounded px-1 py-0.5 transition-colors"
+                isCurrentUserBanned &&
+                  "cursor-pointer hover:bg-white/10 rounded px-1 py-0.5 transition-colors",
               )}
               onClick={isCurrentUserBanned ? handleMessageClick : undefined}
-              title={isCurrentUserBanned ? "Click to message administrator" : undefined}
+              title={
+                isCurrentUserBanned
+                  ? "Click to message administrator"
+                  : undefined
+              }
             >
               {renderMessageWithMentions(message.filteredMessage)}
             </div>
@@ -221,16 +242,19 @@ export function ChatMessage({ message, isOptimistic = false }: ChatMessageProps)
             )}
 
             {/* Moderation Menu for Admins */}
-            {isCurrentUserAdmin && !isOptimistic && message._id && message.userId && (
-              <MessageModerationMenu
-                messageId={message._id}
-                userId={message.userId as Id<"users">}
-                username={message.username}
-                isOwnMessage={currentUser?.userId === message.userId}
-                className="ml-auto"
-                size="md"
-              />
-            )}
+            {isCurrentUserAdmin &&
+              !isOptimistic &&
+              message._id &&
+              message.userId && (
+                <MessageModerationMenu
+                  messageId={message._id}
+                  userId={message.userId as Id<"users">}
+                  username={message.username}
+                  isOwnMessage={currentUser?.userId === message.userId}
+                  className="ml-auto"
+                  size="md"
+                />
+              )}
           </div>
         </div>
 
