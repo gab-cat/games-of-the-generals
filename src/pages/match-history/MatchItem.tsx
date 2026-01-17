@@ -1,11 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useQuery } from "convex-helpers/react/cache";
+import { useConvexQuery } from "../../lib/convex-query-hooks";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   Target,
-  Crown,
-  Calendar,
   Clock,
   Trophy,
   Play,
@@ -15,10 +15,67 @@ import {
   Hand,
   XOctagon,
   MonitorSmartphone,
+  Download,
+  Loader2,
 } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { cn } from "@/lib/utils";
+
+// Helper function to download replay data as JSON
+function downloadReplayAsJson(
+  replayData: {
+    game: unknown;
+    moves: unknown[];
+    initialBoard: unknown;
+    player1Username: string;
+    player2Username: string;
+    moveCount: number;
+    isTruncated: boolean;
+  },
+  match: {
+    opponentUsername: string;
+    createdAt: number;
+    isWin: boolean;
+    isDraw: boolean;
+    reason: string;
+    duration: number;
+    moves: number;
+  },
+) {
+  const exportData = {
+    version: "1.0",
+    exportedAt: new Date().toISOString(),
+    player1Username: replayData.player1Username,
+    player2Username: replayData.player2Username,
+    initialBoard: replayData.initialBoard,
+    moves: replayData.moves,
+    gameMetadata: {
+      createdAt: match.createdAt,
+      duration: match.duration,
+      moveCount: match.moves,
+      isWin: match.isWin,
+      isDraw: match.isDraw,
+      reason: match.reason,
+    },
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+
+  // Format filename: replay_[opponent]_[date].json
+  const dateStr = new Date(match.createdAt).toISOString().split("T")[0];
+  a.download = `replay_${match.opponentUsername}_${dateStr}.json`;
+
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 interface MatchItemProps {
   match: {
@@ -39,9 +96,33 @@ interface MatchItemProps {
 }
 
 export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   const opponentProfile = useQuery(api.profiles.getProfileByUsername, {
     username: match.opponentUsername,
   });
+
+  // Query replay data only when downloading
+  const { data: replayData } = useConvexQuery(
+    api.games.getGameReplay,
+    isDownloading ? { gameId: match.gameId } : "skip",
+  );
+
+  // Handle download when replay data is loaded
+  const handleDownload = async () => {
+    if (replayData) {
+      downloadReplayAsJson(replayData, match);
+      setIsDownloading(false);
+      return;
+    }
+    setIsDownloading(true);
+  };
+
+  // Effect to download when data arrives
+  if (isDownloading && replayData) {
+    downloadReplayAsJson(replayData, match);
+    setIsDownloading(false);
+  }
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -100,7 +181,6 @@ export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
   // Status Styles
   const isWin = match.isWin;
   const isDraw = match.isDraw;
-  const isLoss = !isWin && !isDraw;
 
   const statusColor = isWin
     ? "bg-green-500/10 border-green-500/20 hover:border-green-500/40"
@@ -258,9 +338,10 @@ export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
           </div>
         </div>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         {onViewReplay && (
-          <div className="flex sm:flex-col justify-end">
+          <div className="flex sm:flex-col gap-1.5 justify-end">
+            {/* Replay Button */}
             <Button
               variant="ghost"
               size="sm"
@@ -269,6 +350,22 @@ export function MatchItem({ match, index, onViewReplay }: MatchItemProps) {
             >
               <Play className="h-3.5 w-3.5 ml-0.5" />
               <span className="sr-only">Replay</span>
+            </Button>
+
+            {/* Download Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="h-8 w-8 p-0 rounded-full bg-white/5 hover:bg-blue-500/20 text-zinc-400 hover:text-blue-400 border border-white/5 hover:border-blue-500/30 transition-all disabled:opacity-50"
+            >
+              {isDownloading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              <span className="sr-only">Download</span>
             </Button>
           </div>
         )}

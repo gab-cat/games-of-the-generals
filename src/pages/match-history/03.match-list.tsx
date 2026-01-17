@@ -3,6 +3,7 @@ import { api } from "../../../convex/_generated/api";
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, FileWarning } from "lucide-react";
+import { ReplayLimitCTA } from "./ReplayLimitCTA";
 
 import { Id } from "../../../convex/_generated/dataModel";
 import { MatchHistoryHeader } from "./01.match-history-header";
@@ -22,11 +23,8 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
   const listRef = useAutoAnimate();
   const [currentPage, setCurrentPage] = useState(0);
   const [cursors, setCursors] = useState<{
-    [page: number]: string | undefined;
+    [page: number]: string | Id<"games"> | undefined;
   }>({ 0: undefined });
-  const [hasMorePages, setHasMorePages] = useState<{ [page: number]: boolean }>(
-    {},
-  );
   const [isLoading, setIsLoading] = useState(false);
   const pageSize = 8;
 
@@ -46,29 +44,31 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
     },
   });
 
-  // Update cursors and page info when new data arrives
+  const { data: subscription } = useConvexQuery(
+    api.subscriptions.getCurrentSubscription,
+    {},
+  );
+
+  // Determine if user is limited
+  const isFreeTier = subscription?.tier === "free";
+  const showReplayLimitCTA =
+    isFreeTier && (matchHistory?.page?.length || 0) > 0;
+
+  // Update cursors when new data arrives
   useEffect(() => {
-    if (matchHistory) {
-      setHasMorePages((prev) => ({
-        ...prev,
-        [currentPage]: matchHistory.hasMore && !!matchHistory.continueCursor,
-      }));
-
-      if (matchHistory.continueCursor && matchHistory.hasMore) {
-        const nextPage = currentPage + 1;
-        setCursors((prev) => {
-          if (!(nextPage in prev)) {
-            return {
-              ...prev,
-              [nextPage]: matchHistory.continueCursor,
-            };
-          }
-          return prev;
-        });
-      }
-
-      setIsLoading(false);
+    if (matchHistory?.continueCursor && matchHistory.hasMore) {
+      const nextPage = currentPage + 1;
+      setCursors((prev) => {
+        if (prev[nextPage] !== matchHistory.continueCursor) {
+          return {
+            ...prev,
+            [nextPage]: matchHistory.continueCursor ?? undefined,
+          };
+        }
+        return prev;
+      });
     }
+    setIsLoading(false);
   }, [matchHistory, currentPage]);
 
   const handlePrevPage = () => {
@@ -79,9 +79,7 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
   };
 
   const handleNextPage = () => {
-    const canGoNext =
-      hasMorePages[currentPage] === true && currentPage + 1 in cursors;
-    if (canGoNext) {
+    if (matchHistory?.hasMore && matchHistory.continueCursor) {
       setIsLoading(true);
       setCurrentPage(currentPage + 1);
     }
@@ -120,12 +118,12 @@ export function MatchList({ userId, onViewReplay }: MatchListProps) {
   }
 
   const canGoPrev = currentPage > 0;
-  const canGoNext =
-    hasMorePages[currentPage] === true && currentPage + 1 in cursors;
+  const canGoNext = !!matchHistory?.hasMore && !!matchHistory?.continueCursor;
 
   return (
     <div className="space-y-6">
       <MatchHistoryHeader totalMatches={matchHistory?.page?.length || 0} />
+      {showReplayLimitCTA && <ReplayLimitCTA />}
 
       <div ref={listRef} className="space-y-3">
         {matchHistory?.page?.map((match, index: number) => (

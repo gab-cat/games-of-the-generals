@@ -2,45 +2,106 @@ import { useState, useEffect } from "react";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { motion } from "framer-motion";
-import { 
-  Play, 
-  Pause, 
-  SkipBack, 
-  SkipForward, 
-  RotateCcw, 
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  RotateCcw,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
   ArrowDown,
-  Eye, 
+  Eye,
   EyeOff,
-  Target,
   FastForward,
   Rewind,
-  Crown,
   Sword,
-  Square
+  Square,
+  Activity,
+  User,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+
 import { Badge } from "../../components/ui/badge";
 import { Slider } from "../../components/ui/slider";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { Id } from "../../../convex/_generated/dataModel";
 import { getPieceDisplay } from "../../lib/piece-display";
 import { cn } from "@/lib/utils";
+import type { LocalReplayData } from "./LocalReplayViewer";
+
+// Move type that matches the structure from server
+interface MoveData {
+  moveType: "move" | "challenge";
+  piece?: string;
+  fromRow?: number;
+  fromCol?: number;
+  toRow: number;
+  toCol: number;
+  challengeResult?: {
+    attacker: string;
+    defender: string;
+    winner: "attacker" | "defender" | "tie";
+  };
+}
+
+// Normalized replay data type used internally
+interface NormalizedReplayData {
+  moves: MoveData[];
+  initialBoard: unknown[][];
+  player1Username: string;
+  player2Username: string;
+  game?: {
+    _creationTime: number;
+  };
+}
 
 interface GameReplayProps {
-  gameId: Id<"games">;
+  gameId?: Id<"games">;
+  localReplayData?: LocalReplayData;
   onBack: () => void;
 }
 
-export function GameReplay({ gameId, onBack }: GameReplayProps) {
-  const { data: replayData, isPending: isLoadingReplay, error: replayError } = useConvexQuery(
-    api.games.getGameReplay, 
-    { gameId }
+export function GameReplay({
+  gameId,
+  localReplayData,
+  onBack,
+}: GameReplayProps) {
+  // Only query server if we don't have local data
+  const {
+    data: serverReplayData,
+    isPending: isLoadingReplay,
+    error: replayError,
+  } = useConvexQuery(
+    api.games.getGameReplay,
+    gameId && !localReplayData ? { gameId } : "skip",
   );
-  
+
+  // Normalize replay data from either source
+  const replayData: NormalizedReplayData | null = localReplayData
+    ? {
+        moves: localReplayData.moves as MoveData[],
+        initialBoard: localReplayData.initialBoard as unknown[][],
+        player1Username: localReplayData.player1Username,
+        player2Username: localReplayData.player2Username,
+        game: { _creationTime: localReplayData.gameMetadata.createdAt },
+      }
+    : serverReplayData
+      ? {
+          moves: serverReplayData.moves as MoveData[],
+          initialBoard: serverReplayData.initialBoard as unknown[][],
+          player1Username: serverReplayData.player1Username,
+          player2Username: serverReplayData.player2Username,
+          game: serverReplayData.game,
+        }
+      : null;
+
   const [currentMoveIndex, setCurrentMoveIndex] = useState(-1); // -1 means initial state
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1000); // milliseconds between moves
@@ -63,10 +124,10 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
     return () => clearInterval(timer);
   }, [isPlaying, replayData, playbackSpeed]);
 
-  // Show loading state
-  if (isLoadingReplay) {
+  // Show loading state (only for server replays)
+  if (isLoadingReplay && !localReplayData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-4">
+      <div className="min-h-screen p-4">
         <div className="flex justify-center items-center min-h-[60vh]">
           <motion.div
             initial={{ opacity: 0, scale: 0.8 }}
@@ -81,15 +142,19 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
   // Show error state
   if (replayError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-4">
+      <div className="min-h-screen p-4">
         <div className="flex justify-center items-center min-h-[60vh]">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-center space-y-4"
           >
-            <div className="text-red-400 text-lg">Failed to load game replay</div>
-            <div className="text-white/60 text-sm">Please try refreshing the page</div>
+            <div className="text-red-400 text-lg">
+              Failed to load game replay
+            </div>
+            <div className="text-white/60 text-sm">
+              Please try refreshing the page
+            </div>
             <Button onClick={onBack} variant="outline">
               Go Back
             </Button>
@@ -102,7 +167,7 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
   // Show no data state
   if (!replayData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-gray-900 to-slate-900 p-4">
+      <div className="min-h-screen p-4">
         <div className="flex justify-center items-center min-h-[60vh]">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -123,24 +188,30 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
     if (!replayData) return null;
 
     // Start with the initial board state (pieces placed during setup)
-    const board = replayData.initialBoard.map((row: any) => 
-      row.map((cell: any) => cell ? { 
-        ...cell, 
-        revealed: false // Start with all pieces hidden
-      } : null)
+    const board = replayData.initialBoard.map((row: any) =>
+      row.map((cell: any) =>
+        cell
+          ? {
+              ...cell,
+              revealed: false, // Start with all pieces hidden
+            }
+          : null,
+      ),
     );
 
     // Apply moves up to the current index
     for (let i = 0; i <= moveIndex && i < replayData.moves.length; i++) {
       const move = replayData.moves[i];
-      
+
       if (move.moveType === "move" || move.moveType === "challenge") {
         const fromPiece = board[move.fromRow!][move.fromCol!];
-        
+
         if (move.moveType === "challenge" && move.challengeResult) {
           // Handle challenge result - follow the same logic as server
-          const revealedFromPiece = fromPiece ? { ...fromPiece, revealed: true } : null;
-          
+          const revealedFromPiece = fromPiece
+            ? { ...fromPiece, revealed: true }
+            : null;
+
           if (move.challengeResult.winner === "attacker") {
             // Attacker wins, move attacking piece and reveal it
             board[move.toRow][move.toCol] = revealedFromPiece;
@@ -166,9 +237,10 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
   };
 
   const currentBoard = reconstructBoardAtMove(currentMoveIndex);
-  const currentMove = currentMoveIndex >= 0 && currentMoveIndex < (replayData?.moves.length || 0) 
-    ? replayData.moves[currentMoveIndex] 
-    : null;
+  const currentMove =
+    currentMoveIndex >= 0 && currentMoveIndex < (replayData?.moves.length || 0)
+      ? replayData.moves[currentMoveIndex]
+      : null;
 
   if (!replayData) {
     return (
@@ -189,401 +261,556 @@ export function GameReplay({ gameId, onBack }: GameReplayProps) {
         animate={{ opacity: 1, y: 0 }}
         className="space-y-4 lg:space-y-6 p-0 sm:p-4"
       >
-      {/* Header */}
-      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 mx-0 sm:mx-4">
-        <CardHeader className="p-3 sm:p-6">
-          <div className="flex items-center justify-between">
-            <motion.div 
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              className="flex items-center gap-4"
-            >
-              <motion.div
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{ scale: 1, rotate: 0 }}
-                transition={{ delay: 0.1, type: "spring" }}
-                className="w-12 h-12 bg-gradient-to-br from-purple-500/20 via-blue-500/20 to-cyan-500/20 backdrop-blur-sm border border-purple-500/30 rounded-xl flex items-center justify-center shadow-lg"
+        {/* Header Section */}
+        <div className="mb-8 md:mb-12 space-y-4 px-2 md:px-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: "circOut" }}
+            className="flex flex-col gap-2"
+          >
+            <div className="flex items-center gap-3 text-blue-400/60 font-mono text-xs tracking-[0.2em] uppercase">
+              <RotateCcw className="w-4 h-4" />
+              <span>Replay System</span>
+              <span className="w-px h-3 bg-blue-500/30" />
+              <span>
+                {gameId
+                  ? `Archive ID: ${gameId.slice(0, 8)}...`
+                  : "Local Replay"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <h1 className="text-3xl md:text-5xl font-display font-medium text-white tracking-tight leading-none">
+                Combat <span className="text-white/20">Review</span>
+              </h1>
+              <Button
+                variant="outline"
+                onClick={onBack}
+                className="hidden sm:flex items-center gap-2 bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/20 font-mono text-xs uppercase tracking-wider"
               >
-                <Play className="h-6 w-6 text-purple-400" />
-              </motion.div>
-              <div>
-                <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-white/90">
-                  Game Replay
-                </CardTitle>
-                <p className="text-white/60 mt-1 text-sm sm:text-base">
-                  {replayData.player1Username} vs {replayData.player2Username}
-                </p>
-              </div>
-            </motion.div>
-            <Button variant="outline" onClick={onBack} className="flex items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
-              <ArrowLeft className="h-4 w-4" />
-              Back to History
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+                <ArrowLeft className="h-3 w-3" />
+                Return to Base
+              </Button>
+            </div>
+            <p className="max-w-xl text-white/50 text-sm leading-relaxed font-light font-mono">
+              <span className="text-blue-400">log_entry:</span>{" "}
+              {replayData.player1Username} vs {replayData.player2Username} //{" "}
+              <span className="text-white/30">
+                {new Date(
+                  replayData.game?._creationTime ?? Date.now(),
+                ).toLocaleDateString()}
+              </span>
+            </p>
+          </motion.div>
+        </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-4 lg:grid-cols-3 gap-4 lg:gap-6">
-        {/* Game Board */}
-        <div className="xl:col-span-3 lg:col-span-2">
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader>
-              <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-                <div className="flex items-center gap-2">
-                  <Target className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400" />
-                  <span className="text-white/90 text-sm sm:text-base">Battle Replay</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 px-2 md:px-4 pb-12">
+          {/* Game Board (Left Column) */}
+          <div className="lg:col-span-8">
+            {/* Board Container */}
+            <div className="relative">
+              {/* Board Decoration */}
+              <div className="absolute -inset-4 bg-gradient-to-b from-blue-500/5 to-transparent rounded-2xl pointer-events-none" />
+
+              {/* Main Board Card */}
+              <div className="relative z-10 bg-black/40 backdrop-blur-xl border border-white/10 rounded-sm overflow-hidden shadow-2xl group">
+                {/* Decorative corner accents */}
+                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors z-20" />
+                <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors z-20" />
+                <div className="flex items-center justify-between p-4 sm:p-6 border-b border-white/5 bg-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                    <h3 className="font-mono text-sm uppercase tracking-widest text-white/70">
+                      Tactical Display
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <Badge
+                      variant="outline"
+                      className="bg-white/5 text-white/40 border-white/10 font-mono text-[10px] uppercase tracking-wider px-2 py-1"
+                    >
+                      Grid 9x8
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowAllPieces(!showAllPieces)}
+                      className="h-8 text-[10px] font-mono uppercase tracking-wider text-white/40 hover:text-white hover:bg-white/5"
+                    >
+                      {showAllPieces ? (
+                        <EyeOff className="h-3 w-3 mr-2" />
+                      ) : (
+                        <Eye className="h-3 w-3 mr-2" />
+                      )}
+                      {showAllPieces ? "Mask Intel" : "Reveal Intel"}
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 sm:gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <div className="p-0 sm:p-6 bg-black/40">
+                  <motion.div
+                    initial={{ scale: 0.95, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="grid grid-cols-9 gap-1 sm:gap-2 w-full max-w-2xl mx-auto p-0 sm:p-4 rounded-lg bg-white/5 backdrop-blur-sm border sm:border border-white/10 overflow-hidden"
+                  >
+                    {(currentBoard || replayData.initialBoard).map(
+                      (row: any, rowIndex: number) =>
+                        row.map((cell: any, colIndex: number) => {
+                          const isLastMoveFrom =
+                            currentMove?.fromRow === rowIndex &&
+                            currentMove?.fromCol === colIndex;
+                          const isLastMoveTo =
+                            currentMove?.toRow === rowIndex &&
+                            currentMove?.toCol === colIndex;
+                          const isChallenge =
+                            currentMove?.moveType === "challenge";
+
+                          // Calculate arrow direction for "from" position
+                          const getArrowDirection = () => {
+                            if (!isLastMoveFrom || !currentMove) return null;
+
+                            const rowDiff =
+                              currentMove.toRow - currentMove.fromRow!;
+                            const colDiff =
+                              currentMove.toCol - currentMove.fromCol!;
+
+                            if (rowDiff > 0) return ArrowDown; // Moving down
+                            if (rowDiff < 0) return ArrowUp; // Moving up
+                            if (colDiff > 0) return ArrowRight; // Moving right
+                            if (colDiff < 0) return ArrowLeft; // Moving left
+
+                            return null;
+                          };
+
+                          const ArrowComponent = getArrowDirection();
+
+                          return (
+                            <motion.div
+                              key={`${rowIndex}-${colIndex}`}
+                              animate={
+                                isLastMoveFrom || isLastMoveTo
+                                  ? {
+                                      scale: [1, 1.05, 1],
+                                    }
+                                  : {}
+                              }
+                              transition={{ duration: 0.5 }}
+                              className={cn(
+                                "aspect-square border-2 flex items-center justify-center rounded-lg transition-all bg-muted/30 border-border relative",
+                                isLastMoveFrom && isChallenge
+                                  ? "ring-2 ring-red-500"
+                                  : "",
+                                isLastMoveFrom && !isChallenge
+                                  ? "ring-2 ring-yellow-500"
+                                  : "",
+                                isLastMoveTo && isChallenge
+                                  ? "ring-2 ring-red-500"
+                                  : "",
+                                isLastMoveTo && !isChallenge
+                                  ? "ring-2 ring-yellow-500"
+                                  : "",
+                              )}
+                            >
+                              {/* Directional arrow indicator for "from" position */}
+                              {isLastMoveFrom && ArrowComponent && (
+                                <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                                  <div className="rounded-full p-0.5 sm:p-1">
+                                    <ArrowComponent
+                                      className={cn(
+                                        "h-3 w-3 sm:h-4 sm:w-4",
+                                        isChallenge
+                                          ? "text-red-500"
+                                          : "text-yellow-500",
+                                      )}
+                                    />
+                                  </div>
+                                </div>
+                              )}
+
+                              {cell && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="text-center cursor-pointer">
+                                      <div
+                                        className={`${cell.player === "player1" ? "text-blue-400" : "text-red-400"}`}
+                                      >
+                                        {showAllPieces || cell.revealed ? (
+                                          <div className="flex flex-col items-center justify-center">
+                                            <div className="flex items-center justify-center">
+                                              {getPieceDisplay(cell.piece, {
+                                                showLabel: false,
+                                                size: "small",
+                                              })}
+                                            </div>
+                                            <div className="hidden sm:block text-center mt-0.5 text-xs">
+                                              {cell.piece}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col items-center justify-center">
+                                            <Square
+                                              className="w-4 h-4 sm:w-6 sm:h-6"
+                                              fill="currentColor"
+                                            />
+                                            <div className="text-[10px] sm:text-xs mt-0.5 sm:mt-1">
+                                              Hidden
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>
+                                      {showAllPieces || cell.revealed
+                                        ? cell.piece
+                                        : "Hidden Piece"}
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </motion.div>
+                          );
+                        }),
+                    )}
+                  </motion.div>
+                </div>
+                {/* Footer Status Bar for Board */}
+                <div className="px-6 py-3 bg-white/5 border-t border-white/5 flex justify-between items-center text-[10px] font-mono text-white/30 uppercase tracking-widest">
+                  <span>
+                    View Mode: {showAllPieces ? "Omniscient" : "Standard"}
+                  </span>
+                  <span>Render: 99.8%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Mission Control */}
+          <div className="lg:col-span-4 space-y-6">
+            {/* Playback Controls */}
+            <div className="rounded-sm border border-white/10 bg-white/5 backdrop-blur-md overflow-hidden relative group">
+              {/* Decorative corner accents */}
+              <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors z-20" />
+              <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors z-20" />
+              {/* Scanline overlay */}
+              <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[size:100%_4px] opacity-10 pointer-events-none" />
+
+              <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                <h3 className="text-xs font-mono uppercase tracking-widest text-white/40 flex items-center gap-2">
+                  <Play className="h-3 w-3" />
+                  Playback Sequence
+                </h3>
+                <div className="flex items-center gap-2">
+                  <div
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full",
+                      isPlaying ? "bg-green-500 animate-pulse" : "bg-white/20",
+                    )}
+                  />
+                  <span className="text-[10px] font-mono uppercase text-white/30">
+                    {isPlaying ? "Running" : "Paused"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6 relative z-10">
+                {/* Timeline Slider */}
+                <div className="space-y-3">
+                  <div className="flex justify-between text-[10px] font-mono uppercase tracking-wider text-white/40">
+                    <span>T-Minus 00:00</span>
+                    <span>Op-End</span>
+                  </div>
+                  <Slider
+                    value={[currentMoveIndex + 1]}
+                    onValueChange={([value]: number[]) => {
+                      setCurrentMoveIndex(value - 1);
+                      setIsPlaying(false);
+                    }}
+                    max={replayData.moves.length}
+                    min={0}
+                    step={1}
+                    className="w-full [&>.relative>.bg-primary]:bg-blue-500 [&>.bg-secondary]:bg-white/10"
+                  />
+                </div>
+
+                {/* Control Buttons */}
+                <div className="flex items-center justify-center gap-3">
                   <Button
                     variant="outline"
-                    size="sm"
-                    onClick={() => setShowAllPieces(!showAllPieces)}
-                    className="flex rounded-full items-center gap-1 sm:gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-xs sm:text-sm px-2 sm:px-3"
+                    size="icon"
+                    onClick={() => {
+                      setCurrentMoveIndex(-1);
+                      setIsPlaying(false);
+                    }}
+                    className="w-10 h-10 rounded-full bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all"
                   >
-                    {showAllPieces ? <EyeOff className="h-3 w-3 sm:h-4 sm:w-4" /> : <Eye className="h-3 w-3 sm:h-4 sm:w-4" />}
-                    <span className="hidden sm:inline">{showAllPieces ? 'Hide Pieces' : 'Show All Pieces'}</span>
-                    <span className="sm:hidden">{showAllPieces ? 'Hide' : 'Show'}</span>
+                    <RotateCcw className="h-4 w-4" />
                   </Button>
-                  <Badge variant="outline" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
-                    Move {currentMoveIndex + 1} of {replayData.moves.length}
-                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setCurrentMoveIndex(Math.max(-1, currentMoveIndex - 1));
+                      setIsPlaying(false);
+                    }}
+                    disabled={currentMoveIndex <= -1}
+                    className="w-10 h-10 rounded-full bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all disabled:opacity-30"
+                  >
+                    <SkipBack className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    disabled={currentMoveIndex >= replayData.moves.length - 1}
+                    className={cn(
+                      "w-14 h-14 rounded-full border-2 transition-all shadow-lg",
+                      isPlaying
+                        ? "bg-red-500/20 border-red-500 text-red-500 hover:bg-red-500/30 hover:shadow-red-500/20"
+                        : "bg-blue-500/20 border-blue-500 text-blue-400 hover:bg-blue-500/30 hover:shadow-blue-500/20",
+                    )}
+                  >
+                    {isPlaying ? (
+                      <Pause className="h-6 w-6" fill="currentColor" />
+                    ) : (
+                      <Play className="h-6 w-6 ml-1" fill="currentColor" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => {
+                      setCurrentMoveIndex(
+                        Math.min(
+                          replayData.moves.length - 1,
+                          currentMoveIndex + 1,
+                        ),
+                      );
+                      setIsPlaying(false);
+                    }}
+                    disabled={currentMoveIndex >= replayData.moves.length - 1}
+                    className="w-10 h-10 rounded-full bg-white/5 border-white/10 text-white/60 hover:text-white hover:bg-white/10 hover:border-white/30 transition-all disabled:opacity-30"
+                  >
+                    <SkipForward className="h-4 w-4" />
+                  </Button>
                 </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 sm:p-6">
+
+                {/* Speed Control */}
+                <div className="space-y-3 pt-4 border-t border-white/5">
+                  <div className="flex justify-between items-center text-[10px] font-mono uppercase tracking-wider text-white/40">
+                    <span>Tempo Control</span>
+                    <span>{playbackSpeed}ms / turn</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Rewind className="h-4 w-4 text-white/20" />
+                    <Slider
+                      value={[2000 - playbackSpeed]}
+                      onValueChange={([value]: number[]) =>
+                        setPlaybackSpeed(2000 - value)
+                      }
+                      max={1800}
+                      min={200}
+                      step={200}
+                      className="flex-1 [&>.relative>.bg-primary]:bg-white/20"
+                    />
+                    <FastForward className="h-4 w-4 text-white/20" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Move Info */}
+            {currentMove && (
               <motion.div
-                initial={{ scale: 0.95, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="grid grid-cols-9 gap-1 sm:gap-2 w-full max-w-2xl mx-auto p-0 sm:p-4 rounded-lg bg-white/5 backdrop-blur-sm border sm:border border-white/10 overflow-hidden"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="rounded-sm border border-white/10 bg-white/5 backdrop-blur-md overflow-hidden relative group"
               >
-                {(currentBoard || replayData.initialBoard).map((row: any, rowIndex: number) =>
-                  row.map((cell: any, colIndex: number) => {
-                    const isLastMoveFrom = currentMove?.fromRow === rowIndex && currentMove?.fromCol === colIndex;
-                    const isLastMoveTo = currentMove?.toRow === rowIndex && currentMove?.toCol === colIndex;
-                    const isChallenge = currentMove?.moveType === "challenge";
-                    
-                    // Calculate arrow direction for "from" position
-                    const getArrowDirection = () => {
-                      if (!isLastMoveFrom || !currentMove) return null;
-                      
-                      const rowDiff = currentMove.toRow - currentMove.fromRow!;
-                      const colDiff = currentMove.toCol - currentMove.fromCol!;
-                      
-                      if (rowDiff > 0) return ArrowDown; // Moving down
-                      if (rowDiff < 0) return ArrowUp;   // Moving up
-                      if (colDiff > 0) return ArrowRight; // Moving right
-                      if (colDiff < 0) return ArrowLeft;  // Moving left
-                      
-                      return null;
-                    };
-                    
-                    const ArrowComponent = getArrowDirection();
-                    
-                    return (
-                      <motion.div
-                        key={`${rowIndex}-${colIndex}`}
-                        animate={isLastMoveFrom || isLastMoveTo ? {
-                          scale: [1, 1.05, 1],
-                        } : {}}
-                        transition={{ duration: 0.5 }}
-                        className={cn('aspect-square border-2 flex items-center justify-center rounded-lg transition-all bg-muted/30 border-border relative', 
-                            isLastMoveFrom && isChallenge ? 'ring-2 ring-red-500' : '',
-                            isLastMoveFrom && !isChallenge ? 'ring-2 ring-yellow-500' : '',
-                            isLastMoveTo && isChallenge ? 'ring-2 ring-red-500' : '',
-                            isLastMoveTo && !isChallenge ? 'ring-2 ring-yellow-500' : ''
+                {/* Decorative corner accents */}
+                <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors z-20" />
+                <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors z-20" />
+                <div className="p-4 border-b border-white/10 flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-blue-400" />
+                  <h3 className="text-xs font-mono uppercase tracking-widest text-white/40">
+                    Action Log
+                  </h3>
+                </div>
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <span className="text-white/40">SEQUENCE:</span>
+                    <span className="text-white/80">
+                      #{currentMoveIndex + 1}
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded bg-black/40 border border-white/5 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-white/40 font-mono">TYPE:</span>
+                      <Badge
+                        variant={
+                          currentMove.moveType === "challenge"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                        className={cn(
+                          "h-5 text-[10px] tracking-wider uppercase font-mono rounded-sm px-1.5",
+                          currentMove.moveType === "challenge"
+                            ? "bg-red-900/40 text-red-400 border-red-500/20"
+                            : "bg-blue-900/40 text-blue-400 border-blue-500/20",
                         )}
                       >
-                        {/* Directional arrow indicator for "from" position */}
-                        {isLastMoveFrom && ArrowComponent && (
-                          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                            <div className="rounded-full p-0.5 sm:p-1">
-                              <ArrowComponent className={cn("h-3 w-3 sm:h-4 sm:w-4",
-                                isChallenge ? "text-red-500" : "text-yellow-500"
-                              )} />
+                        {currentMove.moveType}
+                      </Badge>
+                    </div>
+
+                    {currentMove.piece && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-white/40 font-mono">UNIT:</span>
+                        <span className="text-white font-bold">
+                          {currentMove.piece}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-white/5 font-mono text-[10px]">
+                      <div className="flex items-center gap-2 text-white/30">
+                        <span className="uppercase">Origin</span>
+                        <span className="text-white/60">
+                          [{currentMove.fromRow}, {currentMove.fromCol}]
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-white/30 justify-end">
+                        <span className="text-white/60">
+                          [{currentMove.toRow}, {currentMove.toCol}]
+                        </span>
+                        <span className="uppercase">Dest</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Battle Outcome Display */}
+                  {currentMove.challengeResult && (
+                    <div className="space-y-2">
+                      <div className="text-[10px] font-mono uppercase tracking-widest text-white/30">
+                        Engagement Result
+                      </div>
+                      <div className="p-3 bg-red-500/5 border border-red-500/20 rounded relative overflow-hidden">
+                        {/* Flash effect for heavy combat */}
+                        <div className="absolute top-0 right-0 p-1">
+                          <Sword className="w-8 h-8 text-red-500/10 rotate-12" />
+                        </div>
+
+                        <div className="flex justify-between items-center relative z-10 text-xs">
+                          {/* Attacker */}
+                          <div
+                            className={cn(
+                              "text-center",
+                              currentMove.challengeResult.winner === "attacker"
+                                ? "text-green-400"
+                                : "text-red-400 opacity-60",
+                            )}
+                          >
+                            <div className="font-bold">
+                              {currentMove.challengeResult.attacker}
+                            </div>
+                            <div className="text-[9px] uppercase tracking-wider opacity-50">
+                              ATK
                             </div>
                           </div>
-                        )}
-                        
-                        {cell && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <div className="text-center cursor-pointer">
-                                <div className={`${cell.player === 'player1' ? 'text-blue-400' : 'text-red-400'}`}>
-                                  {(showAllPieces || cell.revealed) ? (
-                                    <div className="flex flex-col items-center justify-center">
-                                      <div className="flex items-center justify-center">
-                                        {getPieceDisplay(cell.piece, { showLabel: false, size: "small" })}
-                                      </div>
-                                      <div className="hidden sm:block text-center mt-0.5 text-xs">{cell.piece}</div>
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center">
-                                      <Square className="w-4 h-4 sm:w-6 sm:h-6" fill="currentColor" />
-                                      <div className="text-[10px] sm:text-xs mt-0.5 sm:mt-1">Hidden</div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p>{(showAllPieces || cell.revealed) ? cell.piece : 'Hidden Piece'}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </motion.div>
-                    );
-                  })
-                )}
-              </motion.div>
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Controls and Info */}
-        <div className="space-y-4 lg:space-y-6">
-          {/* Playback Controls */}
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader className="p-3 sm:p-6">
-              <CardTitle className="flex items-center gap-2 text-white/90">
-                <Play className="h-5 w-5 text-green-400" />
-                Playback Controls
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4 p-3 sm:p-6">
-              {/* Timeline Slider */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Move Timeline</label>
-                <Slider
-                  value={[currentMoveIndex + 1]}
-                  onValueChange={([value]: number[]) => {
-                    setCurrentMoveIndex(value - 1);
-                    setIsPlaying(false);
-                  }}
-                  max={replayData.moves.length}
-                  min={0}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Start</span>
-                  <span>End</span>
-                </div>
-              </div>
-
-              {/* Control Buttons */}
-              <div className="flex items-center justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCurrentMoveIndex(-1);
-                    setIsPlaying(false);
-                  }}
-                  className="bg-white/10 rounded-full px-3 sm:px-4 py-2 sm:py-3 border-white/20 text-white/90 hover:bg-white/20"
-                >
-                  <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCurrentMoveIndex(Math.max(-1, currentMoveIndex - 1));
-                    setIsPlaying(false);
-                  }}
-                  disabled={currentMoveIndex <= -1}
-                  className="bg-white/10 rounded-full px-3 sm:px-4 py-2 sm:py-3 border-white/20 text-white/90 hover:bg-white/20 disabled:opacity-50"
-                >
-                  <SkipBack className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
-                <Button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  disabled={currentMoveIndex >= replayData.moves.length - 1}
-                  className="px-3 sm:px-4 py-2 sm:py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
-                >
-                  {isPlaying ? <Pause className="h-3 w-3 sm:h-4 sm:w-4" /> : <Play className="h-3 w-3 sm:h-4 sm:w-4" />}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setCurrentMoveIndex(Math.min(replayData.moves.length - 1, currentMoveIndex + 1));
-                    setIsPlaying(false);
-                  }}
-                  disabled={currentMoveIndex >= replayData.moves.length - 1}
-                  className="bg-white/10 rounded-full px-3 sm:px-4 py-2 sm:py-3 border-white/20 text-white/90 hover:bg-white/20 disabled:opacity-50"
-                >
-                  <SkipForward className="h-3 w-3 sm:h-4 sm:w-4" />
-                </Button>
-              </div>
-
-              {/* Speed Control */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-white/80">Playback Speed</label>
-                <div className="flex items-center gap-2">
-                  <Rewind className="h-4 w-4 text-white/60" />
-                  <Slider
-                    value={[2000 - playbackSpeed]}
-                    onValueChange={([value]: number[]) => setPlaybackSpeed(2000 - value)}
-                    max={1800}
-                    min={200}
-                    step={200}
-                    className="flex-1"
-                  />
-                  <FastForward className="h-4 w-4 text-white/60" />
-                </div>
-                <div className="text-xs text-white/50 text-center">
-                  {playbackSpeed <= 400 ? "Very Fast" : 
-                   playbackSpeed <= 800 ? "Fast" : 
-                   playbackSpeed <= 1200 ? "Normal" : 
-                   playbackSpeed <= 1600 ? "Slow" : "Very Slow"}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Current Move Info */}
-          {currentMove && (
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader className="p-3 sm:p-6">
-                <CardTitle className="flex items-center gap-2 text-white/90">
-                  <Sword className="h-5 w-5 text-red-400" />
-                  Current Move
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-6">
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-white/60">Move #:</span>
-                    <span className="font-medium text-white/90">{currentMoveIndex + 1}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/60">Type:</span>
-                    <Badge variant={currentMove.moveType === "challenge" ? "destructive" : "secondary"} 
-                           className={currentMove.moveType === "challenge" ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-blue-500/20 text-blue-300 border-blue-500/30"}>
-                      {currentMove.moveType}
-                    </Badge>
-                  </div>
-                  {currentMove.piece && (
-                    <div className="flex justify-between">
-                      <span className="text-white/60">Piece:</span>
-                      <span className="font-medium text-white/90">{currentMove.piece}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-white/60">From:</span>
-                    <span className="font-mono text-white/90">({currentMove.fromRow}, {currentMove.fromCol})</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-white/60">To:</span>
-                    <span className="font-mono text-white/90">({currentMove.toRow}, {currentMove.toCol})</span>
-                  </div>
-                  {currentMove.challengeResult && (
-                    <div className="mt-3 p-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg">
-                      <div className="font-medium text-sm mb-3 text-white/90 flex items-center gap-2">
-                        <Sword className="h-4 w-4 text-red-400" />
-                        Battle Result
-                      </div>
-                      
-                      {/* VS Battle Display */}
-                      <div className="flex items-center justify-between gap-3">
-                        {/* Attacker */}
-                        <div className={`flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
-                          currentMove.challengeResult.winner === "attacker" 
-                            ? "bg-green-500/20 border-green-500/50 shadow-green-500/20 shadow-lg" 
-                            : currentMove.challengeResult.winner === "tie"
-                            ? "bg-yellow-500/20 border-yellow-500/50"
-                            : "bg-red-500/20 border-red-500/50"
-                        }`}>
-                          <div className="text-xs text-white/60 mb-1">Attacker</div>
-                          <div className={`font-bold text-sm ${
-                            currentMove.playerId === replayData.game.player1Id ? 'text-blue-400' : 'text-red-400'
-                          }`}>
-                            {currentMove.challengeResult.attacker}
+                          <div className="text-white/20 font-mono font-bold">
+                            VS
                           </div>
-                          {currentMove.challengeResult.winner === "attacker" && (
-                            <Crown className="h-3 w-3 text-yellow-400 mt-1" />
-                          )}
-                        </div>
 
-                        {/* VS Indicator */}
-                        <div className="flex flex-col items-center">
-                          <div className="text-white/40 text-xs font-bold">VS</div>
-                          <Sword className="h-4 w-4 text-white/40 rotate-90" />
-                        </div>
-
-                        {/* Defender */}
-                        <div className={`flex flex-col items-center p-2 rounded-lg border-2 transition-all ${
-                          currentMove.challengeResult.winner === "defender" 
-                            ? "bg-green-500/20 border-green-500/50 shadow-green-500/20 shadow-lg" 
-                            : currentMove.challengeResult.winner === "tie"
-                            ? "bg-yellow-500/20 border-yellow-500/50"
-                            : "bg-red-500/20 border-red-500/50"
-                        }`}>
-                          <div className="text-xs text-white/60 mb-1">Defender</div>
-                          <div className={`font-bold text-sm ${
-                            currentMove.playerId === replayData.game.player1Id ? 'text-red-400' : 'text-blue-400'
-                          }`}>
-                            {currentMove.challengeResult.defender}
+                          {/* Defender */}
+                          <div
+                            className={cn(
+                              "text-center",
+                              currentMove.challengeResult.winner === "defender"
+                                ? "text-green-400"
+                                : "text-red-400 opacity-60",
+                            )}
+                          >
+                            <div className="font-bold">
+                              {currentMove.challengeResult.defender}
+                            </div>
+                            <div className="text-[9px] uppercase tracking-wider opacity-50">
+                              DEF
+                            </div>
                           </div>
-                          {currentMove.challengeResult.winner === "defender" && (
-                            <Crown className="h-3 w-3 text-yellow-400 mt-1" />
-                          )}
                         </div>
-                      </div>
 
-                      {/* Result Summary */}
-                      <div className="mt-3 text-center">
-                        <div className={`text-xs font-medium ${
-                          currentMove.challengeResult.winner === "tie" 
-                            ? "text-yellow-400" 
-                            : "text-green-400"
-                        }`}>
-                          {currentMove.challengeResult.winner === "tie" 
-                            ? "🤝 Both pieces eliminated" 
-                            : currentMove.challengeResult.winner === "attacker"
-                            ? "⚔️ Attacker victorious"
-                            : "🛡️ Defender holds position"
-                          }
+                        <div className="mt-3 pt-2 border-t border-red-500/10 text-center">
+                          <div
+                            className={cn(
+                              "text-[10px] uppercase tracking-widest font-bold",
+                              currentMove.challengeResult.winner === "tie"
+                                ? "text-yellow-500"
+                                : currentMove.challengeResult.winner ===
+                                    "attacker"
+                                  ? "text-green-500"
+                                  : "text-blue-500",
+                            )}
+                          >
+                            {currentMove.challengeResult.winner === "tie" &&
+                              "Mutually Assured Destruction"}
+                            {currentMove.challengeResult.winner ===
+                              "attacker" && "Attacker Victory"}
+                            {currentMove.challengeResult.winner ===
+                              "defender" && "Defender Repelled Attack"}
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </motion.div>
+            )}
 
-          {/* Players Info */}
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardHeader className="p-3 sm:p-6">
-              <CardTitle className="flex items-center gap-2 text-white/90">
-                <Crown className="h-5 w-5 text-yellow-400" />
-                Players
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-3 sm:p-6">
-              <motion.div 
-                initial={{ x: -10, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="flex items-center gap-3 p-2 rounded bg-blue-500/10 backdrop-blur-sm border border-blue-500/20"
-              >
-                <div className="w-4 h-4 bg-blue-400 rounded-full shadow-lg shadow-blue-400/50"></div>
-                <span className="font-medium text-blue-400">{replayData.player1Username}</span>
-              </motion.div>
-              <motion.div 
-                initial={{ x: -10, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: 0.1 }}
-                className="flex items-center gap-3 p-2 rounded bg-red-500/10 backdrop-blur-sm border border-red-500/20"
-              >
-                <div className="w-4 h-4 bg-red-400 rounded-full shadow-lg shadow-red-400/50"></div>
-                <span className="font-medium text-red-400">{replayData.player2Username}</span>
-              </motion.div>
-            </CardContent>
-          </Card>
+            {/* Players Info */}
+            <div className="rounded-sm border border-white/10 bg-white/5 backdrop-blur-md p-4 space-y-4 relative group overflow-hidden">
+              {/* Decorative corner accents */}
+              <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors z-20" />
+              <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors z-20" />
+              <h3 className="text-xs font-mono uppercase tracking-widest text-white/40 flex items-center gap-2">
+                <User className="w-3 h-3" />
+                Commanders
+              </h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between p-2 rounded bg-blue-500/5 border border-blue-500/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                    <span className="font-mono text-xs text-blue-200">
+                      {replayData.player1Username}
+                    </span>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="border-blue-500/20 text-blue-400 text-[9px] h-5"
+                  >
+                    P1
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded bg-red-500/5 border border-red-500/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                    <span className="font-mono text-xs text-red-200">
+                      {replayData.player2Username}
+                    </span>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className="border-red-500/20 text-red-400 text-[9px] h-5"
+                  >
+                    P2
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
     </TooltipProvider>
   );
 }

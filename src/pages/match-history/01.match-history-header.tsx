@@ -1,11 +1,15 @@
+import { useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { History, Swords, Activity } from "lucide-react";
+import { Swords, Upload } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface MatchHistoryHeaderProps {
   totalMatches: number;
 }
 
 export function MatchHistoryHeader({ totalMatches }: MatchHistoryHeaderProps) {
+  const navigate = useNavigate();
+
   return (
     <div className="relative mb-8 sm:mb-12">
       <motion.div
@@ -47,6 +51,22 @@ export function MatchHistoryHeader({ totalMatches }: MatchHistoryHeaderProps) {
                   {totalMatches}
                 </span>
               </div>
+            </div>
+
+            <div className="flex flex-col items-end">
+              <span className="text-xs font-mono text-white/40 tracking-widest uppercase mb-1">
+                Local Database
+              </span>
+              <Button
+                variant="outline"
+                onClick={() => navigate({ to: "/replay" })}
+                className="h-[42px] bg-white/5 border-white/10 text-zinc-300 hover:text-white hover:bg-white/10 hover:border-blue-500/50 transition-all group"
+              >
+                <Upload className="w-4 h-4 mr-2 group-hover:text-blue-400 transition-colors" />
+                <span className="font-mono text-sm tracking-wide">
+                  Load Replay
+                </span>
+              </Button>
             </div>
           </div>
         </div>
