@@ -920,9 +920,6 @@ export const checkAndUpdateExpiredSubscriptions = internalMutation({
 export const sendExpiryNotifications = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const now = Date.now();
-    const oneDay = 24 * 60 * 60 * 1000;
-
     const subscriptions = await ctx.db
       .query("subscriptions")
       .withIndex("by_expires_at")
