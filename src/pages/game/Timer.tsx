@@ -14,15 +14,15 @@ interface TimerProps {
   turnStartTime?: number; // timestamp when current turn started
 }
 
-export const Timer = memo(function Timer({ 
-  duration, 
-  onTimeout, 
-  label, 
-  variant = "game", 
+export const Timer = memo(function Timer({
+  duration,
+  onTimeout,
+  label,
+  variant = "game",
   isActive = false,
   timeUsed = 0,
   onTimeUpdate: _onTimeUpdate,
-  turnStartTime
+  turnStartTime,
 }: TimerProps) {
   const [timeLeft, setTimeLeft] = useState(duration);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -65,9 +65,9 @@ export const Timer = memo(function Timer({
     intervalRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       const remaining = Math.max(0, initialTimeLeft - elapsed);
-      
+
       setTimeLeft(remaining);
-      
+
       // Check for timeout
       if (remaining <= 0) {
         handleTimeout();
@@ -84,7 +84,7 @@ export const Timer = memo(function Timer({
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   }, []);
 
   const progressValue = ((duration - timeLeft) / duration) * 100;
@@ -94,17 +94,57 @@ export const Timer = memo(function Timer({
   const getVariantStyles = useCallback(() => {
     if (variant === "setup") {
       return {
-        bgColor: isCritical ? "bg-red-500/10" : isLowTime ? "bg-yellow-500/10" : "bg-blue-500/10",
-        borderColor: isCritical ? "border-red-500/30" : isLowTime ? "border-yellow-500/30" : "border-blue-500/30",
-        textColor: isCritical ? "text-red-400" : isLowTime ? "text-yellow-400" : "text-blue-400",
-        iconColor: isCritical ? "text-red-500" : isLowTime ? "text-yellow-500" : "text-blue-500"
+        bgColor: isCritical
+          ? "bg-red-500/10"
+          : isLowTime
+            ? "bg-yellow-500/10"
+            : "bg-blue-500/10",
+        borderColor: isCritical
+          ? "border-red-500/30"
+          : isLowTime
+            ? "border-yellow-500/30"
+            : "border-blue-500/30",
+        textColor: isCritical
+          ? "text-red-400"
+          : isLowTime
+            ? "text-yellow-400"
+            : "text-blue-400",
+        iconColor: isCritical
+          ? "text-red-500"
+          : isLowTime
+            ? "text-yellow-500"
+            : "text-blue-500",
       };
     } else {
       return {
-        bgColor: isCritical ? "bg-red-500/10" : isLowTime ? "bg-orange-500/10" : !isActive ? "bg-gray-500/10" : "bg-green-500/10",
-        borderColor: isCritical ? "border-red-500/30" : isLowTime ? "border-orange-500/30" : !isActive ? "border-gray-500/30" : "border-green-500/30",
-        textColor: isCritical ? "text-red-400" : isLowTime ? "text-orange-400" : !isActive ? "text-gray-400" : "text-green-400",
-        iconColor: isCritical ? "text-red-500" : isLowTime ? "text-orange-500" : !isActive ? "text-gray-500" : "text-green-500"
+        bgColor: isCritical
+          ? "bg-red-500/10"
+          : isLowTime
+            ? "bg-orange-500/10"
+            : !isActive
+              ? "bg-gray-500/10"
+              : "bg-green-500/10",
+        borderColor: isCritical
+          ? "border-red-500/30"
+          : isLowTime
+            ? "border-orange-500/30"
+            : !isActive
+              ? "border-gray-500/30"
+              : "border-green-500/30",
+        textColor: isCritical
+          ? "text-red-400"
+          : isLowTime
+            ? "text-orange-400"
+            : !isActive
+              ? "text-gray-400"
+              : "text-green-400",
+        iconColor: isCritical
+          ? "text-red-500"
+          : isLowTime
+            ? "text-orange-500"
+            : !isActive
+              ? "text-gray-500"
+              : "text-green-500",
       };
     }
   }, [variant, isCritical, isLowTime, isActive]);
@@ -114,38 +154,45 @@ export const Timer = memo(function Timer({
   return (
     <motion.div
       initial={{ scale: 0.95, opacity: 0 }}
-      animate={{ 
+      animate={{
         scale: isCritical && isActive ? [1, 1.02, 1] : 1,
-        opacity: !isActive ? 0.6 : 1 
+        opacity: !isActive ? 0.6 : 1,
       }}
       transition={{
-        scale: isCritical && isActive ? { repeat: Infinity, duration: 1 } : { duration: 0.3 },
-        opacity: { duration: 0.3 }
+        scale:
+          isCritical && isActive
+            ? { repeat: Infinity, duration: 1 }
+            : { duration: 0.3 },
+        opacity: { duration: 0.3 },
       }}
-      className={`${styles.bgColor} ${styles.borderColor} border backdrop-blur-md rounded-lg p-2`}
+      className={`${styles.bgColor} ${styles.borderColor} border backdrop-blur-md rounded-sm p-3 font-mono shadow-[0_0_15px_rgba(0,0,0,0.3)]`}
     >
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           {isCritical && isActive ? (
-            <AlertTriangle className={`h-4 w-4 ${styles.iconColor}`} />
+            <AlertTriangle
+              className={`h-4 w-4 ${styles.iconColor} animate-pulse`}
+            />
           ) : (
             <Clock className={`h-4 w-4 ${styles.iconColor}`} />
           )}
-          <span className="text-sm font-medium text-muted-foreground mr-4">
-            {label} {!isActive && "(Waiting)"}
+          <span className="text-xs font-bold tracking-widest text-muted-foreground mr-4 uppercase">
+            {label} {!isActive && "(WAITING)"}
           </span>
         </div>
-        <span className={`font-mono text-lg font-bold ${styles.textColor}`}>
+        <span
+          className={`text-xl font-black ${styles.textColor} tracking-tight`}
+        >
           {formatTime(timeLeft)}
         </span>
       </div>
-      
-      <Progress 
-        value={progressValue} 
+
+      <Progress
+        value={progressValue}
         className="h-2"
         // Note: We might need to add custom color variants to the Progress component
       />
-      
+
       {isCritical && isActive && (
         <motion.p
           initial={{ opacity: 0 }}

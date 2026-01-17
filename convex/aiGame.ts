@@ -1,4 +1,10 @@
-import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
+import {
+  query,
+  mutation,
+  action,
+  internalMutation,
+  internalQuery,
+} from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
@@ -7,28 +13,34 @@ import { Doc } from "./_generated/dataModel";
 
 // Game pieces and their ranks (same as regular games)
 const PIECES = {
-  "Flag": 0,
-  "Private": 1,
-  "Sergeant": 2,
+  Flag: 0,
+  Private: 1,
+  Sergeant: 2,
   "2nd Lieutenant": 3,
   "1st Lieutenant": 4,
-  "Captain": 5,
-  "Major": 6,
+  Captain: 5,
+  Major: 6,
   "Lieutenant Colonel": 7,
-  "Colonel": 8,
+  Colonel: 8,
   "1 Star General": 9,
   "2 Star General": 10,
   "3 Star General": 11,
   "4 Star General": 12,
   "5 Star General": 13,
-  "Spy": 14,
+  Spy: 14,
 };
 
 // Initial piece setup for each player (21 pieces total)
 const INITIAL_PIECES = [
   "Flag",
-  "Spy", "Spy",
-  "Private", "Private", "Private", "Private", "Private", "Private",
+  "Spy",
+  "Spy",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
   "Sergeant",
   "2nd Lieutenant",
   "1st Lieutenant",
@@ -40,12 +52,14 @@ const INITIAL_PIECES = [
   "2 Star General",
   "3 Star General",
   "4 Star General",
-  "5 Star General"
+  "5 Star General",
 ];
 
 // Create empty board
 function createEmptyBoard() {
-  return Array(8).fill(null).map(() => Array(9).fill(null));
+  return Array(8)
+    .fill(null)
+    .map(() => Array(9).fill(null));
 }
 
 // Generate random AI setup
@@ -53,7 +67,7 @@ function generateAISetup() {
   const shuffledPieces = [...INITIAL_PIECES].sort(() => Math.random() - 0.5);
   const board = createEmptyBoard();
   let pieceIndex = 0;
-  
+
   // AI places pieces in rows 0, 1, 2 (top of board)
   for (let row = 0; row < 3; row++) {
     for (let col = 0; col < 9; col++) {
@@ -67,15 +81,19 @@ function generateAISetup() {
       }
     }
   }
-  
+
   return board;
 }
 
 // Start a new AI game session
 export const startAIGameSession = mutation({
-  args: { 
-    profileId: v.id("profiles"), 
-    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
+  args: {
+    profileId: v.id("profiles"),
+    difficulty: v.union(
+      v.literal("easy"),
+      v.literal("medium"),
+      v.literal("hard"),
+    ),
     behavior: v.union(
       v.literal("aggressive"),
       v.literal("defensive"),
@@ -83,13 +101,20 @@ export const startAIGameSession = mutation({
       v.literal("balanced"),
     ),
   },
-  returns: v.object({ 
-    sessionId: v.string(), 
-    initialBoard: v.array(v.array(v.union(v.null(), v.object({
-      piece: v.string(),
-      player: v.union(v.literal("player1"), v.literal("player2")),
-      revealed: v.boolean(),
-    }))))
+  returns: v.object({
+    sessionId: v.string(),
+    initialBoard: v.array(
+      v.array(
+        v.union(
+          v.null(),
+          v.object({
+            piece: v.string(),
+            player: v.union(v.literal("player1"), v.literal("player2")),
+            revealed: v.boolean(),
+          }),
+        ),
+      ),
+    ),
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -120,21 +145,29 @@ export const startAIGameSession = mutation({
       pro: ["easy", "medium", "hard"],
       pro_plus: ["easy", "medium", "hard"],
     } as const;
-    const allowedDifficulties = ALLOWED_DIFFICULTIES[tier] ?? ALLOWED_DIFFICULTIES.free;
+    const allowedDifficulties =
+      ALLOWED_DIFFICULTIES[tier] ?? ALLOWED_DIFFICULTIES.free;
 
-    if (args.difficulty === "hard" && (!allowedDifficulties.includes("hard") || !isActive)) {
+    if (
+      args.difficulty === "hard" &&
+      (!allowedDifficulties.includes("hard") || !isActive)
+    ) {
       if (!isActive && tier !== "free") {
-        throw new Error("Your subscription has expired. Please renew to access Hard difficulty.");
+        throw new Error(
+          "Your subscription has expired. Please renew to access Hard difficulty.",
+        );
       }
-      throw new Error("Hard difficulty is only available for Pro and Pro+ subscribers. Upgrade to unlock advanced AI opponents.");
+      throw new Error(
+        "Hard difficulty is only available for Pro and Pro+ subscribers. Upgrade to unlock advanced AI opponents.",
+      );
     }
 
     // Generate unique session ID
     const sessionId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Generate AI setup
     const aiBoard = generateAISetup();
-    
+
     // Store session in database
     const inserted = await ctx.db.insert("aiGameSessions", {
       sessionId,
@@ -155,9 +188,9 @@ export const startAIGameSession = mutation({
     // Mark profile with active ai session id for quick presence lookup
     await ctx.db.patch(profile._id, { aiSessionId: inserted });
 
-    return { 
-      sessionId, 
-      initialBoard: aiBoard
+    return {
+      sessionId,
+      initialBoard: aiBoard,
     };
   },
 });
@@ -165,50 +198,74 @@ export const startAIGameSession = mutation({
 // Get AI game session
 export const getAIGameSession = query({
   args: { sessionId: v.string() },
-  returns: v.union(v.null(), v.object({
-    _id: v.id("aiGameSessions"),
-    _creationTime: v.number(),
-    sessionId: v.string(),
-    playerId: v.id("users"),
-    playerUsername: v.string(),
-    behavior: v.union(
-      v.literal("aggressive"),
-      v.literal("defensive"),
-      v.literal("passive"),
-      v.literal("balanced"),
-    ),
-    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
-    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
-    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
-    board: v.array(v.array(v.union(v.null(), v.object({
-      piece: v.string(),
-      player: v.union(v.literal("player1"), v.literal("player2")),
-      revealed: v.boolean(),
-    })))),
-    playerSetup: v.boolean(),
-    aiSetup: v.boolean(),
-    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
-    gameEndReason: v.optional(v.union(
-      v.literal("flag_captured"),
-      v.literal("flag_reached_base"),
-      v.literal("timeout"),
-      v.literal("surrender"),
-      v.literal("elimination")
-    )),
-    createdAt: v.number(),
-    setupTimeStarted: v.optional(v.number()),
-    gameTimeStarted: v.optional(v.number()),
-    lastMoveTime: v.optional(v.number()),
-    lastMoveFrom: v.optional(v.object({
-      row: v.number(),
-      col: v.number(),
-    })),
-    lastMoveTo: v.optional(v.object({
-      row: v.number(),
-      col: v.number(),
-    })),
-    moveCount: v.number(),
-  })),
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("aiGameSessions"),
+      _creationTime: v.number(),
+      sessionId: v.string(),
+      playerId: v.id("users"),
+      playerUsername: v.string(),
+      behavior: v.union(
+        v.literal("aggressive"),
+        v.literal("defensive"),
+        v.literal("passive"),
+        v.literal("balanced"),
+      ),
+      difficulty: v.union(
+        v.literal("easy"),
+        v.literal("medium"),
+        v.literal("hard"),
+      ),
+      status: v.union(
+        v.literal("setup"),
+        v.literal("playing"),
+        v.literal("finished"),
+      ),
+      currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+      board: v.array(
+        v.array(
+          v.union(
+            v.null(),
+            v.object({
+              piece: v.string(),
+              player: v.union(v.literal("player1"), v.literal("player2")),
+              revealed: v.boolean(),
+            }),
+          ),
+        ),
+      ),
+      playerSetup: v.boolean(),
+      aiSetup: v.boolean(),
+      winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+      gameEndReason: v.optional(
+        v.union(
+          v.literal("flag_captured"),
+          v.literal("flag_reached_base"),
+          v.literal("timeout"),
+          v.literal("surrender"),
+          v.literal("elimination"),
+        ),
+      ),
+      createdAt: v.number(),
+      setupTimeStarted: v.optional(v.number()),
+      gameTimeStarted: v.optional(v.number()),
+      lastMoveTime: v.optional(v.number()),
+      lastMoveFrom: v.optional(
+        v.object({
+          row: v.number(),
+          col: v.number(),
+        }),
+      ),
+      lastMoveTo: v.optional(
+        v.object({
+          row: v.number(),
+          col: v.number(),
+        }),
+      ),
+      moveCount: v.number(),
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -230,11 +287,13 @@ export const getAIGameSession = query({
 export const setupAIGamePieces = mutation({
   args: {
     sessionId: v.string(),
-    pieces: v.array(v.object({
-      piece: v.string(),
-      row: v.number(),
-      col: v.number(),
-    })),
+    pieces: v.array(
+      v.object({
+        piece: v.string(),
+        row: v.number(),
+        col: v.number(),
+      }),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -290,7 +349,10 @@ export const setupAIGamePieces = mutation({
 });
 
 // Battle logic helper function
-function resolveBattle(attacker: string, defender: string): "attacker" | "defender" | "tie" {
+function resolveBattle(
+  attacker: string,
+  defender: string,
+): "attacker" | "defender" | "tie" {
   const attackerRank = PIECES[attacker as keyof typeof PIECES];
   const defenderRank = PIECES[defender as keyof typeof PIECES];
 
@@ -360,12 +422,18 @@ export const makeAIGameMove = mutation({
   },
   returns: v.object({
     success: v.boolean(),
-    challengeResult: v.optional(v.object({
-      attacker: v.string(),
-      defender: v.string(),
-      winner: v.union(v.literal("attacker"), v.literal("defender"), v.literal("tie")),
-    })),
-    winner: v.optional(v.union(v.literal("player1"), v.literal("player2")))
+    challengeResult: v.optional(
+      v.object({
+        attacker: v.string(),
+        defender: v.string(),
+        winner: v.union(
+          v.literal("attacker"),
+          v.literal("defender"),
+          v.literal("tie"),
+        ),
+      }),
+    ),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
   }),
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -397,8 +465,12 @@ export const makeAIGameMove = mutation({
     // Check if move is valid (adjacent squares only)
     const rowDiff = Math.abs(args.toRow - args.fromRow);
     const colDiff = Math.abs(args.toCol - args.fromCol);
-    if (!((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1))) {
-      throw new Error("Invalid move - pieces can only move to adjacent squares");
+    if (
+      !((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1))
+    ) {
+      throw new Error(
+        "Invalid move - pieces can only move to adjacent squares",
+      );
     }
 
     // Check bounds
@@ -409,7 +481,11 @@ export const makeAIGameMove = mutation({
     const toPiece = session.board[args.toRow][args.toCol];
     const newBoard = session.board.map((row) => [...row]);
 
-    let challengeResult: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" } | null = null;
+    let challengeResult: {
+      attacker: string;
+      defender: string;
+      winner: "attacker" | "defender" | "tie";
+    } | null = null;
     let gameWinner: "player1" | "player2" | null = null;
 
     if (toPiece) {
@@ -454,7 +530,10 @@ export const makeAIGameMove = mutation({
     }
 
     // Check if either player has only the flag remaining
-    const hasOnlyFlag = (board: Doc<"aiGameSessions">["board"], player: "player1" | "player2"): boolean => {
+    const hasOnlyFlag = (
+      board: Doc<"aiGameSessions">["board"],
+      player: "player1" | "player2",
+    ): boolean => {
       const pieces = [];
       for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 9; col++) {
@@ -504,26 +583,23 @@ export const makeAIGameMove = mutation({
       updates.winner = gameWinner;
 
       // Determine game end reason
-      let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" = "flag_captured";
+      let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" =
+        "flag_captured";
       if (flagReachedBase) {
         gameEndReason = "flag_reached_base";
       } else if (fromPiece.piece === "Flag" && !toPiece) {
         gameEndReason = "flag_reached_base";
-      } else if (hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")) {
+      } else if (
+        hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")
+      ) {
         gameEndReason = "elimination";
       } else if (challengeResult && challengeResult.defender === "Flag") {
         gameEndReason = "flag_captured";
       }
       updates.gameEndReason = gameEndReason;
 
-      // Clear AI session ID from profile when game ends
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique();
-      if (profile?.aiSessionId) {
-        await ctx.db.patch(profile._id, { aiSessionId: undefined });
-      }
+      // NOTE: Do NOT clear aiSessionId here - let cleanupAIGameSession handle it
+      // when user explicitly leaves via modal actions. This allows the result modal to show.
     }
 
     await ctx.db.patch(session._id, updates);
@@ -531,11 +607,15 @@ export const makeAIGameMove = mutation({
     return {
       success: true,
       challengeResult: challengeResult || undefined,
-      winner: gameWinner || undefined
+      winner: gameWinner || undefined,
     } as {
       success: boolean;
-      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" };
-      winner?: "player1" | "player2"
+      challengeResult?: {
+        attacker: string;
+        defender: string;
+        winner: "attacker" | "defender" | "tie";
+      };
+      winner?: "player1" | "player2";
     };
   },
 });
@@ -546,42 +626,64 @@ export const getAISessionById = internalQuery({
     sessionId: v.string(),
     userId: v.id("users"),
   },
-  returns: v.union(v.null(), v.object({
-    _id: v.id("aiGameSessions"),
-    _creationTime: v.number(),
-    sessionId: v.string(),
-    playerId: v.id("users"),
-    playerUsername: v.string(),
-    behavior: v.union(
-      v.literal("aggressive"),
-      v.literal("defensive"),
-      v.literal("passive"),
-      v.literal("balanced"),
-    ),
-    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
-    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
-    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
-    board: v.array(v.array(v.union(v.null(), v.object({
-      piece: v.string(),
-      player: v.union(v.literal("player1"), v.literal("player2")),
-      revealed: v.boolean(),
-    })))),
-    playerSetup: v.boolean(),
-    aiSetup: v.boolean(),
-    moveCount: v.number(),
-    createdAt: v.number(),
-    setupTimeStarted: v.optional(v.number()),
-    gameTimeStarted: v.optional(v.number()),
-    lastMoveTime: v.optional(v.number()),
-    lastMoveFrom: v.optional(v.object({
-      row: v.number(),
-      col: v.number(),
-    })),
-    lastMoveTo: v.optional(v.object({
-      row: v.number(),
-      col: v.number(),
-    })),
-  })),
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("aiGameSessions"),
+      _creationTime: v.number(),
+      sessionId: v.string(),
+      playerId: v.id("users"),
+      playerUsername: v.string(),
+      behavior: v.union(
+        v.literal("aggressive"),
+        v.literal("defensive"),
+        v.literal("passive"),
+        v.literal("balanced"),
+      ),
+      difficulty: v.union(
+        v.literal("easy"),
+        v.literal("medium"),
+        v.literal("hard"),
+      ),
+      status: v.union(
+        v.literal("setup"),
+        v.literal("playing"),
+        v.literal("finished"),
+      ),
+      currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+      board: v.array(
+        v.array(
+          v.union(
+            v.null(),
+            v.object({
+              piece: v.string(),
+              player: v.union(v.literal("player1"), v.literal("player2")),
+              revealed: v.boolean(),
+            }),
+          ),
+        ),
+      ),
+      playerSetup: v.boolean(),
+      aiSetup: v.boolean(),
+      moveCount: v.number(),
+      createdAt: v.number(),
+      setupTimeStarted: v.optional(v.number()),
+      gameTimeStarted: v.optional(v.number()),
+      lastMoveTime: v.optional(v.number()),
+      lastMoveFrom: v.optional(
+        v.object({
+          row: v.number(),
+          col: v.number(),
+        }),
+      ),
+      lastMoveTo: v.optional(
+        v.object({
+          row: v.number(),
+          col: v.number(),
+        }),
+      ),
+    }),
+  ),
   handler: async (ctx, args) => {
     // OPTIMIZED: Use profile lookup for direct session access
     const profile = await ctx.db
@@ -593,9 +695,13 @@ export const getAISessionById = internalQuery({
 
     // Direct lookup using aiSessionId
     const session = await ctx.db.get(profile.aiSessionId);
-    
+
     // Verify session exists, belongs to user, and matches sessionId
-    if (!session || session.playerId !== args.userId || session.sessionId !== args.sessionId) {
+    if (
+      !session ||
+      session.playerId !== args.userId ||
+      session.sessionId !== args.sessionId
+    ) {
       return null;
     }
 
@@ -606,17 +712,23 @@ export const getAISessionById = internalQuery({
 // Generate AI move
 // OPTIMIZED: Queries database directly via internal query instead of calling public query
 export const generateAIMove = action({
-  args: { 
+  args: {
     sessionId: v.string(),
   },
-  returns: v.union(v.null(), v.object({
-    fromRow: v.number(),
-    fromCol: v.number(),
-    toRow: v.number(),
-    toCol: v.number(),
-    piece: v.string(),
-  })),
-  handler: async (ctx, args): Promise<{
+  returns: v.union(
+    v.null(),
+    v.object({
+      fromRow: v.number(),
+      fromCol: v.number(),
+      toRow: v.number(),
+      toCol: v.number(),
+      piece: v.string(),
+    }),
+  ),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
     fromRow: number;
     fromCol: number;
     toRow: number;
@@ -633,13 +745,17 @@ export const generateAIMove = action({
       userId: user._id,
     });
 
-    if (!session || session.status !== "playing" || session.currentTurn !== "player2") {
+    if (
+      !session ||
+      session.status !== "playing" ||
+      session.currentTurn !== "player2"
+    ) {
       return null;
     }
 
     // Behavior- and difficulty-aware AI
     const aiPieces: { row: number; col: number; piece: string }[] = [];
-    
+
     // Find all AI pieces
     for (let row = 0; row < 8; row++) {
       for (let col = 0; col < 9; col++) {
@@ -651,12 +767,24 @@ export const generateAIMove = action({
     }
 
     // Utility helpers
-    const getPieceRank = (name: string | undefined) => name ? PIECES[name as keyof typeof PIECES] : -1;
-    const inBounds = (r: number, c: number) => r >= 0 && r <= 7 && c >= 0 && c <= 8;
-    const canPlayerCaptureSquare = (row: number, col: number, aiPieceName: string): boolean => {
-      const dirs = [ {r:-1,c:0}, {r:1,c:0}, {r:0,c:-1}, {r:0,c:1} ];
+    const getPieceRank = (name: string | undefined) =>
+      name ? PIECES[name as keyof typeof PIECES] : -1;
+    const inBounds = (r: number, c: number) =>
+      r >= 0 && r <= 7 && c >= 0 && c <= 8;
+    const canPlayerCaptureSquare = (
+      row: number,
+      col: number,
+      aiPieceName: string,
+    ): boolean => {
+      const dirs = [
+        { r: -1, c: 0 },
+        { r: 1, c: 0 },
+        { r: 0, c: -1 },
+        { r: 0, c: 1 },
+      ];
       for (const d of dirs) {
-        const rr = row + d.r; const cc = col + d.c;
+        const rr = row + d.r;
+        const cc = col + d.c;
         if (!inBounds(rr, cc)) continue;
         const p = session.board[rr][cc];
         if (p && p.player === "player1") {
@@ -672,15 +800,23 @@ export const generateAIMove = action({
 
     // Get all possible moves for AI pieces
     const possibleMoves: Array<{
-      fromRow: number; fromCol: number; toRow: number; toCol: number; piece: string;
-      isAttack: boolean; targetPiece?: string; forwardDelta: number; isSafe: boolean; attackAdvantage: number;
+      fromRow: number;
+      fromCol: number;
+      toRow: number;
+      toCol: number;
+      piece: string;
+      isAttack: boolean;
+      targetPiece?: string;
+      forwardDelta: number;
+      isSafe: boolean;
+      attackAdvantage: number;
     }> = [];
     for (const aiPiece of aiPieces) {
       const directions = [
         { row: -1, col: 0 }, // up
-        { row: 1, col: 0 },  // down
+        { row: 1, col: 0 }, // down
         { row: 0, col: -1 }, // left
-        { row: 0, col: 1 },  // right
+        { row: 0, col: 1 }, // right
       ];
 
       for (const dir of directions) {
@@ -696,9 +832,16 @@ export const generateAIMove = action({
         if (targetPiece && targetPiece.player === "player2") continue;
 
         // Flag can only attack other Flags
-        if (aiPiece.piece === "Flag" && targetPiece && targetPiece.piece !== "Flag") continue;
+        if (
+          aiPiece.piece === "Flag" &&
+          targetPiece &&
+          targetPiece.piece !== "Flag"
+        )
+          continue;
 
-        const attackAdvantage = targetPiece ? (getPieceRank(aiPiece.piece) - getPieceRank(targetPiece.piece)) : 0;
+        const attackAdvantage = targetPiece
+          ? getPieceRank(aiPiece.piece) - getPieceRank(targetPiece.piece)
+          : 0;
         const isSafe = !canPlayerCaptureSquare(newRow, newCol, aiPiece.piece);
         possibleMoves.push({
           fromRow: aiPiece.row,
@@ -723,11 +866,15 @@ export const generateAIMove = action({
     const behavior = session.behavior;
     const difficulty = session.difficulty;
 
-    const scoreMove = (m: typeof possibleMoves[number]): number => {
+    const scoreMove = (m: (typeof possibleMoves)[number]): number => {
       let score = 0;
       const myRank = getPieceRank(m.piece);
       const isFlagAttack = m.targetPiece === "Flag";
-      const spyGood = m.piece === "Spy" && !!m.targetPiece && m.targetPiece !== "Private" && m.targetPiece !== "Spy";
+      const spyGood =
+        m.piece === "Spy" &&
+        !!m.targetPiece &&
+        m.targetPiece !== "Private" &&
+        m.targetPiece !== "Spy";
       const privateVsSpy = m.piece === "Private" && m.targetPiece === "Spy";
       const forwardBonus = m.forwardDelta > 0 ? 2 : m.forwardDelta < 0 ? -1 : 0;
       const safety = m.isSafe ? 3 : -4;
@@ -750,7 +897,7 @@ export const generateAIMove = action({
           if (!m.isSafe && myRank >= PIECES["Captain"]) score -= 4;
           break;
         case "passive":
-          score += (m.isAttack ? -5 : 0);
+          score += m.isAttack ? -5 : 0;
           score += safety * 2;
           score += forwardBonus;
           break;
@@ -771,9 +918,15 @@ export const generateAIMove = action({
         score = score + (Math.random() * 4 - 2);
       } else if (difficulty === "hard") {
         if (!m.isSafe) {
-          const dirs = [ {r:-1,c:0},{r:1,c:0},{r:0,c:-1},{r:0,c:1} ];
+          const dirs = [
+            { r: -1, c: 0 },
+            { r: 1, c: 0 },
+            { r: 0, c: -1 },
+            { r: 0, c: 1 },
+          ];
           for (const d of dirs) {
-            const rr = m.toRow + d.r, cc = m.toCol + d.c;
+            const rr = m.toRow + d.r,
+              cc = m.toCol + d.c;
             if (!inBounds(rr, cc)) continue;
             const p = session.board[rr][cc];
             if (p && p.player === "player1") {
@@ -825,12 +978,18 @@ export const executeAIMove = mutation({
   },
   returns: v.object({
     success: v.boolean(),
-    challengeResult: v.optional(v.object({
-      attacker: v.string(),
-      defender: v.string(),
-      winner: v.union(v.literal("attacker"), v.literal("defender"), v.literal("tie")),
-    })),
-    winner: v.optional(v.union(v.literal("player1"), v.literal("player2")))
+    challengeResult: v.optional(
+      v.object({
+        attacker: v.string(),
+        defender: v.string(),
+        winner: v.union(
+          v.literal("attacker"),
+          v.literal("defender"),
+          v.literal("tie"),
+        ),
+      }),
+    ),
+    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
   }),
   handler: async (ctx, args) => {
     const session = await ctx.db
@@ -838,7 +997,11 @@ export const executeAIMove = mutation({
       .withIndex("by_session_id", (q) => q.eq("sessionId", args.sessionId))
       .unique();
 
-    if (!session || session.status !== "playing" || session.currentTurn !== "player2") {
+    if (
+      !session ||
+      session.status !== "playing" ||
+      session.currentTurn !== "player2"
+    ) {
       throw new Error("Invalid AI move attempt");
     }
 
@@ -851,7 +1014,11 @@ export const executeAIMove = mutation({
     const toPiece = session.board[args.toRow][args.toCol];
     const newBoard = session.board.map((row) => [...row]);
 
-    let challengeResult: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" } | null = null;
+    let challengeResult: {
+      attacker: string;
+      defender: string;
+      winner: "attacker" | "defender" | "tie";
+    } | null = null;
     let gameWinner: "player1" | "player2" | null = null;
 
     if (toPiece) {
@@ -894,7 +1061,10 @@ export const executeAIMove = mutation({
     }
 
     // Check if either player has only the flag remaining
-    const hasOnlyFlag = (board: any[][], player: "player1" | "player2"): boolean => {
+    const hasOnlyFlag = (
+      board: any[][],
+      player: "player1" | "player2",
+    ): boolean => {
       const pieces = [];
       for (let row = 0; row < 8; row++) {
         for (let col = 0; col < 9; col++) {
@@ -944,26 +1114,23 @@ export const executeAIMove = mutation({
       updates.winner = gameWinner;
 
       // Determine game end reason
-      let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" = "flag_captured";
+      let gameEndReason: "flag_captured" | "flag_reached_base" | "elimination" =
+        "flag_captured";
       if (flagReachedBase) {
         gameEndReason = "flag_reached_base";
       } else if (fromPiece.piece === "Flag" && !toPiece) {
         gameEndReason = "flag_reached_base";
-      } else if (hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")) {
+      } else if (
+        hasOnlyFlag(newBoard, gameWinner === "player1" ? "player2" : "player1")
+      ) {
         gameEndReason = "elimination";
       } else if (challengeResult && challengeResult.defender === "Flag") {
         gameEndReason = "flag_captured";
       }
       updates.gameEndReason = gameEndReason;
 
-      // Clear AI session ID from profile when game ends
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", session.playerId))
-        .unique();
-      if (profile?.aiSessionId) {
-        await ctx.db.patch(profile._id, { aiSessionId: undefined });
-      }
+      // NOTE: Do NOT clear aiSessionId here - let cleanupAIGameSession handle it
+      // when user explicitly leaves via modal actions. This allows the result modal to show.
     }
 
     await ctx.db.patch(session._id, updates);
@@ -971,11 +1138,15 @@ export const executeAIMove = mutation({
     return {
       success: true,
       challengeResult: challengeResult || undefined,
-      winner: gameWinner || undefined
+      winner: gameWinner || undefined,
     } as {
       success: boolean;
-      challengeResult?: { attacker: string; defender: string; winner: "attacker" | "defender" | "tie" };
-      winner?: "player1" | "player2"
+      challengeResult?: {
+        attacker: string;
+        defender: string;
+        winner: "attacker" | "defender" | "tie";
+      };
+      winner?: "player1" | "player2";
     };
   },
 });
@@ -1057,50 +1228,74 @@ export const cleanupAIGameSession = mutation({
 // OPTIMIZED: Uses profile.aiSessionId for O(1) direct lookup instead of index scan + filter
 export const getCurrentUserAIGame = query({
   args: {},
-  returns: v.union(v.null(), v.object({
-    _id: v.id("aiGameSessions"),
-    _creationTime: v.number(),
-    sessionId: v.string(),
-    playerId: v.id("users"),
-    playerUsername: v.string(),
-    behavior: v.union(
-      v.literal("aggressive"),
-      v.literal("defensive"),
-      v.literal("passive"),
-      v.literal("balanced"),
-    ),
-    difficulty: v.union(v.literal("easy"), v.literal("medium"), v.literal("hard")),
-    status: v.union(v.literal("setup"), v.literal("playing"), v.literal("finished")),
-    currentTurn: v.union(v.literal("player1"), v.literal("player2")),
-    board: v.array(v.array(v.union(v.null(), v.object({
-      piece: v.string(),
-      player: v.union(v.literal("player1"), v.literal("player2")),
-      revealed: v.boolean(),
-    })))),
-    playerSetup: v.boolean(),
-    aiSetup: v.boolean(),
-    winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
-    gameEndReason: v.optional(v.union(
-      v.literal("flag_captured"),
-      v.literal("flag_reached_base"),
-      v.literal("timeout"),
-      v.literal("surrender"),
-      v.literal("elimination")
-    )),
-    createdAt: v.number(),
-    setupTimeStarted: v.optional(v.number()),
-    gameTimeStarted: v.optional(v.number()),
-    lastMoveTime: v.optional(v.number()),
-    lastMoveFrom: v.optional(v.object({
-      row: v.number(),
-      col: v.number(),
-    })),
-    lastMoveTo: v.optional(v.object({
-      row: v.number(),
-      col: v.number(),
-    })),
-    moveCount: v.number(),
-  })),
+  returns: v.union(
+    v.null(),
+    v.object({
+      _id: v.id("aiGameSessions"),
+      _creationTime: v.number(),
+      sessionId: v.string(),
+      playerId: v.id("users"),
+      playerUsername: v.string(),
+      behavior: v.union(
+        v.literal("aggressive"),
+        v.literal("defensive"),
+        v.literal("passive"),
+        v.literal("balanced"),
+      ),
+      difficulty: v.union(
+        v.literal("easy"),
+        v.literal("medium"),
+        v.literal("hard"),
+      ),
+      status: v.union(
+        v.literal("setup"),
+        v.literal("playing"),
+        v.literal("finished"),
+      ),
+      currentTurn: v.union(v.literal("player1"), v.literal("player2")),
+      board: v.array(
+        v.array(
+          v.union(
+            v.null(),
+            v.object({
+              piece: v.string(),
+              player: v.union(v.literal("player1"), v.literal("player2")),
+              revealed: v.boolean(),
+            }),
+          ),
+        ),
+      ),
+      playerSetup: v.boolean(),
+      aiSetup: v.boolean(),
+      winner: v.optional(v.union(v.literal("player1"), v.literal("player2"))),
+      gameEndReason: v.optional(
+        v.union(
+          v.literal("flag_captured"),
+          v.literal("flag_reached_base"),
+          v.literal("timeout"),
+          v.literal("surrender"),
+          v.literal("elimination"),
+        ),
+      ),
+      createdAt: v.number(),
+      setupTimeStarted: v.optional(v.number()),
+      gameTimeStarted: v.optional(v.number()),
+      lastMoveTime: v.optional(v.number()),
+      lastMoveFrom: v.optional(
+        v.object({
+          row: v.number(),
+          col: v.number(),
+        }),
+      ),
+      lastMoveTo: v.optional(
+        v.object({
+          row: v.number(),
+          col: v.number(),
+        }),
+      ),
+      moveCount: v.number(),
+    }),
+  ),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
@@ -1115,14 +1310,19 @@ export const getCurrentUserAIGame = query({
 
     // Direct lookup using aiSessionId - O(1) instead of index scan + filter
     const session = await ctx.db.get(profile.aiSessionId);
-    
+
     // Verify session exists, belongs to user, and is active
     if (!session || session.playerId !== userId) {
       return null;
     }
 
-    // Only return if session is in setup or playing status
-    if (session.status !== "setup" && session.status !== "playing") {
+    // Return session for setup, playing, OR finished status
+    // Finished games need to be returned so the result modal can show
+    if (
+      session.status !== "setup" &&
+      session.status !== "playing" &&
+      session.status !== "finished"
+    ) {
       return null;
     }
 
@@ -1139,7 +1339,7 @@ export const cleanupStaleAIGameSessions = internalMutation({
   }),
   handler: async (ctx) => {
     const now = Date.now();
-    const oneHourAgo = now - (60 * 60 * 1000); // 1 hour in milliseconds
+    const oneHourAgo = now - 60 * 60 * 1000; // 1 hour in milliseconds
 
     // OPTIMIZED: Added limit and batch processing to prevent excessive document scanning
     const BATCH_SIZE = 100;

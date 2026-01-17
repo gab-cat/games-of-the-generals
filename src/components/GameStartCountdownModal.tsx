@@ -1,11 +1,11 @@
-import React, { useState, useEffect, memo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Dialog, DialogContent } from './ui/dialog';
-import { Sword } from 'lucide-react';
-import { useQuery } from 'convex-helpers/react/cache';
-import { api } from '../../convex/_generated/api';
-import { UserAvatar } from './UserAvatar';
-import { useSound } from '../lib/SoundProvider';
+import React, { useState, useEffect, memo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Dialog, DialogContent } from "./ui/dialog";
+import { Sword, Target, Crosshair, Wifi } from "lucide-react";
+import { useQuery } from "convex-helpers/react/cache";
+import { api } from "../../convex/_generated/api";
+import { UserAvatar } from "./UserAvatar";
+import { useSound } from "../lib/SoundProvider";
 
 interface GameStartCountdownModalProps {
   isOpen: boolean;
@@ -15,21 +15,21 @@ interface GameStartCountdownModalProps {
   currentUsername: string;
 }
 
-export const GameStartCountdownModal = memo(function GameStartCountdownModal({ 
-  isOpen, 
-  onComplete, 
-  player1Username, 
+export const GameStartCountdownModal = memo(function GameStartCountdownModal({
+  isOpen,
+  onComplete,
+  player1Username,
   player2Username,
-  currentUsername 
+  currentUsername,
 }: GameStartCountdownModalProps) {
   const [countdown, setCountdown] = useState(10);
 
   // Fetch profile data for both players to get avatarUrl and rank
   const player1Profile = useQuery(api.profiles.getProfileByUsername, {
-    username: player1Username || undefined
+    username: player1Username || undefined,
   });
   const player2Profile = useQuery(api.profiles.getProfileByUsername, {
-    username: player2Username || undefined
+    username: player2Username || undefined,
   });
   const { playSFX } = useSound();
 
@@ -60,213 +60,194 @@ export const GameStartCountdownModal = memo(function GameStartCountdownModal({
     }
   }, [isOpen, onComplete]);
 
-  const progress = ((10 - countdown) / 10) * 100;
-  const circumference = 2 * Math.PI * 50; // radius = 50
-  const strokeDashoffset = circumference - (progress / 100) * circumference;
-
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent 
-        className="max-w-lg bg-black/20 backdrop-blur-sm border border-slate-700/50 shadow-2xl [&>button]:hidden shadow-blue-500/20"
+      <DialogContent
+        className="max-w-4xl w-full bg-zinc-900/95 backdrop-blur-xl border border-white/10 p-0 overflow-hidden shadow-2xl [&>button]:hidden text-white"
         aria-describedby="countdown-description"
       >
-        {/* Subtle background glow */}
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-cyan-500/5 rounded-lg" />
+        <div className="relative h-[500px] flex flex-col">
+          {/* Tactical Overlay Grid */}
+          <div className="absolute inset-0 pointer-events-none opacity-20 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:40px_40px]" />
 
-        <div className="relative flex flex-col items-center space-y-6 py-8 px-6">
-          {/* Hidden description for accessibility */}
-          <div id="countdown-description" className="sr-only">
-            Game starting countdown timer. Battle will begin in {countdown} seconds.
+          {/* Top Bar - Status */}
+          <div className="relative z-10 flex items-center justify-between p-4 border-b border-white/10 bg-black/40">
+            <div className="flex items-center gap-2 text-xs font-mono text-emerald-500/80">
+              <Wifi className="w-3 h-3 animate-pulse" />
+              <span>LINK_ESTABLISHED</span>
+            </div>
+            <div className="text-xs font-mono text-white/40">
+              SECURE_CHANNEL_V8.2
+            </div>
+            <div className="flex items-center gap-2 text-xs font-mono text-blue-400/80">
+              <Target className="w-3 h-3" />
+              <span>TARGET_LOCKED</span>
+            </div>
           </div>
-          
-          {/* Battle Icon with Glowing Ring */}
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
-            className="relative"
-          >
-            {/* Outer glowing ring */}
+
+          <div className="flex-1 relative z-10 flex flex-col md:flex-row items-center justify-between p-8 md:p-12 gap-8">
+            {/* Player 1 (Blue) */}
             <motion.div
-              className="absolute inset-0 rounded-full"
-              animate={{
-                boxShadow: [
-                  "0 0 20px rgba(59, 130, 246, 0.3)",
-                  "0 0 30px rgba(59, 130, 246, 0.5)",
-                  "0 0 20px rgba(59, 130, 246, 0.3)"
-                ]
-              }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              initial={{ x: -50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="flex-1 flex flex-col items-center"
+            >
+              <div className="relative group">
+                <div
+                  className={`absolute inset-0 bg-blue-500/20 rounded-full blur-xl transition-all duration-500 ${currentUsername === player1Username ? "opacity-100 scale-125" : "opacity-0 scale-100"}`}
+                />
+                <div className="relative w-32 h-32 md:w-40 md:h-40">
+                  <UserAvatar
+                    username={player1Username}
+                    avatarUrl={player1Profile?.avatarUrl}
+                    rank={player1Profile?.rank}
+                    size="xl"
+                    frame={player1Profile?.avatarFrame}
+                    className="w-full h-full ring-2 ring-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.3)]"
+                  />
+                  {currentUsername === player1Username && (
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-[10px] font-bold px-3 py-1 rounded-sm tracking-wider shadow-lg font-mono border border-blue-400/50">
+                      YOU
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 text-center">
+                <h3 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                  {player1Username}
+                </h3>
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <div className="h-1.5 w-16 bg-blue-900/50 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-blue-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                    />
+                  </div>
+                  <span className="text-xs font-mono text-blue-400">READY</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Center Display - VS & Countdown */}
+            <div className="flex flex-col items-center justify-center shrink-0 w-48 relative">
+              <div className="absolute inset-0 bg-zinc-900/50 blur-2xl -z-10" />
+
+              <motion.div
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring", stiffness: 200, delay: 0.4 }}
+                className="mb-8"
+              >
+                <div className="w-16 h-16 bg-zinc-800 rounded-lg flex items-center justify-center border border-white/10 rotate-45 transform hover:rotate-90 transition-transform duration-700">
+                  <Sword className="w-8 h-8 text-white/80 -rotate-45" />
+                </div>
+              </motion.div>
+
+              <div className="relative">
+                <div className="text-center space-y-2">
+                  <div className="text-xs font-mono text-white/50 tracking-[0.2em] uppercase">
+                    Commencing
+                  </div>
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={countdown}
+                      initial={{ y: 20, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -20, opacity: 0 }}
+                      className="text-7xl font-mono font-bold text-white tabular-nums tracking-tighter"
+                    >
+                      {countdown > 0 ? (
+                        <>
+                          <span className="text-white/20">00:0</span>
+                          <span
+                            className={
+                              countdown <= 3 ? "text-red-500" : "text-white"
+                            }
+                          >
+                            {countdown}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-emerald-500 text-5xl tracking-normal">
+                          GO!
+                        </span>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
+            </div>
+
+            {/* Player 2 (Red) */}
+            <motion.div
+              initial={{ x: 50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex-1 flex flex-col items-center"
+            >
+              <div className="relative group">
+                <div
+                  className={`absolute inset-0 bg-red-500/20 rounded-full blur-xl transition-all duration-500 ${currentUsername === player2Username ? "opacity-100 scale-125" : "opacity-0 scale-100"}`}
+                />
+                <div className="relative w-32 h-32 md:w-40 md:h-40">
+                  <UserAvatar
+                    username={player2Username}
+                    avatarUrl={player2Profile?.avatarUrl}
+                    rank={player2Profile?.rank}
+                    size="xl"
+                    frame={player2Profile?.avatarFrame}
+                    className="w-full h-full ring-2 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.3)]"
+                  />
+                  {currentUsername === player2Username && (
+                    <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-red-600 text-white text-[10px] font-bold px-3 py-1 rounded-sm tracking-wider shadow-lg font-mono border border-red-400/50">
+                      YOU
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 text-center">
+                <h3 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                  {player2Username}
+                </h3>
+                <div className="mt-2 flex items-center justify-center gap-2">
+                  <span className="text-xs font-mono text-red-400">READY</span>
+                  <div className="h-1.5 w-16 bg-red-900/50 rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-red-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: "100%" }}
+                      transition={{ duration: 1, delay: 0.6 }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Bottom Bar - Tips */}
+          <div className="relative z-10 p-4 bg-black/40 border-t border-white/10">
+            <div className="flex items-center justify-center gap-4 text-white/40">
+              <Crosshair className="w-4 h-4" />
+              <p className="text-xs md:text-sm font-mono uppercase tracking-wider">
+                {countdown > 0
+                  ? "Initialising Battle Systems..."
+                  : "Engagement Protocols Active"}
+              </p>
+              <Crosshair className="w-4 h-4" />
+            </div>
+            {/* Loading/Progress Bar at very bottom */}
+            <motion.div
+              className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-blue-500 via-white to-red-500"
+              initial={{ width: "0%" }}
+              animate={{ width: "100%" }}
+              transition={{ duration: 10, ease: "linear" }}
             />
-            
-            {/* Main sword container */}
-            <div className="w-20 h-20 bg-gradient-to-br from-slate-700/50 to-slate-800/50 rounded-full flex items-center justify-center border border-slate-600/50 shadow-lg relative z-10">
-              <Sword className="h-10 w-10 text-slate-300" />
-            </div>
-          </motion.div>
-
-          {/* Clean Title */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.4, duration: 0.5 }}
-            className="text-center"
-          >
-            <h2 className="text-2xl font-bold text-white mb-2">
-              Battle Commencing!
-            </h2>
-            <p className="text-slate-400 text-sm">
-              Prepare for strategic warfare
-            </p>
-          </motion.div>
-
-          {/* Clean Players Section */}
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
-            className="flex items-center justify-center space-x-8"
-          >
-            {/* Player 1 */}
-            <div className="text-center">
-              <div className="mb-3 relative">
-                <UserAvatar
-                  username={player1Username}
-                  avatarUrl={player1Profile?.avatarUrl}
-                  rank={player1Profile?.rank}
-                  size="lg"
-                  frame={player1Profile?.avatarFrame}
-                  className={`mx-auto ${
-                    currentUsername === player1Username
-                      ? 'ring-2 ring-blue-400'
-                      : 'ring-1 ring-slate-600'
-                  }`}
-                />
-                {/* Clean YOU indicator */}
-                {currentUsername === player1Username && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.8, type: "spring" }}
-                    className="absolute -bottom-1 -right-1 bg-blue-500 text-white text-xs px-2 py-0.5 rounded-full font-medium shadow-md"
-                  >
-                    YOU
-                  </motion.div>
-                )}
-              </div>
-              <p className={`text-sm font-medium ${
-                currentUsername === player1Username ? 'text-blue-300' : 'text-slate-400'
-              }`}>
-                {player1Username}
-              </p>
-            </div>
-
-            {/* Simple VS indicator */}
-            <div className="bg-slate-700/50 border border-slate-600/50 rounded-full px-3 py-1">
-              <span className="text-slate-300 font-medium text-sm">VS</span>
-            </div>
-
-            {/* Player 2 */}
-            <div className="text-center">
-              <div className="mb-3 relative">
-                <UserAvatar 
-                  username={player2Username}
-                  avatarUrl={player2Profile?.avatarUrl}
-                  rank={player2Profile?.rank}
-                  size="lg"
-                  frame={player2Profile?.avatarFrame}
-                  className={`mx-auto ${
-                    currentUsername === player2Username 
-                      ? 'ring-2 ring-red-400' 
-                      : 'ring-1 ring-slate-600'
-                  }`}
-                />
-                {/* Clean YOU indicator */}
-                {currentUsername === player2Username && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.8, type: "spring" }}
-                    className="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full font-medium shadow-md"
-                  >
-                    YOU
-                  </motion.div>
-                )}
-              </div>
-              <p className={`text-sm font-medium ${
-                currentUsername === player2Username ? 'text-red-300' : 'text-slate-400'
-              }`}>
-                {player2Username}
-              </p>
-            </div>
-          </motion.div>
-
-          {/* Clean Countdown */}
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.6, type: "spring" }}
-            className="relative"
-          >
-            {/* Simple Progress Ring */}
-            <svg width="120" height="120" className="transform -rotate-90">
-              {/* Background ring */}
-              <circle
-                cx="60"
-                cy="60"
-                r="50"
-                stroke="rgba(100, 116, 139, 0.3)"
-                strokeWidth="4"
-                fill="transparent"
-              />
-              {/* Progress ring */}
-              <motion.circle
-                cx="60"
-                cy="60"
-                r="50"
-                stroke={countdown > 5 ? "#3b82f6" : countdown > 3 ? "#f59e0b" : "#ef4444"}
-                strokeWidth="4"
-                fill="transparent"
-                strokeDasharray={circumference}
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset }}
-                transition={{ duration: 0.5, ease: "easeInOut" }}
-                className="drop-shadow-sm"
-              />
-            </svg>
-            
-            {/* Clean countdown number */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={countdown}
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 1.1, opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="text-center"
-                >
-                  <span className={`text-4xl font-bold ${
-                    countdown > 5 ? "text-blue-400" : 
-                    countdown > 3 ? "text-yellow-400" : 
-                    countdown > 0 ? "text-red-400" : "text-green-400"
-                  }`}>
-                    {countdown > 0 ? countdown : "GO!"}
-                  </span>
-                </motion.div>
-              </AnimatePresence>
-            </div>
-          </motion.div>
-
-          {/* Clean Subtitle */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.7 }}
-            className="text-slate-400 text-sm text-center"
-          >
-            {countdown > 0 ? "Starting in..." : "Enter the battlefield!"}
-          </motion.p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

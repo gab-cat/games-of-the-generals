@@ -7,7 +7,6 @@ import { Button } from "../ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import {
-  Bot,
   Shuffle,
   CheckCircle,
   RefreshCw,
@@ -17,7 +16,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { getPieceDisplay } from "../../lib/piece-display";
@@ -27,8 +26,14 @@ import { toast } from "sonner";
 
 const INITIAL_PIECES = [
   "Flag",
-  "Spy", "Spy",
-  "Private", "Private", "Private", "Private", "Private", "Private",
+  "Spy",
+  "Spy",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
   "Sergeant",
   "2nd Lieutenant",
   "1st Lieutenant",
@@ -40,40 +45,56 @@ const INITIAL_PIECES = [
   "2 Star General",
   "3 Star General",
   "4 Star General",
-  "5 Star General"
+  "5 Star General",
 ];
 
 const BOARD_ROWS = 8;
 const BOARD_COLS = 9;
 
 // Create empty board factory function
-const createEmptyBoard = () => Array(BOARD_ROWS).fill(null).map(() => Array(BOARD_COLS).fill(null));
+const createEmptyBoard = () =>
+  Array(BOARD_ROWS)
+    .fill(null)
+    .map(() => Array(BOARD_COLS).fill(null));
 
 interface AIGameBoardProps {
   sessionId: string;
   revealAIPieces?: boolean;
 }
 
-export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardProps) {
+export function AIGameBoard({
+  sessionId,
+  revealAIPieces = false,
+}: AIGameBoardProps) {
   // Setup state
-  const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() => createEmptyBoard());
-  const [availablePieces, setAvailablePieces] = useState(() => [...INITIAL_PIECES]);
+  const [setupBoard, setSetupBoard] = useState<(string | null)[][]>(() =>
+    createEmptyBoard(),
+  );
+  const [availablePieces, setAvailablePieces] = useState(() => [
+    ...INITIAL_PIECES,
+  ]);
   const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
-  const [selectedSetupSquare, setSelectedSetupSquare] = useState<{row: number, col: number} | null>(null);
+  const [selectedSetupSquare, setSelectedSetupSquare] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
   const [isSwapMode, setIsSwapMode] = useState(false);
 
   // Game state
-  const [selectedSquare, setSelectedSquare] = useState<{row: number, col: number} | null>(null);
+  const [selectedSquare, setSelectedSquare] = useState<{
+    row: number;
+    col: number;
+  } | null>(null);
   const [isProcessingMove, setIsProcessingMove] = useState(false);
   const [isResultModalOpen, setIsResultModalOpen] = useState(false);
-  
+
   // Mutations
   const setupPiecesMutation = useMutation(api.aiGame.setupAIGamePieces);
   const makeMove = useMutation(api.aiGame.makeAIGameMove);
   const executeAIMove = useMutation(api.aiGame.executeAIMove);
   const startNewGame = useMutation(api.aiGame.startAIGameSession);
   const cleanupSession = useMutation(api.aiGame.cleanupAIGameSession);
-  
+
   // Actions
   const generateAIMove = useAction(api.aiGame.generateAIMove);
   const { playSFX, playBGM } = useSound();
@@ -85,7 +106,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
     {
       staleTime: 10000, // 10 seconds - active game session needs to be fresh
       gcTime: 300000, // 5 minutes cache
-    }
+    },
   );
 
   // Profile data changes infrequently
@@ -95,7 +116,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
     {
       staleTime: 120000, // 2 minutes - profile data changes infrequently
       gcTime: 600000, // 10 minutes cache
-    }
+    },
   );
 
   // Valid rows for player placement (always bottom 3 rows for player)
@@ -113,7 +134,11 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
 
   useEffect(() => {
     // Process AI moves
-    if (session?.status === "playing" && session.currentTurn === "player2" && !isProcessingMove) {
+    if (
+      session?.status === "playing" &&
+      session.currentTurn === "player2" &&
+      !isProcessingMove
+    ) {
       setIsProcessingMove(true);
 
       // Generate and execute AI move
@@ -141,14 +166,24 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
           setIsProcessingMove(false);
         });
     }
-  }, [session?.status, session?.currentTurn, sessionId, generateAIMove, executeAIMove, isProcessingMove, playSFX]);
+  }, [
+    session?.status,
+    session?.currentTurn,
+    sessionId,
+    generateAIMove,
+    executeAIMove,
+    isProcessingMove,
+    playSFX,
+  ]);
 
   // Open result modal when game finishes
+  // NOTE: We trigger on status change to "finished" - the winner field should always be set
+  // when status changes to finished, but we check it anyway for type safety
   useEffect(() => {
-    if (session?.status === "finished" && session.winner) {
+    if (session?.status === "finished" && !isResultModalOpen) {
       setIsResultModalOpen(true);
     }
-  }, [session?.status, session?.winner]);
+  }, [session?.status, isResultModalOpen]);
 
   // BGM management based on AI game session status
   useEffect(() => {
@@ -168,11 +203,11 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
   const randomizeSetup = useCallback(() => {
     setSetupBoard(createEmptyBoard());
     setAvailablePieces([...INITIAL_PIECES]);
-    
+
     const shuffledPieces = [...INITIAL_PIECES].sort(() => Math.random() - 0.5);
     const newBoard = createEmptyBoard();
     let pieceIndex = 0;
-    
+
     for (const row of validRows) {
       for (let col = 0; col < BOARD_COLS; col++) {
         if (pieceIndex < shuffledPieces.length) {
@@ -181,7 +216,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
         }
       }
     }
-    
+
     setSetupBoard(newBoard);
     setAvailablePieces([]);
     setSelectedPiece(null);
@@ -198,79 +233,94 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
     toast.success("Setup cleared!");
   }, []);
 
-  const loadPresetSetup = useCallback((pieces: { piece: string; row: number; col: number }[]) => {
-    // Clear the board first
-    const newBoard = createEmptyBoard();
-    
-    // Place the pieces from the preset
-    for (const { piece, row, col } of pieces) {
-      newBoard[row][col] = piece;
-    }
-    
-    setSetupBoard(newBoard);
-    setAvailablePieces([]);
-    setSelectedPiece(null);
-    setSelectedSetupSquare(null);
-    setIsSwapMode(true);
-    toast.success("Preset loaded successfully!");
-  }, []);
+  const loadPresetSetup = useCallback(
+    (pieces: { piece: string; row: number; col: number }[]) => {
+      // Clear the board first
+      const newBoard = createEmptyBoard();
+
+      // Place the pieces from the preset
+      for (const { piece, row, col } of pieces) {
+        newBoard[row][col] = piece;
+      }
+
+      setSetupBoard(newBoard);
+      setAvailablePieces([]);
+      setSelectedPiece(null);
+      setSelectedSetupSquare(null);
+      setIsSwapMode(true);
+      toast.success("Preset loaded successfully!");
+    },
+    [],
+  );
 
   // Memoized setup square click handler
-  const handleSetupSquareClick = useCallback((row: number, col: number) => {
-    if (!validRows.includes(row)) {
-      toast.error("You can only place pieces in your area");
-      return;
-    }
-
-    const currentPiece = setupBoard[row][col];
-    
-    if (isSwapMode || availablePieces.length === 0) {
-      if (selectedSetupSquare) {
-        // Swap pieces
-        const selectedRow = selectedSetupSquare.row;
-        const selectedCol = selectedSetupSquare.col;
-        const selectedPieceValue = setupBoard[selectedRow][selectedCol];
-        
-        const newBoard = setupBoard.map(r => [...r]);
-        newBoard[selectedRow][selectedCol] = currentPiece;
-        newBoard[row][col] = selectedPieceValue;
-        setSetupBoard(newBoard);
-        setSelectedSetupSquare(null);
+  const handleSetupSquareClick = useCallback(
+    (row: number, col: number) => {
+      if (!validRows.includes(row)) {
+        toast.error("You can only place pieces in your area");
         return;
+      }
+
+      const currentPiece = setupBoard[row][col];
+
+      if (isSwapMode || availablePieces.length === 0) {
+        if (selectedSetupSquare) {
+          // Swap pieces
+          const selectedRow = selectedSetupSquare.row;
+          const selectedCol = selectedSetupSquare.col;
+          const selectedPieceValue = setupBoard[selectedRow][selectedCol];
+
+          const newBoard = setupBoard.map((r) => [...r]);
+          newBoard[selectedRow][selectedCol] = currentPiece;
+          newBoard[row][col] = selectedPieceValue;
+          setSetupBoard(newBoard);
+          setSelectedSetupSquare(null);
+          return;
+        }
+
+        if (currentPiece) {
+          setSelectedSetupSquare({ row, col });
+          return;
+        }
+
+        if (isSwapMode) {
+          toast.error("No piece to select for swapping");
+          return;
+        }
       }
 
       if (currentPiece) {
-        setSelectedSetupSquare({ row, col });
+        toast.error(
+          "Square is already occupied. Enable swap mode to move pieces.",
+        );
         return;
       }
-      
-      if (isSwapMode) {
-        toast.error("No piece to select for swapping");
+
+      if (!selectedPiece) {
+        toast.error("Please select a piece to place");
         return;
       }
-    }
 
-    if (currentPiece) {
-      toast.error("Square is already occupied. Enable swap mode to move pieces.");
-      return;
-    }
+      const newBoard = setupBoard.map((r) => [...r]);
+      newBoard[row][col] = selectedPiece;
+      setSetupBoard(newBoard);
 
-    if (!selectedPiece) {
-      toast.error("Please select a piece to place");
-      return;
-    }
+      const pieceIndex = availablePieces.indexOf(selectedPiece);
+      const newAvailable = [...availablePieces];
+      newAvailable.splice(pieceIndex, 1);
+      setAvailablePieces(newAvailable);
 
-    const newBoard = setupBoard.map(r => [...r]);
-    newBoard[row][col] = selectedPiece;
-    setSetupBoard(newBoard);
-
-    const pieceIndex = availablePieces.indexOf(selectedPiece);
-    const newAvailable = [...availablePieces];
-    newAvailable.splice(pieceIndex, 1);
-    setAvailablePieces(newAvailable);
-
-    setSelectedPiece(null);
-  }, [validRows, setupBoard, isSwapMode, availablePieces, selectedSetupSquare, selectedPiece]);
+      setSelectedPiece(null);
+    },
+    [
+      validRows,
+      setupBoard,
+      isSwapMode,
+      availablePieces,
+      selectedSetupSquare,
+      selectedPiece,
+    ],
+  );
 
   const handleFinishSetup = useCallback(async () => {
     if (availablePieces.length > 0) {
@@ -343,81 +393,99 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
   }, [cleanupSession, sessionId]);
 
   // Helper function to get arrow direction for moves
-  const getArrowDirection = useCallback((fromRow: number, fromCol: number, toRow: number, toCol: number) => {
-    const rowDiff = toRow - fromRow;
-    const colDiff = toCol - fromCol;
-    
-    if (rowDiff > 0) return ArrowDown;
-    if (rowDiff < 0) return ArrowUp;
-    if (colDiff > 0) return ArrowRight;
-    if (colDiff < 0) return ArrowLeft;
-    
-    return null;
-  }, []);
+  const getArrowDirection = useCallback(
+    (fromRow: number, fromCol: number, toRow: number, toCol: number) => {
+      const rowDiff = toRow - fromRow;
+      const colDiff = toCol - fromCol;
+
+      if (rowDiff > 0) return ArrowDown;
+      if (rowDiff < 0) return ArrowUp;
+      if (colDiff > 0) return ArrowRight;
+      if (colDiff < 0) return ArrowLeft;
+
+      return null;
+    },
+    [],
+  );
 
   // Optimized game square click handler
-  const handleGameSquareClick = useCallback((row: number, col: number) => {
-    if (!session || session.status !== "playing" || session.currentTurn !== "player1" || isProcessingMove) return;
-
-    const board = session.board;
-    
-    if (selectedSquare) {
-      if (selectedSquare.row === row && selectedSquare.col === col) {
-        // Deselect
-        setSelectedSquare(null);
+  const handleGameSquareClick = useCallback(
+    (row: number, col: number) => {
+      if (
+        !session ||
+        session.status !== "playing" ||
+        session.currentTurn !== "player1" ||
+        isProcessingMove
+      )
         return;
-      }
 
-      const isValidMove = Math.abs(selectedSquare.row - row) + Math.abs(selectedSquare.col - col) === 1;
-      if (!isValidMove) {
-        toast.error("Invalid move! You can only move to adjacent squares.");
-        setSelectedSquare(null);
-        return;
-      }
+      const board = session.board;
 
-      const targetPiece = board[row][col];
-      
-      if (targetPiece && targetPiece.player === "player1") {
-        toast.error("Cannot attack your own piece!");
-        setSelectedSquare(null);
-        return;
-      }
-
-      // Play piece-move SFX when a piece is moved
-      playSFX("piece-move");
-
-      // Make the move
-      makeMove({
-        sessionId,
-        fromRow: selectedSquare.row,
-        fromCol: selectedSquare.col,
-        toRow: row,
-        toCol: col,
-      }).then((result: any) => {
-        // Play kill SFX when pieces are eliminated in battle
-        if (result?.challengeResult) {
-          playSFX("kill");
+      if (selectedSquare) {
+        if (selectedSquare.row === row && selectedSquare.col === col) {
+          // Deselect
+          setSelectedSquare(null);
+          return;
         }
-        setSelectedSquare(null);
-      }).catch((error) => {
-        console.error("Move failed:", error);
-        toast.error("Move failed");
-        setSelectedSquare(null);
-      });
 
-    } else {
-      const piece = board[row][col];
-      if (piece && piece.player === "player1") {
-        setSelectedSquare({ row, col });
+        const isValidMove =
+          Math.abs(selectedSquare.row - row) +
+            Math.abs(selectedSquare.col - col) ===
+          1;
+        if (!isValidMove) {
+          toast.error("Invalid move! You can only move to adjacent squares.");
+          setSelectedSquare(null);
+          return;
+        }
+
+        const targetPiece = board[row][col];
+
+        if (targetPiece && targetPiece.player === "player1") {
+          toast.error("Cannot attack your own piece!");
+          setSelectedSquare(null);
+          return;
+        }
+
+        // Play piece-move SFX when a piece is moved
+        playSFX("piece-move");
+
+        // Make the move
+        makeMove({
+          sessionId,
+          fromRow: selectedSquare.row,
+          fromCol: selectedSquare.col,
+          toRow: row,
+          toCol: col,
+        })
+          .then((result: any) => {
+            // Play kill SFX when pieces are eliminated in battle
+            if (result?.challengeResult) {
+              playSFX("kill");
+            }
+            setSelectedSquare(null);
+          })
+          .catch((error) => {
+            console.error("Move failed:", error);
+            toast.error("Move failed");
+            setSelectedSquare(null);
+          });
+      } else {
+        const piece = board[row][col];
+        if (piece && piece.player === "player1") {
+          setSelectedSquare({ row, col });
+        }
       }
-    }
-  }, [session, isProcessingMove, selectedSquare, makeMove, sessionId]);
+    },
+    [session, isProcessingMove, selectedSquare, makeMove, sessionId],
+  );
 
   if (!session) {
     return (
-      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+      <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm">
         <CardContent className="p-8 text-center">
-          <div className="text-white/90">Loading AI game session...</div>
+          <div className="text-white/40 font-mono animate-pulse">
+            INITIALIZING_BATTLEFIELD...
+          </div>
         </CardContent>
       </Card>
     );
@@ -430,67 +498,53 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
         animate={{ opacity: 1, y: 0 }}
         className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
       >
-        {/* Setup Header */}
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardHeader className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <motion.div 
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="flex items-center gap-3 sm:gap-4"
-              >
-                <motion.div
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 0.1, type: "spring" }}
-                  className="w-10 h-10 sm:w-12 sm:h-12 bg-red-500/20 backdrop-blur-sm border border-red-500/30 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
-                >
-                  <Bot className="h-5 w-5 sm:h-6 sm:w-6 text-red-400" />
-                </motion.div>
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-white/90">
-                    VS AI Setup
-                  </CardTitle>
-                  <p className="text-white/60 mt-1 text-sm sm:text-base">
-                    Strategically position your pieces against the AI
-                  </p>
-                </div>
-              </motion.div>
-            </div>
-          </CardHeader>
-        </Card>
-
         {/* Controls */}
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+        <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm">
           <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
               <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                <Button onClick={randomizeSetup} className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm hover:bg-blue-700/80 text-sm">
+                <Button
+                  onClick={randomizeSetup}
+                  className="flex items-center gap-2 bg-blue-600/80 backdrop-blur-sm hover:bg-blue-700/80 text-sm"
+                >
                   <Shuffle className="h-4 w-4" />
                   <span className="hidden sm:inline">Randomize</span>
                   <span className="sm:hidden">Random</span>
                 </Button>
-                <Button onClick={clearSetup} variant="outline" className="flex items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-sm">
+                <Button
+                  onClick={clearSetup}
+                  variant="outline"
+                  className="flex items-center gap-2 bg-white/10 border-white/20 text-white/90 hover:bg-white/20 text-sm"
+                >
                   <RefreshCw className="h-4 w-4" />
                   Clear
                 </Button>
-                {(availablePieces.length > 0 || (availablePieces.length === 0 && !isSwapMode)) && (
+                {(availablePieces.length > 0 ||
+                  (availablePieces.length === 0 && !isSwapMode)) && (
                   <Button
                     onClick={() => setIsSwapMode(!isSwapMode)}
                     variant={isSwapMode ? "default" : "outline"}
-                    className={`flex items-center gap-2 text-sm ${isSwapMode ? 'bg-green-600/80 backdrop-blur-sm hover:bg-green-700/80' : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20'}`}
+                    className={`flex items-center gap-2 text-sm ${isSwapMode ? "bg-green-600/80 backdrop-blur-sm hover:bg-green-700/80" : "bg-white/10 border-white/20 text-white/90 hover:bg-white/20"}`}
                   >
                     <ArrowRightLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">{isSwapMode ? 'Exit Swap Mode' : 'Swap Mode'}</span>
+                    <span className="hidden sm:inline">
+                      {isSwapMode ? "Exit Swap Mode" : "Swap Mode"}
+                    </span>
                     <span className="sm:hidden">Swap</span>
                   </Button>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs sm:text-sm">
-                  {availablePieces.length === 0 ? 'All pieces placed - Swap Mode' : 
-                   isSwapMode ? 'Swap Mode Active' : `${availablePieces.length} pieces remaining`}
+                <Badge
+                  variant="outline"
+                  className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs sm:text-xs font-mono tracking-wider items-center h-8 rounded-sm px-3"
+                >
+                  {availablePieces.length === 0
+                    ? "STATUS: DEPLOYMENT COMPLETE"
+                    : isSwapMode
+                      ? "MODE: RECONFIGURATION"
+                      : `RESERVES: ${availablePieces.length} UNITS`}
                 </Badge>
               </div>
             </div>
@@ -500,7 +554,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Game Board */}
           <div className="lg:col-span-2">
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+            <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm">
               <CardContent className="p-2 sm:p-6">
                 <motion.div
                   initial={{ scale: 1, opacity: 0 }}
@@ -512,40 +566,51 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                     row.map((cell, colIndex) => {
                       const isValidArea = validRows.includes(rowIndex);
                       const isOccupied = !!cell;
-                      const isSelected = selectedSetupSquare?.row === rowIndex && selectedSetupSquare?.col === colIndex;
-                      
+                      const isSelected =
+                        selectedSetupSquare?.row === rowIndex &&
+                        selectedSetupSquare?.col === colIndex;
+
                       return (
                         <motion.div
                           key={`${rowIndex}-${colIndex}`}
                           whileHover={isValidArea ? { scale: 1.05 } : {}}
                           whileTap={isValidArea ? { scale: 0.95 } : {}}
-                          onClick={() => handleSetupSquareClick(rowIndex, colIndex)}
+                          onClick={() =>
+                            handleSetupSquareClick(rowIndex, colIndex)
+                          }
                           className={`
-                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[32px] sm:min-h-0 p-0.5 sm:p-1
-                            ${isValidArea 
-                              ? 'border-primary/50 bg-primary/10 hover:bg-primary/20' 
-                              : 'border-muted bg-muted/20'
+                            aspect-square border flex items-center justify-center cursor-pointer rounded-xs sm:rounded-sm transition-all text-xs sm:text-sm min-h-[32px] sm:min-h-0 p-0.5 sm:p-1 relative overflow-hidden
+                            ${
+                              isValidArea
+                                ? "border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20"
+                                : "border-transparent bg-zinc-950/30"
                             }
-                            ${isOccupied ? 'bg-accent border-accent-foreground/50' : ''}
-                            ${isSelected ? 'ring-1 ring-yellow-500 bg-yellow-500/20' : ''}
-                            ${selectedPiece && isValidArea && !isOccupied ? 'hover:bg-primary/30' : ''}
+                            ${isOccupied ? "bg-zinc-800/80 border-white/20 shadow-inner" : ""}
+                            ${isSelected ? "ring-1 ring-amber-500 bg-amber-500/10 !border-amber-500/50" : ""}
+                            ${selectedPiece && isValidArea && !isOccupied ? "hover:bg-blue-500/10 hover:border-blue-500/30" : ""}
                           `}
                         >
                           {cell && (
                             <div className="text-foreground" title={cell}>
                               {/* Mobile: No labels, small size */}
                               <div className="block sm:hidden">
-                                {getPieceDisplay(cell, { showLabel: false, size: "small" })}
+                                {getPieceDisplay(cell, {
+                                  showLabel: false,
+                                  size: "small",
+                                })}
                               </div>
                               {/* Desktop: With labels, medium size */}
                               <div className="hidden sm:block">
-                                {getPieceDisplay(cell, { showLabel: true, size: "medium" })}
+                                {getPieceDisplay(cell, {
+                                  showLabel: true,
+                                  size: "medium",
+                                })}
                               </div>
                             </div>
                           )}
                         </motion.div>
                       );
-                    })
+                    }),
                   )}
                 </motion.div>
               </CardContent>
@@ -555,14 +620,18 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
           {/* Available Pieces & Controls */}
           <div className="space-y-4 sm:space-y-6">
             {availablePieces.length > 0 && (
-              <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+              <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm">
                 <CardHeader className="p-4 sm:p-6">
                   <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
                     <Sword className="h-5 w-5 text-purple-400" />
                     Available Pieces ({availablePieces.length})
                   </CardTitle>
-                  <Badge variant="outline" className="w-fit bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs sm:text-sm">
-                    Selected: {selectedPiece || "None"}
+                  <Badge
+                    variant="outline"
+                    className="w-fit bg-purple-500/10 text-purple-400 border-purple-500/20 text-[10px] font-mono rounded-sm px-2"
+                  >
+                    SELECT:{" "}
+                    {selectedPiece ? selectedPiece.toUpperCase() : "NONE"}
                   </Badge>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
@@ -579,22 +648,37 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setSelectedPiece(piece)}
                         className={`
-                          p-2 sm:p-3 border-2 rounded-lg text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-1 min-h-[60px] sm:min-h-[80px]
-                          ${selectedPiece === piece 
-                            ? 'border-primary bg-primary/20 ring-1 ring-primary/50' 
-                            : 'border-border bg-card hover:bg-accent hover:border-accent-foreground/50'
+                          p-2 sm:p-3 border rounded-sm text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-1 min-h-[60px] sm:min-h-[80px] relative overflow-hidden group
+                          ${
+                            selectedPiece === piece
+                              ? "border-amber-500/50 bg-amber-500/10 shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                              : "border-white/5 bg-zinc-900/50 hover:bg-white/5 hover:border-white/20"
                           }
                         `}
                       >
                         {/* Mobile: No labels, small size */}
                         <div className="flex sm:hidden flex-col items-center justify-center gap-1">
-                          <div className="text-foreground flex items-center justify-center">{getPieceDisplay(piece, { showLabel: false, size: "small" })}</div>
-                          <div className="text-[10px] text-center font-medium text-muted-foreground truncate w-full leading-tight">{piece}</div>
+                          <div className="text-foreground flex items-center justify-center">
+                            {getPieceDisplay(piece, {
+                              showLabel: false,
+                              size: "small",
+                            })}
+                          </div>
+                          <div className="text-[10px] text-center font-medium text-muted-foreground truncate w-full leading-tight">
+                            {piece}
+                          </div>
                         </div>
                         {/* Desktop: With labels, medium size */}
                         <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:gap-1">
-                          <div className="text-foreground flex items-center justify-center">{getPieceDisplay(piece, { showLabel: false, size: "medium" })}</div>
-                          <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">{piece}</div>
+                          <div className="text-foreground flex items-center justify-center">
+                            {getPieceDisplay(piece, {
+                              showLabel: false,
+                              size: "medium",
+                            })}
+                          </div>
+                          <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">
+                            {piece}
+                          </div>
                         </div>
                       </motion.button>
                     ))}
@@ -604,13 +688,13 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
             )}
 
             {/* Setup Presets */}
-            <SetupPresets 
+            <SetupPresets
               currentSetup={setupBoard}
               onLoadPreset={loadPresetSetup}
             />
 
             {/* Legend */}
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+            <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm">
               <CardHeader className="p-4 sm:p-6">
                 <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
                   <Info className="h-5 w-5 text-orange-400" />
@@ -622,9 +706,15 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="border-b border-white/20">
-                        <th className="text-left py-1 px-1 font-medium text-white/70">Icon</th>
-                        <th className="text-left py-1 px-1 font-medium text-white/70">Piece</th>
-                        <th className="text-center py-1 px-1 font-medium text-white/70">Rank</th>
+                        <th className="text-left py-1 px-1 font-medium text-white/70">
+                          Icon
+                        </th>
+                        <th className="text-left py-1 px-1 font-medium text-white/70">
+                          Piece
+                        </th>
+                        <th className="text-center py-1 px-1 font-medium text-white/70">
+                          Rank
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -635,24 +725,41 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
                         { piece: "2 Star General", rank: "4", short: "2★ Gen" },
                         { piece: "1 Star General", rank: "5", short: "1★ Gen" },
                         { piece: "Colonel", rank: "6", short: "Col" },
-                        { piece: "Lieutenant Colonel", rank: "7", short: "Lt Col" },
+                        {
+                          piece: "Lieutenant Colonel",
+                          rank: "7",
+                          short: "Lt Col",
+                        },
                         { piece: "Major", rank: "8", short: "Maj" },
                         { piece: "Captain", rank: "9", short: "Cpt" },
-                        { piece: "1st Lieutenant", rank: "10", short: "1st Lt" },
-                        { piece: "2nd Lieutenant", rank: "11", short: "2nd Lt" },
+                        {
+                          piece: "1st Lieutenant",
+                          rank: "10",
+                          short: "1st Lt",
+                        },
+                        {
+                          piece: "2nd Lieutenant",
+                          rank: "11",
+                          short: "2nd Lt",
+                        },
                         { piece: "Sergeant", rank: "12", short: "Sgt" },
                         { piece: "Private", rank: "13", short: "Pvt" },
                         { piece: "Spy", rank: "★", short: "Spy" },
-                        { piece: "Flag", rank: "🏁", short: "Flag" }
+                        { piece: "Flag", rank: "🏁", short: "Flag" },
                       ].map(({ piece, rank, short }) => (
-                        <tr key={piece} className="border-b border-border/50 hover:bg-muted/30">
+                        <tr
+                          key={piece}
+                          className="border-b border-border/50 hover:bg-muted/30"
+                        >
                           <td className="py-1 px-1">
                             <div className="flex justify-center">
                               {getPieceDisplay(piece, { size: "small" })}
                             </div>
                           </td>
                           <td className="py-1 px-1 font-medium">{short}</td>
-                          <td className="py-1 px-1 text-muted-foreground text-center">{rank}</td>
+                          <td className="py-1 px-1 text-muted-foreground text-center">
+                            {rank}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -669,7 +776,7 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
               >
                 <Button
                   onClick={() => void handleFinishSetup()}
-                  className="w-full py-3 sm:py-4 text-sm text-black rounded-full"
+                  className="w-full py-3 sm:py-4 text-sm text-black rounded-sm bg-emerald-500 hover:bg-emerald-400 font-mono tracking-wider font-bold shadow-[0_0_15px_rgba(16,185,129,0.4)] hover:shadow-[0_0_25px_rgba(16,185,129,0.6)] border border-emerald-400/50"
                   size="lg"
                 >
                   <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
@@ -690,10 +797,8 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
     >
-
-
       {/* Game Board */}
-      <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+      <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm">
         <CardContent className="p-2 sm:p-6">
           <motion.div
             initial={{ scale: 1, opacity: 0 }}
@@ -702,90 +807,144 @@ export function AIGameBoard({ sessionId, revealAIPieces = false }: AIGameBoardPr
             className="grid grid-cols-9 gap-0.5 sm:gap-2 w-full max-w-lg mx-auto overflow-hidden"
           >
             {session.board.map((row: any[], rowIndex: number) =>
-              row.map((cell: { player: string; piece: string; revealed: any; }, colIndex: number) => {
-                const isSelected = selectedSquare?.row === rowIndex && selectedSquare?.col === colIndex;
-                const isValidMove = selectedSquare && 
-                  Math.abs(selectedSquare.row - rowIndex) + Math.abs(selectedSquare.col - colIndex) === 1;
-                
-                // Recent move highlighting
-                const isLastMoveFrom = session.lastMoveFrom && 
-                  session.lastMoveFrom.row === rowIndex && session.lastMoveFrom.col === colIndex;
-                const isLastMoveTo = session.lastMoveTo && 
-                  session.lastMoveTo.row === rowIndex && session.lastMoveTo.col === colIndex;
-                
-                // Get arrow component for last move
-                const ArrowComponent = isLastMoveFrom && session.lastMoveFrom && session.lastMoveTo 
-                  ? getArrowDirection(session.lastMoveFrom.row, session.lastMoveFrom.col, session.lastMoveTo.row, session.lastMoveTo.col)
-                  : null;
-                
-                return (
-                  <motion.div
-                    key={`${rowIndex}-${colIndex}`}
-                    whileHover={session.status === "playing" && session.currentTurn === "player1" && !isProcessingMove ? { scale: 1.02 } : {}}
-                    whileTap={session.status === "playing" && session.currentTurn === "player1" && !isProcessingMove ? { scale: 0.98 } : {}}
-                    onClick={() => handleGameSquareClick(rowIndex, colIndex)}
-                    className={`
+              row.map(
+                (
+                  cell: { player: string; piece: string; revealed: any },
+                  colIndex: number,
+                ) => {
+                  const isSelected =
+                    selectedSquare?.row === rowIndex &&
+                    selectedSquare?.col === colIndex;
+                  const isValidMove =
+                    selectedSquare &&
+                    Math.abs(selectedSquare.row - rowIndex) +
+                      Math.abs(selectedSquare.col - colIndex) ===
+                      1;
+
+                  // Recent move highlighting
+                  const isLastMoveFrom =
+                    session.lastMoveFrom &&
+                    session.lastMoveFrom.row === rowIndex &&
+                    session.lastMoveFrom.col === colIndex;
+                  const isLastMoveTo =
+                    session.lastMoveTo &&
+                    session.lastMoveTo.row === rowIndex &&
+                    session.lastMoveTo.col === colIndex;
+
+                  // Get arrow component for last move
+                  const ArrowComponent =
+                    isLastMoveFrom && session.lastMoveFrom && session.lastMoveTo
+                      ? getArrowDirection(
+                          session.lastMoveFrom.row,
+                          session.lastMoveFrom.col,
+                          session.lastMoveTo.row,
+                          session.lastMoveTo.col,
+                        )
+                      : null;
+
+                  return (
+                    <motion.div
+                      key={`${rowIndex}-${colIndex}`}
+                      whileHover={
+                        session.status === "playing" &&
+                        session.currentTurn === "player1" &&
+                        !isProcessingMove
+                          ? { scale: 1.02 }
+                          : {}
+                      }
+                      whileTap={
+                        session.status === "playing" &&
+                        session.currentTurn === "player1" &&
+                        !isProcessingMove
+                          ? { scale: 0.98 }
+                          : {}
+                      }
+                      onClick={() => handleGameSquareClick(rowIndex, colIndex)}
+                      className={`
                       aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[32px] sm:min-h-0 p-0.5 sm:p-1 relative
                       bg-muted/30 border-border hover:bg-muted/50
-                      ${isSelected ? 'ring-1 ring-primary bg-primary/20 border-primary' : ''}
-                      ${isValidMove ? 'ring-1 ring-green-500 bg-green-500/20 border-green-500' : ''}
-                      ${isLastMoveFrom ? 'ring-1 ring-yellow-500 bg-yellow-500/20 border-yellow-500' : ''}
-                      ${isLastMoveTo ? 'ring-1 ring-orange-500 bg-orange-500/20 border-orange-500' : ''}
-                      ${session.status === "playing" && session.currentTurn === "player1" && !isProcessingMove ? 'hover:bg-accent' : ''}
+                      ${isSelected ? "ring-1 ring-primary bg-primary/20 border-primary" : ""}
+                      ${isValidMove ? "ring-1 ring-green-500 bg-green-500/20 border-green-500" : ""}
+                      ${isLastMoveFrom ? "ring-1 ring-yellow-500 bg-yellow-500/20 border-yellow-500" : ""}
+                      ${isLastMoveTo ? "ring-1 ring-orange-500 bg-orange-500/20 border-orange-500" : ""}
+                      ${session.status === "playing" && session.currentTurn === "player1" && !isProcessingMove ? "hover:bg-accent" : ""}
                     `}
-                  >
-                    {/* Arrow for last move from position */}
-                    {isLastMoveFrom && ArrowComponent && (
-                      <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                        <ArrowComponent className="h-4 w-4 text-yellow-400" />
-                      </div>
-                    )}
-                    
-                    {cell && (
-                      <div className="text-center">
-                        {cell.player === "player1" ? (
-                          <div className="text-foreground">
-                            {/* Mobile: No labels, small size */}
-                            <div className="block sm:hidden">
-                              {getPieceDisplay(cell.piece, { showLabel: false, size: "small" })}
+                    >
+                      {/* Arrow for last move from position */}
+                      {isLastMoveFrom && ArrowComponent && (
+                        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                          <ArrowComponent className="h-4 w-4 text-yellow-400" />
+                        </div>
+                      )}
+
+                      {cell && (
+                        <div className="text-center">
+                          {cell.player === "player1" ? (
+                            <div className="text-foreground">
+                              {/* Mobile: No labels, small size */}
+                              <div className="block sm:hidden">
+                                {getPieceDisplay(cell.piece, {
+                                  showLabel: false,
+                                  size: "small",
+                                })}
+                              </div>
+                              {/* Desktop: With labels, medium size */}
+                              <div className="hidden sm:block">
+                                {getPieceDisplay(cell.piece, {
+                                  showLabel: true,
+                                  size: "medium",
+                                })}
+                              </div>
                             </div>
-                            {/* Desktop: With labels, medium size */}
-                            <div className="hidden sm:block">
-                              {getPieceDisplay(cell.piece, { showLabel: true, size: "medium" })}
+                          ) : (
+                            <div className="text-foreground">
+                              {cell.revealed || revealAIPieces ? (
+                                <>
+                                  {/* Mobile: No labels, small size */}
+                                  <div className="block sm:hidden">
+                                    {getPieceDisplay(cell.piece, {
+                                      showLabel: false,
+                                      size: "small",
+                                      isOpponent: false,
+                                    })}
+                                  </div>
+                                  {/* Desktop: With labels, medium size */}
+                                  <div className="hidden sm:block">
+                                    {getPieceDisplay(cell.piece, {
+                                      showLabel: true,
+                                      size: "medium",
+                                      isOpponent: false,
+                                    })}
+                                  </div>
+                                </>
+                              ) : (
+                                <>
+                                  {/* Mobile: No labels, small size */}
+                                  <div className="block sm:hidden">
+                                    {getPieceDisplay("Hidden", {
+                                      showLabel: false,
+                                      size: "small",
+                                      isOpponent: true,
+                                    })}
+                                  </div>
+                                  {/* Desktop: With labels, medium size */}
+                                  <div className="hidden sm:block">
+                                    {getPieceDisplay("Hidden", {
+                                      showLabel: false,
+                                      size: "medium",
+                                      isOpponent: true,
+                                    })}
+                                  </div>
+                                </>
+                              )}
                             </div>
-                          </div>
-                        ) : (
-                          <div className="text-foreground">
-                            {(cell.revealed || revealAIPieces) ? (
-                              <>
-                                {/* Mobile: No labels, small size */}
-                                <div className="block sm:hidden">
-                                  {getPieceDisplay(cell.piece, { showLabel: false, size: "small", isOpponent: false })}
-                                </div>
-                                {/* Desktop: With labels, medium size */}
-                                <div className="hidden sm:block">
-                                  {getPieceDisplay(cell.piece, { showLabel: true, size: "medium", isOpponent: false })}
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                {/* Mobile: No labels, small size */}
-                                <div className="block sm:hidden">
-                                  {getPieceDisplay("Hidden", { showLabel: false, size: "small", isOpponent: true })}
-                                </div>
-                                {/* Desktop: With labels, medium size */}
-                                <div className="hidden sm:block">
-                                  {getPieceDisplay("Hidden", { showLabel: false, size: "medium", isOpponent: true })}
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </motion.div>
-                );
-              })
+                          )}
+                        </div>
+                      )}
+                    </motion.div>
+                  );
+                },
+              ),
             )}
           </motion.div>
         </CardContent>

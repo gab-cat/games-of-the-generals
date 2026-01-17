@@ -3,17 +3,11 @@ import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { lazy, Suspense } from "react";
 
 // Lazy load the heavy GameBoard component
-const GameBoard = lazy(() => import("../../components/GameBoard").then(module => ({ default: module.GameBoard })));
-
-interface Profile {
-  _id: Id<"profiles">;
-  userId: Id<"users">;
-  username: string;
-  wins: number;
-  losses: number;
-  gamesPlayed: number;
-  rank: string;
-}
+const GameBoard = lazy(() =>
+  import("../../components/GameBoard").then((module) => ({
+    default: module.GameBoard,
+  })),
+);
 
 interface GamePageProps {
   profile: Doc<"profiles">;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { toast } from "sonner";
 import { useMutation } from "convex/react";
 import {
@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { AIGameBoard } from "../../components/ai-game/AIGameBoard";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { UpgradeDonationCTA } from "../../components/subscription/UpgradeDonationCTA";
 
@@ -160,11 +160,9 @@ export function AIGamePage() {
   // without needing to inspect the profile string directly which might vary.
   const isPro = hardAccess?.hasAccess === true;
 
-  useEffect(() => {
-    if (currentSession && currentSession.status === "finished") {
-      void cleanupSession({ sessionId: currentSession.sessionId });
-    }
-  }, [currentSession, cleanupSession]);
+  // NOTE: We no longer auto-cleanup finished sessions here.
+  // The result modal in AIGameBoard handles "Play Again" and "Return to Lobby" actions,
+  // which will cleanup the session appropriately. This allows the modal to show.
 
   const handleStartGame = () => {
     if (!profile) return;
@@ -232,17 +230,19 @@ export function AIGamePage() {
   // --------------------------------------------------------------------------------
   if (
     currentSession &&
-    (currentSession.status === "setup" || currentSession.status === "playing")
+    (currentSession.status === "setup" ||
+      currentSession.status === "playing" ||
+      currentSession.status === "finished")
   ) {
     return (
       <>
-        <div className="min-h-screen relative overflow-hidden bg-black">
+        <div className="min-h-screen relative overflow-hidden bg-zinc-950 rounded-sm">
           {/* Background Elements */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f2e_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f2e_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-20 pointer-events-none" />
+          <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f10_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f10_1px,transparent_1px)] bg-[size:2rem_2rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
 
           <div className="relative z-10 mx-auto max-w-7xl p-4 sm:p-6 space-y-4 sm:space-y-6">
             {/* Game Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-6 rounded-sm border border-white/10 bg-black/40 backdrop-blur-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-sm border border-white/5 bg-zinc-900/50 backdrop-blur-xl">
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 text-blue-400">
                   <Activity className="h-6 w-6" />
@@ -294,7 +294,7 @@ export function AIGamePage() {
             </div>
 
             {/* Turn Indicator */}
-            <div className="flex items-center justify-between p-4 rounded-sm border border-white/5 bg-white/5 backdrop-blur-md">
+            <div className="flex items-center justify-between p-2 rounded-sm border border-white/5 bg-zinc-900/30 backdrop-blur-md">
               <div
                 className={cn(
                   "flex items-center gap-3 px-4 py-2 rounded-lg border transition-all duration-300",
@@ -362,14 +362,14 @@ export function AIGamePage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen  text-white selection:bg-blue-500/30 font-sans p-4 sm:p-6" // Added global padding and roundedness support via container
+      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-4 sm:p-6" // Added global padding and roundedness support via container
     >
       {/* Ambient Background */}
       <div className="fixed inset-0 pointer-events-none select-none">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/10 via-transparent to-transparent opacity-50" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
+        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/5 via-transparent to-transparent opacity-30" />
       </div>
 
       <div className="relative z-10 max-w-7xl mx-auto rounded-sm overflow-hidden min-h-[calc(100vh-3rem)]">
@@ -437,8 +437,8 @@ export function AIGamePage() {
                       className={cn(
                         "group relative flex flex-col items-start text-left p-6 h-full transition-all duration-300 rounded-sm border backdrop-blur-sm overflow-hidden",
                         isSelected
-                          ? `bg-black/40 ${config.borderColor} shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]`
-                          : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10",
+                          ? `bg-zinc-900/80 ${config.borderColor} shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]`
+                          : "bg-zinc-900/30 border-white/5 hover:bg-zinc-900/50 hover:border-white/10",
                       )}
                     >
                       {/* Selection Indicator */}
@@ -460,7 +460,7 @@ export function AIGamePage() {
 
                       <div
                         className={cn(
-                          "p-3 rounded-lg mb-4 bg-black/40 border border-white/10 transition-colors duration-300",
+                          "p-3 rounded-lg mb-4 bg-black/20 border border-white/5 transition-colors duration-300",
                           isSelected
                             ? config.color
                             : "text-white/40 group-hover:text-white/70",
@@ -536,8 +536,8 @@ export function AIGamePage() {
                       className={cn(
                         "relative flex flex-col items-center justify-center gap-3 py-4 px-2 rounded-sm border transition-all duration-300 overflow-hidden",
                         isSelected
-                          ? "bg-white/10 border-white/20"
-                          : "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10",
+                          ? "bg-zinc-900/80 border-white/20"
+                          : "bg-zinc-900/30 border-white/5 hover:bg-zinc-900/50 hover:border-white/10",
                       )}
                     >
                       <div
@@ -580,7 +580,7 @@ export function AIGamePage() {
                 key={selectedBehavior}
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: "auto" }}
-                className="mt-4 p-4 border border-white/5 bg-black/20 rounded-sm"
+                className="mt-4 p-4 border border-white/5 bg-zinc-900/40 rounded-sm"
               >
                 <div className="flex items-center justify-center gap-2">
                   {selectedBehavior !== "balanced" && !isPro ? (
@@ -609,8 +609,8 @@ export function AIGamePage() {
                 size="lg"
                 className={cn(
                   "w-full text-base rounded-sm font-mono transition-all duration-500",
-                  "bg-white text-black hover:bg-blue-400 hover:text-white hover:tracking-[0.2em]",
-                  "disabled:opacity-50 disabled:cursor-not-allowed",
+                  "bg-white/90 text-black hover:bg-white hover:tracking-[0.2em] shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)]",
+                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:tracking-normal",
                 )}
                 onClick={handleStartGame}
                 disabled={isStarting || !profile}
@@ -638,7 +638,7 @@ export function AIGamePage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
-              className="p-6 border border-white/10 bg-white/5 rounded-sm backdrop-blur-md relative overflow-hidden"
+              className="p-6 border border-white/10 bg-zinc-900/50 rounded-sm backdrop-blur-md relative overflow-hidden"
             >
               {/* Scanline */}
               <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[size:100%_4px] opacity-20 pointer-events-none" />
