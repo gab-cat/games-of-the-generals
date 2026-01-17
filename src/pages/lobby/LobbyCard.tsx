@@ -1,7 +1,5 @@
-
-
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+
 import { UserAvatar } from "@/components/UserAvatar";
 import { UserNameWithBadge } from "@/components/UserNameWithBadge";
 import { useQuery } from "convex-helpers/react/cache";
@@ -9,7 +7,8 @@ import { motion } from "framer-motion";
 import { Users, MessageCircle, Clock, Zap, Eye } from "lucide-react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
-import { Badge } from "@/components/ui/badge";
+
+import { cn } from "@/lib/utils";
 
 interface LobbyCardProps {
   lobby: {
@@ -57,16 +56,25 @@ const getGameModeBadge = (gameMode?: "classic" | "blitz" | "reveal") => {
   }
 };
 
-export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInviteToLobby, isJoining, isLeaving }: LobbyCardProps) {
+export function LobbyCard({
+  lobby,
+  index,
+  currentUserId,
+  onJoin,
+  onLeave,
+  onInviteToLobby,
+  isJoining,
+  isLeaving,
+}: LobbyCardProps) {
   // Fetch host profile for avatar
   const hostProfile = useQuery(api.profiles.getProfileByUsername, {
-    username: lobby.hostUsername
+    username: lobby.hostUsername,
   });
 
   // Fetch player profile for avatar if there's a player
   const playerProfile = useQuery(
     api.profiles.getProfileByUsername,
-    lobby.playerUsername ? { username: lobby.playerUsername } : "skip"
+    lobby.playerUsername ? { username: lobby.playerUsername } : "skip",
   );
 
   const gameModeBadge = getGameModeBadge(lobby.gameMode);
@@ -77,79 +85,125 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.1 }}
     >
-      <Card className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 transition-all duration-200 shadow-lg">
-        <CardContent className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 gap-3 sm:gap-0">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm flex-shrink-0">
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300" />
-            </div>
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-              <UserAvatar 
+      <div className="group relative bg-zinc-900/60 backdrop-blur-sm border border-white/5 rounded-sm p-4 hover:bg-zinc-900/80 transition-all duration-300 overflow-hidden">
+        {/* Tech Corners */}
+        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/10 group-hover:border-blue-500/50 transition-colors" />
+        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/10 group-hover:border-blue-500/50 transition-colors" />
+        <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/10 group-hover:border-blue-500/50 transition-colors" />
+        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/10 group-hover:border-blue-500/50 transition-colors" />
+
+        {/* Scanline Effect on Hover */}
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+          {/* Left: Lobby Info */}
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            {/* Host Avatar with Hex Frame */}
+            <div className="relative flex-shrink-0">
+              <div className="absolute -inset-1 bg-blue-500/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+              <UserAvatar
                 username={lobby.hostUsername}
                 avatarUrl={hostProfile?.avatarUrl}
                 rank={hostProfile?.rank}
-                size="sm"
+                size="md"
                 frame={hostProfile?.avatarFrame}
-                className="flex-shrink-0"
+                className="relative ring-1 ring-white/10 group-hover:ring-blue-500/50 transition-all"
               />
-              <div className="min-w-0 flex-1">
-                <h4 className="font-semibold text-sm sm:text-base text-white/90 truncate">{lobby.name}</h4>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-                  <div className="flex items-center gap-1 text-xs sm:text-sm text-white/60">
-                    <span>Host:</span>
-                    <UserNameWithBadge
-                      username={lobby.hostUsername}
-                      tier={hostProfile?.tier}
-                      isDonor={hostProfile?.isDonor}
-                      usernameColor={hostProfile?.usernameColor}
-                      size="xs"
-                    />
-                  </div>
-                  {lobby.playerUsername && playerProfile && (
-                    <>
-                      <span className="hidden sm:inline text-white/40">•</span>
-                      <div className="flex items-center gap-1">
-                        <UserAvatar 
-                          username={lobby.playerUsername!}
-                          avatarUrl={playerProfile!.avatarUrl}
-                          rank={playerProfile!.rank}
-                          size="sm"
-                          frame={playerProfile!.avatarFrame}
-                          className="w-4 h-4 sm:w-5 sm:h-5"
-                        />
-                        <UserNameWithBadge
-                          username={lobby.playerUsername!}
-                          tier={playerProfile!.tier}
-                          isDonor={playerProfile!.isDonor}
-                          usernameColor={playerProfile!.usernameColor}
-                          size="xs"
-                        />
-                      </div>
-                    </>
-                  )}
+              <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5 border border-white/10">
+                <div className="p-1 bg-blue-500/20 rounded-full">
+                  <Users className="w-2.5 h-2.5 text-blue-400" />
                 </div>
               </div>
             </div>
+
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                  Lobby ID: {lobby._id.slice(-4)}
+                </span>
+                {gameModeBadge && (
+                  <div
+                    className={cn(
+                      "text-[9px] px-1.5 py-0.5 rounded border font-mono uppercase tracking-wider",
+                      gameModeBadge.className.replace("bg-", "bg-transparent "), // Make badge background transparent for tech look
+                    )}
+                  >
+                    {gameModeBadge.label}
+                  </div>
+                )}
+              </div>
+
+              <h4 className="font-display font-medium text-zinc-100 text-lg truncate group-hover:text-blue-200 transition-colors">
+                {lobby.name}
+              </h4>
+
+              <div className="flex items-center gap-3 text-xs">
+                <div className="flex items-center gap-1.5 bg-white/5 rounded px-2 py-0.5 border border-white/5">
+                  <span className="text-zinc-500 font-mono text-[10px] uppercase">
+                    Host
+                  </span>
+                  <UserNameWithBadge
+                    username={lobby.hostUsername}
+                    tier={hostProfile?.tier}
+                    isDonor={hostProfile?.isDonor}
+                    usernameColor={hostProfile?.usernameColor}
+                    size="xs"
+                  />
+                </div>
+
+                {lobby.playerUsername && playerProfile && (
+                  <>
+                    <span className="text-zinc-700 font-mono">VS</span>
+                    <div className="flex items-center gap-1.5 bg-white/5 rounded px-2 py-0.5 border border-white/5">
+                      <span className="text-red-500/50 font-mono text-[10px] uppercase">
+                        Rival
+                      </span>
+                      <UserNameWithBadge
+                        username={lobby.playerUsername}
+                        tier={playerProfile?.tier}
+                        isDonor={playerProfile?.isDonor}
+                        usernameColor={playerProfile?.usernameColor}
+                        size="xs"
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 flex-shrink-0">
-            <Badge className={gameModeBadge.className}>
-              {gameModeBadge.icon}
-              <span className="ml-1 hidden sm:inline">{gameModeBadge.label}</span>
-            </Badge>
-            <Badge variant={lobby.playerId ? "destructive" : "secondary"} className={lobby.playerId ? "bg-red-500/20 text-red-300 border-red-500/30" : "bg-green-500/20 text-green-300 border-green-500/30"}>
-              {lobby.playerId ? "2/2" : "1/2"}
-            </Badge>
-            
+
+          {/* Right: Actions & Status */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0 pt-3 sm:pt-0 border-t border-white/5 sm:border-0 pl-0 sm:pl-4 border-l-0 sm:border-l sm:border-white/5 border-dashed">
+            <div className="flex flex-col items-end gap-1 mr-2">
+              <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                Status
+              </span>
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 text-xs font-mono uppercase tracking-wider",
+                  lobby.playerId ? "text-red-400" : "text-emerald-400",
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-1.5 h-1.5 rounded-full animate-pulse",
+                    lobby.playerId ? "bg-red-500" : "bg-emerald-500",
+                  )}
+                />
+                {lobby.playerId ? "Full Capacity" : "Open Slot"}
+              </div>
+            </div>
+
             {/* Invite button - only visible for host */}
             {lobby.hostId === currentUserId && (
               <Button
-                variant="ghost"
+                variant="outline"
                 size="sm"
-                className="bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/30 h-8 w-8 sm:h-9 sm:w-auto sm:px-3 p-0 sm:p-2"
+                className="bg-transparent border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300 h-9 font-mono text-xs uppercase tracking-wider"
                 onClick={() => onInviteToLobby?.(lobby._id)}
               >
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline ml-2">Invite</span>
+                <MessageCircle className="h-3.5 w-3.5 sm:mr-2" />
+                <span className="hidden sm:inline">Invite</span>
               </Button>
             )}
 
@@ -157,46 +211,52 @@ export function LobbyCard({ lobby, index, currentUserId, onJoin, onLeave, onInvi
               <Button
                 variant="destructive"
                 size="sm"
-                className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 text-xs sm:text-sm"
+                className="bg-red-950/30 hover:bg-red-900/50 text-red-400 border border-red-900/50 h-9 font-mono text-xs uppercase tracking-wider"
                 onClick={() => onLeave(lobby._id)}
                 disabled={isLeaving}
               >
                 {isLeaving ? (
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
-                    <span className="hidden sm:inline">Deleting...</span>
-                    <span className="sm:hidden">...</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Terminating...</span>
                   </div>
                 ) : (
-                  "Delete"
+                  "Abort"
                 )}
               </Button>
             ) : (
               <Button
                 size="sm"
-                className={lobby.playerId ? "bg-gray-500/20 text-gray-400 border border-gray-500/30 text-xs sm:text-sm" : "bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-xs sm:text-sm"}
+                className={cn(
+                  "h-9 font-mono text-xs uppercase tracking-wider transition-all duration-300 shadow-[0_0_10px_-4px_rgba(0,0,0,0.5)]",
+                  lobby.playerId
+                    ? "bg-zinc-800 text-zinc-500 border border-zinc-700"
+                    : "bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/30 shadow-[0_0_10px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]",
+                )}
                 onClick={() => onJoin(lobby._id)}
                 disabled={!!lobby.playerId || isJoining}
               >
                 {isJoining ? (
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <div className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span className="hidden sm:inline">Joining...</span>
-                    <span className="sm:hidden">...</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span className="hidden sm:inline">Syncing...</span>
                   </div>
                 ) : lobby.playerId ? (
-                  "Full"
+                  <span className="flex items-center gap-2">
+                    <Eye className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Full</span>
+                  </span>
                 ) : (
                   <>
-                    <span className="hidden sm:inline">Join Battle</span>
+                    <span className="hidden sm:inline">Engage</span>
                     <span className="sm:hidden">Join</span>
                   </>
                 )}
               </Button>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   );
 }

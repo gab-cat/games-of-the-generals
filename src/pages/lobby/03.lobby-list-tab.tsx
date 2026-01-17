@@ -456,35 +456,48 @@ export function LobbyListTab({
   };
 
   return (
-    <>
+    <div className="space-y-6">
       {/* Active Lobby Display */}
       {activeLobby && (
-        <Card className="bg-blue-500/10 backdrop-blur-sm border border-blue-500/30 shadow-lg">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm">
+        <Card className="bg-zinc-900/40 backdrop-blur-md border border-white/10 shadow-lg relative overflow-hidden group">
+          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/50" />
+          <CardContent className="p-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-sm flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-blue-500/5 blur-[2px]" />
                   {activeLobby.isPrivate ? (
-                    <Lock className="h-5 w-5 text-blue-300" />
+                    <Lock className="h-5 w-5 text-blue-400 relative z-10" />
                   ) : (
-                    <Users className="h-5 w-5 text-blue-300" />
+                    <Users className="h-5 w-5 text-blue-400 relative z-10" />
                   )}
                 </div>
                 <div>
-                  <h4 className="font-semibold text-blue-200">
-                    Your Active Lobby
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-blue-400 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded-sm border border-blue-500/20">
+                      Active Mission
+                    </span>
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                      {activeLobby.isPrivate
+                        ? "Private Channel"
+                        : "Public Channel"}
+                    </span>
+                  </div>
+                  <h4 className="font-display text-lg text-white tracking-wide">
+                    {activeLobby.name}
                   </h4>
-                  <p className="text-sm text-blue-100">{activeLobby.name}</p>
                   {activeLobby.isPrivate && activeLobby.lobbyCode && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-xs text-blue-200">Code:</span>
-                      <code className="bg-blue-500/20 backdrop-blur-sm px-2 py-1 rounded text-xs font-mono text-blue-200 border border-blue-500/30">
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <span className="text-xs text-zinc-400 font-mono">
+                        SECURE CODE:
+                      </span>
+                      <code className="bg-black/40 px-2 py-0.5 rounded-sm text-xs font-mono text-blue-300 border border-white/10 tracking-wider">
                         {activeLobby.lobbyCode}
                       </code>
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-6 w-6 p-0 text-blue-300 hover:text-blue-100 hover:bg-blue-500/20"
+                        className="h-5 w-5 p-0 text-zinc-400 hover:text-white hover:bg-white/5"
                         onClick={() =>
                           activeLobby.lobbyCode &&
                           copyLobbyCode(activeLobby.lobbyCode)
@@ -496,21 +509,22 @@ export function LobbyListTab({
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3 sm:justify-end">
                 <Badge
-                  variant="secondary"
-                  className="bg-blue-500/20 text-blue-200 border-blue-500/30"
+                  variant="outline"
+                  className="bg-zinc-900/50 text-zinc-300 border-white/10 font-mono h-8 px-3"
                 >
-                  {activeLobby.playerId ? "2/2" : "1/2"}
+                  <Users className="w-3 h-3 mr-2 text-zinc-500" />
+                  {activeLobby.playerId ? "2/2" : "1/2"} OPERATIVES
                 </Badge>
 
                 {/* Game Starting Indicator - show when countdown is active */}
                 {activeLobby.hostId === profile.userId &&
                   activeLobby.playerId &&
                   gameStartData.isOpen && (
-                    <div className="bg-orange-500/20 text-orange-300 border border-orange-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-orange-300/30 border-t-orange-300 rounded-full animate-spin" />
-                      Battle Starting...
+                    <div className="bg-amber-500/10 text-amber-300 border border-amber-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
+                      <div className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                      Launch Sequence Initiated...
                     </div>
                   )}
 
@@ -518,9 +532,9 @@ export function LobbyListTab({
                 {activeLobby.hostId !== profile.userId &&
                   activeLobby.playerId &&
                   gameStartData.isOpen && (
-                    <div className="bg-blue-500/20 text-blue-300 border border-blue-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-blue-300/30 border-t-blue-300 rounded-full animate-spin" />
-                      Battle Starting...
+                    <div className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
+                      <div className="w-3 h-3 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                      Launch Sequence Initiated...
                     </div>
                   )}
 
@@ -528,9 +542,9 @@ export function LobbyListTab({
                 {activeLobby.hostId === profile.userId &&
                   activeLobby.playerId &&
                   !gameStartData.isOpen && (
-                    <div className="bg-green-500/20 text-green-300 border border-green-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                      Ready to Start
+                    <div className="bg-green-500/10 text-green-400 border border-green-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider animate-pulse">
+                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                      Deployment Ready
                     </div>
                   )}
 
@@ -538,26 +552,26 @@ export function LobbyListTab({
                 {activeLobby.hostId !== profile.userId &&
                   activeLobby.playerId &&
                   !gameStartData.isOpen && (
-                    <div className="bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 px-4 py-2 rounded-lg flex items-center gap-2">
-                      <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                      Waiting for Host...
+                    <div className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+                      Awaiting Commander...
                     </div>
                   )}
 
                 <Button
                   variant="destructive"
                   size="sm"
-                  className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-sm font-mono text-xs uppercase tracking-wider h-8"
                   onClick={() => void handleLeaveLobby(activeLobby._id)}
                   disabled={leaveLobbyMutation.isPending}
                 >
                   {leaveLobbyMutation.isPending ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full animate-spin" />
-                      Leaving...
+                      <div className="w-3 h-3 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
+                      Aborting...
                     </div>
                   ) : (
-                    "Delete"
+                    "Abort Mission"
                   )}
                 </Button>
               </div>
@@ -566,8 +580,8 @@ export function LobbyListTab({
         </Card>
       )}
 
-      {/* Create/Join Lobby Actions */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+      {/* Control Bar (Actions & Counts) */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-zinc-900/60 backdrop-blur-md p-4 rounded-sm border border-white/5 shadow-sm">
         <motion.div
           initial={{ x: -20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
@@ -579,9 +593,9 @@ export function LobbyListTab({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.1, type: "spring" }}
-              className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-500/20 via-red-500/20 to-pink-500/20 backdrop-blur-sm border border-orange-500/30 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
+              className="w-10 h-10 bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-sm flex items-center justify-center flex-shrink-0"
             >
-              <Sword className="h-5 w-5 sm:h-6 sm:w-6 text-orange-400" />
+              <Sword className="h-5 w-5 text-orange-400" />
             </motion.div>
 
             <div className="flex flex-col min-w-0">
@@ -589,9 +603,9 @@ export function LobbyListTab({
                 initial={{ y: -10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="text-base sm:text-lg font-semibold text-white/90"
+                className="text-sm font-mono uppercase tracking-wider text-white/90 font-semibold"
               >
-                Battle Rooms
+                Available Operations
               </motion.h3>
               <motion.div
                 initial={{ scaleX: 0 }}
@@ -599,9 +613,9 @@ export function LobbyListTab({
                 transition={{ delay: 0.4, duration: 0.6 }}
                 className="flex items-center gap-2"
               >
-                <div className="h-0.5 w-6 sm:w-8 bg-gradient-to-r from-orange-500/60 to-red-500/60 rounded-full"></div>
-                <span className="text-xs text-white/50 font-mono">
-                  {lobbies.length} available
+                <div className="h-0.5 w-6 bg-orange-500/50"></div>
+                <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
+                  {lobbies.length} Active Zones
                 </span>
               </motion.div>
             </div>
@@ -612,16 +626,16 @@ export function LobbyListTab({
           initial={{ x: 20, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto"
+          className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto"
         >
           {/* Quick Match Button */}
           {!activeLobby && !isInQueue && (
             <Button
-              className="flex items-center justify-center transition-all duration-300 gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 w-full sm:w-auto"
+              className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] transition-all duration-300 border border-green-400"
               onClick={() => joinQueueMutation.mutate({})}
               disabled={joinQueueMutation.isPending}
             >
-              <Zap className="h-4 w-4" />
+              <Zap className="h-3.5 w-3.5" />
               <span className="sm:hidden">Quick Match</span>
               <span className="hidden sm:inline">Quick Match</span>
             </Button>
@@ -629,16 +643,19 @@ export function LobbyListTab({
 
           {/* Queue Status */}
           {isInQueue && (
-            <div className="bg-green-500/10 backdrop-blur-sm border border-green-500/30 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full sm:w-auto">
+            <div className="bg-green-500/10 backdrop-blur-sm border border-green-500/20 rounded-sm px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full sm:w-auto">
               <div className="flex items-center gap-3">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+                <div className="relative">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-ping absolute inset-0" />
+                  <div className="w-2 h-2 bg-green-500 rounded-full relative z-10" />
+                </div>
                 <div>
-                  <p className="text-green-200 font-medium text-sm">
-                    Finding opponent...
+                  <p className="text-green-300 font-mono text-xs uppercase tracking-wider">
+                    Scanning for Opponent...
                   </p>
                   {queueTimeRemaining && (
-                    <p className="text-xs text-green-300">
-                      {Math.ceil(queueTimeRemaining / 1000)}s remaining
+                    <p className="text-[10px] text-green-500/70 font-mono">
+                      TIMEOUT IN {Math.ceil(queueTimeRemaining / 1000)}s
                     </p>
                   )}
                 </div>
@@ -646,12 +663,12 @@ export function LobbyListTab({
               <Button
                 variant="outline"
                 size="sm"
-                className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
+                className="bg-transparent hover:bg-red-500/10 text-red-400 border border-red-500/30 rounded-sm h-7 text-[10px] uppercase font-mono tracking-widest"
                 onClick={() => leaveQueueMutation.mutate({})}
                 disabled={leaveQueueMutation.isPending}
               >
-                <X className="h-4 w-4" />
-                {leaveQueueMutation.isPending ? "Leaving..." : "Cancel"}
+                <X className="h-3 w-3 mr-1" />
+                {leaveQueueMutation.isPending ? "Aborting..." : "Cancel"}
               </Button>
             </div>
           )}
@@ -660,50 +677,62 @@ export function LobbyListTab({
             <DialogTrigger asChild>
               <Button
                 variant="outline"
-                className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20 w-full sm:w-auto"
+                className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-zinc-300 hover:text-white rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider"
               >
-                <Key className="h-4 w-4" />
-                <span className="sm:hidden">Join by Code</span>
+                <Key className="h-3.5 w-3.5" />
+                <span className="sm:hidden">Enter Code</span>
                 <span className="hidden sm:inline">Join by Code</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-gray-500/10 backdrop-blur-md  border border-white/10">
+            <DialogContent className="sm:max-w-[425px] bg-zinc-900 border border-white/10 rounded-sm">
               <DialogHeader>
-                <DialogTitle className="text-white/90">
-                  Join Private Lobby
-                </DialogTitle>
-                <DialogDescription className="text-white/60">
-                  Enter the 6-character lobby code to join a private battle room
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-sm bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                    <Key className="w-4 h-4 text-purple-400" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-white font-display tracking-wide uppercase text-lg">
+                      Private Access
+                    </DialogTitle>
+                  </div>
+                </div>
+                <DialogDescription className="text-zinc-400 font-mono text-xs">
+                  Enter the 6-character encryption key to access the private war
+                  room.
                 </DialogDescription>
               </DialogHeader>
               <form
                 onSubmit={(e) => void handleJoinByCode(e)}
-                className="space-y-4"
+                className="space-y-6 mt-4"
               >
-                <Input
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="ABC123"
-                  maxLength={6}
-                  required
-                  disabled={
-                    joinLobbyByCodeMutation.isPending ||
-                    startGameMutation.isPending
-                  }
-                  className="font-mono tracking-wider text-center text-lg bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
-                />
-                <div className="flex justify-end gap-2">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-blue-500/5 blur-xl pointer-events-none" />
+                  <Input
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="ABC123"
+                    maxLength={6}
+                    required
+                    disabled={
+                      joinLobbyByCodeMutation.isPending ||
+                      startGameMutation.isPending
+                    }
+                    className="font-mono tracking-[0.5em] text-center text-2xl bg-black/50 border-white/10 text-blue-400 placeholder:text-zinc-700 h-16 rounded-sm focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 transition-all uppercase"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     onClick={() => setShowJoinByCode(false)}
-                    className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20"
+                    className="text-zinc-400 hover:text-white font-mono text-xs uppercase tracking-wider hover:bg-white/5"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    className="bg-blue-600 hover:bg-blue-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider min-w-[100px]"
                     disabled={
                       joinLobbyByCodeMutation.isPending ||
                       startGameMutation.isPending
@@ -712,8 +741,8 @@ export function LobbyListTab({
                     {joinLobbyByCodeMutation.isPending ||
                     startGameMutation.isPending ? (
                       <div className="flex items-center gap-2">
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Joining...
+                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Accessing...
                       </div>
                     ) : (
                       "Join Lobby"
@@ -727,51 +756,61 @@ export function LobbyListTab({
           {!activeLobby && (
             <Dialog open={showCreateLobby} onOpenChange={setShowCreateLobby}>
               <DialogTrigger asChild>
-                <Button className="flex items-center justify-center gap-2 bg-gradient-to-r text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 w-full sm:w-auto">
-                  <Plus className="h-4 w-4" />
-                  <span className="sm:hidden">Create Room</span>
+                <Button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/20 rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider shadow-lg shadow-blue-900/20">
+                  <Plus className="h-3.5 w-3.5" />
+                  <span className="sm:hidden">Create</span>
                   <span className="hidden sm:inline">Create Lobby</span>
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] bg-gray-500/10 backdrop-blur-md border border-white/10">
+              <DialogContent className="sm:max-w-[425px] bg-zinc-900 border border-white/10 rounded-sm">
                 <DialogHeader>
-                  <DialogTitle className="text-white/90">
-                    Create Battle Room
-                  </DialogTitle>
-                  <DialogDescription className="text-white/60">
-                    Create a new lobby for strategic warfare
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-sm bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                      <Sword className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-white font-display tracking-wide uppercase text-lg">
+                        Initialize Battlefield
+                      </DialogTitle>
+                    </div>
+                  </div>
+                  <DialogDescription className="text-zinc-400 font-mono text-xs">
+                    Configure parameters for a new strategic engagement.
                   </DialogDescription>
                 </DialogHeader>
                 <form
                   onSubmit={(e) => void handleCreateLobby(e)}
-                  className="space-y-4"
+                  className="space-y-5 mt-4"
                 >
                   <div className="space-y-2">
+                    <label className="text-xs font-mono uppercase tracking-wider text-zinc-500">
+                      Operation Name
+                    </label>
                     <div className="flex gap-2">
                       <Input
                         value={lobbyName}
                         onChange={(e) => setLobbyName(e.target.value)}
-                        placeholder="Enter lobby name"
+                        placeholder="ENTER LOBBY DESIGNATION"
                         disabled={createLobbyMutation.isPending}
-                        className="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
+                        className="flex-1 bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-sm focus-visible:ring-blue-500/50"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         onClick={generateRandomName}
                         disabled={createLobbyMutation.isPending}
-                        className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20 px-3"
+                        className="bg-zinc-800 border-white/10 text-zinc-400 hover:text-white px-3 rounded-sm"
                         title="Generate random name"
                       >
                         <Shuffle className="h-4 w-4" />
                       </Button>
                     </div>
-                    <p className="text-xs text-white/50">
-                      Leave empty to auto-generate a random name
+                    <p className="text-[10px] text-zinc-600 font-mono">
+                      * Leave empty to auto-generate tactical designation
                     </p>
                   </div>
 
-                  <div className="space-y-2">
+                  <div className="space-y-4 pt-2 border-t border-white/5">
                     <div className="flex items-center space-x-2">
                       <input
                         type="checkbox"
@@ -782,93 +821,76 @@ export function LobbyListTab({
                           createLobbyMutation.isPending ||
                           (privateLobbyLimit && !privateLobbyLimit.canCreate)
                         }
-                        className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
+                        className="rounded-sm border-white/20 bg-black/40 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
                       />
                       <label
                         htmlFor="private-lobby"
-                        className="text-sm flex items-center gap-2 text-white/80"
+                        className="text-xs font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-2 cursor-pointer select-none"
                       >
-                        <Lock className="h-4 w-4" />
-                        Private lobby (requires code to join)
+                        <Lock className="h-3 w-3 text-zinc-500" />
+                        Private Channel (Code Required)
                       </label>
                     </div>
                     {isPrivate && privateLobbyLimit && (
-                      <div className="ml-6 space-y-1">
+                      <div className="ml-6 space-y-2 bg-zinc-950/50 p-2 rounded-sm border border-white/5">
                         {!privateLobbyLimit.canCreate && (
                           <div
-                            className={`rounded-lg p-2 text-xs ${
+                            className={`rounded-sm p-2 text-xs font-mono border ${
                               privateLobbyLimit.reason ===
                               "subscription_expired"
-                                ? "bg-red-500/20 border border-red-500/30 text-red-300"
-                                : "bg-amber-500/20 border border-amber-500/30 text-amber-300"
+                                ? "bg-red-500/10 border-red-500/20 text-red-400"
+                                : "bg-amber-500/10 border-amber-500/20 text-amber-400"
                             }`}
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 mb-1">
                               <AlertTriangle className="w-3 h-3" />
-                              <span className="font-medium">
+                              <span className="uppercase tracking-wider font-bold">
                                 {privateLobbyLimit.reason ===
                                 "subscription_expired"
                                   ? "Subscription Expired"
                                   : "Daily Limit Reached"}
                               </span>
                             </div>
-                            <p className="mt-1 font-light">
+                            <p className="opacity-80">
                               {privateLobbyLimit.reason ===
                               "subscription_expired"
-                                ? "Your subscription has expired. Please renew to create private lobbies."
-                                : `You've reached your daily limit of ${privateLobbyLimit.limit} private lobbies for ${privateLobbyLimit.tier === "free" ? "Free" : privateLobbyLimit.tier === "pro" ? "Pro" : "Pro+"} tier.`}
+                                ? "Renew subscription to restore access."
+                                : `Limit: ${privateLobbyLimit.limit} lobbies for ${privateLobbyLimit.tier === "free" ? "Free" : privateLobbyLimit.tier === "pro" ? "Pro" : "Pro+"} tier.`}
                             </p>
-                            {privateLobbyLimit.reason ===
-                            "subscription_expired" ? (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                onClick={() =>
-                                  navigate({
-                                    to: "/subscription",
-                                    search: { subscription: undefined },
-                                  })
-                                }
-                                className="text-xs p-0 h-auto mt-1 font-light underline"
-                              >
-                                Renew Now
-                              </Button>
-                            ) : privateLobbyLimit.tier === "free" ? (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                onClick={() =>
-                                  navigate({
-                                    to: "/pricing",
-                                    search: { donation: undefined },
-                                  })
-                                }
-                                className="text-xs p-0 h-auto mt-1 font-light underline"
-                              >
-                                Upgrade to Pro for 50/day, or Pro+ for unlimited
-                              </Button>
-                            ) : privateLobbyLimit.tier === "pro" ? (
-                              <Button
-                                variant="link"
-                                size="sm"
-                                onClick={() =>
-                                  navigate({
-                                    to: "/pricing",
-                                    search: { donation: undefined },
-                                  })
-                                }
-                                className="text-xs p-0 h-auto mt-1 font-light underline"
-                              >
-                                Upgrade to Pro+ for unlimited private lobbies
-                              </Button>
-                            ) : null}
+
+                            <Button
+                              variant="link"
+                              size="sm"
+                              onClick={() =>
+                                navigate({
+                                  to:
+                                    privateLobbyLimit.reason ===
+                                    "subscription_expired"
+                                      ? "/subscription"
+                                      : "/pricing",
+                                  search: {
+                                    subscription: undefined,
+                                    donation: undefined,
+                                  },
+                                })
+                              }
+                              className="text-xs p-0 h-auto mt-2 font-bold underline decoration-dotted underline-offset-4"
+                            >
+                              {privateLobbyLimit.reason ===
+                              "subscription_expired"
+                                ? "RENEW NOW"
+                                : "UPGRADE CLEARANCE LEVEL"}
+                            </Button>
                           </div>
                         )}
                         {privateLobbyLimit.canCreate && (
-                          <div className="text-xs text-white/60 font-light">
+                          <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
+                            <div
+                              className={`w-1.5 h-1.5 rounded-full ${privateLobbyLimit.limit === Infinity ? "bg-green-500" : "bg-amber-500"}`}
+                            />
                             {privateLobbyLimit.limit === Infinity
-                              ? "Unlimited private lobbies"
-                              : `${privateLobbyLimit.limit - privateLobbyLimit.today} remaining today (${privateLobbyLimit.today}/${privateLobbyLimit.limit})`}
+                              ? "UNLIMITED ACCESS GRANTED"
+                              : `${privateLobbyLimit.limit - privateLobbyLimit.today} CREATIONS REMAINING TODAY`}
                           </div>
                         )}
                       </div>
@@ -882,66 +904,71 @@ export function LobbyListTab({
                       checked={allowSpectators}
                       onChange={(e) => setAllowSpectators(e.target.checked)}
                       disabled={createLobbyMutation.isPending}
-                      className="rounded border-white/30 bg-white/10 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
+                      className="rounded-sm border-white/20 bg-black/40 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
                     />
                     <label
                       htmlFor="allow-spectators"
-                      className="text-sm flex items-center gap-2 text-white/80"
+                      className="text-xs font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-2 cursor-pointer select-none"
                     >
-                      <Users className="h-4 w-4" />
-                      Allow spectators
+                      <Users className="h-3 w-3 text-zinc-500" />
+                      Allow Spectators
                     </label>
                   </div>
 
                   {allowSpectators && (
-                    <Input
-                      value={maxSpectators}
-                      onChange={(e) => setMaxSpectators(e.target.value)}
-                      placeholder="Max spectators (leave empty for unlimited)"
-                      type="number"
-                      min="1"
-                      disabled={createLobbyMutation.isPending}
-                      className="bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50"
-                    />
+                    <div className="space-y-1 ml-6">
+                      <Input
+                        value={maxSpectators}
+                        onChange={(e) => setMaxSpectators(e.target.value)}
+                        placeholder="MAX LIMIT (EMPTY = UNLIMITED)"
+                        type="number"
+                        min="1"
+                        disabled={createLobbyMutation.isPending}
+                        className="bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-xs focus-visible:ring-blue-500/50 h-8 w-full"
+                      />
+                    </div>
                   )}
 
-                  <GameModeSelector
-                    value={gameMode}
-                    onChange={setGameMode}
-                    disabled={createLobbyMutation.isPending}
-                  />
+                  <div className="pt-2 border-t border-white/5">
+                    <label className="text-xs font-mono uppercase tracking-wider text-zinc-500 block mb-2">
+                      Game Protocol
+                    </label>
+                    <GameModeSelector
+                      value={gameMode}
+                      onChange={setGameMode}
+                      disabled={createLobbyMutation.isPending}
+                    />
+                  </div>
 
                   {/* Warning about auto-deletion */}
-                  <div className="flex items-start gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                    <Clock className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                    <p className="text-xs text-amber-200">
-                      <strong>Note:</strong> Waiting lobbies that are inactive
-                      for more than 30 minutes are automatically deleted to keep
-                      the server clean.
+                  <div className="flex items-start gap-2 p-2 bg-amber-500/5 border border-amber-500/10 rounded-sm">
+                    <Clock className="h-3 w-3 text-amber-500/70 mt-0.5 flex-shrink-0" />
+                    <p className="text-[10px] text-amber-500/70 font-mono leading-relaxed">
+                      INACTIVE PROTOCOLS AUTOMATICALLY PURGED AFTER 30 MIN.
                     </p>
                   </div>
 
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-3 pt-2">
                     <Button
                       type="button"
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => setShowCreateLobby(false)}
-                      className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20"
+                      className="text-zinc-400 hover:text-white font-mono text-xs uppercase tracking-wider hover:bg-white/5"
                     >
                       Cancel
                     </Button>
                     <Button
                       type="submit"
-                      className="bg-gradient-to-r text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                      className="bg-blue-600 hover:bg-blue-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider w-[120px]"
                       disabled={createLobbyMutation.isPending}
                     >
                       {createLobbyMutation.isPending ? (
                         <div className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                           Creating...
                         </div>
                       ) : (
-                        "Create"
+                        "Initialize"
                       )}
                     </Button>
                   </div>
@@ -953,63 +980,77 @@ export function LobbyListTab({
       </div>
 
       {/* Lobbies List */}
-      <div ref={listRef} className="space-y-3">
+      <div ref={listRef} className="space-y-3 pb-20">
         {lobbiesQuery === undefined ? (
-          <div className="flex justify-center py-8">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full"
-            />
+          <div className="flex justify-center py-20">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+              <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest animate-pulse">
+                Scanning Grid...
+              </p>
+            </div>
           </div>
         ) : lobbies.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="text-center py-12"
+            className="text-center py-20 border border-dashed border-white/10 rounded-sm bg-zinc-900/20"
           >
-            <Sword className="h-12 w-12 text-white/40 mx-auto mb-4" />
-            <p className="text-white/60">No public battle rooms available.</p>
-            <p className="text-sm text-white/40">
-              Create one to start your conquest!
+            <div className="bg-zinc-900/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/5">
+              <Sword className="h-10 w-10 text-zinc-700" />
+            </div>
+            <h3 className="text-zinc-400 font-display uppercase tracking-wide text-lg mb-2">
+              Sector Clear
+            </h3>
+            <p className="text-zinc-600 text-sm font-mono mb-6 max-w-sm mx-auto">
+              No active battle rooms detected in this sector.
             </p>
+            <Button
+              onClick={() => setShowCreateLobby(true)}
+              variant="outline"
+              className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 font-mono text-xs uppercase tracking-wider"
+            >
+              Initialize New Operation
+            </Button>
           </motion.div>
         ) : (
           <>
-            {lobbies.map((lobby, index) => (
-              <LobbyCard
-                key={lobby._id}
-                lobby={lobby}
-                index={index}
-                currentUserId={profile.userId}
-                onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
-                onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
-                onInviteToLobby={handleInviteToLobby}
-                isJoining={
-                  joinLobbyMutation.isPending || startGameMutation.isPending
-                }
-                isLeaving={leaveLobbyMutation.isPending}
-              />
-            ))}
+            <div className="grid gap-4">
+              {lobbies.map((lobby, index) => (
+                <LobbyCard
+                  key={lobby._id}
+                  lobby={lobby}
+                  index={index}
+                  currentUserId={profile.userId}
+                  onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
+                  onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
+                  onInviteToLobby={handleInviteToLobby}
+                  isJoining={
+                    joinLobbyMutation.isPending || startGameMutation.isPending
+                  }
+                  isLeaving={leaveLobbyMutation.isPending}
+                />
+              ))}
+            </div>
 
             {/* Load More Button */}
             {lobbiesQuery && !lobbiesQuery.isDone && (
-              <div className="flex justify-center pt-4">
+              <div className="flex justify-center pt-8">
                 <Button
                   variant="outline"
                   onClick={loadMoreLobbies}
-                  className="flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20"
+                  className="flex items-center gap-2 bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-sm font-mono text-xs uppercase tracking-wider px-8 h-10"
                   disabled={isLoadingMore}
                 >
                   {isLoadingMore ? (
                     <>
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Loading...
+                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Loading Data...
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="h-4 w-4" />
-                      Load More Lobbies
+                      <ChevronDown className="h-3 w-3" />
+                      Load Extended Grid
                     </>
                   )}
                 </Button>
@@ -1027,6 +1068,6 @@ export function LobbyListTab({
         player2Username={gameStartData.player2Username}
         currentUsername={gameStartData.currentUsername}
       />
-    </>
+    </div>
   );
 }

@@ -3,7 +3,12 @@ import { Target, Trophy, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../../components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 import { UserBadge } from "../../components/UserBadge";
 import { Id } from "../../../convex/_generated/dataModel";
 import Squares from "../../components/backgrounds/Squares/Squares";
@@ -26,172 +31,200 @@ interface LobbyHeaderProps {
 }
 
 export function LobbyHeader({ profile }: LobbyHeaderProps) {
-  const winRate = profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
+  const winRate =
+    profile.gamesPlayed > 0
+      ? Math.round((profile.wins / profile.gamesPlayed) * 100)
+      : 0;
   const tier = profile.tier || "free";
   const isPro = tier === "pro";
   const isProPlus = tier === "pro_plus";
   const isDonor = profile.isDonor;
 
   return (
-    <Card className={cn(
-      "bg-black/20 backdrop-blur-xl border shadow-2xl shadow-black/20 relative overflow-hidden transition-all duration-500",
-      isPro && "border-blue-500/40 shadow-blue-500/10",
-      isProPlus && "border-amber-500/50 shadow-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.15)]",
-      !isPro && !isProPlus && "border-white/10"
-    )}>
+    <Card
+      className={cn(
+        "bg-zinc-900/60 backdrop-blur-md border shadow-2xl relative overflow-hidden transition-all duration-500 rounded-sm",
+        isPro && "border-blue-500/20 shadow-blue-500/10",
+        isProPlus && "border-amber-500/20 shadow-amber-500/10",
+        !isPro && !isProPlus && "border-white/5",
+      )}
+    >
+      {/* Tech Corners */}
+      <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-white/10" />
+      <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-white/10" />
+      <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-white/10" />
+      <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-white/10" />
+
       {isProPlus && (
         <motion.div
           animate={{
-            opacity: [0.1, 0.2, 0.1],
+            opacity: [0.05, 0.1, 0.05],
           }}
           transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
           className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-amber-500/5 pointer-events-none"
         />
       )}
+
       {/* Animated Squares Background */}
-      <div className="absolute inset-0 rounded-2xl overflow-hidden opacity-20">
+      <div className="absolute inset-0 rounded-sm overflow-hidden opacity-30 pointer-events-none">
         <Squares
           direction="diagonal"
-          speed={0.3}
-          borderColor="rgba(255,255,255,0.08)"
+          speed={0.2}
+          borderColor={
+            isProPlus
+              ? "rgba(245,158,11,0.1)"
+              : isPro
+                ? "rgba(59,130,246,0.1)"
+                : "rgba(255,255,255,0.05)"
+          }
         />
       </div>
-      <CardHeader className="p-4 sm:p-6 relative z-10">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-0">
-          <motion.div 
+
+      <CardHeader className="p-6 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 lg:gap-0">
+          <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
+            className="flex flex-col sm:flex-row sm:items-center gap-6"
           >
             {/* Stats Icon Section */}
             <motion.div
-              initial={{ scale: 0, rotateY: -180 }}
-              animate={{ scale: 1, rotateY: 0 }}
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 120 }}
               className={cn(
-                "w-12 h-12 sm:w-16 sm:h-16 backdrop-blur-sm border rounded-2xl flex items-center justify-center shadow-lg relative overflow-hidden mx-auto sm:mx-0 flex-shrink-0 transition-colors duration-500",
-                isProPlus 
-                  ? "bg-gradient-to-br from-amber-500/30 via-orange-500/30 to-yellow-500/30 border-amber-400/40" 
+                "w-16 h-16 rounded-sm flex items-center justify-center shadow-lg relative overflow-hidden mx-auto sm:mx-0 flex-shrink-0 transition-all duration-500 border group",
+                isProPlus
+                  ? "bg-amber-500/10 border-amber-500/30"
                   : isPro
-                    ? "bg-gradient-to-br from-blue-500/30 via-indigo-500/30 to-purple-500/30 border-blue-400/40"
-                    : "bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-cyan-500/20 border-white/10"
+                    ? "bg-blue-500/10 border-blue-500/30"
+                    : "bg-zinc-800/50 border-white/10",
               )}
             >
-              {/* Animated background pattern */}
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              {/* Scanline Effect */}
+              <div className="absolute inset-0 bg-[linear-gradient(transparent_0%,rgba(255,255,255,0.05)_50%,transparent_100%)] translate-y-[-100%] group-hover:translate-y-[100%] transition-transform duration-1000" />
+
+              <Target
                 className={cn(
-                  "absolute inset-0 opacity-20 rounded-2xl",
-                  isProPlus ? "bg-gradient-to-br from-amber-500 to-orange-500" : "bg-gradient-to-br from-blue-500 to-purple-500"
+                  "h-8 w-8 relative z-10",
+                  isProPlus
+                    ? "text-amber-400"
+                    : isPro
+                      ? "text-blue-400"
+                      : "text-zinc-400",
                 )}
               />
-              <Target className={cn(
-                "h-6 w-6 sm:h-8 sm:w-8 relative z-10",
-                isProPlus ? "text-amber-300" : isPro ? "text-blue-300" : "text-blue-400"
-              )} />
             </motion.div>
-            
-            <div className="flex flex-col text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
-                <Badge variant="secondary" className="flex items-center justify-center gap-1 bg-blue-500/20 text-blue-300 border-blue-500/30 w-fit mx-auto sm:mx-0">
-                  <Trophy className="h-4 w-4" />
-                  {profile.rank}
-                </Badge>
-                <motion.div
-                  initial={{ scaleX: 0 }}
-                  animate={{ scaleX: 1 }}
-                  transition={{ delay: 0.4, duration: 0.8 }}
-                  className="hidden sm:block h-px w-12 bg-gradient-to-r from-blue-500/60 to-purple-500/60"
-                />
-              </div>
-              <motion.div
-                initial={{ y: 10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="flex items-center gap-2"
-              >
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-lg sm:text-xl font-bold text-white/90">Commander Profile</CardTitle>
-                    {(isPro || isProPlus) && (
-                      <UserBadge type={isProPlus ? "pro_plus" : "pro"} size="sm" showText />
-                    )}
-                    {isDonor && (
-                      <UserBadge type="donor" size="sm" />
-                    )}
-                  </div>
-                  <p className={cn(
-                    "text-xs sm:text-xs mt-1 transition-colors duration-500",
-                    isProPlus ? "text-amber-300/80" : isPro ? "text-blue-300/80" : "text-white/60"
-                  )}>
-                    {isProPlus ? "Elite Global Commander" : isPro ? "Professional Commander" : "Battle Statistics & Performance"}
-                  </p>
+
+            <div className="flex flex-col text-center sm:text-left space-y-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-center sm:justify-start">
+                <div className="flex items-center gap-2 justify-center sm:justify-start">
+                  {(isPro || isProPlus) && (
+                    <UserBadge
+                      type={isProPlus ? "pro_plus" : "pro"}
+                      size="sm"
+                      showText={false}
+                      className="shadow-none"
+                    />
+                  )}
+                  <CardTitle className="text-xl sm:text-2xl font-display font-medium text-white">
+                    {profile.username}
+                  </CardTitle>
                 </div>
-              </motion.div>
+                {isDonor && (
+                  <UserBadge
+                    type="donor"
+                    size="sm"
+                    className="mx-auto sm:mx-0"
+                  />
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 justify-center sm:justify-start">
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-mono tracking-wider uppercase bg-transparent border-opacity-40 rounded-sm h-5",
+                    isProPlus
+                      ? "text-amber-400 border-amber-500"
+                      : isPro
+                        ? "text-blue-400 border-blue-500"
+                        : "text-zinc-400 border-zinc-600",
+                  )}
+                >
+                  <Trophy className="h-3 w-3" />
+                  Rank: {profile.rank}
+                </Badge>
+
+                <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest hidden sm:inline-block">
+                  //{" "}
+                  {isProPlus ? "Elite Cmdr" : isPro ? "Pro Cmdr" : "Commander"}
+                </span>
+              </div>
             </div>
           </motion.div>
 
-          <motion.div 
+          {/* Stats Grid */}
+          <motion.div
             initial={{ x: 20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="grid grid-cols-2 sm:grid-cols-5 gap-4 sm:gap-6 text-center"
+            className="flex flex-wrap justify-center sm:justify-end gap-x-8 gap-y-4"
           >
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              <div className="text-xl sm:text-2xl font-bold text-green-400">{profile.wins}</div>
-              <div className="text-xs text-white/60">Wins</div>
-            </motion.div>
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.6 }}
-            >
-              <div className="text-xl sm:text-2xl font-bold text-red-400">{profile.losses}</div>
-              <div className="text-xs text-white/60">Losses</div>
-            </motion.div>
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.7 }}
-            >
-              <div className="text-xl sm:text-2xl font-bold text-white/90">{profile.gamesPlayed}</div>
-              <div className="text-xs text-white/60">Games</div>
-            </motion.div>
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.8 }}
-            >
-              <div className="text-xl sm:text-2xl font-bold text-blue-400">{winRate}%</div>
-              <div className="text-xs text-white/60">Win Rate</div>
-            </motion.div>
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.9 }}
-            >
-              <div className="text-xl sm:text-2xl font-bold text-yellow-400">{profile.elo ?? 1500}</div>
-              <div className="text-xs text-white/60 flex text-center justify-center items-center gap-1">
-                ELO
+            {/* Wins */}
+            <div className="flex flex-col items-center sm:items-end">
+              <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-1">
+                Victory
+              </span>
+              <span className="text-2xl font-mono text-green-400 tracking-tight">
+                {profile.wins}
+              </span>
+            </div>
+
+            {/* Losses */}
+            <div className="flex flex-col items-center sm:items-end">
+              <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-1">
+                Defeat
+              </span>
+              <span className="text-2xl font-mono text-red-400 tracking-tight">
+                {profile.losses}
+              </span>
+            </div>
+
+            {/* Win Rate */}
+            <div className="flex flex-col items-center sm:items-end relative group cursor-help">
+              <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                Win Rate
+              </span>
+              <span className="text-2xl font-mono text-blue-400 tracking-tight">
+                {winRate}%
+              </span>
+            </div>
+
+            {/* ELO */}
+            <div className="flex flex-col items-center sm:items-end">
+              <div className="flex items-center gap-1 mb-1">
+                <span className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
+                  ELO Rating
+                </span>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <HelpCircle className="w-3 h-3 text-white/40 hover:text-white/60 cursor-help" />
+                      <HelpCircle className="w-3 h-3 text-zinc-600 hover:text-zinc-400 cursor-help" />
                     </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs bg-black/20 backdrop-blur-sm text-white">
-                      <p className="text-xs">
-                        ELO rating is calculated only from Quick Match games, as matchmaking ensures fair skill-based pairings.
-                      </p>
+                    <TooltipContent
+                      side="bottom"
+                      className="bg-zinc-900 border border-white/10 text-xs font-mono max-w-[200px]"
+                    >
+                      Calculated from Quick Match performance only.
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
-            </motion.div>
+              <span className="text-2xl font-mono text-yellow-400 tracking-tight">
+                {profile.elo ?? 1500}
+              </span>
+            </div>
           </motion.div>
         </div>
       </CardHeader>
