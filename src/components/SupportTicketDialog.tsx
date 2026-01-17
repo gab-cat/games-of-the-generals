@@ -1,33 +1,34 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
+import { useState, useRef, useEffect } from "react";
+
+import {
+  Clock,
+  CheckCircle,
+  XCircle,
   RefreshCw,
   User,
   Send,
   Loader2,
-  Shield,
-  ExternalLink,
-  Settings,
   ArrowRight,
-  UserPlus
+  Terminal,
+  Paperclip,
+  AlertCircle,
+  Shield,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { useConvexQuery, useConvexMutationWithQuery } from "@/lib/convex-query-hooks";
+import {
+  useConvexQuery,
+  useConvexMutationWithQuery,
+} from "@/lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
-import { Badge } from "./ui/badge";
+
 import { ScrollArea } from "./ui/scroll-area";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
 import { Id } from "../../convex/_generated/dataModel";
+import { cn } from "@/lib/utils";
+import { LoadingSpinner } from "./LoadingSpinner";
 
 interface SupportTicketDialogProps {
   ticketId: Id<"supportTickets"> | null;
@@ -35,16 +36,34 @@ interface SupportTicketDialogProps {
   onClose: () => void;
 }
 
-export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicketDialogProps) {
+export function SupportTicketDialog({
+  ticketId,
+  isOpen,
+  onClose,
+}: SupportTicketDialogProps) {
   const [newMessage, setNewMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const { data: ticketData, isLoading, error } = useConvexQuery(
+  const {
+    data: ticketData,
+    isLoading,
+    error,
+  } = useConvexQuery(
     api.supportTickets.getSupportTicketWithUpdates,
-    ticketId ? { ticketId } : "skip"
+    ticketId ? { ticketId } : "skip",
   );
 
-  const addUpdateMutation = useConvexMutationWithQuery(api.supportTickets.addSupportTicketUpdate);
+  const addUpdateMutation = useConvexMutationWithQuery(
+    api.supportTickets.addSupportTicketUpdate,
+  );
+
+  // Auto-scroll to bottom of conversation
+  useEffect(() => {
+    if (ticketData?.updates && scrollRef.current) {
+      scrollRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [ticketData?.updates, isOpen]);
 
   const handleAddUpdate = () => {
     if (!newMessage.trim() || !ticketId) {
@@ -56,17 +75,20 @@ export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicket
       try {
         setIsSubmitting(true);
         await new Promise<string>((resolve, reject) => {
-          addUpdateMutation.mutate({
-            ticketId,
-            message: newMessage.trim(),
-          }, {
-            onSuccess: resolve,
-            onError: reject
-          });
+          addUpdateMutation.mutate(
+            {
+              ticketId,
+              message: newMessage.trim(),
+            },
+            {
+              onSuccess: resolve,
+              onError: reject,
+            },
+          );
         });
 
         setNewMessage("");
-        toast.success("Update added successfully!");
+        toast.success("Transmission sent successfully.");
       } catch (error) {
         console.error("Error adding update:", error);
         toast.error("Failed to add update");
@@ -78,55 +100,65 @@ export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicket
     void addUpdate();
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case "open":
-        return <Clock className="w-4 h-4" />;
+        return {
+          icon: <Clock className="w-3.5 h-3.5" />,
+          color: "text-blue-400",
+          bg: "bg-blue-500/10",
+          border: "border-blue-500/20",
+        };
       case "in_progress":
-        return <RefreshCw className="w-4 h-4" />;
+        return {
+          icon: <RefreshCw className="w-3.5 h-3.5" />,
+          color: "text-amber-400",
+          bg: "bg-amber-500/10",
+          border: "border-amber-500/20",
+        };
       case "resolved":
-        return <CheckCircle className="w-4 h-4" />;
+        return {
+          icon: <CheckCircle className="w-3.5 h-3.5" />,
+          color: "text-emerald-400",
+          bg: "bg-emerald-500/10",
+          border: "border-emerald-500/20",
+        };
       case "closed":
-        return <XCircle className="w-4 h-4" />;
+        return {
+          icon: <XCircle className="w-3.5 h-3.5" />,
+          color: "text-zinc-400",
+          bg: "bg-zinc-500/10",
+          border: "border-zinc-500/20",
+        };
       default:
-        return <Clock className="w-4 h-4" />;
+        return {
+          icon: <Clock className="w-3.5 h-3.5" />,
+          color: "text-zinc-400",
+          bg: "bg-zinc-500/10",
+          border: "border-zinc-500/20",
+        };
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "open":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
-      case "in_progress":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
-      case "resolved":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
-      case "closed":
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-      default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
+  const getPriorityConfig = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "bg-red-500/20 text-red-400 border-red-500/30";
+        return { color: "text-red-400", bg: "bg-red-500/10" };
       case "high":
-        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+        return { color: "text-orange-400", bg: "bg-orange-500/10" };
       case "medium":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+        return { color: "text-yellow-400", bg: "bg-yellow-500/10" };
       case "low":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
+        return { color: "text-blue-400", bg: "bg-blue-500/10" };
       default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+        return { color: "text-zinc-400", bg: "bg-zinc-500/10" };
     }
   };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case "bug_report":
-        return "🐛";
+        return "🐞";
       case "feature_request":
         return "✨";
       case "account_issue":
@@ -138,26 +170,13 @@ export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicket
     }
   };
 
-  const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case "bug_report":
-        return "Bug Report";
-      case "feature_request":
-        return "Feature Request";
-      case "account_issue":
-        return "Account Issue";
-      case "game_issue":
-        return "Game Issue";
-      default:
-        return "Other";
-    }
-  };
-
   // Helper functions to detect and parse system changes
   const isSystemChange = (message: string) => {
-    return message.startsWith("Status changed from") || 
-           message.startsWith("Priority changed from") || 
-           message.startsWith("Ticket assigned to");
+    return (
+      message.startsWith("Status changed from") ||
+      message.startsWith("Priority changed from") ||
+      message.startsWith("Ticket assigned to")
+    );
   };
 
   const parseSystemChange = (message: string) => {
@@ -167,7 +186,7 @@ export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicket
         return {
           type: "status" as const,
           from: match[1].toLowerCase(),
-          to: match[2].toLowerCase()
+          to: match[2].toLowerCase(),
         };
       }
     } else if (message.startsWith("Priority changed from")) {
@@ -176,32 +195,16 @@ export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicket
         return {
           type: "priority" as const,
           from: match[1].toLowerCase(),
-          to: match[2].toLowerCase()
+          to: match[2].toLowerCase(),
         };
       }
     } else if (message.startsWith("Ticket assigned to")) {
       const match = message.match(/Ticket assigned to (.+)/);
       if (match && match[1]) {
-        return {
-          type: "assignment" as const,
-          username: match[1]
-        };
+        return { type: "assignment" as const, username: match[1] };
       }
     }
     return null;
-  };
-
-  const getSystemChangeIcon = (type: string) => {
-    switch (type) {
-      case "status":
-        return <Settings className="w-4 h-4" />;
-      case "priority":
-        return <RefreshCw className="w-4 h-4" />;
-      case "assignment":
-        return <UserPlus className="w-4 h-4" />;
-      default:
-        return <Settings className="w-4 h-4" />;
-    }
   };
 
   const handleClose = () => {
@@ -211,295 +214,352 @@ export function SupportTicketDialog({ ticketId, isOpen, onClose }: SupportTicket
 
   if (!isOpen) return null;
 
-  if (isLoading) {
-    return (
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] bg-black/20 backdrop-blur-xl border border-white/10 text-white shadow-2xl shadow-black/20">
-          <div className="flex items-center justify-center p-8">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-              <p className="text-white/60">Loading ticket details...</p>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  if (error || !ticketData) {
-    return (
-      <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-md bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg text-white">
-          <div className="p-6 text-center">
-            <XCircle className="w-8 h-8 text-red-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-white/80 mb-2">
-              Ticket Not Found
-            </h3>
-            <p className="text-white/60 mb-4">
-              The ticket you're looking for doesn't exist or you don't have access to it.
-            </p>
-            <Button onClick={handleClose} variant="outline" className="bg-white/5 backdrop-blur-sm border border-white/10 text-white hover:bg-white/10 transition-all duration-200">
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
-  const { ticket, updates } = ticketData;
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] bg-black/20 backdrop-blur-xl border border-white/10 text-white shadow-2xl shadow-black/20 p-0">
-        <ScrollArea className="max-h-[90vh]">
-          <div className="p-4 space-y-4">
-            {/* Compact Header */}
-            <div className="border-b border-white/10 pb-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg">{getCategoryIcon(ticket.category)}</span>
-                    <DialogTitle className="text-lg font-semibold text-white truncate">
-                      {ticket.subject}
+      <DialogContent className="max-w-4xl max-h-[90vh] h-[90vh] flex flex-col bg-zinc-900 border border-white/10 text-white shadow-2xl p-0 overflow-hidden">
+        {/* Decorative corner accents */}
+        <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-white/20 z-20 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-white/20 z-20 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-white/20 z-20 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-white/20 z-20 pointer-events-none" />
+
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <LoadingSpinner size="md" />
+          </div>
+        ) : error || !ticketData ? (
+          <div className="flex-1 flex flex-col items-center justify-center space-y-4 p-8">
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <div className="text-center">
+              <h3 className="font-display text-lg text-white">
+                Transmission Failed
+              </h3>
+              <p className="font-mono text-xs text-zinc-500 mt-1">
+                LOG ACCESS DENIED OR NOT FOUND
+              </p>
+            </div>
+            <Button
+              onClick={handleClose}
+              variant="outline"
+              className="border-white/10 bg-white/5 hover:bg-white/10"
+            >
+              Return to Base
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Header */}
+            <div className="p-6 border-b border-white/5 bg-white/[0.02] flex-shrink-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">
+                      {getCategoryIcon(ticketData.ticket.category)}
+                    </span>
+                    <DialogTitle className="font-display text-xl sm:text-2xl font-medium tracking-tight text-white uppercase">
+                      {ticketData.ticket.subject}
                     </DialogTitle>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-white/60">
-                    <span>#{ticket._id.slice(-8)}</span>
-                    <span>•</span>
-                    <span>{getCategoryLabel(ticket.category)}</span>
-                    <span>•</span>
-                    <span>{format(new Date(ticket.createdAt), "MMM d, yyyy")}</span>
+                  <div className="flex items-center gap-3 font-mono text-[10px] sm:text-xs text-zinc-500 uppercase tracking-wider pl-1">
+                    <span>ID: #{ticketData.ticket._id.slice(-6)}</span>
+                    <span className="text-zinc-700">|</span>
+                    <span>
+                      {format(
+                        new Date(ticketData.ticket.createdAt),
+                        "yyyy-MM-dd HH:mm",
+                      )}
+                    </span>
+                    <span className="text-zinc-700">|</span>
+                    <span>OP: {ticketData.ticket.username}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge className={`${getStatusColor(ticket.status)} flex items-center gap-1 text-xs px-2 py-1`}>
-                    {getStatusIcon(ticket.status)}
-                    <span className="hidden sm:inline">{ticket.status.replace("_", " ").toUpperCase()}</span>
-                    <span className="sm:hidden">{ticket.status === "in_progress" ? "IN PROG" : ticket.status.toUpperCase()}</span>
-                  </Badge>
-                  <Badge className={`${getPriorityColor(ticket.priority)} text-xs px-2 py-1`}>
-                    {ticket.priority.toUpperCase()}
-                  </Badge>
-                </div>
-              </div>
-            </div>
 
-            {/* Original Request - Integrated */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-white/70">
-                <User className="w-4 h-4" />
-                <span>Original Request</span>
-                <span className="text-white/40">•</span>
-                <span className="text-white/40">{format(new Date(ticket.createdAt), "MMM d, yyyy 'at' h:mm a")}</span>
-                {ticket.assignedToUsername && (
-                  <>
-                    <span className="text-white/40">•</span>
-                    <span className="text-white/40">Assigned to {ticket.assignedToUsername}</span>
-                  </>
-                )}
-              </div>
-              
-              <div className="bg-white/5 rounded-lg p-3 border border-white/5">
-                <p className="text-white/90 whitespace-pre-wrap leading-relaxed">{ticket.description}</p>
-                
-                {ticket.attachmentUrl && (
-                  <div className="mt-3">
-                    <img
-                      src={ticket.attachmentUrl}
-                      alt="Ticket attachment"
-                      className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-80 transition-opacity max-h-40"
-                      onClick={() => window.open(ticket.attachmentUrl, '_blank')}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 text-white/60 hover:text-white text-xs"
-                      onClick={() => window.open(ticket.attachmentUrl, '_blank')}
-                    >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      Open attachment
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Conversation Thread */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm text-white/70">
-                <RefreshCw className="w-4 h-4" />
-                <span>Conversation</span>
-                {updates.length > 0 && (
-                  <>
-                    <span className="text-white/40">•</span>
-                    <span className="text-white/40">{updates.length} {updates.length === 1 ? 'update' : 'updates'}</span>
-                  </>
-                )}
-              </div>
-
-              {updates.length === 0 ? (
-                <div className="text-center py-6">
-                  <RefreshCw className="w-6 h-6 text-white/30 mx-auto mb-2" />
-                  <p className="text-white/50 text-sm">No updates yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-80 overflow-y-auto">
-                  {updates.map((update, index) => {
-                    const systemChange = isSystemChange(update.message) ? parseSystemChange(update.message) : null;
-                    
-                    if (systemChange) {
-                      // Render system change as a special message
-                      return (
-                        <motion.div
-                          key={update._id}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="flex justify-end"
+                <div className="flex flex-col sm:flex-row gap-2 items-end">
+                  {(() => {
+                    const status = getStatusConfig(ticketData.ticket.status);
+                    const priority = getPriorityConfig(
+                      ticketData.ticket.priority,
+                    );
+                    return (
+                      <>
+                        <div
+                          className={cn(
+                            "px-2 py-1 rounded-sm border text-[10px] font-mono uppercase tracking-wider flex items-center gap-1.5",
+                            status.bg,
+                            status.border,
+                            status.color,
+                          )}
                         >
-                          <div className="bg-gray-500/20 border border-gray-500/30 rounded-2xl px-4 py-3 max-w-[80%]">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 bg-gray-500/20 rounded-full flex items-center justify-center">
-                                  {getSystemChangeIcon(systemChange.type)}
+                          {status.icon}
+                          {ticketData.ticket.status.replace("_", " ")}
+                        </div>
+                        <div
+                          className={cn(
+                            "px-2 py-1 rounded-sm text-[10px] font-mono uppercase tracking-wider",
+                            priority.bg,
+                            priority.color,
+                          )}
+                        >
+                          PRIORITY: {ticketData.ticket.priority}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Content Area - Single Column Layout */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <ScrollArea className="flex-1 bg-zinc-900/20">
+                <div className="min-h-full p-8 space-y-10">
+                  {/* Initial Request Card */}
+                  <div className="relative group">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500/30 group-hover:bg-blue-500/60 transition-colors" />
+                    <div className="ml-6 space-y-4">
+                      <div className="flex items-center gap-2 font-mono text-xs text-blue-400 uppercase tracking-wider">
+                        <User className="w-3.5 h-3.5" />
+                        <span>Initial Transmission</span>
+                      </div>
+                      <div className="bg-zinc-900/50 border border-white/5 p-6 backdrop-blur-sm text-zinc-300 leading-relaxed text-sm">
+                        {ticketData.ticket.description}
+                      </div>
+                      {ticketData.ticket.attachmentUrl && (
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              window.open(
+                                ticketData.ticket.attachmentUrl,
+                                "_blank",
+                              )
+                            }
+                            className="bg-zinc-900/40 border-dashed border-zinc-700 hover:border-blue-500/50 hover:bg-blue-500/10 text-zinc-400 hover:text-blue-400 h-9 font-mono text-xs uppercase"
+                          >
+                            <Paperclip className="w-3.5 h-3.5 mr-2" />
+                            View Attachment
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-6">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                    <div className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">
+                      Communication Log
+                    </div>
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+                  </div>
+
+                  {/* Updates / Conversation */}
+                  <div className="space-y-8 pb-6">
+                    {ticketData.updates.map((update) => {
+                      const systemChange = isSystemChange(update.message)
+                        ? parseSystemChange(update.message)
+                        : null;
+
+                      if (systemChange) {
+                        return (
+                          <div
+                            key={update._id}
+                            className="flex justify-center my-6"
+                          >
+                            <div className="bg-white/5 border border-white/5 rounded-full px-5 py-2 flex items-center gap-3 text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+                              <Terminal className="w-3 h-3 text-zinc-600" />
+                              <span>System Event:</span>
+                              {systemChange.type === "status" && (
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={
+                                      getStatusConfig(systemChange.from).color
+                                    }
+                                  >
+                                    {systemChange.from.replace("_", " ")}
+                                  </span>
+                                  <ArrowRight className="w-3 h-3 opacity-50" />
+                                  <span
+                                    className={
+                                      getStatusConfig(systemChange.to).color
+                                    }
+                                  >
+                                    {systemChange.to.replace("_", " ")}
+                                  </span>
                                 </div>
-
-                                {systemChange.type === "status" && (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Badge className={`${getStatusColor(systemChange.from)} text-xs`}>
-                                      {getStatusIcon(systemChange.from.toLocaleUpperCase())}
-                                      <span className="ml-1">{systemChange.from.replace("_", " ").toUpperCase()}</span>
-                                    </Badge>
-                                    <ArrowRight className="w-3 h-3 text-white/40" />
-                                    <Badge className={`${getStatusColor(systemChange.to)} text-xs`}>
-                                      {getStatusIcon(systemChange.to.toLocaleUpperCase())}
-                                      <span className="ml-1">{systemChange.to.replace("_", " ").toUpperCase()}</span>
-                                    </Badge>
-                                  </div>
-                                )}
-
-                                {systemChange.type === "priority" && (
-                                  <div className="flex items-center gap-2 text-sm">
-                                    <Badge className={`${getPriorityColor(systemChange.from)} text-xs`}>
-                                      {systemChange.from.toUpperCase()}
-                                    </Badge>
-                                    <ArrowRight className="w-3 h-3 text-white/40" />
-                                    <Badge className={`${getPriorityColor(systemChange.to)} text-xs`}>
-                                      {systemChange.to.toUpperCase()}
-                                    </Badge>
-                                  </div>
-                                )}
-
-                                {systemChange.type === "assignment" && (
-                                  <div className="flex items-center gap-2 text-sm text-white/80">
-                                    <span>Assigned to <span className="text-gray-300 font-medium">{systemChange.username}</span></span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <span className="text-xs text-white/40 flex-shrink-0">
-                                {format(new Date(update.timestamp), "MMM d, h:mm a")}
+                              )}
+                              {systemChange.type === "priority" && (
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={
+                                      getPriorityConfig(systemChange.from).color
+                                    }
+                                  >
+                                    {systemChange.from}
+                                  </span>
+                                  <ArrowRight className="w-3 h-3 opacity-50" />
+                                  <span
+                                    className={
+                                      getPriorityConfig(systemChange.to).color
+                                    }
+                                  >
+                                    {systemChange.to}
+                                  </span>
+                                </div>
+                              )}
+                              {systemChange.type === "assignment" && (
+                                <span className="text-zinc-300">
+                                  Assigned to {systemChange.username}
+                                </span>
+                              )}
+                              <span className="text-zinc-600 pl-2">
+                                [{format(new Date(update.timestamp), "HH:mm")}]
                               </span>
                             </div>
                           </div>
-                        </motion.div>
-                      );
-                    }
-                    
-                    // Render regular message
-                    return (
-                      <motion.div
-                        key={update._id}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className={`flex gap-3 ${
-                          update.isAdminResponse ? "flex-row-reverse" : "flex-row"
-                        }`}
-                      >
-                        <div className={`flex-1 max-w-[80%] ${
-                          update.isAdminResponse ? "text-right" : "text-left"
-                        }`}>
-                          <div className={`inline-block rounded-2xl px-4 py-3 ${
-                            update.isAdminResponse 
-                              ? "bg-blue-600/20 border border-blue-500/30" 
-                              : "bg-white/10 border border-white/10"
-                          }`}>
-                            <div className="flex items-center gap-2 mb-1">
-                              {update.isAdminResponse && (
-                                <Shield className="w-3 h-3 text-blue-400" />
+                        );
+                      }
+
+                      // Admin messages: Left aligned. User messages: Right aligned.
+                      const isUserMessage = !update.isAdminResponse;
+
+                      return (
+                        <div
+                          key={update._id}
+                          className={cn(
+                            "flex gap-4 max-w-[80%]",
+                            isUserMessage ? "ml-auto flex-row-reverse" : "",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "w-9 h-9 flex items-center justify-center border flex-shrink-0 mt-1",
+                              isUserMessage
+                                ? "bg-zinc-900 border-zinc-700 text-zinc-500"
+                                : "bg-amber-950/30 border-amber-500/20 text-amber-500",
+                            )}
+                          >
+                            {isUserMessage ? (
+                              <User className="w-4 h-4" />
+                            ) : (
+                              <Shield className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div className="space-y-2 min-w-0">
+                            <div
+                              className={cn(
+                                "flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider",
+                                isUserMessage
+                                  ? "justify-end text-zinc-500"
+                                  : "text-amber-500/60",
                               )}
-                              <span className={`text-xs font-medium ${
-                                update.isAdminResponse ? "text-blue-400" : "text-white/70"
-                              }`}>
+                            >
+                              <span
+                                className={
+                                  isUserMessage
+                                    ? "text-zinc-300"
+                                    : "text-amber-500"
+                                }
+                              >
                                 {update.username}
-                                {update.isAdminResponse && " (Support)"}
+                                {!isUserMessage && " (Support)"}
                               </span>
-                              <span className="text-xs text-white/40">
-                                {format(new Date(update.timestamp), "MMM d, h:mm a")}
+                              <span>•</span>
+                              <span>
+                                {format(
+                                  new Date(update.timestamp),
+                                  "MMM dd, HH:mm",
+                                )}
                               </span>
                             </div>
-                            <p className="text-white/90 text-sm leading-relaxed">{update.message}</p>
-                            
+                            <div
+                              className={cn(
+                                "p-5 border text-sm leading-relaxed whitespace-pre-wrap",
+                                isUserMessage
+                                  ? "bg-zinc-900/60 border-white/5 text-zinc-300"
+                                  : "bg-amber-950/10 border-amber-500/10 text-amber-100/90",
+                              )}
+                            >
+                              {update.message}
+                            </div>
                             {update.attachmentUrl && (
-                              <div className="mt-2">
-                                <img
-                                  src={update.attachmentUrl}
-                                  alt="Update attachment"
-                                  className="max-w-full h-auto rounded cursor-pointer hover:opacity-80 transition-opacity max-h-32"
-                                  onClick={() => window.open(update.attachmentUrl, '_blank')}
-                                />
+                              <div
+                                className={cn(
+                                  "pt-1",
+                                  isUserMessage && "text-right",
+                                )}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    window.open(update.attachmentUrl, "_blank")
+                                  }
+                                  className="h-8 text-[10px] text-zinc-500 hover:text-white"
+                                >
+                                  <Paperclip className="w-3 h-3 mr-2" />
+                                  Attachment
+                                </Button>
                               </div>
                             )}
                           </div>
                         </div>
-                      </motion.div>
-                    );
-                  })}
+                      );
+                    })}
+                    <div ref={scrollRef} />
+                  </div>
+                </div>
+              </ScrollArea>
+
+              {/* Input Area (Bottom docked) */}
+              {ticketData.ticket.status !== "closed" && (
+                <div className="p-5 bg-zinc-900 border-t border-white/10 flex-shrink-0">
+                  <div className="flex flex-col gap-3 max-w-4xl mx-auto">
+                    <div className="flex items-center justify-between px-1">
+                      <span className="font-mono text-[10px] text-blue-400/60 uppercase tracking-[0.2em] animate-pulse">
+                        Secure Channel Active
+                      </span>
+                      <span className="font-mono text-[10px] text-zinc-600">
+                        {newMessage.length} / 2000
+                      </span>
+                    </div>
+                    <div className="relative group">
+                      <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 to-purple-500/20 opacity-0 group-focus-within:opacity-100 transition-opacity blur duration-500" />
+                      <div className="relative flex gap-0">
+                        <Textarea
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder="Enter transmission message..."
+                          className="min-h-[70px] max-h-[150px] bg-black/40 border-zinc-800 focus:border-blue-500/50 rounded-r-none resize-none font-mono text-sm placeholder:text-zinc-700 py-4 px-4"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (newMessage.trim()) handleAddUpdate();
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={handleAddUpdate}
+                          disabled={isSubmitting || !newMessage.trim()}
+                          className="rounded-l-none h-auto px-7 bg-blue-600/90 hover:bg-blue-500 border-l border-white/10"
+                        >
+                          {isSubmitting ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-
-            {/* Add Update - Streamlined */}
-            {ticket.status !== "closed" && (
-              <div className="border-t border-white/10 pt-4">
-                <div className="space-y-3">
-                  <Textarea
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Add a comment or provide additional information..."
-                    className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 text-white placeholder:text-white/50 min-h-[80px] resize-none transition-all duration-200 text-sm"
-                    maxLength={2000}
-                  />
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs text-white/50">
-                      {newMessage.length}/2000
-                    </div>
-                    <Button
-                      onClick={handleAddUpdate}
-                      disabled={isSubmitting || !newMessage.trim()}
-                      size="sm"
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all duration-200"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          Adding...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3 h-3 mr-2" />
-                          Send
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </ScrollArea>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

@@ -1,19 +1,19 @@
-import { useState } from "react";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Ticket, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  MessageSquare, 
+import {
+  Ticket,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  MessageSquare,
   Plus,
   Filter,
   Search,
   Calendar,
-  User,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Terminal,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
@@ -27,27 +27,32 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+
 import { SupportDialog } from "@/components/SupportDialog";
 import { SupportTicketDialog } from "@/components/SupportTicketDialog";
 import { Id } from "../../../convex/_generated/dataModel";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { cn } from "@/lib/utils";
 
 interface SupportTicketsPageProps {
   initialTicketId?: string;
 }
 
-export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps) {
+export function SupportTicketsPage({
+  initialTicketId,
+}: SupportTicketsPageProps) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedTicketId, setSelectedTicketId] = useState<Id<"supportTickets"> | null>(null);
+  const [selectedTicketId, setSelectedTicketId] =
+    useState<Id<"supportTickets"> | null>(null);
   const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
-  const { data: tickets, isLoading, error } = useConvexQuery(
-    api.supportTickets.getUserSupportTickets,
-    {}
-  );
+  const {
+    data: tickets,
+    isLoading,
+    error,
+  } = useConvexQuery(api.supportTickets.getUserSupportTickets, {});
 
   // Open ticket dialog if initialTicketId is provided
   useEffect(() => {
@@ -57,91 +62,105 @@ export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps)
     }
   }, [initialTicketId, tickets]);
 
-  // Filter tickets based on search and status
-  const filteredTickets = tickets?.filter((ticket) => {
-    const matchesSearch = 
-      ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ticket.category.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  }) || [];
+  // Filter tickets
+  const filteredTickets =
+    tickets?.filter((ticket) => {
+      const matchesSearch =
+        ticket.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ticket.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesStatus =
+        statusFilter === "all" || ticket.status === statusFilter;
+
+      return matchesSearch && matchesStatus;
+    }) || [];
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "open":
-        return <Clock className="w-4 h-4" />;
+        return <Clock className="w-3.5 h-3.5" />;
       case "in_progress":
-        return <RefreshCw className="w-4 h-4" />;
+        return <RefreshCw className="w-3.5 h-3.5" />;
       case "resolved":
-        return <CheckCircle className="w-4 h-4" />;
+        return <CheckCircle2 className="w-3.5 h-3.5" />;
       case "closed":
-        return <XCircle className="w-4 h-4" />;
+        return <XCircle className="w-3.5 h-3.5" />;
       default:
-        return <Ticket className="w-4 h-4" />;
+        return <Ticket className="w-3.5 h-3.5" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusConfig = (status: string) => {
     switch (status) {
       case "open":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+        return {
+          color: "text-blue-400",
+          bg: "bg-blue-500/10",
+          border: "border-blue-500/20",
+        };
       case "in_progress":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+        return {
+          color: "text-amber-400",
+          bg: "bg-amber-500/10",
+          border: "border-amber-500/20",
+        };
       case "resolved":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
+        return {
+          color: "text-emerald-400",
+          bg: "bg-emerald-500/10",
+          border: "border-emerald-500/20",
+        };
       case "closed":
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+        return {
+          color: "text-zinc-400",
+          bg: "bg-zinc-500/10",
+          border: "border-zinc-500/20",
+        };
       default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+        return {
+          color: "text-zinc-400",
+          bg: "bg-zinc-500/10",
+          border: "border-zinc-500/20",
+        };
     }
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityConfig = (priority: string) => {
     switch (priority) {
       case "urgent":
-        return "bg-red-500/20 text-red-400 border-red-500/30";
+        return { color: "text-red-400", bg: "bg-red-500/10" };
       case "high":
-        return "bg-orange-500/20 text-orange-400 border-orange-500/30";
+        return { color: "text-orange-400", bg: "bg-orange-500/10" };
       case "medium":
-        return "bg-yellow-500/20 text-yellow-400 border-yellow-500/30";
+        return { color: "text-yellow-400", bg: "bg-yellow-500/10" };
       case "low":
-        return "bg-green-500/20 text-green-400 border-green-500/30";
+        return { color: "text-blue-400", bg: "bg-blue-500/10" };
       default:
-        return "bg-gray-500/20 text-gray-400 border-gray-500/30";
+        return { color: "text-zinc-400", bg: "bg-zinc-500/10" };
     }
   };
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case "bug_report":
-        return "🐛";
+        return <div className="text-red-400">🐛</div>;
       case "feature_request":
-        return "✨";
+        return <div className="text-amber-400">✨</div>;
       case "account_issue":
-        return "👤";
+        return <div className="text-blue-400">👤</div>;
       case "game_issue":
-        return "🎮";
+        return <div className="text-purple-400">🎮</div>;
       default:
-        return "💬";
+        return <div className="text-zinc-400">💬</div>;
     }
   };
 
   const getCategoryLabel = (category: string) => {
-    switch (category) {
-      case "bug_report":
-        return "Bug Report";
-      case "feature_request":
-        return "Feature Request";
-      case "account_issue":
-        return "Account Issue";
-      case "game_issue":
-        return "Game Issue";
-      default:
-        return "Other";
-    }
+    return category
+      .split("_")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
   };
 
   const handleTicketClick = (ticketId: Id<"supportTickets">) => {
@@ -155,213 +174,247 @@ export function SupportTicketsPage({ initialTicketId }: SupportTicketsPageProps)
   };
 
   return (
-    <div className="min-h-screen space-y-4 sm:space-y-6 px-2 sm:px-0">
-      {/* Header */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardHeader className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <CardTitle className="text-xl sm:text-2xl font-bold text-white/90 flex items-center gap-3">
-                  <Ticket className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
-                  Support Tickets
-                </CardTitle>
-                <p className="text-white/60 mt-2 text-sm sm:text-base">
-                  Track your support requests and get help with any issues
-                </p>
-              </div>
-              <Button
-                onClick={() => setIsCreateDialogOpen(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all duration-200 shadow-lg w-full sm:w-auto"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">New Ticket</span>
-                <span className="sm:hidden">Create Ticket</span>
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
-      </motion.div>
+    <div className="min-h-screen space-y-8 pb-10">
+      {/* Tactical Header */}
+      <div className="relative space-y-4 text-center py-6">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex justify-center"
+        >
+          <div className="flex items-center gap-3 text-blue-400/60 font-mono text-xs tracking-[0.2em] uppercase bg-blue-500/5 border border-blue-500/10 px-3 py-1 rounded-full">
+            <Terminal className="w-3.5 h-3.5" />
+            <span>Command Uplink</span>
+          </div>
+        </motion.div>
 
-      {/* Filters */}
-      <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
-      >
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/40" />
-                  <Input
-                    placeholder="Search tickets..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 text-white transition-all duration-200"
-                  />
+        <motion.h1
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="text-4xl md:text-5xl font-display font-medium text-white tracking-tight"
+        >
+          Support <span className="text-zinc-600">Channels</span>
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="text-zinc-500 text-sm max-w-2xl mx-auto leading-relaxed font-mono"
+        >
+          Submit operational reports, bug tracking, and feature requests. All
+          transmissions are encrypted and logged for review.
+        </motion.p>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        {/* Controls Toolbar */}
+        <motion.div
+          initial={{ y: 10, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="flex flex-col md:flex-row gap-4 mb-8 items-start md:items-center justify-between"
+        >
+          <div className="flex flex-1 w-full md:w-auto gap-4">
+            <div className="relative flex-1 md:max-w-md group">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-blue-400 transition-colors" />
+              <Input
+                placeholder="SEARCH LOGS..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 bg-zinc-900/40 border-zinc-800 focus:border-blue-500/50 text-white font-mono text-xs h-10 uppercase placeholder:text-zinc-600 transition-all"
+              />
+            </div>
+
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px] bg-zinc-900/40 border-zinc-800 text-zinc-300 font-mono text-xs uppercase h-10">
+                <div className="flex items-center gap-2">
+                  <Filter className="w-3.5 h-3.5 text-zinc-500" />
+                  <SelectValue placeholder="STATUS" />
                 </div>
-              </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-[180px] bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 text-white transition-all duration-200">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-                  <SelectItem value="all" className="text-white hover:bg-white/10">All Status</SelectItem>
-                  <SelectItem value="open" className="text-white hover:bg-white/10">Open</SelectItem>
-                  <SelectItem value="in_progress" className="text-white hover:bg-white/10">In Progress</SelectItem>
-                  <SelectItem value="resolved" className="text-white hover:bg-white/10">Resolved</SelectItem>
-                  <SelectItem value="closed" className="text-white hover:bg-white/10">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-950 border-zinc-800">
+                <SelectItem
+                  value="all"
+                  className="font-mono text-xs uppercase text-zinc-300"
+                >
+                  All Status
+                </SelectItem>
+                <SelectItem
+                  value="open"
+                  className="font-mono text-xs uppercase text-blue-400"
+                >
+                  Open
+                </SelectItem>
+                <SelectItem
+                  value="in_progress"
+                  className="font-mono text-xs uppercase text-amber-400"
+                >
+                  In Progress
+                </SelectItem>
+                <SelectItem
+                  value="resolved"
+                  className="font-mono text-xs uppercase text-emerald-400"
+                >
+                  Resolved
+                </SelectItem>
+                <SelectItem
+                  value="closed"
+                  className="font-mono text-xs uppercase text-zinc-500"
+                >
+                  Closed
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-      {/* Tickets List */}
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="space-y-4"
-      >
-        {isLoading ? (
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardContent className="p-6 sm:p-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mx-auto mb-4"></div>
-              <p className="text-white/60 text-sm sm:text-base">Loading your tickets...</p>
-            </CardContent>
-          </Card>
-        ) : error ? (
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardContent className="p-6 sm:p-8 text-center">
-              <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-4" />
-              <p className="text-red-400 text-sm sm:text-base">Failed to load tickets</p>
-              <p className="text-white/60 text-xs sm:text-sm mt-2">Please try refreshing the page</p>
-            </CardContent>
-          </Card>
-        ) : filteredTickets.length === 0 ? (
-          <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-            <CardContent className="p-6 sm:p-8 text-center">
-              <Ticket className="w-10 h-10 sm:w-12 sm:h-12 text-white/40 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-white/80 mb-2">
-                {tickets?.length === 0 ? "No tickets yet" : "No matching tickets"}
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="w-full md:w-auto bg-blue-600/90 hover:bg-blue-500 text-white font-mono text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] border-0 h-10"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Initialize Ticket
+          </Button>
+        </motion.div>
+
+        {/* Tickets Grid */}
+        <div className="space-y-4 min-h-[400px]">
+          {isLoading ? (
+            <LoadingSpinner size="md" />
+          ) : error ? (
+            <div className="border border-red-500/20 bg-red-500/5 rounded-sm p-8 text-center">
+              <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-4" />
+              <p className="text-red-400 font-mono text-sm">
+                CONNECTION FAILURE
+              </p>
+              <p className="text-zinc-500 text-xs mt-2">
+                Remote server unreachable.
+              </p>
+            </div>
+          ) : filteredTickets.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="flex flex-col items-center justify-center py-20 border border-white/5 bg-zinc-900/20 rounded-sm"
+            >
+              <div className="w-16 h-16 rounded-full bg-zinc-800/50 flex items-center justify-center mb-6 border border-white/5">
+                <Ticket className="w-8 h-8 text-zinc-600" />
+              </div>
+              <h3 className="text-lg font-display text-zinc-300 mb-2">
+                No Active Logs
               </h3>
-              <p className="text-white/60 mb-4 text-sm sm:text-base">
+              <p className="text-zinc-600 font-mono text-xs max-w-xs text-center mb-6">
                 {tickets?.length === 0
-                  ? "Create your first support ticket to get help with any issues."
-                  : "Try adjusting your search or filter criteria."}
+                  ? "Frequency clear. Initiate a new support ticket to begin transmission."
+                  : "No tickets match your filter parameters."}
               </p>
               {tickets?.length === 0 && (
                 <Button
                   onClick={() => setIsCreateDialogOpen(true)}
-                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all duration-200 shadow-lg w-full sm:w-auto"
+                  variant="outline"
+                  className="border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 font-mono text-xs uppercase"
                 >
-                  <Plus className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Create First Ticket</span>
-                  <span className="sm:hidden">Create Ticket</span>
+                  Create First Ticket
                 </Button>
               )}
-            </CardContent>
-          </Card>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {filteredTickets.map((ticket, index) => (
-              <motion.div
-                key={ticket._id}
-                layout
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ scale: 1.01 }}
-                className="cursor-pointer"
-                onClick={() => handleTicketClick(ticket._id)}
-              >
-                <Card className="bg-black/20 backdrop-blur-xl border border-white/10 hover:bg-black/30 hover:border-white/20 shadow-2xl shadow-black/20 transition-all duration-200">
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 space-y-3">
-                        {/* Header */}
-                        <div className="flex items-center gap-3">
-                          <span className="text-lg">
-                            {getCategoryIcon(ticket.category)}
-                          </span>
-                          <div>
-                            <h3 className="font-semibold text-white/90 line-clamp-1">
-                              {ticket.subject}
-                            </h3>
-                            <p className="text-sm text-white/60">
-                              #{ticket._id.slice(-8)} • {getCategoryLabel(ticket.category)}
-                            </p>
-                          </div>
-                        </div>
+            </motion.div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              <div className="grid gap-3">
+                {filteredTickets.map((ticket, index) => {
+                  const status = getStatusConfig(ticket.status);
+                  const priority = getPriorityConfig(ticket.priority);
 
-                        {/* Description preview */}
-                        <p className="text-sm text-white/70 line-clamp-2">
-                          {ticket.description}
-                        </p>
+                  return (
+                    <motion.div
+                      key={ticket._id}
+                      layout
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => handleTicketClick(ticket._id)}
+                      className="group relative"
+                    >
+                      <div className="absolute top-0 left-0 w-1 h-full bg-white/5 group-hover:bg-blue-500/50 transition-colors duration-300 z-10" />
 
-                        {/* Meta info */}
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-white/50">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3" />
-                            <span className="hidden sm:inline">{format(new Date(ticket.createdAt), "MMM d, yyyy")}</span>
-                            <span className="sm:hidden">{format(new Date(ticket.createdAt), "MMM d")}</span>
-                          </div>
-                          {ticket.assignedToUsername && (
-                            <div className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              <span className="hidden sm:inline">Assigned to {ticket.assignedToUsername}</span>
-                              <span className="sm:hidden">{ticket.assignedToUsername}</span>
+                      <div
+                        className={cn(
+                          "relative bg-zinc-900/40 border border-white/5 backdrop-blur-sm p-4 pl-6 cursor-pointer hover:bg-white/[0.02] hover:border-white/10 transition-all duration-300 overflow-hidden",
+                        )}
+                      >
+                        {/* Decorative corners */}
+                        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/10 group-hover:border-white/30 transition-colors" />
+                        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/10 group-hover:border-white/30 transition-colors" />
+
+                        <div className="flex flex-col sm:flex-row gap-4 sm:items-center justify-between relative z-10">
+                          <div className="flex items-start gap-4">
+                            <div className="w-10 h-10 rounded-sm bg-black/40 border border-white/5 flex items-center justify-center text-lg mt-1">
+                              {getCategoryIcon(ticket.category)}
                             </div>
-                          )}
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-zinc-200 group-hover:text-blue-400 transition-colors">
+                                  {ticket.subject}
+                                </h3>
+                                {ticket.attachmentUrl && (
+                                  <MessageSquare className="w-3 h-3 text-zinc-600" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 text-xs font-mono text-zinc-500 uppercase">
+                                <span>ID: {ticket._id.slice(-6)}</span>
+                                <span className="w-px h-3 bg-zinc-800" />
+                                <span className="text-zinc-400">
+                                  {getCategoryLabel(ticket.category)}
+                                </span>
+                                <span className="w-px h-3 bg-zinc-800" />
+                                <span className="flex items-center gap-1.5">
+                                  <Calendar className="w-3 h-3" />
+                                  {format(new Date(ticket.createdAt), "MMM dd")}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 sm:self-center ml-14 sm:ml-0">
+                            <div
+                              className={cn(
+                                "px-2 py-1 rounded-sm border text-[10px] font-mono uppercase tracking-wider flex items-center gap-1.5",
+                                status.bg,
+                                status.border,
+                                status.color,
+                              )}
+                            >
+                              {getStatusIcon(ticket.status)}
+                              {ticket.status.replace("_", " ")}
+                            </div>
+                            <div
+                              className={cn(
+                                "px-2 py-1 rounded-sm text-[10px] font-mono uppercase tracking-wider bg-black/40 border border-white/5",
+                                priority.color,
+                              )}
+                            >
+                              PRIORITY: {ticket.priority}
+                            </div>
+                            <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-blue-500/50 transition-colors" />
+                          </div>
                         </div>
                       </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </AnimatePresence>
+          )}
+        </div>
+      </div>
 
-                      {/* Status and Priority */}
-                      <div className="flex flex-col items-end gap-2 ml-4">
-                        <Badge className={`${getStatusColor(ticket.status)} flex items-center gap-1`}>
-                          {getStatusIcon(ticket.status)}
-                          {ticket.status.replace("_", " ").toUpperCase()}
-                        </Badge>
-                        <Badge className={`${getPriorityColor(ticket.priority)} text-xs`}>
-                          {ticket.priority.toUpperCase()}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Attachment indicator */}
-                    {ticket.attachmentUrl && (
-                      <div className="mt-3 pt-3 border-t border-white/10">
-                        <div className="flex items-center gap-1 text-xs text-white/60">
-                          <MessageSquare className="w-3 h-3" />
-                          Has attachment
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        )}
-      </motion.div>
-
-      {/* Create Support Dialog */}
+      {/* Dialogs */}
       <SupportDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
       />
 
-      {/* Support Ticket Details Dialog */}
       <SupportTicketDialog
         ticketId={selectedTicketId}
         isOpen={isTicketDialogOpen}
