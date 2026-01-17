@@ -25,9 +25,14 @@ import { Route as GameRouteImport } from './routes/game'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AiGameRouteImport } from './routes/ai-game'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AchievementsRouteImport } from './routes/achievements'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminTicketsRouteImport } from './routes/admin/tickets'
+import { Route as AdminSubscriptionsRouteImport } from './routes/admin/subscriptions'
 
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
@@ -109,6 +114,11 @@ const AiGameRoute = AiGameRouteImport.update({
   path: '/ai-game',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AchievementsRoute = AchievementsRouteImport.update({
   id: '/achievements',
   path: '/achievements',
@@ -124,11 +134,32 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminTicketsRoute = AdminTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSubscriptionsRoute = AdminSubscriptionsRouteImport.update({
+  id: '/subscriptions',
+  path: '/subscriptions',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/achievements': typeof AchievementsRoute
+  '/admin': typeof AdminRouteWithChildren
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
@@ -145,6 +176,10 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/tickets': typeof AdminTicketsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -166,12 +201,17 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/tickets': typeof AdminTicketsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
   '/achievements': typeof AchievementsRoute
+  '/admin': typeof AdminRouteWithChildren
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
@@ -188,6 +228,10 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
+  '/admin/subscriptions': typeof AdminSubscriptionsRoute
+  '/admin/tickets': typeof AdminTicketsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -195,6 +239,7 @@ export interface FileRouteTypes {
     | '/'
     | '/$'
     | '/achievements'
+    | '/admin'
     | '/ai-game'
     | '/announcements'
     | '/auth'
@@ -211,6 +256,10 @@ export interface FileRouteTypes {
     | '/support'
     | '/support-resolve'
     | '/terms'
+    | '/admin/subscriptions'
+    | '/admin/tickets'
+    | '/admin/users'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -232,11 +281,16 @@ export interface FileRouteTypes {
     | '/support'
     | '/support-resolve'
     | '/terms'
+    | '/admin/subscriptions'
+    | '/admin/tickets'
+    | '/admin/users'
+    | '/admin'
   id:
     | '__root__'
     | '/'
     | '/$'
     | '/achievements'
+    | '/admin'
     | '/ai-game'
     | '/announcements'
     | '/auth'
@@ -253,12 +307,17 @@ export interface FileRouteTypes {
     | '/support'
     | '/support-resolve'
     | '/terms'
+    | '/admin/subscriptions'
+    | '/admin/tickets'
+    | '/admin/users'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
   AchievementsRoute: typeof AchievementsRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AiGameRoute: typeof AiGameRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
   AuthRoute: typeof AuthRoute
@@ -391,6 +450,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AiGameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/achievements': {
       id: '/achievements'
       path: '/achievements'
@@ -412,13 +478,58 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/tickets': {
+      id: '/admin/tickets'
+      path: '/tickets'
+      fullPath: '/admin/tickets'
+      preLoaderRoute: typeof AdminTicketsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/subscriptions': {
+      id: '/admin/subscriptions'
+      path: '/subscriptions'
+      fullPath: '/admin/subscriptions'
+      preLoaderRoute: typeof AdminSubscriptionsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
+
+interface AdminRouteChildren {
+  AdminSubscriptionsRoute: typeof AdminSubscriptionsRoute
+  AdminTicketsRoute: typeof AdminTicketsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminSubscriptionsRoute: AdminSubscriptionsRoute,
+  AdminTicketsRoute: AdminTicketsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
   AchievementsRoute: AchievementsRoute,
+  AdminRoute: AdminRouteWithChildren,
   AiGameRoute: AiGameRoute,
   AnnouncementsRoute: AnnouncementsRoute,
   AuthRoute: AuthRoute,

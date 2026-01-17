@@ -11,6 +11,7 @@
 import type * as ResendEmailChangeVerification from "../ResendEmailChangeVerification.js";
 import type * as ResendOTPPasswordReset from "../ResendOTPPasswordReset.js";
 import type * as achievements from "../achievements.js";
+import type * as adminDashboard from "../adminDashboard.js";
 import type * as aiGame from "../aiGame.js";
 import type * as announcements from "../announcements.js";
 import type * as auth from "../auth.js";
@@ -55,6 +56,7 @@ declare const fullApi: ApiFromModules<{
   ResendEmailChangeVerification: typeof ResendEmailChangeVerification;
   ResendOTPPasswordReset: typeof ResendOTPPasswordReset;
   achievements: typeof achievements;
+  adminDashboard: typeof adminDashboard;
   aiGame: typeof aiGame;
   announcements: typeof announcements;
   auth: typeof auth;

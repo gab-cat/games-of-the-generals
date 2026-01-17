@@ -11,7 +11,10 @@ import { isSubscriptionActive } from "./featureGating";
  * Calculate expected score for a player based on ELO ratings
  * Formula: E_A = 1 / (1 + 10^((R_B - R_A) / 400))
  */
-function calculateExpectedScore(playerElo: number, opponentElo: number): number {
+function calculateExpectedScore(
+  playerElo: number,
+  opponentElo: number,
+): number {
   return 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
 }
 
@@ -24,7 +27,12 @@ function calculateExpectedScore(playerElo: number, opponentElo: number): number 
  * @param kFactor K-factor (32 for new players < 30 games, 16 for established)
  * @returns New ELO rating (clamped between 800-2500)
  */
-function calculateNewElo(playerElo: number, opponentElo: number, actualScore: number, kFactor: number): number {
+function calculateNewElo(
+  playerElo: number,
+  opponentElo: number,
+  actualScore: number,
+  kFactor: number,
+): number {
   const expectedScore = calculateExpectedScore(playerElo, opponentElo);
   const newElo = playerElo + kFactor * (actualScore - expectedScore);
   // Clamp between 800-2500
@@ -48,7 +56,7 @@ export async function updateEloRatings(
   winnerElo: number,
   loserElo: number,
   winnerGamesPlayed: number,
-  loserGamesPlayed: number
+  loserGamesPlayed: number,
 ): Promise<void> {
   // Determine K-factor: 32 for players with < 30 games, 16 for established
   const winnerKFactor = winnerGamesPlayed < 30 ? 32 : 16;
@@ -83,7 +91,10 @@ export async function updateEloRatings(
  * Check if a game is a quick match by checking the lobby name pattern
  * Quick match lobbies have name pattern: "Quick Match ${timestamp}"
  */
-export async function isQuickMatchGame(ctx: QueryCtx | MutationCtx, lobbyId: Id<"lobbies">): Promise<boolean> {
+export async function isQuickMatchGame(
+  ctx: QueryCtx | MutationCtx,
+  lobbyId: Id<"lobbies">,
+): Promise<boolean> {
   const lobby = await ctx.db.get("lobbies", lobbyId);
   if (!lobby) return false;
   return lobby.name?.startsWith("Quick Match") ?? false;
@@ -113,11 +124,17 @@ export const getCurrentProfile = query({
         .first(),
     ]);
 
-    const isActive = subscription ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null) : true;
+    const isActive = subscription
+      ? isSubscriptionActive(
+          subscription.status,
+          subscription.expiresAt,
+          subscription.gracePeriodEndsAt || null,
+        )
+      : true;
 
     return {
       ...profile,
-      tier: isActive ? (subscription?.tier || "free") : "free",
+      tier: isActive ? subscription?.tier || "free" : "free",
       usernameColor: customization?.usernameColor,
       avatarFrame: customization?.avatarFrame,
       showBadges: customization?.showBadges ?? true,
@@ -134,7 +151,9 @@ export const getProfileByUsername = query({
     if (!args.username) return null;
     const profile = await ctx.db
       .query("profiles")
-      .withIndex("by_username", (q) => q.eq("username", args.username as string))
+      .withIndex("by_username", (q) =>
+        q.eq("username", args.username as string),
+      )
       .unique();
     if (!profile) return null;
 
@@ -149,11 +168,17 @@ export const getProfileByUsername = query({
         .first(),
     ]);
 
-    const isActive = subscription ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null) : true;
+    const isActive = subscription
+      ? isSubscriptionActive(
+          subscription.status,
+          subscription.expiresAt,
+          subscription.gracePeriodEndsAt || null,
+        )
+      : true;
 
     return {
       ...profile,
-      tier: isActive ? (subscription?.tier || "free") : "free",
+      tier: isActive ? subscription?.tier || "free" : "free",
       usernameColor: customization?.usernameColor,
       avatarFrame: customization?.avatarFrame,
       showBadges: customization?.showBadges ?? true,
@@ -181,20 +206,34 @@ export const searchUsernames = query({
     // This is more efficient than scanning active players only
     const allProfiles = await ctx.db
       .query("profiles")
-      .withIndex("by_username_games", (q) => q.gte("username", lower).lte("username", upper + '\uffff'))
+      .withIndex("by_username_games", (q) =>
+        q.gte("username", lower).lte("username", upper + "\uffff"),
+      )
       .take(100); // Reasonable limit to avoid excessive data transfer
 
     const matches = allProfiles
       .filter((p) => p.username.toLowerCase().startsWith(lower))
       .slice(0, limit)
-      .map((p) => ({ username: p.username, avatarUrl: p.avatarUrl, rank: p.rank }));
+      .map((p) => ({
+        username: p.username,
+        avatarUrl: p.avatarUrl,
+        rank: p.rank,
+      }));
 
     // If not enough prefix matches, include contains matches
     if (matches.length < limit) {
       const extra = allProfiles
-        .filter((p) => !p.username.toLowerCase().startsWith(lower) && p.username.toLowerCase().includes(lower))
+        .filter(
+          (p) =>
+            !p.username.toLowerCase().startsWith(lower) &&
+            p.username.toLowerCase().includes(lower),
+        )
         .slice(0, limit - matches.length)
-        .map((p) => ({ username: p.username, avatarUrl: p.avatarUrl, rank: p.rank }));
+        .map((p) => ({
+          username: p.username,
+          avatarUrl: p.avatarUrl,
+          rank: p.rank,
+        }));
       return [...matches, ...extra];
     }
     return matches;
@@ -247,11 +286,18 @@ export const getProfileByUserId = query({
         .first(),
     ]);
 
-    const isActive = subscription ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null) : true;
+    const isActive = subscription
+      ? isSubscriptionActive(
+          subscription.status,
+          subscription.expiresAt,
+          subscription.gracePeriodEndsAt || null,
+        )
+      : true;
 
     return {
       ...profile,
-      tier: isActive ? (subscription?.tier || "free") : "free",
+      tier: isActive ? subscription?.tier || "free" : "free",
+      isDonor: profile.isDonor ?? false,
       usernameColor: customization?.usernameColor,
       avatarFrame: customization?.avatarFrame,
       showBadges: customization?.showBadges ?? true,
@@ -316,10 +362,13 @@ export const createOrUpdateProfile = mutation({
       });
 
       // Initialize notification conversation for the user
-      await ctx.runMutation(internal.notifications.ensureNotificationConversation, {
-        userId,
-        username: args.username,
-      });
+      await ctx.runMutation(
+        internal.notifications.ensureNotificationConversation,
+        {
+          userId,
+          username: args.username,
+        },
+      );
 
       return profileId;
     }
@@ -341,7 +390,9 @@ export const updateUsername = mutation({
     }
 
     if (!/^[a-zA-Z0-9_-]+$/.test(args.username)) {
-      throw new Error("Username can only contain letters, numbers, underscores, and hyphens");
+      throw new Error(
+        "Username can only contain letters, numbers, underscores, and hyphens",
+      );
     }
 
     // Check if username is already taken
@@ -406,24 +457,36 @@ export const updateAvatar = mutation({
       const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
 
       // Check if subscription is active using shared helper
-      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
+      const isActive = isSubscriptionActive(
+        status,
+        expiresAt,
+        gracePeriodEndsAt,
+      );
 
       // Free tier cannot upload custom avatars
       if (tier === "free") {
-        throw new Error("Custom avatar upload is only available for Pro and Pro+ subscribers. Upgrade to unlock this feature.");
+        throw new Error(
+          "Custom avatar upload is only available for Pro and Pro+ subscribers. Upgrade to unlock this feature.",
+        );
       }
 
       // Pro/Pro+ users need active subscription
       if (!isActive) {
-        throw new Error("Your subscription has expired. Please renew to upload custom avatars.");
+        throw new Error(
+          "Your subscription has expired. Please renew to upload custom avatars.",
+        );
       }
     }
 
     // Delete old avatar file if it exists and either:
     // 1. Avatar URL is empty (removal)
     // 2. A new avatar is being set with a different storage ID
-    if (currentProfile.avatarStorageId && 
-        (!args.avatarUrl || (args.avatarUrl && args.avatarStorageId !== currentProfile.avatarStorageId))) {
+    if (
+      currentProfile.avatarStorageId &&
+      (!args.avatarUrl ||
+        (args.avatarUrl &&
+          args.avatarStorageId !== currentProfile.avatarStorageId))
+    ) {
       try {
         await ctx.storage.delete(currentProfile.avatarStorageId);
       } catch (error) {
@@ -457,28 +520,32 @@ export const getProfileStats = query({
     if (!profile) return null;
 
     // Calculate additional stats
-    const winRate = profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
-    const avgGameTime = profile.totalPlayTime && profile.gamesPlayed > 0 
-      ? Math.round(profile.totalPlayTime / profile.gamesPlayed) 
-      : 0;
+    const winRate =
+      profile.gamesPlayed > 0
+        ? Math.round((profile.wins / profile.gamesPlayed) * 100)
+        : 0;
+    const avgGameTime =
+      profile.totalPlayTime && profile.gamesPlayed > 0
+        ? Math.round(profile.totalPlayTime / profile.gamesPlayed)
+        : 0;
 
     // Get recent games using the new optimized indexes for better performance
     const [recentGamesAsPlayer1, recentGamesAsPlayer2] = await Promise.all([
       ctx.db
         .query("games")
-        .withIndex("by_player1_finished", (q) => 
-          q.eq("player1Id", userId).eq("status", "finished")
+        .withIndex("by_player1_finished", (q) =>
+          q.eq("player1Id", userId).eq("status", "finished"),
         )
         .order("desc")
         .take(3),
-      
+
       ctx.db
         .query("games")
-        .withIndex("by_player2_finished", (q) => 
-          q.eq("player2Id", userId).eq("status", "finished")
+        .withIndex("by_player2_finished", (q) =>
+          q.eq("player2Id", userId).eq("status", "finished"),
         )
         .order("desc")
-        .take(3)
+        .take(3),
     ]);
 
     // Combine and sort by finished time, take most recent 5
@@ -494,13 +561,13 @@ export const getProfileStats = query({
         ctx.db
           .query("games")
           .withIndex("by_player1_finished", (q) =>
-            q.eq("player1Id", userId).eq("status", "finished")
+            q.eq("player1Id", userId).eq("status", "finished"),
           )
           .take(500), // Reasonable limit - enough to find fastest win, prevents excessive scanning
         ctx.db
           .query("games")
           .withIndex("by_player2_finished", (q) =>
-            q.eq("player2Id", userId).eq("status", "finished")
+            q.eq("player2Id", userId).eq("status", "finished"),
           )
           .take(500), // Reasonable limit - enough to find fastest win, prevents excessive scanning
       ]);
@@ -515,7 +582,10 @@ export const getProfileStats = query({
         if (!g.finishedAt) continue;
         const start = g.gameTimeStarted || g.createdAt;
         const duration = g.finishedAt - start;
-        if (duration > 0 && (minDurationMs === undefined || duration < minDurationMs)) {
+        if (
+          duration > 0 &&
+          (minDurationMs === undefined || duration < minDurationMs)
+        ) {
           minDurationMs = duration;
         }
       }
@@ -536,12 +606,16 @@ export const getProfileStats = query({
     ]);
 
     const isActive = subscription
-      ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null)
+      ? isSubscriptionActive(
+          subscription.status,
+          subscription.expiresAt,
+          subscription.gracePeriodEndsAt || null,
+        )
       : true;
 
     return {
       ...profile,
-      tier: isActive ? (subscription?.tier || "free") : "free",
+      tier: isActive ? subscription?.tier || "free" : "free",
       usernameColor: customization?.usernameColor,
       avatarFrame: customization?.avatarFrame,
       showBadges: customization?.showBadges ?? true,
@@ -569,28 +643,32 @@ export const getProfileStatsByUsername = query({
     if (!profile) return null;
 
     // Calculate additional stats
-    const winRate = profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
-    const avgGameTime = profile.totalPlayTime && profile.gamesPlayed > 0 
-      ? Math.round(profile.totalPlayTime / profile.gamesPlayed) 
-      : 0;
+    const winRate =
+      profile.gamesPlayed > 0
+        ? Math.round((profile.wins / profile.gamesPlayed) * 100)
+        : 0;
+    const avgGameTime =
+      profile.totalPlayTime && profile.gamesPlayed > 0
+        ? Math.round(profile.totalPlayTime / profile.gamesPlayed)
+        : 0;
 
     // Get recent games using the optimized indexes
     const [recentGamesAsPlayer1, recentGamesAsPlayer2] = await Promise.all([
       ctx.db
         .query("games")
-        .withIndex("by_player1_finished", (q) => 
-          q.eq("player1Id", profile.userId).eq("status", "finished")
+        .withIndex("by_player1_finished", (q) =>
+          q.eq("player1Id", profile.userId).eq("status", "finished"),
         )
         .order("desc")
         .take(3),
-      
+
       ctx.db
         .query("games")
-        .withIndex("by_player2_finished", (q) => 
-          q.eq("player2Id", profile.userId).eq("status", "finished")
+        .withIndex("by_player2_finished", (q) =>
+          q.eq("player2Id", profile.userId).eq("status", "finished"),
         )
         .order("desc")
-        .take(3)
+        .take(3),
     ]);
 
     // Combine and sort by finished time, take most recent 5
@@ -611,12 +689,16 @@ export const getProfileStatsByUsername = query({
     ]);
 
     const isActive = subscription
-      ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null)
+      ? isSubscriptionActive(
+          subscription.status,
+          subscription.expiresAt,
+          subscription.gracePeriodEndsAt || null,
+        )
       : true;
 
     return {
       ...profile,
-      tier: isActive ? (subscription?.tier || "free") : "free",
+      tier: isActive ? subscription?.tier || "free" : "free",
       avatarFrame: customization?.avatarFrame,
       usernameColor: customization?.usernameColor,
       showBadges: customization?.showBadges ?? true,
@@ -630,11 +712,20 @@ export const getProfileStatsByUsername = query({
 // Get leaderboard with optimized cursor-based pagination using new indexes - ENHANCED
 export const getLeaderboard = query({
   args: {
-    paginationOpts: v.optional(v.object({
-      numItems: v.number(),
-      cursor: v.optional(v.string()),
-    })),
-    sortBy: v.optional(v.union(v.literal("wins"), v.literal("gamesPlayed"), v.literal("winRate"), v.literal("elo"))),
+    paginationOpts: v.optional(
+      v.object({
+        numItems: v.number(),
+        cursor: v.optional(v.string()),
+      }),
+    ),
+    sortBy: v.optional(
+      v.union(
+        v.literal("wins"),
+        v.literal("gamesPlayed"),
+        v.literal("winRate"),
+        v.literal("elo"),
+      ),
+    ),
   },
   handler: async (ctx, args) => {
     const { paginationOpts, sortBy = "wins" } = args; // Default to ELO sorting
@@ -689,16 +780,16 @@ export const getLeaderboard = query({
           ctx.db
             .query("subscriptions")
             .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-            .first()
-        )
+            .first(),
+        ),
       ),
       Promise.all(
         profiles.map((profile) =>
           ctx.db
             .query("userCustomizations")
             .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-            .first()
-        )
+            .first(),
+        ),
       ),
     ]);
 
@@ -707,13 +798,20 @@ export const getLeaderboard = query({
       const subscription = subscriptions[idx];
       const customization = customizations[idx];
       const isActive = subscription
-        ? isSubscriptionActive(subscription.status, subscription.expiresAt, subscription.gracePeriodEndsAt || null)
+        ? isSubscriptionActive(
+            subscription.status,
+            subscription.expiresAt,
+            subscription.gracePeriodEndsAt || null,
+          )
         : true;
-      const tier = isActive ? (subscription?.tier || "free") : "free";
+      const tier = isActive ? subscription?.tier || "free" : "free";
 
       return {
         ...profile,
-        winRate: profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0,
+        winRate:
+          profile.gamesPlayed > 0
+            ? Math.round((profile.wins / profile.gamesPlayed) * 100)
+            : 0,
         tier,
         isDonor: profile.isDonor ?? false,
         usernameColor: customization?.usernameColor,
@@ -744,7 +842,10 @@ export const getLeaderboard = query({
           position: index + 1,
         })),
         isDone: profilesWithStats.length < limit,
-        continueCursor: profilesWithStats.length > 0 ? profilesWithStats[profilesWithStats.length - 1]._id : "",
+        continueCursor:
+          profilesWithStats.length > 0
+            ? profilesWithStats[profilesWithStats.length - 1]._id
+            : "",
       };
     }
   },
@@ -775,7 +876,7 @@ export const updateProfileStats = mutation({
     // Update win streak
     let newWinStreak = profile.winStreak || 0;
     let newBestWinStreak = profile.bestWinStreak || 0;
-    
+
     if (args.won) {
       newWinStreak += 1;
       newBestWinStreak = Math.max(newBestWinStreak, newWinStreak);
@@ -786,18 +887,24 @@ export const updateProfileStats = mutation({
     // Update other stats
     const gameTimeMs = args.gameTime || 0;
     const newTotalPlayTime = (profile.totalPlayTime || 0) + gameTimeMs;
-    const newFastestWin = args.won && gameTimeMs > 0
-      ? Math.min(profile.fastestWin ?? Infinity, gameTimeMs)
-      : profile.fastestWin;
-    const newFastestGame = gameTimeMs > 0
-      ? Math.min(profile.fastestGame ?? Infinity, gameTimeMs)
-      : profile.fastestGame;
-    const newLongestGame = gameTimeMs > 0
-      ? Math.max(profile.longestGame || 0, gameTimeMs)
-      : profile.longestGame;
-    const newCapturedFlags = (profile.capturedFlags || 0) + (args.flagCaptured ? 1 : 0);
-    const newPiecesEliminated = (profile.piecesEliminated || 0) + (args.piecesEliminated || 0);
-    const newSpiesRevealed = (profile.spiesRevealed || 0) + (args.spiesRevealed || 0);
+    const newFastestWin =
+      args.won && gameTimeMs > 0
+        ? Math.min(profile.fastestWin ?? Infinity, gameTimeMs)
+        : profile.fastestWin;
+    const newFastestGame =
+      gameTimeMs > 0
+        ? Math.min(profile.fastestGame ?? Infinity, gameTimeMs)
+        : profile.fastestGame;
+    const newLongestGame =
+      gameTimeMs > 0
+        ? Math.max(profile.longestGame || 0, gameTimeMs)
+        : profile.longestGame;
+    const newCapturedFlags =
+      (profile.capturedFlags || 0) + (args.flagCaptured ? 1 : 0);
+    const newPiecesEliminated =
+      (profile.piecesEliminated || 0) + (args.piecesEliminated || 0);
+    const newSpiesRevealed =
+      (profile.spiesRevealed || 0) + (args.spiesRevealed || 0);
 
     // Calculate new rank based on wins
     let newRank = "Private";
@@ -875,7 +982,8 @@ export const checkTutorialStatus = query({
     }
 
     // Consider it first login if profile was just created (within last 5 minutes) and no tutorial seen
-    const isRecentProfile = profile.createdAt && (Date.now() - profile.createdAt) < 5 * 60 * 1000;
+    const isRecentProfile =
+      profile.createdAt && Date.now() - profile.createdAt < 5 * 60 * 1000;
     const hasSeenTutorial = profile.hasSeenTutorial || false;
     const isFirstLogin = isRecentProfile && !hasSeenTutorial;
 
