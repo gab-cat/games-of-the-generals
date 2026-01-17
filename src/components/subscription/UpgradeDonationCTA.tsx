@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
@@ -9,18 +9,47 @@ import { Button } from "@/components/ui/button";
 import { X, Crown, Heart, Zap, PlayCircle, Users } from "lucide-react";
 
 export function UpgradeDonationCTA() {
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(true); // Start dismissed to avoid flash while checking localStorage
   const navigate = useNavigate();
 
+  const STORAGE_KEY = "upgrade-cta-dismissed-until";
+  const DISMISS_DURATION = 60 * 60 * 1000; // 1 hour in ms
+
+  useEffect(() => {
+    const checkDismissal = () => {
+      const dismissedUntil = localStorage.getItem(STORAGE_KEY);
+      if (dismissedUntil) {
+        const expiry = parseInt(dismissedUntil, 10);
+        if (Date.now() < expiry) {
+          setIsDismissed(true);
+
+          // Set a timer to show it again exactly when it expires
+          const remaining = expiry - Date.now();
+          const timer = setTimeout(() => {
+            setIsDismissed(false);
+          }, remaining);
+
+          return () => clearTimeout(timer);
+        }
+      }
+      setIsDismissed(false);
+    };
+
+    checkDismissal();
+  }, []);
+
   // Check subscription status
-  const { data: subscription } = useConvexQuery(api.subscriptions.getCurrentSubscription, {});
-  
+  const { data: subscription } = useConvexQuery(
+    api.subscriptions.getCurrentSubscription,
+    {},
+  );
+
   // Check donor status via profile
   const { data: profile } = useConvexQuery(api.profiles.getCurrentProfile, {});
 
   // Wait for data before determining eligibility to prevent flashing
   const isLoading = subscription === undefined || profile === undefined;
-  
+
   // Determine persistent eligibility (should this ever be shown to this user?)
   const tier = subscription?.tier || "free";
   const isDonor = profile?.isDonor || false;
@@ -33,21 +62,23 @@ export function UpgradeDonationCTA() {
   }
 
   const handleUpgrade = () => {
-    void navigate({ 
+    void navigate({
       to: "/pricing",
-      search: { donation: undefined }
+      search: { donation: undefined },
     });
   };
 
   const handleDonate = () => {
-    void navigate({ 
+    void navigate({
       to: "/pricing",
       search: { donation: undefined },
-      hash: "#donate"
+      hash: "#donate",
     });
   };
 
   const handleDismiss = () => {
+    const expiry = Date.now() + DISMISS_DURATION;
+    localStorage.setItem(STORAGE_KEY, expiry.toString());
     setIsDismissed(true);
   };
 
@@ -64,79 +95,72 @@ export function UpgradeDonationCTA() {
             damping: 30,
             mass: 0.8,
           }}
-          className="fixed bottom-0 left-0 right-0 z-50 px-3 sm:px-4 pointer-events-none"
+          className="fixed bottom-0 left-0 right-0 z-50 p-2 pointer-events-none flex justify-center"
         >
           <motion.div
-            className="max-w-3xl mx-auto pointer-events-auto"
+            className="w-full max-w-3xl pointer-events-auto"
             whileHover={{ scale: 1.005 }}
             transition={{ duration: 0.2 }}
           >
-            <div className="relative overflow-hidden rounded-lg border border-blue-500/20 bg-gradient-to-r from-black/50 via-slate-900/50 to-black/50 backdrop-blur-xl shadow-lg">
-              {/* Subtle accent gradient */}
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-blue-500/40 via-purple-500/30 to-blue-500/40" />
-              
-              <div className="relative p-3 sm:p-4">
-                {/* Close button */}
+            <div className="relative overflow-hidden rounded-xl border border-white/10 bg-zinc-900/90 backdrop-blur-md shadow-2xl">
+              <div className="relative p-2 sm:p-5 flex flex-col sm:flex-row items-center gap-5">
+                {/* Close Button */}
                 <button
                   onClick={handleDismiss}
-                  className="absolute top-2 right-2 sm:top-3 sm:right-3 w-6 h-6 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center transition-all duration-200 group"
+                  className="absolute top-2 right-2 p-1.5 rounded-full text-zinc-500 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Dismiss"
                 >
-                  <X className="w-3 h-3 text-white/60 group-hover:text-white/80 transition-colors" />
+                  <X className="w-4 h-4" />
                 </button>
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pr-7 sm:pr-8">
-                  {/* Left content */}
-                  <div className="flex-1 space-y-1.5 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 rounded bg-blue-500/10 border border-blue-500/20">
-                        <Heart className="w-3.5 h-3.5 text-blue-400/80 flex-shrink-0" />
-                      </div>
-                      <h3 className="text-sm sm:text-base font-display font-light text-white leading-tight">
-                        Help Keep the Server Alive
-                      </h3>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/70 font-light">
-                      <span className="flex items-center gap-1.5">
-                        <PlayCircle className="w-3 h-3 text-blue-400/70" />
-                        Game replays
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Zap className="w-3 h-3 text-purple-400/70" />
-                        Advanced AI
-                      </span>
-                      <span className="flex items-center gap-1.5">
-                        <Users className="w-3 h-3 text-pink-400/70" />
-                        Unlimited private lobbies
-                      </span>
-                    </div>
-                    <p className="text-xs text-white/50 font-light leading-snug">
-                      Upgrade or donate to remove this banner and help keep this project alive ❤️
-                    </p>
+                {/* Left: Content */}
+                <div className="flex-1 text-center sm:text-left space-y-2">
+                  <h3 className="text-base font-display font-medium text-white flex items-center justify-center sm:justify-start gap-2">
+                    <span className="p-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      <Heart className="w-3.5 h-3.5" />
+                    </span>
+                    Enjoying Games of Generals?
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed max-w-xl">
+                    Your support helps keep the servers running and independent.
+                    Upgrade to unlock exclusive features or consider making a
+                    small donation.
+                  </p>
+                  <div className="flex font-mono flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-xs text-zinc-500 pt-1">
+                    <span className="flex items-center gap-1.5">
+                      <PlayCircle className="w-3 h-3 text-zinc-400" />
+                      Replay Storage
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Zap className="w-3 h-3 text-zinc-400" />
+                      Advanced AI
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3 h-3 text-zinc-400" />
+                      Unlimited Lobbies
+                    </span>
                   </div>
+                </div>
 
-                  {/* Right actions */}
-                  <div className="flex flex-row gap-2 w-full sm:w-auto flex-shrink-0">
-                    <Button
-                      variant="outline"
-                      onClick={handleUpgrade}
-                      size="sm"
-                      className="font-light font-mono px-4 py-2 h-auto text-xs sm:text-sm flex-1 sm:flex-none"
-                    >
-                      <Crown className="w-3.5 h-3.5 mr-1.5" />
-                      Upgrade
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={handleDonate}
-                      size="sm"
-                      className="font-light font-mono px-4 py-2 h-auto text-xs sm:text-sm flex-1 sm:flex-none border-pink-500/30 bg-pink-500/10 hover:bg-pink-500/20 hover:border-pink-500/40"
-                    >
-                      <Heart className="w-3.5 h-3.5 mr-1.5 text-pink-400/80" />
-                      Donate
-                    </Button>
-                  </div>
+                {/* Right: Actions */}
+                <div className="flex items-center gap-3 w-full sm:w-auto">
+                  <Button
+                    onClick={handleUpgrade}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 font-mono sm:flex-none border-blue-500/30 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 h-9 font-normal"
+                  >
+                    <Crown className="w-3.5 h-3.5 mr-2" />
+                    Upgrade
+                  </Button>
+                  <Button
+                    onClick={handleDonate}
+                    size="sm"
+                    className="flex-1 font-mono sm:flex-none bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-900/20 h-9 font-normal border-0"
+                  >
+                    <Heart className="w-3.5 h-3.5 mr-2 fill-current" />
+                    Donate
+                  </Button>
                 </div>
               </div>
             </div>
