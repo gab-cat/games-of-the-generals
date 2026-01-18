@@ -460,12 +460,12 @@ export function LobbyListTab({
       {/* Active Lobby Display */}
       {activeLobby && (
         <Card className="bg-zinc-900/40 backdrop-blur-md border border-white/10 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500/50" />
+          <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50" />
           <CardContent className="p-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-sm flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-blue-500/5 blur-[2px]" />
+                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-sm flex items-center justify-center relative">
+                  <div className="absolute inset-0 bg-amber-500/5 blur-[2px]" />
                   {activeLobby.isPrivate ? (
                     <Lock className="h-5 w-5 text-blue-400 relative z-10" />
                   ) : (
@@ -474,7 +474,7 @@ export function LobbyListTab({
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-blue-400 font-semibold bg-blue-500/10 px-1.5 py-0.5 rounded-sm border border-blue-500/20">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded-sm border border-amber-500/20">
                       Active Mission
                     </span>
                     <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
@@ -491,7 +491,7 @@ export function LobbyListTab({
                       <span className="text-xs text-zinc-400 font-mono">
                         SECURE CODE:
                       </span>
-                      <code className="bg-black/40 px-2 py-0.5 rounded-sm text-xs font-mono text-blue-300 border border-white/10 tracking-wider">
+                      <code className="bg-black/40 px-2 py-0.5 rounded-sm text-xs font-mono text-amber-300 border border-white/10 tracking-wider">
                         {activeLobby.lobbyCode}
                       </code>
                       <Button
@@ -532,8 +532,8 @@ export function LobbyListTab({
                 {activeLobby.hostId !== profile.userId &&
                   activeLobby.playerId &&
                   gameStartData.isOpen && (
-                    <div className="bg-blue-500/10 text-blue-300 border border-blue-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
-                      <div className="w-3 h-3 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+                    <div className="bg-amber-500/10 text-amber-300 border border-amber-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
+                      <div className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                       Launch Sequence Initiated...
                     </div>
                   )}
@@ -706,7 +706,7 @@ export function LobbyListTab({
                 className="space-y-6 mt-4"
               >
                 <div className="relative">
-                  <div className="absolute inset-0 bg-blue-500/5 blur-xl pointer-events-none" />
+                  <div className="absolute inset-0 bg-amber-500/5 blur-xl pointer-events-none" />
                   <Input
                     value={joinCode}
                     onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
@@ -717,7 +717,7 @@ export function LobbyListTab({
                       joinLobbyByCodeMutation.isPending ||
                       startGameMutation.isPending
                     }
-                    className="font-mono tracking-[0.5em] text-center text-2xl bg-black/50 border-white/10 text-blue-400 placeholder:text-zinc-700 h-16 rounded-sm focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50 transition-all uppercase"
+                    className="font-mono tracking-[0.5em] text-center text-2xl bg-black/50 border-white/10 text-amber-400 placeholder:text-zinc-700 h-16 rounded-sm focus-visible:ring-amber-500/50 focus-visible:border-amber-500/50 transition-all uppercase"
                   />
                 </div>
 
@@ -732,7 +732,7 @@ export function LobbyListTab({
                   </Button>
                   <Button
                     type="submit"
-                    className="bg-blue-600 hover:bg-blue-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider min-w-[100px]"
+                    className="bg-amber-600 hover:bg-amber-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider min-w-[100px]"
                     disabled={
                       joinLobbyByCodeMutation.isPending ||
                       startGameMutation.isPending
@@ -756,7 +756,7 @@ export function LobbyListTab({
           {!activeLobby && (
             <Dialog open={showCreateLobby} onOpenChange={setShowCreateLobby}>
               <DialogTrigger asChild>
-                <Button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/20 rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider shadow-lg shadow-blue-900/20">
+                <Button className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/20 rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider shadow-lg shadow-amber-900/20">
                   <Plus className="h-3.5 w-3.5" />
                   <span className="sm:hidden">Create</span>
                   <span className="hidden sm:inline">Create Lobby</span>
@@ -765,8 +765,8 @@ export function LobbyListTab({
               <DialogContent className="sm:max-w-[425px] bg-zinc-900 border border-white/10 rounded-sm">
                 <DialogHeader>
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-sm bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                      <Sword className="w-4 h-4 text-blue-400" />
+                    <div className="w-8 h-8 rounded-sm bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                      <Sword className="w-4 h-4 text-amber-400" />
                     </div>
                     <div>
                       <DialogTitle className="text-white font-display tracking-wide uppercase text-lg">
@@ -792,7 +792,7 @@ export function LobbyListTab({
                         onChange={(e) => setLobbyName(e.target.value)}
                         placeholder="ENTER LOBBY DESIGNATION"
                         disabled={createLobbyMutation.isPending}
-                        className="flex-1 bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-sm focus-visible:ring-blue-500/50"
+                        className="flex-1 bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-sm focus-visible:ring-amber-500/50"
                       />
                       <Button
                         type="button"
@@ -821,7 +821,7 @@ export function LobbyListTab({
                           createLobbyMutation.isPending ||
                           (privateLobbyLimit && !privateLobbyLimit.canCreate)
                         }
-                        className="rounded-sm border-white/20 bg-black/40 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
+                        className="rounded-sm border-white/20 bg-black/40 text-amber-500 focus:ring-amber-500/50 disabled:opacity-50"
                       />
                       <label
                         htmlFor="private-lobby"
@@ -924,7 +924,7 @@ export function LobbyListTab({
                         type="number"
                         min="1"
                         disabled={createLobbyMutation.isPending}
-                        className="bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-xs focus-visible:ring-blue-500/50 h-8 w-full"
+                        className="bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-xs focus-visible:ring-amber-500/50 h-8 w-full"
                       />
                     </div>
                   )}
@@ -959,7 +959,7 @@ export function LobbyListTab({
                     </Button>
                     <Button
                       type="submit"
-                      className="bg-blue-600 hover:bg-blue-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider w-[120px]"
+                      className="bg-amber-600 hover:bg-amber-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider w-[120px]"
                       disabled={createLobbyMutation.isPending}
                     >
                       {createLobbyMutation.isPending ? (
@@ -984,7 +984,7 @@ export function LobbyListTab({
         {lobbiesQuery === undefined ? (
           <div className="flex justify-center py-20">
             <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+              <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
               <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest animate-pulse">
                 Scanning Grid...
               </p>
@@ -1008,7 +1008,7 @@ export function LobbyListTab({
             <Button
               onClick={() => setShowCreateLobby(true)}
               variant="outline"
-              className="border-blue-500/30 text-blue-400 hover:bg-blue-500/10 font-mono text-xs uppercase tracking-wider"
+              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-mono text-xs uppercase tracking-wider"
             >
               Initialize New Operation
             </Button>

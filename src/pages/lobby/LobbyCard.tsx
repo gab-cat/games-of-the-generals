@@ -51,7 +51,7 @@ const getGameModeBadge = (gameMode?: "classic" | "blitz" | "reveal") => {
       return {
         label: "Classic",
         icon: <Clock className="h-3 w-3" />,
-        className: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+        className: "bg-amber-500/20 text-amber-300 border-amber-500/30",
       };
   }
 };
@@ -87,10 +87,10 @@ export function LobbyCard({
     >
       <div className="group relative bg-zinc-900/60 backdrop-blur-sm border border-white/5 rounded-sm p-4 hover:bg-zinc-900/80 transition-all duration-300 overflow-hidden">
         {/* Tech Corners */}
-        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/10 group-hover:border-blue-500/50 transition-colors" />
-        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/10 group-hover:border-blue-500/50 transition-colors" />
-        <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/10 group-hover:border-blue-500/50 transition-colors" />
-        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/10 group-hover:border-blue-500/50 transition-colors" />
+        <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/10 group-hover:border-amber-500/50 transition-colors" />
+        <div className="absolute top-0 right-0 w-2 h-2 border-t border-r border-white/10 group-hover:border-amber-500/50 transition-colors" />
+        <div className="absolute bottom-0 left-0 w-2 h-2 border-b border-l border-white/10 group-hover:border-amber-500/50 transition-colors" />
+        <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/10 group-hover:border-amber-500/50 transition-colors" />
 
         {/* Scanline Effect on Hover */}
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-in-out pointer-events-none" />
@@ -100,18 +100,18 @@ export function LobbyCard({
           <div className="flex items-center gap-4 min-w-0 flex-1">
             {/* Host Avatar with Hex Frame */}
             <div className="relative flex-shrink-0">
-              <div className="absolute -inset-1 bg-blue-500/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="absolute -inset-1 bg-amber-500/20 rounded-full blur-sm opacity-0 group-hover:opacity-100 transition-opacity" />
               <UserAvatar
                 username={lobby.hostUsername}
                 avatarUrl={hostProfile?.avatarUrl}
                 rank={hostProfile?.rank}
                 size="md"
                 frame={hostProfile?.avatarFrame}
-                className="relative ring-1 ring-white/10 group-hover:ring-blue-500/50 transition-all"
+                className="relative ring-1 ring-white/10 group-hover:ring-amber-500/50 transition-all"
               />
               <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5 border border-white/10">
-                <div className="p-1 bg-blue-500/20 rounded-full">
-                  <Users className="w-2.5 h-2.5 text-blue-400" />
+                <div className="p-1 bg-amber-500/20 rounded-full">
+                  <Users className="w-2.5 h-2.5 text-amber-400" />
                 </div>
               </div>
             </div>
@@ -133,7 +133,7 @@ export function LobbyCard({
                 )}
               </div>
 
-              <h4 className="font-display font-medium text-zinc-100 text-lg truncate group-hover:text-blue-200 transition-colors">
+              <h4 className="font-display font-medium text-zinc-100 text-lg truncate group-hover:text-amber-200 transition-colors">
                 {lobby.name}
               </h4>
 
@@ -231,7 +231,7 @@ export function LobbyCard({
                   "h-9 font-mono text-xs uppercase tracking-wider transition-all duration-300 shadow-[0_0_10px_-4px_rgba(0,0,0,0.5)]",
                   lobby.playerId
                     ? "bg-zinc-800 text-zinc-500 border border-zinc-700"
-                    : "bg-blue-600 hover:bg-blue-500 text-white border border-blue-400/30 shadow-[0_0_10px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]",
+                    : "bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/30 shadow-[0_0_10px_rgba(245,158,11,0.3)] hover:shadow-[0_0_20px_rgba(245,158,11,0.5)]",
                 )}
                 onClick={() => onJoin(lobby._id)}
                 disabled={!!lobby.playerId || isJoining}

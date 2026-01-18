@@ -75,7 +75,7 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
     <>
       <motion.div
         exit={{ opacity: 0 }}
-        className="min-h-screen relative font-sans p-4 sm:p-6 pb-20"
+        className="min-h-screen relative font-sans p-2 sm:p-6 pb-20"
       >
         {/* Ambient Command Center Background */}
         <div className="fixed inset-0 pointer-events-none select-none z-[-1] bg-black">
