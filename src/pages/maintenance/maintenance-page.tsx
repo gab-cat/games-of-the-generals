@@ -11,7 +11,7 @@ import Squares from "@/components/backgrounds/Squares/Squares";
 
 export function MaintenancePage() {
   const handleRefresh = () => {
-    window.location.reload();
+    window.location.href = "/";
   };
 
   return (
