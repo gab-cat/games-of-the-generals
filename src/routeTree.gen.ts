@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TestCountdownRouteImport } from './routes/test-countdown'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SupportResolveRouteImport } from './routes/support-resolve'
 import { Route as SupportRouteImport } from './routes/support'
@@ -20,6 +21,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as MatchHistoryRouteImport } from './routes/match-history'
+import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GameRouteImport } from './routes/game'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -34,6 +36,11 @@ import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTicketsRouteImport } from './routes/admin/tickets'
 import { Route as AdminSubscriptionsRouteImport } from './routes/admin/subscriptions'
 
+const TestCountdownRoute = TestCountdownRouteImport.update({
+  id: '/test-countdown',
+  path: '/test-countdown',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
@@ -87,6 +94,11 @@ const PricingRoute = PricingRouteImport.update({
 const MatchHistoryRoute = MatchHistoryRouteImport.update({
   id: '/match-history',
   path: '/match-history',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MaintenanceRoute = MaintenanceRouteImport.update({
+  id: '/maintenance',
+  path: '/maintenance',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LeaderboardRoute = LeaderboardRouteImport.update({
@@ -165,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
+  '/maintenance': typeof MaintenanceRoute
   '/match-history': typeof MatchHistoryRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -176,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/support': typeof SupportRoute
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
+  '/test-countdown': typeof TestCountdownRoute
   '/admin/subscriptions': typeof AdminSubscriptionsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -190,6 +204,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
+  '/maintenance': typeof MaintenanceRoute
   '/match-history': typeof MatchHistoryRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -201,6 +216,7 @@ export interface FileRoutesByTo {
   '/support': typeof SupportRoute
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
+  '/test-countdown': typeof TestCountdownRoute
   '/admin/subscriptions': typeof AdminSubscriptionsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -217,6 +233,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
+  '/maintenance': typeof MaintenanceRoute
   '/match-history': typeof MatchHistoryRoute
   '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
@@ -228,6 +245,7 @@ export interface FileRoutesById {
   '/support': typeof SupportRoute
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
+  '/test-countdown': typeof TestCountdownRoute
   '/admin/subscriptions': typeof AdminSubscriptionsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -245,6 +263,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/game'
     | '/leaderboard'
+    | '/maintenance'
     | '/match-history'
     | '/pricing'
     | '/privacy'
@@ -256,6 +275,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/support-resolve'
     | '/terms'
+    | '/test-countdown'
     | '/admin/subscriptions'
     | '/admin/tickets'
     | '/admin/users'
@@ -270,6 +290,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/game'
     | '/leaderboard'
+    | '/maintenance'
     | '/match-history'
     | '/pricing'
     | '/privacy'
@@ -281,6 +302,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/support-resolve'
     | '/terms'
+    | '/test-countdown'
     | '/admin/subscriptions'
     | '/admin/tickets'
     | '/admin/users'
@@ -296,6 +318,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/game'
     | '/leaderboard'
+    | '/maintenance'
     | '/match-history'
     | '/pricing'
     | '/privacy'
@@ -307,6 +330,7 @@ export interface FileRouteTypes {
     | '/support'
     | '/support-resolve'
     | '/terms'
+    | '/test-countdown'
     | '/admin/subscriptions'
     | '/admin/tickets'
     | '/admin/users'
@@ -323,6 +347,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   GameRoute: typeof GameRoute
   LeaderboardRoute: typeof LeaderboardRoute
+  MaintenanceRoute: typeof MaintenanceRoute
   MatchHistoryRoute: typeof MatchHistoryRoute
   PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
@@ -334,10 +359,18 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   SupportResolveRoute: typeof SupportResolveRoute
   TermsRoute: typeof TermsRoute
+  TestCountdownRoute: typeof TestCountdownRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/test-countdown': {
+      id: '/test-countdown'
+      path: '/test-countdown'
+      fullPath: '/test-countdown'
+      preLoaderRoute: typeof TestCountdownRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terms': {
       id: '/terms'
       path: '/terms'
@@ -413,6 +446,13 @@ declare module '@tanstack/react-router' {
       path: '/match-history'
       fullPath: '/match-history'
       preLoaderRoute: typeof MatchHistoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/maintenance': {
+      id: '/maintenance'
+      path: '/maintenance'
+      fullPath: '/maintenance'
+      preLoaderRoute: typeof MaintenanceRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/leaderboard': {
@@ -535,6 +575,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   GameRoute: GameRoute,
   LeaderboardRoute: LeaderboardRoute,
+  MaintenanceRoute: MaintenanceRoute,
   MatchHistoryRoute: MatchHistoryRoute,
   PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
@@ -546,6 +587,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   SupportResolveRoute: SupportResolveRoute,
   TermsRoute: TermsRoute,
+  TestCountdownRoute: TestCountdownRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
