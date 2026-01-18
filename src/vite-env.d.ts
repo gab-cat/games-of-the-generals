@@ -3,6 +3,7 @@
 
 interface ImportMetaEnv {
   readonly VITE_VAPID_PUBLIC_KEY?: string;
+  readonly VITE_MAINTENANCE_MODE?: string;
 }
 
 interface ImportMeta {
