@@ -145,7 +145,7 @@ export function AIGameResultModal({
             </div>
           </div>
 
-          <div className="w-full p-8 md:p-10 flex flex-col items-center relative overflow-hidden">
+          <div className="w-full p-4 md:p-10 flex flex-col items-center relative overflow-hidden overflow-y-auto max-h-[80vh]">
             {/* Background Effects */}
             <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:30px_30px]" />
 
@@ -154,7 +154,7 @@ export function AIGameResultModal({
               initial={{ scale: 0, rotate: 180 }}
               animate={{ scale: 1, rotate: 0 }}
               transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-              className={`w-20 h-20 mb-6 rounded-2xl border-2 flex items-center justify-center relative ${
+              className={`w-12 h-12 md:w-20 md:h-20 mb-3 md:mb-6 rounded-xl md:rounded-2xl border-2 flex items-center justify-center relative ${
                 isVictory
                   ? "border-emerald-500/50 bg-emerald-500/10"
                   : isDefeat
@@ -173,22 +173,22 @@ export function AIGameResultModal({
               className="text-center mb-8"
             >
               <h1
-                className={`text-5xl font-black tracking-tighter mb-2 ${getResultColor()}`}
+                className={`text-3xl md:text-5xl font-black tracking-tighter mb-1 ${getResultColor()}`}
               >
                 {getResultTitle()}
               </h1>
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-2 md:gap-3">
                 <div
-                  className={`h-[1px] w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
+                  className={`h-[1px] w-6 md:w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
                 />
-                <p className="text-xs font-mono tracking-[0.2em] text-white/60 uppercase">
+                <p className="text-[10px] md:text-xs font-mono tracking-[0.1em] md:tracking-[0.2em] text-white/60 uppercase">
                   {getMissionStatus()}
                 </p>
                 <div
-                  className={`h-[1px] w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
+                  className={`h-[1px] w-6 md:w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
                 />
               </div>
-              <p className="mt-3 text-white/40 font-mono text-[10px] uppercase tracking-widest">
+              <p className="mt-2 text-white/40 font-mono text-[9px] md:text-[10px] uppercase tracking-widest px-4">
                 [{getReasonDescription()}]
               </p>
             </motion.div>
@@ -198,42 +198,42 @@ export function AIGameResultModal({
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="w-full grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/5 border border-white/10 rounded-sm overflow-hidden mb-8"
+              className="w-full grid grid-cols-2 md:grid-cols-4 gap-px bg-white/5 border border-white/10 rounded-sm overflow-hidden mb-8"
             >
-              <div className="bg-black/40 p-3 flex flex-col items-center justify-center text-center">
-                <Zap className="w-4 h-4 text-blue-400 mb-2 opacity-70" />
-                <div className="text-lg font-mono font-bold text-white">
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Zap className="w-3 h-3 md:w-4 md:h-4 text-blue-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white">
                   {moveCount}
                 </div>
-                <div className="text-[9px] uppercase tracking-widest text-white/40">
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
                   Moves
                 </div>
               </div>
-              <div className="bg-black/40 p-3 flex flex-col items-center justify-center text-center">
-                <Target className="w-4 h-4 text-amber-400 mb-2 opacity-70" />
-                <div className="text-lg font-mono font-bold text-white">
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Target className="w-3 h-3 md:w-4 md:h-4 text-amber-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white">
                   N/A
                 </div>
-                <div className="text-[9px] uppercase tracking-widest text-white/40">
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
                   Score
                 </div>
               </div>
-              <div className="bg-black/40 p-3 flex flex-col items-center justify-center text-center">
-                <Swords className="w-4 h-4 text-red-400 mb-2 opacity-70" />
-                <div className="text-lg font-mono font-bold text-white uppercase">
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Swords className="w-3 h-3 md:w-4 md:h-4 text-red-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white uppercase">
                   {difficulty}
                 </div>
-                <div className="text-[9px] uppercase tracking-widest text-white/40">
-                  Difficulty
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
+                  Diff
                 </div>
               </div>
-              <div className="bg-black/40 p-3 flex flex-col items-center justify-center text-center">
-                <Brain className="w-4 h-4 text-purple-400 mb-2 opacity-70" />
-                <div className="text-lg font-mono font-bold text-white uppercase">
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Brain className="w-3 h-3 md:w-4 md:h-4 text-purple-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white uppercase truncate max-w-full px-1">
                   {behavior}
                 </div>
-                <div className="text-[9px] uppercase tracking-widest text-white/40">
-                  AI Logic
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
+                  Logic
                 </div>
               </div>
             </motion.div>
