@@ -130,7 +130,7 @@ export function SubscriptionPage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-4 sm:p-6"
+      className="min-h-screen py-10 px-2 sm:px-6 relative overflow-hidden font-sans text-zinc-300"
     >
       {/* Ambient Background */}
       <div className="fixed inset-0 pointer-events-none select-none">
@@ -164,7 +164,7 @@ export function SubscriptionPage() {
           </motion.div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 px-2 md:px-4 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 px-1 md:px-4 pb-12">
           {/* LEFT COLUMN: Main Content */}
           <div className="lg:col-span-8 space-y-12">
             {/* Current License Card */}

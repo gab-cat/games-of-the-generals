@@ -183,7 +183,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
   };
 
   return (
-    <div className="min-h-screen py-10 px-4 sm:px-6 relative overflow-hidden font-sans text-zinc-300">
+    <div className="min-h-screen py-10 px-2 sm:px-6 relative overflow-hidden font-sans text-zinc-300">
       <div className="relative z-10 max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="mb-16 md:mb-20 space-y-4 text-center">
