@@ -145,7 +145,7 @@ export function ProfilePage() {
         <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/10 via-transparent to-transparent opacity-40" />
       </div>
 
-      <div className="relative z-10 max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8">
+      <div className="relative z-10 max-w-7xl mx-auto p-2 sm:p-6 lg:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* LEFT RAIL: IDENTITY CARD (Sticky) */}
           <div className="lg:col-span-4 xl:col-span-3">
