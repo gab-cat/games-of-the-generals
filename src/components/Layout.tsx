@@ -42,6 +42,7 @@ import { TutorialButton } from "./TutorialButton";
 import Squares from "./backgrounds/Squares/Squares";
 import { TutorialModal } from "./TutorialModal";
 import { BanScreen } from "./BanScreen";
+import { SeasonUpdateModal } from "./modals/SeasonUpdateModal";
 import { cn } from "../lib/utils";
 import { Id } from "../../convex/_generated/dataModel";
 import { useMutation } from "convex/react";
@@ -331,11 +332,11 @@ export function Layout({
   }, [location.pathname, latestAnnouncement]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 pb-16 lg:pb-0 no-scrollbar relative selection:bg-blue-500/30">
+    <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-900 to-zinc-800 pb-16 lg:pb-0 no-scrollbar relative selection:bg-amber-500/30">
       {/* Global Background Grid */}
       <div className="fixed inset-0 pointer-events-none select-none z-0">
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/10 via-transparent to-transparent opacity-50" />
+        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-amber-900/10 via-transparent to-transparent opacity-50" />
       </div>
       {/* Minimalist Header */}
       <motion.header
@@ -396,7 +397,7 @@ export function Layout({
               }
               className="relative w-10 h-10 flex items-center justify-center shrink-0 cursor-pointer group"
             >
-              <div className="absolute inset-0 m-auto w-7 h-7 bg-blue-500/10 rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500 border border-blue-500/30" />
+              <div className="absolute inset-0 m-auto w-7 h-7 bg-amber-500/10 rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500 border border-amber-500/30" />
               <div className="absolute inset-0 m-auto w-7 h-7 border border-white/10 rounded-sm rotate-45 group-hover:rotate-0 transition-transform duration-500" />
               <Gamepad2 className="w-4 h-4 text-white/90 group-hover:text-white transition-colors relative z-10" />
             </motion.div>
@@ -408,9 +409,9 @@ export function Layout({
                 void navigate({ to: "/", search: { lobbyId: undefined } })
               }
             >
-              <h1 className="text-lg font-display font-medium text-white tracking-wide leading-none group-hover:text-blue-400 transition-colors duration-300">
+              <h1 className="text-sm sm:text-lg font-display font-medium text-white tracking-wide leading-none group-hover:text-amber-400 transition-colors duration-300 flex items-center">
                 <span className="tracking-[0.05em]">GAMES</span>
-                <span className="mx-1.5 text-white/40 text-sm font-light italic">
+                <span className="mx-1 sm:mx-1.5 text-white/40 text-[10px] sm:text-sm font-light italic shrink-0">
                   of the
                 </span>
                 <span className="tracking-[0.05em]">GENERALS</span>
@@ -420,8 +421,8 @@ export function Layout({
                   System v{version}
                 </span>
                 <div className="flex gap-1">
-                  <span className="w-0.5 h-0.5 rounded-full bg-blue-500/50" />
-                  <span className="w-0.5 h-0.5 rounded-full bg-blue-500/50" />
+                  <span className="w-0.5 h-0.5 rounded-full bg-amber-500/50" />
+                  <span className="w-0.5 h-0.5 rounded-full bg-amber-500/50" />
                   <span className="w-0.5 h-0.5 rounded-full bg-green-500 animate-pulse shadow-[0_0_5px_rgba(34,197,94,0.5)]" />
                 </div>
               </div>
@@ -456,7 +457,7 @@ export function Layout({
                       <Icon
                         className={cn(
                           "w-3.5 h-3.5",
-                          active ? "text-blue-400" : "opacity-70",
+                          active ? "text-amber-400" : "opacity-70",
                         )}
                       />
                       <span
@@ -478,7 +479,7 @@ export function Layout({
                       {active && (
                         <motion.div
                           layoutId="activeTabIndicator"
-                          className="absolute bottom-0 left-2 right-2 h-[2px] bg-blue-400/50 rounded-full"
+                          className="absolute bottom-0 left-2 right-2 h-[2px] bg-amber-400/50 rounded-full"
                         />
                       )}
                     </Button>
@@ -644,7 +645,7 @@ export function Layout({
                         <span className="text-[9px] font-mono text-white/30 uppercase tracking-widest">
                           RANK
                         </span>
-                        <span className="text-xs font-bold text-blue-400">
+                        <span className="text-xs font-bold text-amber-400">
                           {profile?.rank || "UNRANKED"}
                         </span>
                       </div>
@@ -667,7 +668,7 @@ export function Layout({
                             <User className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
                             <span>Profile</span>
                           </div>
-                          <div className="w-1 h-1 rounded-full bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                          <div className="w-1 h-1 rounded-full bg-amber-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                         </DropdownMenuItem>
 
                         <DropdownMenuItem
@@ -779,7 +780,7 @@ export function Layout({
                         className="group flex items-center justify-center gap-2 px-2 py-2 text-xs font-bold text-red-500/80 hover:text-red-400 hover:bg-red-500/10 rounded-md cursor-pointer transition-colors border border-transparent hover:border-red-500/20"
                       >
                         <LogOut className="h-3.5 w-3.5" />
-                        <span>TERMINATE SESSION</span>
+                        <span>TERMINATE_SESSION</span>
                       </DropdownMenuItem>
                     </div>
                   </div>
@@ -823,7 +824,7 @@ export function Layout({
       )}
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl min-h-[90vh] mx-auto mt-4 sm:mt-8 px-3 pb-4 sm:px-6">
+      <main className="flex-1 max-w-7xl min-h-[90vh] mx-auto mt-4 sm:mt-8 px-2 pb-4 sm:px-6">
         {isAuthenticated && isBanned ? <BanScreen /> : children}
       </main>
 
@@ -843,7 +844,7 @@ export function Layout({
           >
             {/* Ambient Light/Grid */}
             <div className="absolute inset-0 overflow-hidden opacity-10 pointer-events-none">
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500/20 to-transparent" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/20 to-transparent" />
               <Squares
                 direction="diagonal"
                 speed={0.2}
@@ -889,7 +890,7 @@ export function Layout({
                             }
                           >
                             <div className="relative w-12 h-12 flex items-center justify-center shrink-0">
-                              <div className="absolute inset-0 m-auto w-8 h-8 bg-blue-500/10 rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500" />
+                              <div className="absolute inset-0 m-auto w-8 h-8 bg-amber-500/10 rounded-sm rotate-45 group-hover:rotate-90 transition-transform duration-500" />
                               <div className="absolute inset-0 m-auto w-8 h-8 border border-white/10 rounded-sm rotate-45 group-hover:rotate-0 transition-transform duration-500" />
                               <Gamepad2 className="w-5 h-5 text-white/80" />
                             </div>
@@ -898,7 +899,7 @@ export function Layout({
                                 Games of Generals
                               </h2>
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono text-blue-400 uppercase tracking-wider bg-blue-500/10 px-1.5 py-0.5 rounded-sm">
+                                <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider bg-amber-500/10 px-1.5 py-0.5 rounded-sm">
                                   System v{version}
                                 </span>
                                 <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
@@ -927,7 +928,7 @@ export function Layout({
                               <div className="text-xs font-mono text-white/30 mb-1">
                                 {stat.label}
                               </div>
-                              <div className="text-sm font-bold text-white/80 group-hover:text-blue-400">
+                              <div className="text-sm font-bold text-white/80 group-hover:text-amber-400">
                                 {stat.value}
                               </div>
                             </div>
@@ -947,7 +948,7 @@ export function Layout({
                               onClick={() => void navigate({ to: link.path })}
                               className="group flex items-center gap-3 py-1.5 text-sm text-white/50 hover:text-white transition-colors text-left"
                             >
-                              <span className="w-1 h-1 bg-white/20 rounded-full group-hover:bg-blue-400 transition-colors" />
+                              <span className="w-1 h-1 bg-white/20 rounded-full group-hover:bg-amber-400 transition-colors" />
                               {link.label}
                             </button>
                           ))}
@@ -1124,9 +1125,9 @@ export function Layout({
           initial={{ y: 100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-black/40 backdrop-blur-2xl border-t border-white/20"
+          className="lg:hidden fixed bottom-4 left-4 right-4 z-40"
         >
-          <div className="flex items-center justify-around py-2 px-1 sm:py-3 sm:px-2">
+          <div className="flex items-center justify-around p-1.5 bg-zinc-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 overflow-hidden">
             {navigationItems.map((item) => {
               const Icon = item.icon;
               const isActive = isActiveTab(item.path);
@@ -1137,90 +1138,57 @@ export function Layout({
                   size="sm"
                   onClick={() => void navigate({ to: item.path })}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-1 px-2 py-5 transition-all duration-200 min-w-0 flex-1 max-w-20 sm:max-w-24 rounded-full",
+                    "flex flex-col items-center justify-center gap-1 h-12 min-w-0 flex-1 rounded-xl transition-all duration-300",
                     isActive
-                      ? "bg-white/20 text-white"
-                      : "text-white/70 hover:text-white hover:bg-white/10",
+                      ? "bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)]"
+                      : "text-white/40 hover:text-white hover:bg-white/5",
                   )}
                 >
-                  <Icon className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
-                  <span className="text-[10px] sm:text-xs text-white font-medium text-center leading-tight w-full">
+                  <Icon
+                    className={cn(
+                      "w-5 h-5",
+                      isActive ? "text-amber-400" : "opacity-70",
+                    )}
+                  />
+                  <span
+                    className={cn(
+                      "text-[8px] font-mono uppercase tracking-wider leading-none",
+                      isActive ? "font-bold" : "font-medium",
+                    )}
+                  >
                     {item.label}
                   </span>
                 </Button>
               );
             })}
+
             {/* Global Chat Button */}
-            <motion.div
-              whileHover={isMobile ? undefined : { scale: 1.02 }}
-              whileTap={isMobile ? undefined : { scale: 0.98 }}
-              animate={
-                isMobile
-                  ? undefined
-                  : {
-                      backgroundColor: isGlobalChatOpen
-                        ? "rgba(255, 255, 255, 0.15)"
-                        : "rgba(0, 0, 0, 0.3)",
-                    }
-              }
-              transition={
-                isMobile
-                  ? { duration: 0.2 }
-                  : {
-                      backgroundColor: { duration: 0.4 },
-                      scale: { type: "spring", stiffness: 400, damping: 25 },
-                    }
-              }
-              className="flex max-w-20 sm:max-w-24 rounded-full"
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
+              className={cn(
+                "flex flex-col items-center justify-center gap-1 h-12 min-w-0 flex-1 rounded-xl transition-all duration-300",
+                isGlobalChatOpen
+                  ? "bg-white/10 text-white shadow-[0_0_15px_rgba(255,255,255,0.05)]"
+                  : "text-white/40 hover:text-white hover:bg-white/5",
+              )}
             >
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsGlobalChatOpen(!isGlobalChatOpen)}
+              <MessageCircle
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-4 py-1 rounded-full transition-all duration-200 min-w-0 w-full h-full cursor-pointer",
-                  isGlobalChatOpen
-                    ? "text-white"
-                    : "text-white/70 hover:text-white",
+                  "w-5 h-5",
+                  isGlobalChatOpen ? "text-white" : "opacity-70",
+                )}
+              />
+              <span
+                className={cn(
+                  "text-[8px] font-mono uppercase tracking-wider leading-none",
+                  isGlobalChatOpen ? "font-bold" : "font-medium",
                 )}
               >
-                <motion.div
-                  animate={
-                    isMobile
-                      ? undefined
-                      : {
-                          rotate: isGlobalChatOpen ? 180 : 0,
-                          scale: isGlobalChatOpen ? 1.05 : 1,
-                        }
-                  }
-                  transition={
-                    isMobile
-                      ? { duration: 0.2 }
-                      : {
-                          rotate: { duration: 0.6, ease: "easeInOut" },
-                          scale: { duration: 0.4 },
-                        }
-                  }
-                >
-                  <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
-                </motion.div>
-                <motion.span
-                  className="text-[10px] sm:text-xs text-white font-medium text-center leading-tight w-full"
-                  animate={
-                    isMobile
-                      ? undefined
-                      : {
-                          color: isGlobalChatOpen
-                            ? "#ffffff"
-                            : "rgba(255, 255, 255, 0.7)",
-                        }
-                  }
-                  transition={isMobile ? { duration: 0.2 } : { duration: 0.4 }}
-                >
-                  Chat
-                </motion.span>
-              </Button>
-            </motion.div>
+                Chat
+              </span>
+            </Button>
           </div>
         </motion.nav>
       )}
@@ -1299,6 +1267,7 @@ export function Layout({
           onClose={() => setIsSoundSettingsOpen(false)}
         />
       </Suspense>
+      <SeasonUpdateModal />
     </div>
   );
 }

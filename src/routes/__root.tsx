@@ -1,6 +1,11 @@
-import { createRootRoute, Outlet, useLocation } from "@tanstack/react-router";
+import {
+  createRootRoute,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
-import { lazy, Suspense, useState, useCallback } from "react";
+import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { ConvertAnonymousPopup } from "../components/ConvertAnonymousPopup";
 import { Toaster } from "sonner";
 import { useConvexQuery } from "../lib/convex-query-hooks";
@@ -35,13 +40,22 @@ function RootComponent() {
   }
 
   const location = useLocation();
+  const navigate = useNavigate();
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const isMaintenancePage = location.pathname === "/maintenance";
+
+  useEffect(() => {
+    const isMaintenanceMode = import.meta.env.VITE_MAINTENANCE_MODE === "true";
+    if (isMaintenanceMode && !isMaintenancePage && !isAdminRoute) {
+      navigate({ to: "/maintenance" });
+    }
+  }, [location.pathname, navigate, isAdminRoute, isMaintenancePage]);
 
   return (
     <div className="min-h-screen">
       <Suspense fallback={<LoadingSpinner fullScreen={true} />}>
         <SoundProvider>
-          {isAdminRoute ? (
+          {isAdminRoute || isMaintenancePage ? (
             <Outlet />
           ) : (
             <Layout

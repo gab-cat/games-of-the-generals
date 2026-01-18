@@ -1,7 +1,16 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { Swords, Shield, Target, Zap, Crown, Terminal, Activity, Cpu } from "lucide-react";
+import {
+  Swords,
+  Shield,
+  Target,
+  Zap,
+  Crown,
+  Terminal,
+  Activity,
+  Cpu,
+} from "lucide-react";
 import { cn } from "../lib/utils";
 import { useState, useEffect } from "react";
 
@@ -36,10 +45,10 @@ const militaryIcons = [Swords, Shield, Target, Zap, Crown];
 export function LoadingSpinner({
   fullScreen = false,
   className,
-  size = "md"
+  size = "md",
 }: LoadingSpinnerProps) {
   const [messageIndex, setMessageIndex] = useState(0);
-  
+
   useEffect(() => {
     const interval = setInterval(() => {
       setMessageIndex((prev) => (prev + 1) % loadingMessages.length);
@@ -52,7 +61,7 @@ export function LoadingSpinner({
     fullScreen
       ? "fixed inset-0 z-[100] bg-[#050505] overflow-hidden"
       : "min-h-[60vh] relative",
-    className
+    className,
   );
 
   const spinnerSize = sizeVariants[size];
@@ -64,7 +73,7 @@ export function LoadingSpinner({
       {[...Array(3)].map((_, i) => (
         <motion.div
           key={i}
-          className="absolute rounded-full border border-blue-500/10"
+          className="absolute rounded-full border border-amber-500/10"
           style={{
             width: `calc(100% + ${i * 40}px)`,
             height: `calc(100% + ${i * 40}px)`,
@@ -83,12 +92,18 @@ export function LoadingSpinner({
       ))}
 
       {/* Main Spinner Container */}
-      <div className={cn("relative rounded-full p-2 bg-zinc-900/50 border border-white/5 backdrop-blur-sm", spinnerSize)}>
+      <div
+        className={cn(
+          "relative rounded-full p-2 bg-zinc-900/50 border border-white/5 backdrop-blur-sm",
+          spinnerSize,
+        )}
+      >
         {/* Conic Gradient Scanner Beam */}
         <motion.div
           className="absolute inset-0 rounded-full"
           style={{
-            background: "conic-gradient(from 0deg, transparent 0%, transparent 70%, rgba(59, 130, 246, 0.4) 100%)",
+            background:
+              "conic-gradient(from 0deg, transparent 0%, transparent 70%, rgba(245, 158, 11, 0.4) 100%)",
           }}
           animate={{ rotate: 360 }}
           transition={{
@@ -104,23 +119,25 @@ export function LoadingSpinner({
         {/* Central Tactical Core */}
         <div className="absolute inset-1 rounded-full bg-zinc-950 flex items-center justify-center border border-white/10 group overflow-hidden">
           {/* Pulsing Core */}
-          <motion.div 
-            className="absolute inset-0 bg-blue-500/5"
+          <motion.div
+            className="absolute inset-0 bg-amber-500/5"
             animate={{ opacity: [0.05, 0.15, 0.05] }}
             transition={{ duration: 2, repeat: Infinity }}
           />
-          
-          <Target className={cn(
-             "text-blue-500/80 relative z-10",
-             size === "sm" ? "w-3 h-3" : size === "lg" ? "w-8 h-8" : "w-5 h-5"
-          )} />
+
+          <Target
+            className={cn(
+              "text-amber-500/80 relative z-10",
+              size === "sm" ? "w-3 h-3" : size === "lg" ? "w-8 h-8" : "w-5 h-5",
+            )}
+          />
         </div>
 
         {/* Orbital Blips */}
         {[...Array(2)].map((_, i) => (
           <motion.div
             key={i}
-            className="absolute w-1.5 h-1.5 bg-blue-400 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.8)]"
+            className="absolute w-1.5 h-1.5 bg-amber-400 rounded-full shadow-[0_0_8px_rgba(245, 158, 11, 0.8)]"
             animate={{
               rotate: 360,
               scale: [1, 1.5, 1],
@@ -132,11 +149,11 @@ export function LoadingSpinner({
               opacity: { duration: 1.5, repeat: Infinity },
             }}
             style={{
-              top: '50%',
-              left: '50%',
-              marginLeft: '-0.75px',
-              marginTop: '-0.75px',
-              transformOrigin: `${size === "sm" ? 16 : size === "lg" ? 40 : 28}px center`
+              top: "50%",
+              left: "50%",
+              marginLeft: "-0.75px",
+              marginTop: "-0.75px",
+              transformOrigin: `${size === "sm" ? 16 : size === "lg" ? 40 : 28}px center`,
             }}
           />
         ))}
@@ -144,8 +161,8 @@ export function LoadingSpinner({
 
       {/* Crosshair Elements */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-        <div className="w-px h-full bg-blue-500/5" />
-        <div className="h-px w-full bg-blue-500/5" />
+        <div className="w-px h-full bg-amber-500/5" />
+        <div className="h-px w-full bg-amber-500/5" />
       </div>
     </div>
   );
@@ -166,27 +183,27 @@ export function LoadingSpinner({
 
           {/* HUD Corner Elements */}
           <div className="absolute top-8 left-8 flex flex-col gap-2 font-mono text-[10px] text-zinc-500 tracking-widest opacity-50">
-             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                <span>SYSTEM_CALIBRATION_ACTIVE</span>
-             </div>
-             <div>LOC_SIG: 127.0.0.1:8080</div>
-             <div>AUTH_LEVEL: GENERAL_HQ</div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>SYSTEM_CALIBRATION_ACTIVE</span>
+            </div>
+            <div>LOC_SIG: 127.0.0.1:8080</div>
+            <div>AUTH_LEVEL: GENERAL_HQ</div>
           </div>
 
           <div className="absolute bottom-8 right-8 text-right font-mono text-[10px] text-zinc-500 tracking-widest opacity-50">
-             <div>ENCRYPTION: AES-256-GCM</div>
-             <div>LATENCY: 24MS</div>
-             <div className="mt-1 flex justify-end gap-1">
-                {[...Array(4)].map((_, i) => (
-                   <motion.div 
-                     key={i} 
-                     className="w-4 h-1 bg-blue-500/20"
-                     animate={{ opacity: [0.2, 0.5, 0.2] }}
-                     transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                   />
-                ))}
-             </div>
+            <div>ENCRYPTION: AES-256-GCM</div>
+            <div>LATENCY: 24MS</div>
+            <div className="mt-1 flex justify-end gap-1">
+              {[...Array(4)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="w-4 h-1 bg-amber-500/20"
+                  animate={{ opacity: [0.2, 0.5, 0.2] }}
+                  transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                />
+              ))}
+            </div>
           </div>
         </>
       )}
@@ -196,66 +213,66 @@ export function LoadingSpinner({
         <RadarSpinner />
 
         <div className="flex flex-col items-center gap-4 text-center">
-            {/* Brand/App Title */}
-            <motion.div
-               animate={{ opacity: [0.4, 0.8, 0.4] }}
-               transition={{ duration: 3, repeat: Infinity }}
-               className="flex items-center gap-3"
-            >
-               <div className="h-[1px] w-8 bg-blue-500/20" />
-               <h3 className="text-zinc-500 font-mono text-xs tracking-[0.3em] uppercase">
-                 Games of the Generals
-               </h3>
-               <div className="h-[1px] w-8 bg-blue-500/20" />
-            </motion.div>
+          {/* Brand/App Title */}
+          <motion.div
+            animate={{ opacity: [0.4, 0.8, 0.4] }}
+            transition={{ duration: 3, repeat: Infinity }}
+            className="flex items-center gap-3"
+          >
+            <div className="h-[1px] w-8 bg-amber-500/20" />
+            <h3 className="text-zinc-500 font-mono text-xs tracking-[0.3em] uppercase">
+              Games of the Generals
+            </h3>
+            <div className="h-[1px] w-8 bg-amber-500/20" />
+          </motion.div>
 
-            {/* Terminal Message Display */}
-            <div className="h-6 flex items-center justify-center font-mono">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={messageIndex}
-                  initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
-                  animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                  exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
-                  transition={{ duration: 0.5, ease: "easeOut" }}
-                  className="flex items-center gap-3 text-blue-400/90 text-[10px] sm:text-xs tracking-[0.15em] font-bold"
-                >
-                  <Terminal size={12} className="opacity-50" />
-                  <span>{loadingMessages[messageIndex]}</span>
-                  <motion.span
-                    animate={{ opacity: [1, 1, 0, 0] }}
-                    transition={{ 
-                      duration: 1, 
-                      repeat: Infinity, 
-                      times: [0, 0.5, 0.5, 1],
-                      ease: "linear" 
-                    }}
-                    className="w-[2px] h-3 bg-blue-500"
-                  />
-                </motion.div>
-              </AnimatePresence>
-            </div>
+          {/* Terminal Message Display */}
+          <div className="h-6 flex items-center justify-center font-mono">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={messageIndex}
+                initial={{ opacity: 0, y: 10, filter: "blur(4px)" }}
+                animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                exit={{ opacity: 0, y: -10, filter: "blur(4px)" }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                className="flex items-center gap-3 text-amber-400/90 text-[10px] sm:text-xs tracking-[0.15em] font-bold"
+              >
+                <Terminal size={12} className="opacity-50" />
+                <span>{loadingMessages[messageIndex]}</span>
+                <motion.span
+                  animate={{ opacity: [1, 1, 0, 0] }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    times: [0, 0.5, 0.5, 1],
+                    ease: "linear",
+                  }}
+                  className="w-[2px] h-3 bg-amber-500"
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-            {/* Tactical Icon Grid */}
-            <motion.div 
-               className="flex items-center gap-6 mt-4"
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               transition={{ delay: 1 }}
-            >
-               {[Activity, Cpu, Shield, Swords].map((Icon, i) => (
-                  <motion.div
-                     key={i}
-                     animate={{ 
-                        opacity: [0.1, 0.3, 0.1],
-                        scale: [1, 1.1, 1]
-                     }}
-                     transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
-                  >
-                     <Icon className="text-white w-4 h-4" />
-                  </motion.div>
-               ))}
-            </motion.div>
+          {/* Tactical Icon Grid */}
+          <motion.div
+            className="flex items-center gap-6 mt-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            {[Activity, Cpu, Shield, Swords].map((Icon, i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  opacity: [0.1, 0.3, 0.1],
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.4 }}
+              >
+                <Icon className="text-white w-4 h-4" />
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       </div>
 
@@ -266,10 +283,10 @@ export function LoadingSpinner({
             <motion.div
               key={i}
               className="absolute"
-              initial={{ 
-                x: Math.random() * 100 + "%", 
+              initial={{
+                x: Math.random() * 100 + "%",
                 y: Math.random() * 100 + "%",
-                rotate: Math.random() * 360
+                rotate: Math.random() * 360,
               }}
               animate={{
                 y: ["-10%", "110%"],
@@ -278,7 +295,7 @@ export function LoadingSpinner({
                 duration: 20 + i * 5,
                 repeat: Infinity,
                 ease: "linear",
-                delay: -i * 10
+                delay: -i * 10,
               }}
             >
               <Icon size={120} />

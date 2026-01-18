@@ -1,16 +1,13 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   darkMode: "class",
   theme: {
     extend: {
       fontFamily: {
-        'display': ['Playfair Display', 'serif'],
-        'body': ['Inter', 'sans-serif'],
-        'mono': ['JetBrains Mono', 'monospace'],
+        display: ["Playfair Display", "serif"],
+        body: ["Inter", "sans-serif"],
+        mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -48,19 +45,30 @@ export default {
         },
       },
       spacing: {
-        'section': '2rem',
-        'container': '1rem',
+        section: "2rem",
+        container: "1rem",
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
-        'container': '0.75rem',
+        container: "0.75rem",
+      },
+      keyframes: {
+        "spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        "spin-linear": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+      },
+      animation: {
+        "spin-slow": "spin-slow 8s linear infinite",
+        "spin-linear": "spin-linear 3s linear infinite",
       },
     },
   },
-  plugins: [
-    require("tailwindcss-animate"),
-    require("@tailwindcss/typography"),
-  ],
-}
+  plugins: [require("tailwindcss-animate"), require("@tailwindcss/typography")],
+};
