@@ -37,7 +37,7 @@ export function ReplayPage({ gameId }: ReplayPageProps) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-4 sm:p-6"
+      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-2 sm:p-6"
     >
       {/* Command Center Ambient Background */}
       <div className="fixed inset-0 pointer-events-none select-none -z-10 bg-black">

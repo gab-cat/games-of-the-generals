@@ -127,7 +127,7 @@ export function AchievementsPage() {
   );
 
   return (
-    <div className="min-h-screen py-8 px-4 sm:px-6 relative overflow-hidden">
+    <div className="min-h-screen py-8 px-2 sm:px-6 relative overflow-hidden">
       {/* Global decorative background */}
       <div className="fixed inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(0,0,0,0)_0%,#000000_100%)]" />
