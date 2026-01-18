@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Doc, Id } from "../../../convex/_generated/dataModel";
 import { lazy, Suspense } from "react";
+import { LoadingSpinner } from "@/components/LoadingSpinner";
 
 // Lazy load the heavy GameBoard component
 const GameBoard = lazy(() =>
@@ -27,13 +28,7 @@ export function GamePage({ profile, gameId }: GamePageProps) {
   }
 
   return (
-    <Suspense
-      fallback={
-        <div className="flex justify-center items-center min-h-[60vh] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800">
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-primary border-t-transparent"></div>
-        </div>
-      }
-    >
+    <Suspense fallback={<LoadingSpinner />}>
       <GameBoard
         gameId={gameId as Id<"games">}
         profile={profile}

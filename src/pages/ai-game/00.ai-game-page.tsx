@@ -362,7 +362,7 @@ export function AIGamePage() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-4 sm:p-6" // Added global padding and roundedness support via container
+      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-2 sm:p-6" // Added global padding and roundedness support via container
     >
       {/* Ambient Background */}
       <div className="fixed inset-0 pointer-events-none select-none">
@@ -398,7 +398,7 @@ export function AIGamePage() {
             </p>
           </motion.div>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 px-2 md:px-4 pb-12">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 px-1 md:px-4 pb-12">
           {/* LEFT COLUMN: Controls */}
           <div className="lg:col-span-8 space-y-12">
             {/* 1. THREAT LEVEL */}

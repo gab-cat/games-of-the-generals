@@ -130,7 +130,7 @@ const getGameModeBadge = (gameMode?: "classic" | "blitz" | "reveal") => {
         label: "Classic",
         icon: <Clock className="h-3 w-3" />,
         className:
-          "bg-blue-500/10 text-blue-400 border-blue-500/20 font-mono tracking-wider",
+          "bg-amber-500/10 text-amber-400 border-amber-500/20 font-mono tracking-wider",
       };
   }
 };
@@ -614,12 +614,27 @@ const GameBoard = memo(function GameBoard({
     }
   }, [game, optimisticBoard, pendingMove]);
 
+  // Disconnection grace period constant (2 minutes = 120 seconds)
+  const DISCONNECTION_GRACE_PERIOD_MS = 2 * 60 * 1000;
+
   // Memoized helper functions
   const formatTime = useCallback((seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   }, []);
+
+  // Calculate remaining time before forfeit for a disconnected player
+  const getDisconnectForfeitTime = useCallback(
+    (disconnectedAt: number | undefined): number | null => {
+      if (!disconnectedAt) return null;
+      const forfeitAt = disconnectedAt + DISCONNECTION_GRACE_PERIOD_MS;
+      const remainingMs = forfeitAt - currentTime;
+      const remainingSeconds = Math.max(0, Math.floor(remainingMs / 1000));
+      return remainingSeconds;
+    },
+    [currentTime],
+  );
 
   // Memoized timeout handlers
   const handlePlayer1Timeout = useCallback(() => {
@@ -1283,7 +1298,7 @@ const GameBoard = memo(function GameBoard({
           <motion.div
             animate={{ rotate: 360 }}
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="rounded-full h-12 w-12 border-4 border-blue-400 border-t-transparent"
+            className="rounded-full h-12 w-12 border-4 border-amber-400 border-t-transparent"
           />
           <p className="text-white/70 text-lg">Loading game...</p>
         </motion.div>
@@ -1356,7 +1371,7 @@ const GameBoard = memo(function GameBoard({
           >
             <div className="w-full max-w-lg relative">
               {/* Tactical Border */}
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 rounded-sm opacity-50 blur-sm" />
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 rounded-sm opacity-50 blur-sm" />
 
               <div className="relative bg-zinc-950 backdrop-blur-xl border border-white/10 rounded-sm overflow-hidden shadow-2xl">
                 {/* Header Bar */}
@@ -1378,10 +1393,10 @@ const GameBoard = memo(function GameBoard({
 
                   {/* Radar Animation */}
                   <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
-                    <div className="absolute inset-0 border border-blue-500/30 rounded-full" />
-                    <div className="absolute inset-2 border border-blue-500/20 rounded-full border-dashed animate-spin-slow" />
-                    <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(59,130,246,0.5)_360deg)] animate-spin-linear opacity-20" />
-                    <Users className="w-12 h-12 text-blue-400 relative z-10" />
+                    <div className="absolute inset-0 border border-amber-500/30 rounded-full" />
+                    <div className="absolute inset-2 border border-amber-500/20 rounded-full border-dashed animate-spin-slow" />
+                    <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(245,158,11,0.5)_360deg)] animate-spin-linear opacity-20" />
+                    <Users className="w-12 h-12 text-amber-400 relative z-10" />
 
                     {/* Pinging dots */}
                     <motion.div
@@ -1450,7 +1465,7 @@ const GameBoard = memo(function GameBoard({
                       }}
                       size="sm"
                       variant="ghost"
-                      className="text-xs font-mono text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                      className="text-xs font-mono text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
                     >
                       <Copy className="h-3 w-3 mr-2" />
                       COPY_ID
@@ -1460,7 +1475,7 @@ const GameBoard = memo(function GameBoard({
 
                 {/* Footer Progress */}
                 <motion.div
-                  className="h-1 bg-gradient-to-r from-transparent via-blue-500 to-transparent w-full opacity-50"
+                  className="h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent w-full opacity-50"
                   animate={{ x: ["-100%", "100%"] }}
                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                 />
@@ -1593,7 +1608,7 @@ const GameBoard = memo(function GameBoard({
                 <div className="flex items-center gap-2">
                   <Badge
                     variant="outline"
-                    className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-xs sm:text-xs font-mono tracking-wider px-3 py-1 rounded-sm"
+                    className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-xs sm:text-xs font-mono tracking-wider px-3 py-1 rounded-sm"
                   >
                     {availablePieces.length === 0
                       ? "All pieces placed - Swap Mode"
@@ -2072,7 +2087,7 @@ const GameBoard = memo(function GameBoard({
                         : "bg-gray-500/10 border border-gray-500/20"
                       : game.currentTurn === "player1" &&
                           game.status === "playing"
-                        ? "bg-blue-500/20 border border-blue-500/30 shadow-lg"
+                        ? "bg-amber-500/20 border border-amber-500/30 shadow-lg"
                         : "bg-transparent"
                   }`}
                 >
@@ -2085,7 +2100,7 @@ const GameBoard = memo(function GameBoard({
                     className={`border-2 ${
                       game.status === "finished" && game.winner === "player1"
                         ? "border-yellow-400"
-                        : "border-blue-500/50"
+                        : "border-amber-500/50"
                     }`}
                   />
                   <div className="flex-1 min-w-0">
@@ -2102,6 +2117,9 @@ const GameBoard = memo(function GameBoard({
                         const player1Presence = getPlayerPresence(
                           game.player1Username,
                         );
+                        const forfeitTimeRemaining = getDisconnectForfeitTime(
+                          game.player1DisconnectedAt,
+                        );
                         return player1Presence ? (
                           player1Presence.online ? (
                             <div
@@ -2111,11 +2129,24 @@ const GameBoard = memo(function GameBoard({
                           ) : (
                             <div
                               className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded-full border border-orange-400/50 bg-orange-400/10"
-                              title="Disconnected"
+                              title={
+                                forfeitTimeRemaining !== null
+                                  ? `Forfeit in ${formatTime(forfeitTimeRemaining)}`
+                                  : "Disconnected"
+                              }
                             >
                               <AlertTriangle className="w-3 h-3 text-orange-400" />
-                              <span className="text-xs text-orange-400 font-medium">
-                                Disconnected
+                              <span
+                                className={`text-xs font-medium font-mono ${
+                                  forfeitTimeRemaining !== null &&
+                                  forfeitTimeRemaining <= 30
+                                    ? "text-red-400"
+                                    : "text-orange-400"
+                                }`}
+                              >
+                                {forfeitTimeRemaining !== null
+                                  ? formatTime(forfeitTimeRemaining)
+                                  : "Disconnected"}
                               </span>
                             </div>
                           )
@@ -2185,6 +2216,9 @@ const GameBoard = memo(function GameBoard({
                         const player2Presence = getPlayerPresence(
                           game.player2Username,
                         );
+                        const forfeitTimeRemaining = getDisconnectForfeitTime(
+                          game.player2DisconnectedAt,
+                        );
                         return player2Presence ? (
                           player2Presence.online ? (
                             <div
@@ -2194,11 +2228,24 @@ const GameBoard = memo(function GameBoard({
                           ) : (
                             <div
                               className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded-full border border-orange-400/50 bg-orange-400/10"
-                              title="Disconnected"
+                              title={
+                                forfeitTimeRemaining !== null
+                                  ? `Forfeit in ${formatTime(forfeitTimeRemaining)}`
+                                  : "Disconnected"
+                              }
                             >
                               <AlertTriangle className="w-3 h-3 text-orange-400" />
-                              <span className="text-xs text-orange-400 font-medium">
-                                Disconnected
+                              <span
+                                className={`text-xs font-medium font-mono ${
+                                  forfeitTimeRemaining !== null &&
+                                  forfeitTimeRemaining <= 30
+                                    ? "text-red-400"
+                                    : "text-orange-400"
+                                }`}
+                              >
+                                {forfeitTimeRemaining !== null
+                                  ? formatTime(forfeitTimeRemaining)
+                                  : "Disconnected"}
                               </span>
                             </div>
                           )
@@ -2433,12 +2480,12 @@ const GameBoard = memo(function GameBoard({
                           transition={{ delay: index * 0.05 }}
                           className={`flex items-center gap-3 p-2 rounded-lg border ${
                             isPlayer1
-                              ? "bg-blue-500/10 border-blue-500/30"
+                              ? "bg-amber-500/10 border border-amber-500/30"
                               : "bg-red-500/10 border-red-500/30"
                           }`}
                         >
                           <div
-                            className={`flex-shrink-0 ${isPlayer1 ? "text-blue-400" : "text-red-400"}`}
+                            className={`flex-shrink-0 ${isPlayer1 ? "text-amber-400" : "text-red-400"}`}
                           >
                             {getPieceDisplay(eliminated.piece, {
                               size: "small",
