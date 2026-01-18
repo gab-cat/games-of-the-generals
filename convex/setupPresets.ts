@@ -1,6 +1,7 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { Doc } from "./_generated/dataModel";
 
 // Initial piece setup for each player (21 pieces total)
 const INITIAL_PIECES = [
@@ -20,6 +21,9 @@ const INITIAL_PIECES = [
   "4 Star General",
   "5 Star General"
 ];
+
+// Maximum number of presets to fetch for checking limits (to avoid unbounded queries)
+const MAX_PRESETS_CHECK_LIMIT = 1000;
 
 // Default preset formations - these are standard presets available to all users
 const DEFAULT_PRESETS = [
@@ -242,15 +246,54 @@ export const saveSetupPreset = mutation({
       throw new Error("Invalid number of pieces");
     }
 
-    // Check if user already has 5 custom presets (limit)
-    // OPTIMIZED: Added limit to prevent excessive document scanning
+    // Check subscription tier and limits
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    const tier = subscription?.tier || "free";
+    const status = subscription?.status || "active";
+    const expiresAt = subscription?.expiresAt || null;
+    const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+    // Check if subscription is active (not expired beyond grace period)
+    const now = Date.now();
+    let isActive = true;
+    if (expiresAt && status !== "canceled") {
+      if (status === "expired" || (expiresAt < now && gracePeriodEndsAt && gracePeriodEndsAt < now)) {
+        isActive = false;
+      } else if (status === "grace_period" && gracePeriodEndsAt && gracePeriodEndsAt > now) {
+        isActive = true; // Still in grace period
+      } else if (expiresAt > now) {
+        isActive = true;
+      } else if (expiresAt < now && !gracePeriodEndsAt) {
+        // Expired with no grace period defined
+        isActive = false;
+      }
+    }
+
+    // Get preset limits based on tier
+    const limits: Record<string, number> = {
+      free: 2,
+      pro: Infinity,
+      pro_plus: Infinity,
+    };
+    const limit = limits[tier] || 2;
+
+    // Check if user can create more presets
     const userCustomPresets = await ctx.db
       .query("setupPresets")
       .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(10); // Reasonable limit - checking limit
+      .take(limit === Infinity ? MAX_PRESETS_CHECK_LIMIT : limit + 1); // Reasonable limit for checking
 
-    if (userCustomPresets.length >= 5) {
-      throw new Error("Maximum of 5 custom presets allowed. Please delete one first.");
+    if (!isActive && tier !== "free") {
+      throw new Error("Your subscription has expired. Please renew to create more custom presets.");
+    }
+
+    if (limit !== Infinity && userCustomPresets.length >= limit) {
+      const tierName = tier === "free" ? "Free" : tier === "pro" ? "Pro" : "Pro+";
+      throw new Error(`Maximum of ${limit} custom presets allowed for ${tierName} tier. ${tier === "free" ? "Upgrade to Pro for unlimited presets." : "Please delete one first."}`);
     }
 
     // Check if name already exists
@@ -466,7 +509,7 @@ export const updateSetupPreset = mutation({
       throw new Error("Not authorized to update this preset");
     }
 
-    const updates: any = {};
+    const updates: Partial<Doc<"setupPresets">> = {};
 
     if (args.name && args.name !== preset.name) {
       // Check if new name already exists

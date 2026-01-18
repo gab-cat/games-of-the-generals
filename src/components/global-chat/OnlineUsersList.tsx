@@ -5,6 +5,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Crown, Shield, Star, Zap, Target, X, GamepadIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
+import { UserNameWithBadge } from "../UserNameWithBadge";
 import { Button } from "../ui/button";
 import { useAutoAnimate } from "../../lib/useAutoAnimate";
 import { Id } from "../../../convex/_generated/dataModel";
@@ -19,6 +20,10 @@ interface OnlineUser {
   gameId?: Id<"games">;
   lobbyId?: Id<"lobbies">;
   aiGameId?: Id<"aiGameSessions">;
+  tier: "free" | "pro" | "pro_plus";
+  isDonor: boolean;
+  avatarFrame?: string;
+  usernameColor?: string;
 }
 
 interface OnlineUsersListProps {
@@ -146,18 +151,25 @@ export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
                     avatarUrl={user.avatarUrl}
                     rank={user.rank}
                     size="xs"
-                    className="ring-1 ring-white/20 flex-shrink-0"
+                    frame={user.avatarFrame}
+                    className="flex-shrink-0"
                   />
 
                   {/* User Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1 justify-between">
                       <div className="flex gap-1 flex-col">
-                        <div className="text-left flex items-center gap-1">
-                          <span className="text-white/90 text-sm font-medium truncate">
-                            {user.username}
-                          </span>
-                          <RankIcon className={cn("w-3 h-3 flex-shrink-0", rankColor)} />
+                        <div className="text-left flex items-center gap-1 min-w-0">
+                          <UserNameWithBadge
+                            username={user.username!}
+                            tier={user.tier}
+                            isDonor={user.isDonor}
+                            usernameColor={user.usernameColor}
+                            size="sm"
+                            showBadges={true}
+                            className="max-w-[120px]"
+                          />
+                          <RankIcon className={cn("w-3 h-3 flex-shrink-0 opacity-70", rankColor)} />
                         </div>
                         <div className="text-white/50 text-[0.65rem] truncate  -mt-1 font-light">
                           {getActivityText(user)}

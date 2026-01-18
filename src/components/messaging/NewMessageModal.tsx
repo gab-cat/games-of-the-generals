@@ -21,6 +21,7 @@ interface SearchResult {
   username: string;
   avatarUrl?: string;
   rank?: string;
+  avatarFrame?: string;
 }
 
 export function NewMessageModal({ isOpen, onClose, onSelectUser, inviteLobbyId }: NewMessageModalProps) {
@@ -145,6 +146,7 @@ export function NewMessageModal({ isOpen, onClose, onSelectUser, inviteLobbyId }
                           username={user.username}
                           avatarUrl={user.avatarUrl}
                           size="md"
+                          frame={user.avatarFrame}
                           className="ring-1 ring-white/20"
                         />
                         <div className="flex-1 min-w-0">

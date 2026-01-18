@@ -23,10 +23,10 @@ export function MessageButton({ unreadCount, isActive, onClick, className }: Mes
         size="sm"
         onClick={onClick}
         className={cn(
-          "relative rounded-full py-5 px-6 transition-all duration-200",
+          "relative rounded-full w-9 h-9 p-0 flex items-center justify-center transition-all duration-200",
           isActive 
             ? "bg-gray-400/50 hover:bg-gray-100 text-white shadow-lg" 
-            : "bg-white/10 hover:bg-white/20 text-white/90 border border-white/20"
+            : "bg-white/5 hover:bg-white/10 text-white/90 border border-white/10"
         )}
       >
         <MessageCircle className="w-5 h-5" />

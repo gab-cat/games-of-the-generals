@@ -1,5 +1,14 @@
 import { useState, useEffect, type ReactNode } from "react";
-import { Search, Plus, ArrowLeft, ExternalLink, Users, MessageCircle, MessageSquareText, Bell } from "lucide-react";
+import {
+  Search,
+  Plus,
+  ArrowLeft,
+  ExternalLink,
+  Users,
+  MessageCircle,
+  MessageSquareText,
+  Bell,
+} from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
@@ -8,20 +17,22 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Badge } from "../ui/badge";
 import { UserAvatar } from "../UserAvatar";
+import { UserNameWithBadge } from "../UserNameWithBadge";
 import { cn } from "../../lib/utils";
 import { ConversationView } from "./ConversationView";
 import { toast } from "sonner";
 import { useDebounce } from "use-debounce";
-import { subscribeUserToPush, serializeSubscription } from "../../lib/push-client";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "../ui/sheet";
+  subscribeUserToPush,
+  serializeSubscription,
+} from "../../lib/push-client";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { useOnlineUsers } from "../../lib/useOnlineUsers";
-import { getStatusForUsername, getStatusIndicatorNode } from "../../lib/getIndicator";
+import {
+  getStatusForUsername,
+  getStatusIndicatorNode,
+} from "../../lib/getIndicator";
 
 interface MessagingPanelProps {
   isOpen: boolean;
@@ -45,19 +56,32 @@ interface SearchResult {
   username: string;
   avatarUrl?: string;
   rank?: string;
+  avatarFrame?: string;
+  usernameColor?: string;
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
 }
 
-function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isSubscribing, onEnablePush, getOnlineStatusIndicator }: NewMessageViewProps) {
+function NewMessageView({
+  inviteLobbyId,
+  onSelectUser,
+  shouldShowEnablePush,
+  isSubscribing,
+  onEnablePush,
+  getOnlineStatusIndicator,
+}: NewMessageViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
-  
+
   // Using online indicators from parent; logging handled at root
 
   // Helper function now comes from parent via props
 
   const { data: searchResults = [], isLoading: searchLoading } = useConvexQuery(
     api.messages.searchUsers,
-    debouncedSearchTerm.length >= 2 ? { searchTerm: debouncedSearchTerm } : "skip"
+    debouncedSearchTerm.length >= 2
+      ? { searchTerm: debouncedSearchTerm }
+      : "skip",
   );
 
   const { data: recentConversationsData } = useConvexQueryWithOptions(
@@ -66,7 +90,7 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
     {
       staleTime: 60000, // 1 minute - conversations update moderately frequently
       gcTime: 300000, // 5 minutes cache
-    }
+    },
   );
 
   // Extract conversations from paginated response
@@ -87,7 +111,11 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
           <Input
-            placeholder={inviteLobbyId ? "Search for player to invite..." : "Search by username..."}
+            placeholder={
+              inviteLobbyId
+                ? "Search for player to invite..."
+                : "Search by username..."
+            }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
@@ -118,17 +146,25 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
             {recentConversations.length > 0 && (
               <div className="space-y-2">
                 <div className="px-4 py-2">
-                  <h3 className="text-sm font-medium text-white/80">Recent Conversations</h3>
+                  <h3 className="text-sm font-medium text-white/80">
+                    Recent Conversations
+                  </h3>
                 </div>
                 <div className="space-y-1 px-2">
                   {recentConversations.map((conversation: any) => (
                     <div
                       key={conversation._id}
-                      onClick={() => handleSelectUser(conversation.otherParticipant.id, conversation.otherParticipant.username)}
+                      onClick={() =>
+                        handleSelectUser(
+                          conversation.otherParticipant.id,
+                          conversation.otherParticipant.username,
+                        )
+                      }
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
                     >
                       <div className="relative">
-                        {conversation.otherParticipant.username === "Notifications" ? (
+                        {conversation.otherParticipant.username ===
+                        "Notifications" ? (
                           <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
                             <Bell className="w-5 h-5 text-white" />
                           </div>
@@ -137,20 +173,32 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                             username={conversation.otherParticipant.username}
                             avatarUrl={conversation.otherParticipant.avatarUrl}
                             size="md"
-                            className="ring-1 ring-white/20"
+                            frame={conversation.otherParticipant.avatarFrame}
                           />
                         )}
                         {/* Online status indicator - hide for Notifications */}
-                        {conversation.otherParticipant.username !== "Notifications" && getOnlineStatusIndicator(conversation.otherParticipant.username) && (
-                          <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
-                            {getOnlineStatusIndicator(conversation.otherParticipant.username)}
-                          </div>
-                        )}
+                        {conversation.otherParticipant.username !==
+                          "Notifications" &&
+                          getOnlineStatusIndicator(
+                            conversation.otherParticipant.username,
+                          ) && (
+                            <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                              {getOnlineStatusIndicator(
+                                conversation.otherParticipant.username,
+                              )}
+                            </div>
+                          )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-white truncate">
-                          {conversation.otherParticipant.username}
-                        </h3>
+                        <UserNameWithBadge
+                          username={conversation.otherParticipant.username}
+                          tier={conversation.otherParticipant.tier}
+                          isDonor={conversation.otherParticipant.isDonor}
+                          usernameColor={
+                            conversation.otherParticipant.usernameColor
+                          }
+                          size="sm"
+                        />
                         {conversation.otherParticipant.rank && (
                           <p className="text-sm text-white/60">
                             {conversation.otherParticipant.rank}
@@ -165,14 +213,15 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                 </div>
               </div>
             )}
-            
+
             {/* Search Instructions */}
             <div className="flex items-center justify-center py-8">
               <div className="text-center">
                 <MessageCircle className="w-12 h-12 text-white/40 mx-auto mb-4" />
                 <p className="text-white/60 mb-2">Search for more players</p>
                 <p className="text-sm text-white/40">
-                  Type at least 2 characters to search for players to {inviteLobbyId ? "invite" : "message"}
+                  Type at least 2 characters to search for players to{" "}
+                  {inviteLobbyId ? "invite" : "message"}
                 </p>
               </div>
             </div>
@@ -182,9 +231,7 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
             <div className="text-center">
               <Search className="w-12 h-12 text-white/40 mx-auto mb-4" />
               <p className="text-white/60 mb-2">No players found</p>
-              <p className="text-sm text-white/40">
-                Try a different username
-              </p>
+              <p className="text-sm text-white/40">Try a different username</p>
             </div>
           </div>
         ) : (
@@ -200,7 +247,7 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                     username={user.username}
                     avatarUrl={user.avatarUrl}
                     size="md"
-                    className="ring-1 ring-white/20"
+                    frame={user.avatarFrame}
                   />
                   {/* Online status indicator */}
                   {getOnlineStatusIndicator(user.username) && (
@@ -210,13 +257,15 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-medium text-white truncate">
-                    {user.username}
-                  </h3>
+                  <UserNameWithBadge
+                    username={user.username}
+                    tier={user.tier}
+                    isDonor={user.isDonor}
+                    usernameColor={user.usernameColor}
+                    size="sm"
+                  />
                   {user.rank && (
-                    <p className="text-sm text-white/60">
-                      {user.rank}
-                    </p>
+                    <p className="text-sm text-white/60">{user.rank}</p>
                   )}
                 </div>
                 <div className="text-xs text-white/40">
@@ -231,15 +280,17 @@ function NewMessageView({ inviteLobbyId, onSelectUser, shouldShowEnablePush, isS
   );
 }
 
-export function MessagingPanel({ 
-  isOpen, 
-  onClose, 
+export function MessagingPanel({
+  isOpen,
+  onClose,
   onNavigateToLobby,
   onNavigateToGame,
-  inviteLobbyId 
+  inviteLobbyId,
 }: MessagingPanelProps) {
   const { isAuthenticated } = useConvexAuth();
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<
+    string | null
+  >(null);
   const [showNewMessage, setShowNewMessage] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -248,16 +299,16 @@ export function MessagingPanel({
   const [isMobile, setIsMobile] = useState(false);
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
   const [hasLocalSubscription, setHasLocalSubscription] = useState(false);
-  
+
   // Get online users data at root
   const { onlineUsers } = useOnlineUsers();
-  
+
   // Shared helper at root used by both list and NewMessageView
   const getOnlineStatusIndicator = (username: string) => {
     const status = getStatusForUsername(onlineUsers, username);
     return getStatusIndicatorNode(status);
   };
-  
+
   // Debounce search term to avoid too many queries
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
 
@@ -281,17 +332,20 @@ export function MessagingPanel({
     }
   }, [inviteLobbyId, isOpen]);
 
-  const { data: conversationsData, isLoading: conversationsLoading } = useConvexQueryWithOptions(
-    api.messages.getConversations,
-    {},
-    {
-      staleTime: 30000, // 30 seconds - conversations need moderate freshness
-      gcTime: 300000, // 5 minutes cache
-    }
-  );
+  const { data: conversationsData, isLoading: conversationsLoading } =
+    useConvexQueryWithOptions(
+      api.messages.getConversations,
+      {},
+      {
+        staleTime: 30000, // 30 seconds - conversations need moderate freshness
+        gcTime: 300000, // 5 minutes cache
+      },
+    );
 
   // Extract conversations from paginated response
-  const conversations = Array.isArray(conversationsData) ? conversationsData : conversationsData?.page || [];
+  const conversations = Array.isArray(conversationsData)
+    ? conversationsData
+    : conversationsData?.page || [];
 
   const { data: unreadCount = 0 } = useConvexQueryWithOptions(
     api.messages.getUnreadCount,
@@ -299,17 +353,17 @@ export function MessagingPanel({
     {
       staleTime: 10000, // 10 seconds - unread count should be fresh
       gcTime: 60000, // 1 minute cache
-    }
+    },
   );
 
   const { data: existingSubs } = useConvexQuery(
     api.push.getSubscriptionsForCurrentUser,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
 
   const { data: currentProfile } = useConvexQuery(
     api.profiles.getCurrentProfile,
-    isAuthenticated ? {} : "skip"
+    isAuthenticated ? {} : "skip",
   );
 
   const saveSubscription = useMutation(api.push.saveSubscription);
@@ -318,13 +372,15 @@ export function MessagingPanel({
 
   // Filter conversations based on debounced search term
   const filteredConversations = conversations.filter((conv: any) =>
-    conv.otherParticipant.username.toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+    conv.otherParticipant.username
+      .toLowerCase()
+      .includes(debouncedSearchTerm.toLowerCase()),
   );
 
   const formatTime = (timestamp: number) => {
     const now = Date.now();
     const diff = now - timestamp;
-    
+
     if (diff < 60000) return "now";
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
@@ -367,12 +423,14 @@ export function MessagingPanel({
   }, [isOpen]);
 
   const isLocalEndpointSaved = Boolean(
-    localEndpoint && existingSubs?.some((s: any) => s.endpoint === localEndpoint)
+    localEndpoint &&
+      existingSubs?.some((s: any) => s.endpoint === localEndpoint),
   );
 
-  const supportsPush = typeof window !== "undefined"
-    && "Notification" in window
-    && "serviceWorker" in navigator;
+  const supportsPush =
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    "serviceWorker" in navigator;
 
   const [shouldShowEnablePush, setShouldShowEnablePush] = useState(false);
 
@@ -393,7 +451,9 @@ export function MessagingPanel({
         const reg = await navigator.serviceWorker.getRegistration();
         const existing = await reg?.pushManager.getSubscription();
         if (existing) {
-          await saveSubscription({ subscription: serializeSubscription(existing) });
+          await saveSubscription({
+            subscription: serializeSubscription(existing),
+          });
           toast.success("Push notifications enabled on this device");
           setShouldShowEnablePush(false);
           return;
@@ -423,23 +483,28 @@ export function MessagingPanel({
   const handleUserSelect = (userId: string, username?: string) => {
     if (inviteLobbyId) {
       // Handle lobby invite - we need to get the username first
-      const conversation = conversations.find((c: any) => c.otherParticipant.id === userId);
-      const recipientUsername = username || conversation?.otherParticipant.username;
-      
+      const conversation = conversations.find(
+        (c: any) => c.otherParticipant.id === userId,
+      );
+      const recipientUsername =
+        username || conversation?.otherParticipant.username;
+
       if (recipientUsername) {
         sendMessage({
           recipientUsername,
           content: `Join my lobby!`,
           messageType: "lobby_invite",
           lobbyId: inviteLobbyId as Id<"lobbies">,
-        }).then(() => {
-          toast.success("Lobby invite sent!");
-          setShowNewMessage(false);
-          onClose(); // Close the messaging panel after sending invite
-        }).catch((error: any) => {
-          console.error("Failed to send lobby invite:", error);
-          toast.error("Failed to send lobby invite");
-        });
+        })
+          .then(() => {
+            toast.success("Lobby invite sent!");
+            setShowNewMessage(false);
+            onClose(); // Close the messaging panel after sending invite
+          })
+          .catch((error: any) => {
+            console.error("Failed to send lobby invite:", error);
+            toast.error("Failed to send lobby invite");
+          });
       }
     } else {
       // For regular messages, open the conversation
@@ -455,16 +520,18 @@ export function MessagingPanel({
 
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={onClose} >
+      <Sheet open={isOpen} onOpenChange={onClose}>
         <SheetContent
           side="right"
           className="w-full max-w-md p-0 focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none bg-gray-700/20 backdrop-blur-xl border-white/20 text-white"
           tabIndex={-1}
         >
-          <SheetHeader className={cn(
-            "p-4 border-b border-white/20 bg-gray-900/40",
-            selectedConversation && "hidden" // Hide header when in conversation view
-          )}>
+          <SheetHeader
+            className={cn(
+              "p-4 border-b border-white/20 bg-gray-900/40",
+              selectedConversation && "hidden", // Hide header when in conversation view
+            )}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <MessageSquareText className="w-6 h-6 text-white/80" />
@@ -482,12 +549,15 @@ export function MessagingPanel({
                   {showNewMessage ? "New Message" : "Messages"}
                 </SheetTitle>
                 {!showNewMessage && unreadCount > 0 && (
-                  <Badge variant="destructive" className="bg-red-500 text-white rounded-full">
+                  <Badge
+                    variant="destructive"
+                    className="bg-red-500 text-white rounded-full"
+                  >
                     {unreadCount}
                   </Badge>
                 )}
               </div>
-              
+
               <div className="flex items-center mr-8 gap-1">
                 {!showNewMessage && (
                   <Button
@@ -505,10 +575,12 @@ export function MessagingPanel({
           </SheetHeader>
 
           {/* Content */}
-          <div className={cn(
-            "flex-1 overflow-hidden",
-            selectedConversation ? "h-full" : "h-[calc(100vh-80px)]"
-          )}>
+          <div
+            className={cn(
+              "flex-1 overflow-hidden",
+              selectedConversation ? "h-full" : "h-[calc(100vh-80px)]",
+            )}
+          >
             {selectedConversation ? (
               <ConversationView
                 otherUserId={selectedConversation}
@@ -555,7 +627,10 @@ export function MessagingPanel({
                   {conversationsLoading ? (
                     <div className="p-4 space-y-3">
                       {[...Array(5)].map((_, i) => (
-                        <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-white/5 animate-pulse">
+                        <div
+                          key={i}
+                          className="flex items-center gap-3 p-3 rounded-lg bg-white/5 animate-pulse"
+                        >
                           <div className="w-12 h-12 rounded-full bg-white/10" />
                           <div className="flex-1 space-y-2">
                             <div className="h-4 bg-white/10 rounded w-24" />
@@ -569,10 +644,14 @@ export function MessagingPanel({
                       <div className="text-center">
                         <MessageCircle className="w-12 h-12 text-white/40 mx-auto mb-4" />
                         <p className="text-white/60 mb-2">
-                          {debouncedSearchTerm ? "No conversations found" : "No messages yet"}
+                          {debouncedSearchTerm
+                            ? "No conversations found"
+                            : "No messages yet"}
                         </p>
                         <p className="text-sm text-white/40 mb-4">
-                          {debouncedSearchTerm ? "Try a different search term" : "Start a conversation with other players"}
+                          {debouncedSearchTerm
+                            ? "Try a different search term"
+                            : "Start a conversation with other players"}
                         </p>
                         {!debouncedSearchTerm && (
                           <Button
@@ -590,78 +669,116 @@ export function MessagingPanel({
                       {filteredConversations.map((conversation: any) => (
                         <div
                           key={conversation._id}
-                          onClick={() => setSelectedConversation(conversation.otherParticipant.id)}
+                          onClick={() =>
+                            setSelectedConversation(
+                              conversation.otherParticipant.id,
+                            )
+                          }
                           className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
                         >
                           <div className="relative">
-                            {conversation.otherParticipant.username === "Notifications" ? (
+                            {conversation.otherParticipant.username ===
+                            "Notifications" ? (
                               <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
                                 <Bell className="w-5 h-5 text-white" />
                               </div>
                             ) : (
                               <UserAvatar
-                                username={conversation.otherParticipant.username}
-                                avatarUrl={conversation.otherParticipant.avatarUrl}
+                                username={
+                                  conversation.otherParticipant.username
+                                }
+                                avatarUrl={
+                                  conversation.otherParticipant.avatarUrl
+                                }
                                 size="md"
-                                className="ring-1 ring-white/20"
+                                frame={
+                                  conversation.otherParticipant.avatarFrame
+                                }
                               />
                             )}
                             {/* Online status indicator - hide for Notifications */}
-                            {conversation.otherParticipant.username !== "Notifications" && getOnlineStatusIndicator(conversation.otherParticipant.username) && (
-                              <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
-                                {getOnlineStatusIndicator(conversation.otherParticipant.username)}
-                              </div>
-                            )}
+                            {conversation.otherParticipant.username !==
+                              "Notifications" &&
+                              getOnlineStatusIndicator(
+                                conversation.otherParticipant.username,
+                              ) && (
+                                <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                                  {getOnlineStatusIndicator(
+                                    conversation.otherParticipant.username,
+                                  )}
+                                </div>
+                              )}
                           </div>
-                          
+
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <h3 className={cn(
-                                "font-normal truncate text-sm",
-                                conversation.unreadCount > 0 ? "text-white font-medium" : "text-white/80"
-                              )}>
-                                {conversation.otherParticipant.username}
-                              </h3>
+                              <UserNameWithBadge
+                                username={
+                                  conversation.otherParticipant.username
+                                }
+                                tier={conversation.otherParticipant.tier}
+                                isDonor={conversation.otherParticipant.isDonor}
+                                usernameColor={
+                                  conversation.otherParticipant.usernameColor
+                                }
+                                size="sm"
+                                className={cn(
+                                  conversation.unreadCount > 0 && "font-medium",
+                                )}
+                              />
                               <span className="text-xs text-white/50 flex-shrink-0">
                                 {formatTime(conversation.lastMessageAt)}
                               </span>
                             </div>
-                            
+
                             <div className="flex items-center gap-2">
-                              <p className={cn(
-                                "text-xs truncate flex-1",
-                                conversation.unreadCount > 0 ? "text-white/90" : "text-white/60"
-                              )}>
+                              <p
+                                className={cn(
+                                  "text-xs truncate flex-1",
+                                  conversation.unreadCount > 0
+                                    ? "text-white/90"
+                                    : "text-white/60",
+                                )}
+                              >
                                 {conversation.lastMessage ? (
                                   <>
-                                    {conversation.lastMessage.messageType === "lobby_invite" && (
+                                    {conversation.lastMessage.messageType ===
+                                      "lobby_invite" && (
                                       <span className="inline-flex items-center gap-1">
                                         <Users className="w-3 h-3" />
                                         Lobby invite:
                                       </span>
                                     )}
-                                    {conversation.lastMessage.messageType === "game_invite" && (
+                                    {conversation.lastMessage.messageType ===
+                                      "game_invite" && (
                                       <span className="inline-flex items-center gap-1">
                                         <ExternalLink className="w-3 h-3" />
                                         Game invite:
                                       </span>
                                     )}
-                                    {currentProfile && conversation.lastMessage.senderId === currentProfile.userId && conversation.otherParticipant.username !== "Notifications"
+                                    {currentProfile &&
+                                    conversation.lastMessage.senderId ===
+                                      currentProfile.userId &&
+                                    conversation.otherParticipant.username !==
+                                      "Notifications"
                                       ? `You: ${truncateMessage(conversation.lastMessage.content)}`
-                                      : truncateMessage(conversation.lastMessage.content)
-                                    }
+                                      : truncateMessage(
+                                          conversation.lastMessage.content,
+                                        )}
                                   </>
                                 ) : (
                                   "No messages yet"
                                 )}
                               </p>
-                              
+
                               {conversation.unreadCount > 0 && (
-                                <Badge 
-                                  variant="default" 
+                                <Badge
+                                  variant="default"
                                   className="bg-red-500 border-none rounded-full text-white min-w-[20px] h-5 text-xs flex items-center justify-center"
                                 >
-                                  {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
+                                  {conversation.unreadCount > 9
+                                    ? "9+"
+                                    : conversation.unreadCount}
                                 </Badge>
                               )}
                             </div>

@@ -1,36 +1,36 @@
-import { motion } from "framer-motion";
 import { Camera } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { AvatarUpload } from "./AvatarUpload";
+import { SettingsCard } from "./components/SettingsCard";
 
 interface AvatarSectionProps {
   username: string;
   currentAvatarUrl?: string;
   rank: string;
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
 }
 
-export function AvatarSection({ username, currentAvatarUrl, rank }: AvatarSectionProps) {
+export function AvatarSection({
+  username,
+  currentAvatarUrl,
+  rank,
+  tier,
+  isDonor,
+}: AvatarSectionProps) {
   return (
-    <motion.div
-      initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ delay: 0.1 }}
+    <SettingsCard
+      title="Identity Matrix"
+      description="Update your visual identification protocol."
+      icon={<Camera className="w-5 h-5" />}
+      delay={0.1}
     >
-      <Card className="rounded-xl border border-white/10 bg-black/30">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Camera className="w-5 h-5" />
-            Avatar
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AvatarUpload 
-            username={username}
-            currentAvatarUrl={currentAvatarUrl}
-            rank={rank}
-          />
-        </CardContent>
-      </Card>
-    </motion.div>
+      <AvatarUpload
+        username={username}
+        currentAvatarUrl={currentAvatarUrl}
+        rank={rank}
+        tier={tier}
+        isDonor={isDonor}
+      />
+    </SettingsCard>
   );
 }

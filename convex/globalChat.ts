@@ -4,6 +4,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { profanity, CensorType } from "@2toad/profanity";
 import { api, internal } from "./_generated/api";
+import { isSubscriptionActive } from "./featureGating";
 
 
 // Type for online user data from presence system
@@ -90,12 +91,20 @@ function formatRemainingTime(remainingMs: number): string {
 
 
 // Handle chat commands
-async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userId: Id<"users">, profile: Doc<"profiles">): Promise<any> {
+async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userId: Id<"users">, profile: Doc<"profiles">): Promise<{
+  commandResponse?: string;
+  isSystemMessage?: boolean;
+  success: boolean;
+  formattedMessage?: string;
+  isRoleplay?: boolean;
+}> {
   const message = args.message.trim();
 
   // Check if message is a command (starts with /)
   if (!message.startsWith('/')) {
-    return null; // Not a command, handle as regular message
+    return {
+      success: false,
+    }; // Not a command, handle as regular message
   }
 
   const commandParts = message.split(' ');
@@ -120,7 +129,7 @@ async function handleChatCommand(ctx: QueryCtx, args: { message: string }, userI
     case '/rules': {
       const activeRules = await ctx.db
         .query("chatRules")
-        .withIndex("by_active", (q: any) => q.eq("isActive", true))
+        .withIndex("by_active", (q) => q.eq("isActive", true))
         .unique();
 
       if (activeRules) {
@@ -262,8 +271,29 @@ export const sendMessage = mutation({
         return { success: false, message: "Message cannot be empty" };
       }
 
-      if (trimmedMessage.length > 500) {
-        return { success: false, message: "Message must be 500 characters or less" };
+      // Check subscription for message length limit
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
+
+      // Message length limits: Free (500), Pro/Pro+ (1000)
+      const maxLength = (tier === "pro" || tier === "pro_plus") && isActive ? 1000 : 500;
+      if (trimmedMessage.length > maxLength) {
+        if (tier === "free") {
+          return { success: false, message: `Message must be 500 characters or less. Upgrade to Pro for longer messages (up to 1000 characters).` };
+        } else if (!isActive) {
+          return { success: false, message: `Your subscription has expired. Message limit is now 500 characters. Renew to restore extended messages.` };
+        }
+        return { success: false, message: `Message must be ${maxLength} characters or less` };
       }
 
       // Handle commands first
@@ -279,7 +309,7 @@ export const sendMessage = mutation({
         }
         // If it's a /me command, replace the original message with the formatted one
         if (commandResult.isRoleplay) {
-          args.message = commandResult.formattedMessage;
+          args.message = commandResult.formattedMessage ?? '';
         }
       }
 
@@ -415,8 +445,8 @@ export const getMessages = query({
       };
     }
 
-    // Batch fetch all user settings and profiles in parallel
-    const [userSettings, userProfiles] = await Promise.all([
+    // Batch fetch all user settings, profiles, and subscriptions in parallel
+    const [userSettings, userProfiles, userSubscriptions] = await Promise.all([
       Promise.all(
         userIds.map(id =>
           ctx.db
@@ -429,6 +459,14 @@ export const getMessages = query({
         userIds.map(id =>
           ctx.db
             .query("profiles")
+            .withIndex("by_user", (q) => q.eq("userId", id))
+            .unique()
+        )
+      ),
+      Promise.all(
+        userIds.map(id =>
+          ctx.db
+            .query("subscriptions")
             .withIndex("by_user", (q) => q.eq("userId", id))
             .unique()
         )
@@ -450,12 +488,27 @@ export const getMessages = query({
       }
     });
 
+    const subscriptionsMap = new Map();
+    userSubscriptions.forEach(sub => {
+      if (sub) {
+        subscriptionsMap.set(sub.userId, sub);
+      }
+    });
+
     // Enhance messages with batched user data
-    const enhancedMessages = messages.map(message => ({
-      ...message,
-      usernameColor: message.userId ? settingsMap.get(message.userId)?.usernameColor : undefined,
-      adminRole: message.userId ? profilesMap.get(message.userId)?.adminRole : undefined,
-    }));
+    const enhancedMessages = messages.map(message => {
+      const profile = message.userId ? profilesMap.get(message.userId) : undefined;
+      const sub = message.userId ? subscriptionsMap.get(message.userId) : undefined;
+      const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
+
+      return {
+        ...message,
+        usernameColor: message.userId ? settingsMap.get(message.userId)?.usernameColor : undefined,
+        adminRole: profile?.adminRole,
+        tier: isActive ? (sub?.tier || "free") : "free",
+        isDonor: profile?.isDonor || false,
+      };
+    });
 
     return {
       messages: enhancedMessages,
@@ -493,6 +546,31 @@ export const updateChatSettings = mutation({
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
+
+    // Check subscription for custom username color
+    if (args.usernameColor) {
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
+
+      // Custom username colors are Pro/Pro+ only
+      if (tier === "free") {
+        throw new Error("Custom username colors are only available for Pro and Pro+ subscribers. Upgrade to unlock this feature.");
+      }
+
+      if (!isActive) {
+        throw new Error("Your subscription has expired. Please renew to use custom username colors.");
+      }
+    }
 
     // Process username color - adjust for readability if provided
     let processedColor = args.usernameColor;
@@ -595,10 +673,34 @@ export const getAllUsernames = query({
       .query("profiles")
       .take(1000); // Reduced limit - enough for mention autocomplete
 
-    return profiles.map(profile => ({
-      userId: profile.userId,
-      username: profile.username,
-    }));
+    // Batch fetch subscriptions for these users
+    const userIds = profiles.map(p => p.userId);
+    const subscriptions = await Promise.all(
+      userIds.map(id =>
+        ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .unique()
+      )
+    );
+
+    const subscriptionsMap = new Map();
+    subscriptions.forEach(sub => {
+      if (sub) {
+        subscriptionsMap.set(sub.userId, sub);
+      }
+    });
+
+    return profiles.map(profile => {
+      const sub = subscriptionsMap.get(profile.userId);
+      const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
+      return {
+        userId: profile.userId,
+        username: profile.username,
+        tier: isActive ? (sub?.tier || "free") : "free",
+        isDonor: profile.isDonor || false,
+      };
+    });
   },
 });
 
@@ -728,7 +830,7 @@ export const sendMentionNotifications = internalMutation({
     timestamp: v.number(),
   },
   handler: async (ctx, args) => {
-    const message = await ctx.db.get(args.messageId);
+    const message = await ctx.db.get("globalChat", args.messageId);
     if (!message) return;
 
     // Create mention notifications for each mentioned user
@@ -1005,7 +1107,7 @@ export const muteUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendMuteEmail, {
           targetEmail: targetUser.email,
@@ -1078,7 +1180,7 @@ export const unmuteUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendUnmuteEmail, {
           targetEmail: targetUser.email,
@@ -1140,7 +1242,7 @@ export const banUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendBanEmail, {
           targetEmail: targetUser.email,
@@ -1212,7 +1314,7 @@ export const unbanUser = mutation({
 
     // Send email notification (don't fail the moderation if email fails)
     try {
-      const targetUser = await ctx.db.get(args.targetUserId);
+      const targetUser = await ctx.db.get("users", args.targetUserId);
       if (targetUser?.email) {
         await ctx.scheduler.runAfter(0, internal.sendEmails.sendUnbanEmail, {
           targetEmail: targetUser.email,
@@ -1248,7 +1350,7 @@ export const deleteMessage = mutation({
     if (!profile?.adminRole) throw new Error("Insufficient permissions");
 
     // Get the message to ensure it exists
-    const message = await ctx.db.get(args.messageId);
+    const message = await ctx.db.get("globalChat", args.messageId);
     if (!message) throw new Error("Message not found");
 
     const timestamp = Date.now();

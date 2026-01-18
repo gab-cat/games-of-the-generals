@@ -43,7 +43,7 @@ export const sendPushForMessage = internalAction({
     });
 
     await Promise.all(
-      subscriptions.map(async (sub: any) => {
+      subscriptions.map(async (sub) => {
         const pushSub = {
           endpoint: sub.endpoint,
           expirationTime: sub.expirationTime ?? null,
@@ -94,7 +94,7 @@ export const sendTestNotification = action({
     });
 
     await Promise.all(
-      subscriptions.map(async (sub: any) => {
+      subscriptions.map(async (sub) => {
         const pushSub = {
           endpoint: sub.endpoint,
           expirationTime: sub.expirationTime ?? null,
@@ -126,7 +126,7 @@ export const sendMentionPushNotifications = internalAction({
 
     const mentions = await ctx.runQuery(internal.push.getMentionsByMessage, { messageId: args.messageId });
 
-    const notificationPromises = mentions.map(async (mention: any) => {
+    const notificationPromises = mentions.map(async (mention) => {
       const subscriptions = await ctx.runQuery(internal.push.getSubscriptionsForUser, { userId: mention.mentionedUserId });
       if (subscriptions.length === 0) return;
 
@@ -145,7 +145,7 @@ export const sendMentionPushNotifications = internalAction({
       });
 
       await Promise.all(
-        subscriptions.map(async (sub: any) => {
+        subscriptions.map(async (sub) => {
           const pushSub = {
             endpoint: sub.endpoint,
             expirationTime: sub.expirationTime ?? null,

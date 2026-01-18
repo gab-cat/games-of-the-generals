@@ -1,12 +1,7 @@
 import { useState, useRef } from "react";
-import { FileImage, Send, X, Loader2 } from "lucide-react";
+import { Send, X, Loader2, Plus, Paperclip } from "lucide-react";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "./ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 import {
   Select,
   SelectContent,
@@ -20,6 +15,7 @@ import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
 import { useConvexMutationWithQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface SupportDialogProps {
   isOpen: boolean;
@@ -27,12 +23,36 @@ interface SupportDialogProps {
 }
 
 const categoryOptions = [
-    // lady bug icon on bug report
-  { value: "bug_report", label: "🐞 Bug Report", description: "Report a problem or error" },
-  { value: "feature_request", label: "✨ Feature Request", description: "Suggest a new feature" },
-  { value: "account_issue", label: "👤 Account Issue", description: "Problems with your account" },
-  { value: "game_issue", label: "🎮 Game Issue", description: "Issues during gameplay" },
-  { value: "other", label: "💬 Other", description: "General questions or feedback" },
+  {
+    value: "bug_report",
+    label: "BUG REPORT",
+    description: "System anomaly or error",
+    icon: "🐞",
+  },
+  {
+    value: "feature_request",
+    label: "FEATURE REQ",
+    description: "Proposed enhancement",
+    icon: "✨",
+  },
+  {
+    value: "account_issue",
+    label: "ACCOUNT",
+    description: "Access or profile issues",
+    icon: "👤",
+  },
+  {
+    value: "game_issue",
+    label: "GAMEPLAY",
+    description: "Match or rules dispute",
+    icon: "🎮",
+  },
+  {
+    value: "other",
+    label: "GENERAL",
+    description: "Other inquiries",
+    icon: "💬",
+  },
 ];
 
 export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
@@ -41,12 +61,20 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
   const [description, setDescription] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
-  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const generateUploadUrlMutation = useConvexMutationWithQuery(api.fileUpload.generateUploadUrl);
-  const processSupportAttachmentMutation = useConvexMutationWithQuery(api.supportTickets.processSupportAttachmentUpload);
-  const createSupportTicketMutation = useConvexMutationWithQuery(api.supportTickets.createSupportTicket);
+  const generateUploadUrlMutation = useConvexMutationWithQuery(
+    api.fileUpload.generateUploadUrl,
+  );
+  const processSupportAttachmentMutation = useConvexMutationWithQuery(
+    api.supportTickets.processSupportAttachmentUpload,
+  );
+  const createSupportTicketMutation = useConvexMutationWithQuery(
+    api.supportTickets.createSupportTicket,
+  );
 
   const handleClose = () => {
     setCategory("");
@@ -60,7 +88,9 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
   const handleFileSelect = async (file: File) => {
     try {
       // Dynamically import image utilities to load jimp only when needed
-      const { validateImageFile, compressImage } = await import("@/lib/image-utils");
+      const { validateImageFile, compressImage } = await import(
+        "@/lib/image-utils"
+      );
 
       // Validate file
       const validation = validateImageFile(file);
@@ -71,26 +101,29 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
 
       // Compress image to reasonable size for attachments (max 800px)
       const compressedBlob = await compressImage(file, 800);
-      const compressedFile = new File([compressedBlob], file.name, { type: compressedBlob.type });
-      
+      const compressedFile = new File([compressedBlob], file.name, {
+        type: compressedBlob.type,
+      });
+
       // Create preview URL
       const previewUrl = URL.createObjectURL(compressedBlob);
       setAttachmentPreview(previewUrl);
       setAttachmentFile(compressedFile);
-      
     } catch (error) {
       console.error("Error processing file:", error);
       toast.error("Failed to process file. Please try again.");
     }
   };
 
-  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     const file = event.target.files?.[0];
     if (file) {
       void handleFileSelect(file);
     }
     // Reset input
-    event.target.value = '';
+    event.target.value = "";
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -131,10 +164,13 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
       if (attachmentFile) {
         // Get upload URL
         const uploadUrl = await new Promise<string>((resolve, reject) => {
-          generateUploadUrlMutation.mutate({}, {
-            onSuccess: resolve,
-            onError: reject
-          });
+          generateUploadUrlMutation.mutate(
+            {},
+            {
+              onSuccess: resolve,
+              onError: reject,
+            },
+          );
         });
 
         // Upload file
@@ -151,11 +187,17 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
         const { storageId } = await uploadResponse.json();
 
         // Process the upload to get the file URL
-        const result = await new Promise<{ storageId: string; fileUrl: string | null }>((resolve, reject) => {
-          processSupportAttachmentMutation.mutate({ storageId }, {
-            onSuccess: resolve,
-            onError: reject
-          });
+        const result = await new Promise<{
+          storageId: string;
+          fileUrl: string | null;
+        }>((resolve, reject) => {
+          processSupportAttachmentMutation.mutate(
+            { storageId },
+            {
+              onSuccess: resolve,
+              onError: reject,
+            },
+          );
         });
 
         if (!result.fileUrl) {
@@ -168,151 +210,199 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
 
       // Create support ticket
       await new Promise<string>((resolve, reject) => {
-        createSupportTicketMutation.mutate({
-          category: category as any,
-          subject: subject.trim(),
-          description: description.trim(),
-          attachmentUrl,
-          attachmentStorageId: attachmentStorageId as any,
-        }, {
-          onSuccess: resolve,
-          onError: reject
-        });
+        createSupportTicketMutation.mutate(
+          {
+            category: category as any,
+            subject: subject.trim(),
+            description: description.trim(),
+            attachmentUrl,
+            attachmentStorageId: attachmentStorageId as any,
+          },
+          {
+            onSuccess: resolve,
+            onError: reject,
+          },
+        );
       });
 
-      toast.success("Support ticket submitted successfully! We'll get back to you soon.");
+      toast.success("Ticket initialized successfully. Stand by for response.");
       handleClose();
-
     } catch (error) {
       console.error("Error submitting support ticket:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to submit support ticket");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to submit support ticket",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const selectedCategory = categoryOptions.find(opt => opt.value === category);
-
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl bg-black/20 backdrop-blur-xl border border-white/10 text-white shadow-2xl shadow-black/20">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-white/90 flex items-center gap-2">
-            💬 Contact Support
+      <DialogContent className="max-w-2xl bg-zinc-900 border border-white/10 text-white shadow-2xl p-0 overflow-hidden">
+        {/* Decorative corner accents */}
+        <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-white/20 z-20 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-white/20 z-20 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-white/20 z-20 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-white/20 z-20 pointer-events-none" />
+
+        <DialogHeader className="p-6 border-b border-white/5 bg-white/[0.02]">
+          <DialogTitle className="flex items-center gap-3">
+            <div className="p-2 bg-blue-500/10 rounded-sm border border-blue-500/20">
+              <Plus className="w-4 h-4 text-blue-400" />
+            </div>
+            <div className="space-y-0.5">
+              <div className="font-display text-lg tracking-wide uppercase text-zinc-100">
+                Initialize Support Ticket
+              </div>
+              <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
+                Secure Channel • Encrypted
+              </div>
+            </div>
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-6">
+        <form onSubmit={(e) => void handleSubmit(e)} className="p-6 space-y-6">
           {/* Category Selection */}
           <div className="space-y-2">
-            <Label htmlFor="category" className="text-white/80">
-              Category <span className="text-red-400">*</span>
+            <Label
+              htmlFor="category"
+              className="text-zinc-400 font-mono text-xs uppercase tracking-wider"
+            >
+              Classification <span className="text-red-400">*</span>
             </Label>
             <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-white/5 text-left px-8 backdrop-blur-sm border rounded-full border-white/10 hover:bg-white/10 text-white transition-all duration-200">
-                <SelectValue placeholder="Select a category..." />
+              <SelectTrigger className="bg-zinc-900/40 border-zinc-800 text-zinc-300 font-mono text-sm h-11 focus:ring-1 focus:ring-blue-500/50 hover:bg-zinc-900/60 transition-colors">
+                <SelectValue placeholder="SELECT CATEGORY..." />
               </SelectTrigger>
-              <SelectContent className="bg-black/20 rounded-3xl backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
+              <SelectContent className="bg-zinc-950 border-zinc-800">
                 {categoryOptions.map((option) => (
                   <SelectItem
                     key={option.value}
                     value={option.value}
-                    className="text-white rounded-2xl transition-all cursor-pointer duration-200 hover:bg-white/10 focus:bg-white/10"
+                    className="font-mono text-xs uppercase focus:bg-white/5 text-zinc-400 focus:text-zinc-200 cursor-pointer py-3"
                   >
-                    <div>
-                      <div className="font-medium">{option.label}</div>
-                      <div className="text-xs text-white/60">{option.description}</div>
+                    <div className="flex items-center gap-3">
+                      <span className="opacity-50">{option.icon}</span>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="font-bold text-white/80">
+                          {option.label}
+                        </span>
+                        <span className="text-[10px] text-zinc-600 normal-case tracking-normal">
+                          {option.description}
+                        </span>
+                      </div>
                     </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {selectedCategory && (
-              <p className="text-xs text-white/60">{selectedCategory.description}</p>
-            )}
           </div>
 
           {/* Subject */}
           <div className="space-y-2">
-            <Label htmlFor="subject" className="text-white/80">
-              Subject <span className="text-red-400">*</span>
+            <Label
+              htmlFor="subject"
+              className="text-zinc-400 font-mono text-xs uppercase tracking-wider"
+            >
+              Subject Line <span className="text-red-400">*</span>
             </Label>
             <Input
               id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Brief summary of your issue..."
-              className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 text-white placeholder:text-white/50 transition-all duration-200"
+              placeholder="BRIEF SUMMARY OF ISSUE..."
+              className="bg-zinc-900/40 border-zinc-800 focus:border-blue-500/50 text-white font-mono text-sm h-11 placeholder:text-zinc-700 transition-all uppercase"
               maxLength={200}
             />
-            <div className="text-xs text-white/50 text-right">
-              {subject.length}/200
-            </div>
           </div>
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-white/80">
-              Description <span className="text-red-400">*</span>
+            <Label
+              htmlFor="description"
+              className="text-zinc-400 font-mono text-xs uppercase tracking-wider"
+            >
+              Details <span className="text-red-400">*</span>
             </Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Please provide detailed information about your issue, including steps to reproduce if it's a bug..."
-              className="bg-white/5 backdrop-blur-sm border border-white/10 hover:bg-white/10 text-white placeholder:text-white/50 min-h-[120px] resize-none transition-all duration-200"
-              maxLength={2000}
-            />
-            <div className="text-xs text-white/50 text-right">
-              {description.length}/2000
+            <div className="relative">
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Provide detailed situational report..."
+                className="bg-zinc-900/40 border-zinc-800 focus:border-blue-500/50 text-white min-h-[140px] resize-none transition-all placeholder:text-zinc-700 font-mono text-sm p-4 leading-relaxed"
+                maxLength={2000}
+              />
+              <div className="absolute bottom-2 right-2 text-[10px] font-mono text-zinc-700">
+                {description.length}/2000
+              </div>
             </div>
           </div>
 
           {/* Attachment */}
           <div className="space-y-2">
-            <Label className="text-white/80">
-              Attachment (Optional)
+            <Label className="text-zinc-400 font-mono text-xs uppercase tracking-wider flex items-center justify-between">
+              <span>Attachment</span>
+              <span className="text-[10px] text-zinc-600">
+                OPTIONAL • MAX 5MB
+              </span>
             </Label>
-            
+
             {/* Attachment Preview */}
-            {attachmentPreview && (
-              <div className="relative">
-                <img
-                  src={attachmentPreview}
-                  alt="Attachment preview"
-                  className="max-w-full h-32 object-contain bg-black/20 rounded-lg"
-                />
-                <Button
-                  type="button"
-                  onClick={removeAttachment}
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1 right-1 bg-red-600/80 hover:bg-red-600 text-white"
+            <AnimatePresence mode="wait">
+              {attachmentPreview ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="relative group bg-zinc-900/40 border border-zinc-800 rounded-lg p-2 flex items-start gap-4"
                 >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            )}
+                  <img
+                    src={attachmentPreview}
+                    alt="Preview"
+                    className="h-20 w-20 object-cover rounded bg-zinc-950 border border-white/5"
+                  />
+                  <div className="flex-1 min-w-0 pt-1">
+                    <div className="text-sm font-mono text-white/80 truncate">
+                      {attachmentFile?.name}
+                    </div>
+                    <div className="text-xs text-zinc-500 mt-1">
+                      {((attachmentFile?.size || 0) / 1024).toFixed(1)} KB
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={removeAttachment}
+                    variant="ghost"
+                    size="icon"
+                    className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onDragOver={handleDragOver}
+                  onDrop={handleDrop}
+                  className="border border-dashed border-zinc-800 rounded-lg p-6 text-center hover:border-blue-500/40 hover:bg-blue-500/5 transition-all duration-300 cursor-pointer group bg-zinc-900/20"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:border-blue-500/40 transition-colors">
+                    <Paperclip className="w-4 h-4 text-zinc-600 group-hover:text-blue-400 transition-colors" />
+                  </div>
+                  <p className="text-xs text-zinc-400 font-mono uppercase tracking-wide">
+                    Click to upload or drag image
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-            {/* Drag and Drop Area */}
-            {!attachmentPreview && (
-              <div
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                className="border-2 border-dashed border-white/20 rounded-lg p-4 text-center hover:border-white/40 transition-all duration-200 cursor-pointer bg-white/5 hover:bg-white/10 backdrop-blur-sm"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <FileImage className="w-8 h-8 text-white/60 mx-auto mb-2" />
-                <p className="text-sm text-white/70">
-                  Click to upload or drag & drop an image
-                </p>
-                <p className="text-xs text-white/50 mt-1">
-                  JPEG, PNG, WebP • Max 5MB
-                </p>
-              </div>
-            )}
-
-            {/* Hidden file input */}
             <input
               ref={fileInputRef}
               type="file"
@@ -322,30 +412,35 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
             />
           </div>
 
-          {/* Submit Button */}
-          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+          {/* Footer Actions */}
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="bg-white/5 backdrop-blur-sm border border-white/10 text-white hover:bg-white/10 transition-all duration-200 order-2 sm:order-1"
+              className="text-zinc-500 hover:text-white hover:bg-white/5 font-mono text-xs uppercase tracking-wider"
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={isSubmitting || !category || !subject.trim() || !description.trim()}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white transition-all duration-200 shadow-lg order-1 sm:order-2"
+              disabled={
+                isSubmitting ||
+                !category ||
+                !subject.trim() ||
+                !description.trim()
+              }
+              className="bg-blue-600/90 hover:bg-blue-500 text-white font-mono text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] border-0 min-w-[140px]"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Submitting...
+                  <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                  Transmitting...
                 </>
               ) : (
                 <>
-                  <Send className="w-4 h-4 mr-2" />
+                  <Send className="w-3.5 h-3.5 mr-2" />
                   Submit Ticket
                 </>
               )}

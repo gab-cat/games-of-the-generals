@@ -30,9 +30,9 @@ export function SpectatePage({ profile, gameId }: SpectatePageProps) {
   }
 
   return (
-    <SpectatorView 
-      gameId={gameId as Id<"games">} 
-      profile={profile} 
+    <SpectatorView
+      gameId={gameId as Id<"games">}
+      profile={profile}
       onBack={handleBack}
     />
   );

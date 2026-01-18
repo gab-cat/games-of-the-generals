@@ -100,7 +100,7 @@ export const sendNotification = internalMutation({
     });
 
     // Ensure user has notification conversation
-    const user = await ctx.db.get(args.userId);
+    const user = await ctx.db.get("users", args.userId);
     if (!user) {
       throw new Error("User not found");
     }
@@ -128,7 +128,7 @@ export const sendNotification = internalMutation({
     });
 
     // Update conversation metadata with last message reference
-    const conversation = await ctx.db.get(conversationId);
+    const conversation = await ctx.db.get("conversations", conversationId);
     if (conversation) {
       // For notification conversations, both participants are the same user,
       // so only increment one unread count to avoid double counting

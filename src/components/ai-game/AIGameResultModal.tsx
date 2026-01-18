@@ -5,11 +5,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "../ui/dialog";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { Crown, Bot, Trophy, Target, Shield, Zap, Star, RotateCcw } from "lucide-react";
+import {
+  Trophy,
+  Target,
+  Shield,
+  Zap,
+  RotateCcw,
+  Skull,
+  Swords,
+  Brain,
+  ExternalLink,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import { useSound } from "../../lib/SoundProvider";
 import ConfettiBoom from "react-confetti-boom";
@@ -42,55 +51,47 @@ export function AIGameResultModal({
   const { playSFX } = useSound();
 
   const getResultIcon = () => {
-    if (isVictory) return <Crown className="h-12 w-12 text-yellow-400" />;
-    if (isDefeat) return <Bot className="h-12 w-12 text-red-400" />;
-    return <Trophy className="h-12 w-12 text-gray-400" />;
+    if (isVictory) return <Trophy className="h-10 w-10 text-emerald-500" />;
+    if (isDefeat) return <Skull className="h-10 w-10 text-red-500" />;
+    return <Trophy className="h-10 w-10 text-gray-400" />;
   };
 
   const getResultTitle = () => {
-    if (isVictory) return "Victory!";
-    if (isDefeat) return "AI Wins";
-    return "Game Over";
+    if (isVictory) return "VICTORY";
+    if (isDefeat) return "DEFEAT";
+    return "DRAW";
   };
 
-  const getResultDescription = () => {
-    if (isVictory) return "Congratulations! You defeated the AI opponent.";
-    if (isDefeat) return "The AI was too clever this time. Better luck next battle!";
-    return "The game has ended.";
+  const getMissionStatus = () => {
+    if (isVictory) return "MISSION ACCOMPLISHED";
+    if (isDefeat) return "MISSION FAILED";
+    return "MISSION ENDED";
   };
 
   const getReasonDescription = () => {
+    if (!winner) return "STALEMATE DETECTED";
+    if (!gameEndReason) return "OPERATION ENDED";
+
     switch (gameEndReason) {
       case "flag_captured":
-        return isVictory ? "You captured the AI's flag!" : "Your flag was captured by the AI.";
+        return isVictory ? "ENEMY FLAG CAPTURED" : "FLAG CAPTURED";
       case "flag_reached_base":
-        return isVictory ? "Your flag reached the AI's back row!" : "The AI's flag reached your back row.";
+        return isVictory ? "INFILTRATION SUCCESSFUL" : "BASE INFILTRATED";
       case "elimination":
-        return "All enemy pieces have been eliminated.";
+        return isVictory ? "HOSTILES ELIMINATED" : "FORCES ELIMINATED";
       case "timeout":
-        return "The game timed out.";
+        return isVictory ? "ENEMY TIME EXCEEDED" : "TIME LIMIT EXCEEDED";
       case "surrender":
-        return "Game was surrendered.";
+        return isVictory ? "OPPONENT SURRENDERED" : "MISSION ABORTED";
       default:
-        return gameEndReason?.replace(/_/g, " ") || "Unknown reason";
+        return gameEndReason.replace(/_/g, " ").toUpperCase();
     }
   };
 
-  const getDifficultyIcon = () => {
-    switch (difficulty) {
-      case "easy": return <Star className="h-4 w-4" />;
-      case "medium": return <Zap className="h-4 w-4" />;
-      case "hard": return <Crown className="h-4 w-4" />;
-    }
-  };
-
-  const getBehaviorIcon = () => {
-    switch (behavior) {
-      case "aggressive": return <Target className="h-4 w-4" />;
-      case "defensive": return <Shield className="h-4 w-4" />;
-      case "passive": return <Star className="h-4 w-4" />;
-      case "balanced": return <Zap className="h-4 w-4" />;
-    }
+  const getResultColor = () => {
+    if (isVictory) return "text-emerald-500";
+    if (isDefeat) return "text-red-500";
+    return "text-white";
   };
 
   // Play victory/lose SFX when modal opens
@@ -106,115 +107,162 @@ export function AIGameResultModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md border-white/10 bg-black/80 backdrop-blur-xl">
-        {/* Confetti effect for victories */}
+      <DialogContent className="max-w-3xl w-full bg-zinc-950 backdrop-blur-xl border border-white/10 p-0 overflow-hidden shadow-2xl text-white sm:max-w-2xl rounded-sm">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Game Result</DialogTitle>
+          <DialogDescription>
+            Match analysis against AI Opponent
+          </DialogDescription>
+        </DialogHeader>
+
         {isVictory && (
           <ConfettiBoom
             mode="boom"
             particleCount={80}
-            colors={['#FFD700', '#FFA500', '#FF6B35', '#F7931E', '#FFD700']}
+            colors={["#10B981", "#34D399", "#059669", "#6EE7B7"]}
             shapeSize={10}
             launchSpeed={1.2}
             opacityDeltaMultiplier={2.5}
           />
         )}
 
-        {/* Fall effect for defeats */}
-        {isDefeat && (
-          <ConfettiBoom
-            mode="fall"
-            particleCount={50}
-            colors={['#DC2626', '#EF4444', '#F87171', '#FCA5A5', '#FEE2E2']}
-            shapeSize={7}
-            fadeOutHeight={0.8}
-          />
-        )}
+        <div className="relative flex flex-col items-center">
+          {/* Top Security Header */}
+          <div className="w-full flex items-center justify-between px-6 py-3 border-b border-white/10 bg-black/40">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-white/40" />
+              <span className="text-xs font-mono text-white/40 tracking-[0.2em]">
+                COMBAT_SIMULATION_REPORT
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="text-[10px] h-5 border-white/10 bg-white/5 text-white/60 font-mono rounded-sm"
+              >
+                AI_SIMULATION
+              </Badge>
+            </div>
+          </div>
 
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
-          className="text-center space-y-6"
-        >
-          <DialogHeader>
+          <div className="w-full p-4 md:p-10 flex flex-col items-center relative overflow-hidden overflow-y-auto max-h-[80vh]">
+            {/* Background Effects */}
+            <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:30px_30px]" />
+
+            {/* Result Icon */}
             <motion.div
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="flex justify-center"
+              initial={{ scale: 0, rotate: 180 }}
+              animate={{ scale: 1, rotate: 0 }}
+              transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+              className={`w-12 h-12 md:w-20 md:h-20 mb-3 md:mb-6 rounded-xl md:rounded-2xl border-2 flex items-center justify-center relative ${
+                isVictory
+                  ? "border-emerald-500/50 bg-emerald-500/10"
+                  : isDefeat
+                    ? "border-red-500/50 bg-red-500/10"
+                    : "border-white/10 bg-white/5"
+              }`}
             >
               {getResultIcon()}
             </motion.div>
-            <DialogTitle className={`text-2xl font-bold ${isVictory ? 'text-green-400' : isDefeat ? 'text-red-400' : 'text-gray-400'}`}>
-              {getResultTitle()}
-            </DialogTitle>
-            <DialogDescription className="text-white/70">
-              {getResultDescription()}
-            </DialogDescription>
-          </DialogHeader>
 
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-4"
-          >
-            {/* Game Stats */}
-            <div className="grid grid-cols-2 gap-4 p-4 bg-white/5 rounded-lg border border-white/10">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white/90">{moveCount}</div>
-                <div className="text-xs text-white/60">Moves</div>
-              </div>
-              <div className="text-center">
-                <div className="text-lg font-semibold text-white/90">
-                  {getReasonDescription()}
-                </div>
-                <div className="text-xs text-white/60">Result</div>
-              </div>
-            </div>
-
-            {/* AI Configuration */}
-            <div className="space-y-2">
-              <div className="text-sm text-white/60">Opponent Configuration:</div>
-              <div className="flex justify-center gap-2">
-                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20">
-                  {getDifficultyIcon()}
-                  <span className="ml-1 capitalize">{difficulty}</span>
-                </Badge>
-                <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20">
-                  {getBehaviorIcon()}
-                  <span className="ml-1 capitalize">{behavior}</span>
-                </Badge>
-              </div>
-            </div>
-          </motion.div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
+            {/* Status Text */}
             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-2 w-full"
+              className="text-center mb-8"
+            >
+              <h1
+                className={`text-3xl md:text-5xl font-black tracking-tighter mb-1 ${getResultColor()}`}
+              >
+                {getResultTitle()}
+              </h1>
+              <div className="flex items-center justify-center gap-2 md:gap-3">
+                <div
+                  className={`h-[1px] w-6 md:w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
+                />
+                <p className="text-[10px] md:text-xs font-mono tracking-[0.1em] md:tracking-[0.2em] text-white/60 uppercase">
+                  {getMissionStatus()}
+                </p>
+                <div
+                  className={`h-[1px] w-6 md:w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
+                />
+              </div>
+              <p className="mt-2 text-white/40 font-mono text-[9px] md:text-[10px] uppercase tracking-widest px-4">
+                [{getReasonDescription()}]
+              </p>
+            </motion.div>
+
+            {/* Stats Grid */}
+            <motion.div
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="w-full grid grid-cols-2 md:grid-cols-4 gap-px bg-white/5 border border-white/10 rounded-sm overflow-hidden mb-8"
+            >
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Zap className="w-3 h-3 md:w-4 md:h-4 text-blue-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white">
+                  {moveCount}
+                </div>
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
+                  Moves
+                </div>
+              </div>
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Target className="w-3 h-3 md:w-4 md:h-4 text-amber-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white">
+                  N/A
+                </div>
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
+                  Score
+                </div>
+              </div>
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Swords className="w-3 h-3 md:w-4 md:h-4 text-red-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white uppercase">
+                  {difficulty}
+                </div>
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
+                  Diff
+                </div>
+              </div>
+              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
+                <Brain className="w-3 h-3 md:w-4 md:h-4 text-purple-400 mb-1 md:mb-2 opacity-70" />
+                <div className="text-sm md:text-lg font-mono font-bold text-white uppercase truncate max-w-full px-1">
+                  {behavior}
+                </div>
+                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
+                  Logic
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Action Buttons */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="flex flex-col sm:flex-row gap-3 w-full justify-center"
             >
               <Button
                 onClick={onPlayAgain}
-                className="flex-1 bg-blue-600/80 hover:bg-blue-700/80 text-white border-0"
-                size="lg"
+                className="h-10 bg-white text-black hover:bg-white/90 font-bold font-mono text-xs tracking-wider flex-1 max-w-xs rounded-sm"
               >
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Play Again
+                <RotateCcw className="w-3 h-3 mr-2" />
+                REINITIATE_SIM
               </Button>
               <Button
                 onClick={onReturnToLobby}
                 variant="outline"
-                className="flex-1 bg-white/10 border-white/20 text-white/90 hover:bg-white/20"
-                size="lg"
+                className="h-10 border-white/10 hover:bg-white/5 text-white bg-transparent font-mono text-xs tracking-wider flex-1 max-w-xs rounded-sm"
               >
-                Return to Lobby
+                <ExternalLink className="w-3 h-3 mr-2" />
+                RETURN_TO_LOBBY
               </Button>
             </motion.div>
-          </DialogFooter>
-        </motion.div>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );

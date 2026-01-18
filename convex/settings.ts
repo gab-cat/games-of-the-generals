@@ -73,7 +73,7 @@ export const changePassword = action({
 export const getUserForPasswordChange = internalQuery({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.userId);
+    return await ctx.db.get("users", args.userId);
   },
 });
 
@@ -84,7 +84,7 @@ export const getUserSettings = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const user = await ctx.db.get(userId);
+    const user = await ctx.db.get("users", userId);
     if (!user) throw new Error("User not found");
 
     return {

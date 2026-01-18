@@ -1,35 +1,42 @@
 import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { presence } from "./presence";
 import { updateEloRatings, isQuickMatchGame } from "./profiles";
 import { Doc } from "./_generated/dataModel";
+import { isSubscriptionActive } from "./featureGating";
 
 // Game pieces and their ranks
 const PIECES = {
-  "Flag": 0,
-  "Private": 1,
-  "Sergeant": 2,
+  Flag: 0,
+  Private: 1,
+  Sergeant: 2,
   "2nd Lieutenant": 3,
   "1st Lieutenant": 4,
-  "Captain": 5,
-  "Major": 6,
+  Captain: 5,
+  Major: 6,
   "Lieutenant Colonel": 7,
-  "Colonel": 8,
+  Colonel: 8,
   "1 Star General": 9,
   "2 Star General": 10,
   "3 Star General": 11,
   "4 Star General": 12,
   "5 Star General": 13,
-  "Spy": 14,
+  Spy: 14,
 };
 
 // Initial piece setup for each player (21 pieces total)
 const INITIAL_PIECES = [
   "Flag",
-  "Spy", "Spy",
-  "Private", "Private", "Private", "Private", "Private", "Private",
+  "Spy",
+  "Spy",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
+  "Private",
   "Sergeant",
   "2nd Lieutenant",
   "1st Lieutenant",
@@ -41,12 +48,14 @@ const INITIAL_PIECES = [
   "2 Star General",
   "3 Star General",
   "4 Star General",
-  "5 Star General"
+  "5 Star General",
 ];
 
 // Create empty board
 function createEmptyBoard() {
-  return Array(8).fill(null).map(() => Array(9).fill(null));
+  return Array(8)
+    .fill(null)
+    .map(() => Array(9).fill(null));
 }
 
 // Get time limit in milliseconds based on game mode
@@ -71,7 +80,7 @@ export const startGame = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const lobby = await ctx.db.get(args.lobbyId);
+    const lobby = await ctx.db.get("lobbies", args.lobbyId);
     if (!lobby) throw new Error("Lobby not found");
 
     if (lobby.status !== "waiting" || !lobby.playerId) {
@@ -94,6 +103,9 @@ export const startGame = mutation({
 
     // Create new game
     const gameMode = lobby.gameMode ?? "classic"; // Default to classic if not set (for legacy lobbies)
+    const now = Date.now();
+    const SETUP_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes for setup phase
+
     const gameId = await ctx.db.insert("games", {
       lobbyId: args.lobbyId,
       lobbyName: lobby.name,
@@ -107,14 +119,57 @@ export const startGame = mutation({
       player1Setup: false,
       player2Setup: false,
       spectators: [],
-      createdAt: Date.now(),
-      setupTimeStarted: Date.now(),
+      createdAt: now,
+      setupTimeStarted: now,
+      setupDeadline: now + SETUP_TIMEOUT_MS, // Hard deadline for setup
       player1TimeUsed: 0,
       player2TimeUsed: 0,
       moveCount: 0, // Initialize move count
       disconnectionGracePeriod: 120 * 1000, // 120 seconds in milliseconds
       gameMode, // Copy game mode from lobby
     });
+
+    // Schedule setup timeout check
+    await ctx.scheduler.runAfter(
+      SETUP_TIMEOUT_MS,
+      internal.games.handleSetupTimeout,
+      { gameId },
+    );
+
+    // Consume private lobby usage now that game has actually started
+    if (lobby.isPrivate) {
+      const nowDate = new Date();
+      const today = new Date(
+        Date.UTC(
+          nowDate.getUTCFullYear(),
+          nowDate.getUTCMonth(),
+          nowDate.getUTCDate(),
+        ),
+      )
+        .toISOString()
+        .split("T")[0];
+
+      const usage = await ctx.db
+        .query("subscriptionUsage")
+        .withIndex("by_user_date", (q) =>
+          q.eq("userId", lobby.hostId).eq("date", today),
+        )
+        .unique();
+
+      if (usage) {
+        await ctx.db.patch(usage._id, {
+          privateLobbiesCreated: (usage.privateLobbiesCreated || 0) + 1,
+        });
+      } else {
+        await ctx.db.insert("subscriptionUsage", {
+          userId: lobby.hostId,
+          date: today,
+          privateLobbiesCreated: 1,
+          aiReplaysSaved: 0,
+          lastResetAt: Date.now(),
+        });
+      }
+    }
 
     // Update lobby with game reference and change status to playing
     await ctx.db.patch(args.lobbyId, {
@@ -128,10 +183,12 @@ export const startGame = mutation({
       .withIndex("by_user", (q) => q.eq("userId", lobby.hostId))
       .unique();
 
-    const playerProfile = lobby.playerId ? await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
-      .unique() : null;
+    const playerProfile = lobby.playerId
+      ? await ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
+          .unique()
+      : null;
 
     if (hostProfile) {
       await ctx.db.patch(hostProfile._id, {
@@ -158,12 +215,15 @@ export const getGame = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    const game = await ctx.db.get(args.gameId);
-    
+    const game = await ctx.db.get("games", args.gameId);
+
     if (!game) return null;
 
     // Should not allow if not part of the game - return null to hide game existence
-    if (userId && ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)) {
+    if (
+      userId &&
+      ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)
+    ) {
       return null;
     }
 
@@ -174,28 +234,31 @@ export const getGame = query({
 
     // Check if user is a spectator
     const isSpectator = userId && game.spectators.includes(userId);
-    
+
     // Hide opponent's unrevealed pieces unless user is spectator or player
     if (userId && (userId === game.player1Id || userId === game.player2Id)) {
       const isPlayer1 = userId === game.player1Id;
-      const boardCopy = game.board.map(row => 
-        row.map(cell => {
+      const boardCopy = game.board.map((row) =>
+        row.map((cell) => {
           if (!cell) return null;
-          
+
           // Show own pieces and revealed pieces
-          if (cell.player === (isPlayer1 ? "player1" : "player2") || cell.revealed) {
+          if (
+            cell.player === (isPlayer1 ? "player1" : "player2") ||
+            cell.revealed
+          ) {
             return cell;
           }
-          
+
           // Hide opponent's unrevealed pieces
           return {
             piece: "Hidden",
             player: cell.player,
             revealed: false,
           };
-        })
+        }),
       );
-      
+
       return { ...game, board: boardCopy };
     } else if (isSpectator) {
       // Spectators can see all pieces (both revealed and unrevealed)
@@ -206,21 +269,148 @@ export const getGame = query({
   },
 });
 
+// BANDWIDTH OPTIMIZED: Static game metadata that rarely changes
+// Use together with getGameState to reduce sync bandwidth by ~40%
+export const getGameMetadata = query({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const game = await ctx.db.get("games", args.gameId);
+
+    if (!game) return null;
+
+    // Authorization check
+    if (
+      userId &&
+      ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)
+    ) {
+      return null;
+    }
+
+    // Return only static/rarely-changing fields
+    return {
+      _id: game._id,
+      lobbyId: game.lobbyId,
+      lobbyName: game.lobbyName,
+      player1Id: game.player1Id,
+      player1Username: game.player1Username,
+      player2Id: game.player2Id,
+      player2Username: game.player2Username,
+      spectators: game.spectators,
+      createdAt: game.createdAt,
+      gameMode: game.gameMode,
+      disconnectionGracePeriod: game.disconnectionGracePeriod,
+    };
+  },
+});
+
+// BANDWIDTH OPTIMIZED: Dynamic game state that changes frequently
+// Use together with getGameMetadata to reduce sync bandwidth by ~40%
+export const getGameState = query({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    const game = await ctx.db.get("games", args.gameId);
+
+    if (!game) return null;
+
+    // Authorization check
+    if (
+      userId &&
+      ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)
+    ) {
+      return null;
+    }
+
+    // Process board visibility based on player perspective
+    let processedBoard = game.board;
+
+    if (game.status !== "finished") {
+      const isSpectator = userId && game.spectators.includes(userId);
+
+      if (userId && (userId === game.player1Id || userId === game.player2Id)) {
+        const isPlayer1 = userId === game.player1Id;
+        processedBoard = game.board.map((row) =>
+          row.map((cell) => {
+            if (!cell) return null;
+
+            // Show own pieces and revealed pieces
+            if (
+              cell.player === (isPlayer1 ? "player1" : "player2") ||
+              cell.revealed
+            ) {
+              return cell;
+            }
+
+            // Hide opponent's unrevealed pieces
+            return {
+              piece: "Hidden",
+              player: cell.player,
+              revealed: false,
+            };
+          }),
+        );
+      } else if (!isSpectator) {
+        // Non-authenticated or non-participant - hide all pieces
+        processedBoard = game.board.map((row) =>
+          row.map((cell) =>
+            cell
+              ? { piece: "Hidden", player: cell.player, revealed: false }
+              : null,
+          ),
+        );
+      }
+    }
+
+    // Return only dynamic state fields
+    return {
+      status: game.status,
+      board: processedBoard,
+      currentTurn: game.currentTurn,
+      player1Setup: game.player1Setup,
+      player2Setup: game.player2Setup,
+      winner: game.winner,
+      gameEndReason: game.gameEndReason,
+      finishedAt: game.finishedAt,
+      setupTimeStarted: game.setupTimeStarted,
+      gameTimeStarted: game.gameTimeStarted,
+      lastMoveTime: game.lastMoveTime,
+      lastMoveFrom: game.lastMoveFrom,
+      lastMoveTo: game.lastMoveTo,
+      player1TimeUsed: game.player1TimeUsed,
+      player2TimeUsed: game.player2TimeUsed,
+      player1ResultAcknowledged: game.player1ResultAcknowledged,
+      player2ResultAcknowledged: game.player2ResultAcknowledged,
+      player1DisconnectedAt: game.player1DisconnectedAt,
+      player2DisconnectedAt: game.player2DisconnectedAt,
+      moveCount: game.moveCount,
+      eliminatedPieces: game.eliminatedPieces,
+    };
+  },
+});
+
 // Setup pieces on board
+
 export const setupPieces = mutation({
   args: {
     gameId: v.id("games"),
-    pieces: v.array(v.object({
-      piece: v.string(),
-      row: v.number(),
-      col: v.number(),
-    })),
+    pieces: v.array(
+      v.object({
+        piece: v.string(),
+        row: v.number(),
+        col: v.number(),
+      }),
+    ),
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "setup") {
@@ -258,7 +448,7 @@ export const setupPieces = mutation({
     }
 
     // Update game state
-    const updates: any = {
+    const updates: Partial<Doc<"games">> = {
       board: newBoard,
     };
 
@@ -273,8 +463,8 @@ export const setupPieces = mutation({
       updates.status = "playing";
       updates.gameTimeStarted = Date.now();
       // Save the initial setup board for replay purposes
-      updates.initialSetupBoard = newBoard.map(row => 
-        row.map(cell => cell ? { ...cell, revealed: false } : null)
+      updates.initialSetupBoard = newBoard.map((row) =>
+        row.map((cell) => (cell ? { ...cell, revealed: false } : null)),
       );
     }
 
@@ -295,7 +485,7 @@ export const makeMove = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -326,7 +516,9 @@ export const makeMove = mutation({
     if ((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1)) {
       // Valid move
     } else {
-      throw new Error("Invalid move - pieces can only move to adjacent squares");
+      throw new Error(
+        "Invalid move - pieces can only move to adjacent squares",
+      );
     }
 
     // Check bounds
@@ -335,7 +527,7 @@ export const makeMove = mutation({
     }
 
     const toPiece = game.board[args.toRow][args.toCol];
-    const newBoard = game.board.map(row => [...row]);
+    const newBoard = game.board.map((row) => [...row]);
 
     let challengeResult = null;
     let gameWinner = null;
@@ -354,7 +546,7 @@ export const makeMove = mutation({
 
       // Special rules for Game of the Generals
       let winner: "attacker" | "defender" | "tie";
-      
+
       if (fromPiece.piece === "Flag" || toPiece.piece === "Flag") {
         // Flag logic: can only eat another flag
         if (fromPiece.piece === "Flag" && toPiece.piece === "Flag") {
@@ -368,8 +560,11 @@ export const makeMove = mutation({
         }
       } else if (fromPiece.piece === "Spy") {
         // Spy eliminates all officers (Sergeant through 5 Star General) and Flag
-        if (toPiece.piece === "Flag" || 
-            (defenderRank >= 2 && defenderRank <= 13)) { // Sergeant to 5 Star General
+        if (
+          toPiece.piece === "Flag" ||
+          (defenderRank >= 2 && defenderRank <= 13)
+        ) {
+          // Sergeant to 5 Star General
           winner = "attacker";
         } else if (toPiece.piece === "Private") {
           winner = "defender"; // Private eliminates Spy
@@ -384,7 +579,8 @@ export const makeMove = mutation({
           winner = "attacker";
         } else if (fromPiece.piece === "Spy") {
           winner = "tie"; // Same rank eliminates each other
-        } else if (attackerRank >= 2 && attackerRank <= 13) { // Sergeant to 5 Star General
+        } else if (attackerRank >= 2 && attackerRank <= 13) {
+          // Sergeant to 5 Star General
           winner = "defender"; // Spy eliminates officers
         } else {
           winner = "tie";
@@ -426,7 +622,8 @@ export const makeMove = mutation({
           winner = "defender"; // Sergeant eliminates Private
         } else if (fromPiece.piece === "Sergeant") {
           winner = "tie"; // Same rank eliminates each other
-        } else if (attackerRank > 2) { // Officers above Sergeant
+        } else if (attackerRank > 2) {
+          // Officers above Sergeant
           winner = "attacker";
         } else {
           winner = "tie";
@@ -499,7 +696,7 @@ export const makeMove = mutation({
           newBoard[args.toRow][args.toCol] = revealedFromPiece;
         }
         newBoard[args.fromRow][args.fromCol] = null;
-        
+
         // Check if flag was captured
         if (toPiece.piece === "Flag") {
           gameWinner = currentPlayer;
@@ -515,7 +712,7 @@ export const makeMove = mutation({
           newBoard[args.toRow][args.toCol] = toPiece;
         }
         newBoard[args.fromRow][args.fromCol] = null;
-        
+
         // Check if the attacking piece was a flag - if so, opponent wins
         if (fromPiece.piece === "Flag") {
           gameWinner = currentPlayer === "player1" ? "player2" : "player1";
@@ -549,12 +746,13 @@ export const makeMove = mutation({
     // Calculate time used for current player
     const currentTime = Date.now();
     let timeUsedThisTurn = 0;
-    
+
     if (game.lastMoveTime || game.gameTimeStarted) {
-      const turnStartTime = game.lastMoveTime || game.gameTimeStarted || currentTime;
+      const turnStartTime =
+        game.lastMoveTime || game.gameTimeStarted || currentTime;
       timeUsedThisTurn = currentTime - turnStartTime; // Keep in milliseconds
     }
-    
+
     // Update game state
     const updates: Partial<Doc<"games">> = {
       board: newBoard,
@@ -607,9 +805,13 @@ export const makeMove = mutation({
       updates.status = "finished";
       updates.winner = gameWinner as "player1" | "player2" | undefined;
       updates.finishedAt = Date.now();
-      
+
       // Determine the reason for winning
-      if (challengeResult && (challengeResult.defender === "Flag" || challengeResult.attacker === "Flag")) {
+      if (
+        challengeResult &&
+        (challengeResult.defender === "Flag" ||
+          challengeResult.attacker === "Flag")
+      ) {
         updates.gameEndReason = "flag_captured" as const;
       } else if (flagReachedBase) {
         updates.gameEndReason = "flag_reached_base" as const;
@@ -633,7 +835,7 @@ export const makeMove = mutation({
         ctx.db
           .query("profiles")
           .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
-          .unique()
+          .unique(),
       ]);
 
       if (player1Profile) {
@@ -649,15 +851,20 @@ export const makeMove = mutation({
       }
 
       // Clean up spectator chat when game ends
-      await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
+      await ctx.runMutation(api.spectate.cleanupSpectatorChat, {
+        gameId: args.gameId,
+      });
 
       // Update player stats
-      const winnerId = gameWinner === "player1" ? game.player1Id : game.player2Id;
-      const loserId = gameWinner === "player1" ? game.player2Id : game.player1Id;
+      const winnerId =
+        gameWinner === "player1" ? game.player1Id : game.player2Id;
+      const loserId =
+        gameWinner === "player1" ? game.player2Id : game.player1Id;
 
       // Calculate game duration and stats for achievement tracking
-      const gameDuration = currentTime - (game.gameTimeStarted || game.createdAt);
-      
+      const gameDuration =
+        currentTime - (game.gameTimeStarted || game.createdAt);
+
       // OPTIMIZED: Use indexed queries instead of collecting all moves
       // Count pieces eliminated and spies revealed from moves in this game
       // OPTIMIZED: Added limit to prevent excessive document scanning
@@ -671,7 +878,7 @@ export const makeMove = mutation({
           .query("moves")
           .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
           .filter((q) => q.eq(q.field("playerId"), loserId))
-          .take(250) // Reasonable limit - games rarely exceed 500 moves
+          .take(250), // Reasonable limit - games rarely exceed 500 moves
       ]);
 
       let winnerPiecesEliminated = 0;
@@ -719,22 +926,22 @@ export const makeMove = mutation({
       }
 
       // Update player stats with detailed information
-      await ctx.runMutation(api.profiles.updateProfileStats, { 
-        userId: winnerId, 
+      await ctx.runMutation(api.profiles.updateProfileStats, {
+        userId: winnerId,
         won: true,
         gameTime: gameDuration,
         flagCaptured: flagCapturedByWinner,
         piecesEliminated: winnerPiecesEliminated,
-        spiesRevealed: winnerSpiesRevealed
+        spiesRevealed: winnerSpiesRevealed,
       });
-      
-      await ctx.runMutation(api.profiles.updateProfileStats, { 
-        userId: loserId, 
+
+      await ctx.runMutation(api.profiles.updateProfileStats, {
+        userId: loserId,
         won: false,
         gameTime: gameDuration,
         flagCaptured: false,
         piecesEliminated: loserPiecesEliminated,
-        spiesRevealed: loserSpiesRevealed
+        spiesRevealed: loserSpiesRevealed,
       });
 
       // Get profiles for ELO update and achievements
@@ -742,7 +949,7 @@ export const makeMove = mutation({
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", winnerId))
         .unique();
-      
+
       const loserProfile = await ctx.db
         .query("profiles")
         .withIndex("by_user", (q) => q.eq("userId", loserId))
@@ -758,25 +965,39 @@ export const makeMove = mutation({
           winnerProfile.elo ?? 1500,
           loserProfile.elo ?? 1500,
           winnerProfile.gamesPlayed,
-          loserProfile.gamesPlayed
+          loserProfile.gamesPlayed,
         );
       }
 
       // Check and unlock achievements for both players
 
       if (winnerProfile) {
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+        void Promise.all([
+          ctx.runMutation(api.achievements.checkAchievements, {
+            profileId: winnerProfile._id,
+          }),
+          ctx.db.patch(winnerProfile._id, {
+            gameId: undefined,
+          }),
+        ]);
       }
-      
+
       if (loserProfile) {
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+        void Promise.all([
+          ctx.runMutation(api.achievements.checkAchievements, {
+            profileId: loserProfile._id,
+          }),
+          ctx.db.patch(loserProfile._id, {
+            gameId: undefined,
+          }),
+        ]);
       }
 
       // Check game-specific achievements (like Perfectionist, Comeback King)
       await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
         gameId: args.gameId,
         winnerId,
-        loserId
+        loserId,
       });
     }
 
@@ -798,16 +1019,18 @@ export const makeMove = mutation({
 export const getGameMoves = query({
   args: {
     gameId: v.id("games"),
-    paginationOpts: v.optional(v.object({
-      numItems: v.number(),
-      cursor: v.optional(v.string()),
-    })),
+    paginationOpts: v.optional(
+      v.object({
+        numItems: v.number(),
+        cursor: v.optional(v.string()),
+      }),
+    ),
     moveTypes: v.optional(v.array(v.string())), // Optional filter by move types
   },
   handler: async (ctx, args) => {
     const { paginationOpts } = args;
     const limit = paginationOpts ? Math.min(paginationOpts.numItems, 100) : 50;
-    
+
     let queryBuilder = ctx.db
       .query("moves")
       .withIndex("by_game_timestamp", (q) => q.eq("gameId", args.gameId))
@@ -819,7 +1042,9 @@ export const getGameMoves = query({
       const moveType = args.moveTypes[0] as "setup" | "move" | "challenge";
       queryBuilder = ctx.db
         .query("moves")
-        .withIndex("by_game_type", (q) => q.eq("gameId", args.gameId).eq("moveType", moveType))
+        .withIndex("by_game_type", (q) =>
+          q.eq("gameId", args.gameId).eq("moveType", moveType),
+        )
         .order("asc");
     }
 
@@ -833,24 +1058,30 @@ export const getGameMoves = query({
       if (args.moveTypes && args.moveTypes.length > 1) {
         return {
           ...result,
-          page: result.page.filter(move => args.moveTypes!.includes(move.moveType)),
+          page: result.page.filter((move) =>
+            args.moveTypes!.includes(move.moveType),
+          ),
         };
       }
-      
+
       return result;
     } else {
       // Initial load
       const moves = await queryBuilder.take(limit);
 
       // Filter by move types if multiple types specified (less common case)
-      const filteredMoves = args.moveTypes && args.moveTypes.length > 1
-        ? moves.filter(move => args.moveTypes!.includes(move.moveType))
-        : moves;
+      const filteredMoves =
+        args.moveTypes && args.moveTypes.length > 1
+          ? moves.filter((move) => args.moveTypes!.includes(move.moveType))
+          : moves;
 
       return {
         page: filteredMoves,
         isDone: filteredMoves.length < limit,
-        continueCursor: filteredMoves.length > 0 ? filteredMoves[filteredMoves.length - 1]._id : "",
+        continueCursor:
+          filteredMoves.length > 0
+            ? filteredMoves[filteredMoves.length - 1]._id
+            : "",
       };
     }
   },
@@ -865,7 +1096,7 @@ export const surrenderGame = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -907,19 +1138,21 @@ export const surrenderGame = mutation({
     await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
     // Clean up spectator chat when game ends
-    await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
+    await ctx.runMutation(api.spectate.cleanupSpectatorChat, {
+      gameId: args.gameId,
+    });
 
     // Update player stats with game duration
-    await ctx.runMutation(api.profiles.updateProfileStats, { 
-      userId: winnerId, 
+    await ctx.runMutation(api.profiles.updateProfileStats, {
+      userId: winnerId,
       won: true,
-      gameTime: gameDuration
+      gameTime: gameDuration,
     });
-    
-    await ctx.runMutation(api.profiles.updateProfileStats, { 
-      userId: loserId, 
+
+    await ctx.runMutation(api.profiles.updateProfileStats, {
+      userId: loserId,
       won: false,
-      gameTime: gameDuration
+      gameTime: gameDuration,
     });
 
     // Check achievements for both players
@@ -927,7 +1160,7 @@ export const surrenderGame = mutation({
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", winnerId))
       .unique();
-    
+
     const loserProfile = await ctx.db
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", loserId))
@@ -943,26 +1176,29 @@ export const surrenderGame = mutation({
         winnerProfile.elo ?? 1500,
         loserProfile.elo ?? 1500,
         winnerProfile.gamesPlayed,
-        loserProfile.gamesPlayed
+        loserProfile.gamesPlayed,
       );
     }
 
     if (winnerProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
-        await ctx.db.patch(winnerProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, {
+          profileId: winnerProfile._id,
+        }),
+        ctx.db.patch(winnerProfile._id, {
           gameId: undefined,
-        })
+        }),
       ]);
-
     }
-    
+
     if (loserProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
-        await ctx.db.patch(loserProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, {
+          profileId: loserProfile._id,
+        }),
+        ctx.db.patch(loserProfile._id, {
           gameId: undefined,
-        })
+        }),
       ]);
     }
 
@@ -970,7 +1206,7 @@ export const surrenderGame = mutation({
     await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
       gameId: args.gameId,
       winnerId,
-      loserId
+      loserId,
     });
 
     return { success: true, winner };
@@ -986,7 +1222,7 @@ export const timeoutGame = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -1002,10 +1238,12 @@ export const timeoutGame = mutation({
 
     // For timeout handling, allow either player to call timeout when it's their turn OR their opponent's turn
     // This enables offline opponent timeout handling
-    const isCurrentPlayer = (isPlayer1 && game.currentTurn === "player1") ||
-                           (isPlayer2 && game.currentTurn === "player2");
-    const isOpponentTurn = (isPlayer1 && game.currentTurn === "player2") ||
-                          (isPlayer2 && game.currentTurn === "player1");
+    const isCurrentPlayer =
+      (isPlayer1 && game.currentTurn === "player1") ||
+      (isPlayer2 && game.currentTurn === "player2");
+    const isOpponentTurn =
+      (isPlayer1 && game.currentTurn === "player2") ||
+      (isPlayer2 && game.currentTurn === "player1");
 
     if (!isCurrentPlayer && !isOpponentTurn) {
       throw new Error("Not authorized to handle timeout for this game");
@@ -1014,8 +1252,10 @@ export const timeoutGame = mutation({
     // Determine who timed out based on whose turn it is
     const timedOutPlayer = game.currentTurn;
     const winner = timedOutPlayer === "player1" ? "player2" : "player1";
-    const winnerId = timedOutPlayer === "player1" ? game.player2Id : game.player1Id;
-    const loserId = timedOutPlayer === "player1" ? game.player1Id : game.player2Id;
+    const winnerId =
+      timedOutPlayer === "player1" ? game.player2Id : game.player1Id;
+    const loserId =
+      timedOutPlayer === "player1" ? game.player1Id : game.player2Id;
 
     // Calculate game duration
     const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
@@ -1040,16 +1280,16 @@ export const timeoutGame = mutation({
     await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
     // Update player stats with game duration
-    await ctx.runMutation(api.profiles.updateProfileStats, { 
-      userId: winnerId, 
+    await ctx.runMutation(api.profiles.updateProfileStats, {
+      userId: winnerId,
       won: true,
       gameTime: gameDuration,
     });
-    
-    await ctx.runMutation(api.profiles.updateProfileStats, { 
-      userId: loserId, 
+
+    await ctx.runMutation(api.profiles.updateProfileStats, {
+      userId: loserId,
       won: false,
-      gameTime: gameDuration
+      gameTime: gameDuration,
     });
 
     // Check achievements for both players
@@ -1057,7 +1297,7 @@ export const timeoutGame = mutation({
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", winnerId))
       .unique();
-    
+
     const loserProfile = await ctx.db
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", loserId))
@@ -1073,25 +1313,29 @@ export const timeoutGame = mutation({
         winnerProfile.elo ?? 1500,
         loserProfile.elo ?? 1500,
         winnerProfile.gamesPlayed,
-        loserProfile.gamesPlayed
+        loserProfile.gamesPlayed,
       );
     }
 
     if (winnerProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
-        await ctx.db.patch(winnerProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, {
+          profileId: winnerProfile._id,
+        }),
+        ctx.db.patch(winnerProfile._id, {
           gameId: undefined,
-        })
+        }),
       ]);
     }
-    
+
     if (loserProfile) {
       void Promise.all([
-        await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
-        await ctx.db.patch(loserProfile._id, {
+        ctx.runMutation(api.achievements.checkAchievements, {
+          profileId: loserProfile._id,
+        }),
+        ctx.db.patch(loserProfile._id, {
           gameId: undefined,
-        })
+        }),
       ]);
     }
 
@@ -1099,41 +1343,46 @@ export const timeoutGame = mutation({
     await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
       gameId: args.gameId,
       winnerId,
-      loserId
+      loserId,
     });
 
     return { success: true, winner };
   },
 });
 
-
 // Handle game forfeit due to disconnection
 export const forfeitGame = mutation({
-  args: { 
+  args: {
     gameId: v.id("games"),
-    reason: v.union(v.literal("disconnection_timeout"), v.literal("manual"))
+    reason: v.union(v.literal("disconnection_timeout"), v.literal("manual")),
   },
   handler: async (ctx, { gameId, reason }) => {
-    const game = await ctx.db.get(gameId);
+    const game = await ctx.db.get("games", gameId);
     if (!game || game.status !== "playing") {
       throw new Error("Game not found or not in playing state");
     }
 
     // Determine winner (the player who didn't disconnect)
     const winner = game.currentTurn === "player1" ? "player2" : "player1";
-    const winnerId = game.currentTurn === "player1" ? game.player2Id : game.player1Id;
-    const loserId = game.currentTurn === "player1" ? game.player1Id : game.player2Id;
+    const winnerId =
+      game.currentTurn === "player1" ? game.player2Id : game.player1Id;
+    const loserId =
+      game.currentTurn === "player1" ? game.player1Id : game.player2Id;
+
+    // Calculate game duration
+    const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
 
     // Update game status
     await ctx.db.patch(gameId, {
       status: "finished",
       winner,
       finishedAt: Date.now(),
-      gameEndReason: reason === "disconnection_timeout" ? "timeout" : "surrender",
+      gameEndReason:
+        reason === "disconnection_timeout" ? "timeout" : "surrender",
     });
 
     // Update lobby status
-    const lobby = await ctx.db.get(game.lobbyId);
+    const lobby = await ctx.db.get("lobbies", game.lobbyId);
     if (lobby) {
       await ctx.db.patch(game.lobbyId, { status: "finished" });
     }
@@ -1158,20 +1407,27 @@ export const forfeitGame = mutation({
 
     if (winnerProfile) {
       await ctx.db.patch(winnerProfile._id, {
-        wins: winnerProfile.wins + 1,
-        gamesPlayed: winnerProfile.gamesPlayed + 1,
-        winStreak: (winnerProfile.winStreak || 0) + 1,
-        bestWinStreak: Math.max(winnerProfile.bestWinStreak || 0, (winnerProfile.winStreak || 0) + 1),
         gameId: undefined,
+      });
+
+      // Update player stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, {
+        userId: winnerId,
+        won: true,
+        gameTime: gameDuration,
       });
     }
 
     if (loserProfile) {
       await ctx.db.patch(loserProfile._id, {
-        losses: loserProfile.losses + 1,
-        gamesPlayed: loserProfile.gamesPlayed + 1,
-        winStreak: 0,
         gameId: undefined,
+      });
+
+      // Update player stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, {
+        userId: loserId,
+        won: false,
+        gameTime: gameDuration,
       });
     }
 
@@ -1185,16 +1441,20 @@ export const forfeitGame = mutation({
         winnerProfile.elo ?? 1500,
         loserProfile.elo ?? 1500,
         winnerProfile.gamesPlayed, // Use current value before increment
-        loserProfile.gamesPlayed   // Use current value before increment
+        loserProfile.gamesPlayed, // Use current value before increment
       );
     }
 
     // Check achievements
     if (winnerProfile) {
-      await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id });
+      await ctx.runMutation(api.achievements.checkAchievements, {
+        profileId: winnerProfile._id,
+      });
     }
     if (loserProfile) {
-      await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id });
+      await ctx.runMutation(api.achievements.checkAchievements, {
+        profileId: loserProfile._id,
+      });
     }
 
     // Check game-specific achievements
@@ -1206,7 +1466,259 @@ export const forfeitGame = mutation({
   },
 });
 
+// Constants for disconnection handling
+const DISCONNECTION_GRACE_PERIOD_MS = 2 * 60 * 1000; // 2 minutes
+
+// Report that opponent has disconnected - schedules auto-forfeit after grace period
+export const reportOpponentDisconnect = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, { gameId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(gameId);
+    if (!game) throw new Error("Game not found");
+
+    // Only handle during playing status
+    if (game.status !== "playing") {
+      return { scheduled: false, reason: "game_not_playing" };
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    // Determine which player disconnected (the opponent)
+    const opponentDisconnectedField = isPlayer1
+      ? "player2DisconnectedAt"
+      : "player1DisconnectedAt";
+    const currentDisconnectedAt = isPlayer1
+      ? game.player2DisconnectedAt
+      : game.player1DisconnectedAt;
+
+    // If already tracking disconnection, don't schedule again
+    if (currentDisconnectedAt) {
+      return {
+        scheduled: false,
+        reason: "already_tracking",
+        disconnectedAt: currentDisconnectedAt,
+      };
+    }
+
+    const now = Date.now();
+
+    // Record the disconnection timestamp
+    await ctx.db.patch(gameId, {
+      [opponentDisconnectedField]: now,
+    });
+
+    // Schedule the auto-forfeit after grace period
+    await ctx.scheduler.runAfter(
+      DISCONNECTION_GRACE_PERIOD_MS,
+      internal.games.handleDisconnectionForfeit,
+      {
+        gameId,
+        disconnectedPlayer: isPlayer1 ? "player2" : "player1",
+        disconnectedAt: now,
+      },
+    );
+
+    console.log(
+      `[reportOpponentDisconnect] Scheduled forfeit for game ${gameId} in ${DISCONNECTION_GRACE_PERIOD_MS / 1000}s`,
+    );
+
+    return {
+      scheduled: true,
+      disconnectedAt: now,
+      forfeitAt: now + DISCONNECTION_GRACE_PERIOD_MS,
+    };
+  },
+});
+
+// Report that opponent has reconnected - cancels the pending forfeit
+export const reportOpponentReconnect = mutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, { gameId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("Not authenticated");
+
+    const game = await ctx.db.get(gameId);
+    if (!game) throw new Error("Game not found");
+
+    // Only handle during playing status
+    if (game.status !== "playing") {
+      return { cleared: false, reason: "game_not_playing" };
+    }
+
+    const isPlayer1 = userId === game.player1Id;
+    const isPlayer2 = userId === game.player2Id;
+
+    if (!isPlayer1 && !isPlayer2) {
+      throw new Error("Not a player in this game");
+    }
+
+    // Clear the opponent's disconnection timestamp
+    const opponentDisconnectedField = isPlayer1
+      ? "player2DisconnectedAt"
+      : "player1DisconnectedAt";
+
+    await ctx.db.patch(gameId, {
+      [opponentDisconnectedField]: undefined,
+    });
+
+    console.log(
+      `[reportOpponentReconnect] Cleared disconnection for game ${gameId}`,
+    );
+
+    return { cleared: true };
+  },
+});
+
+// Internal mutation to handle disconnection forfeit after grace period
+export const handleDisconnectionForfeit = internalMutation({
+  args: {
+    gameId: v.id("games"),
+    disconnectedPlayer: v.union(v.literal("player1"), v.literal("player2")),
+    disconnectedAt: v.number(),
+  },
+  handler: async (ctx, { gameId, disconnectedPlayer, disconnectedAt }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game) {
+      console.log(
+        `[handleDisconnectionForfeit] Game ${gameId} not found, already cleaned up`,
+      );
+      return { handled: false, reason: "game_not_found" };
+    }
+
+    // If game is not in playing status, nothing to do
+    if (game.status !== "playing") {
+      console.log(
+        `[handleDisconnectionForfeit] Game ${gameId} already in ${game.status} status, skipping`,
+      );
+      return { handled: false, reason: "game_not_playing" };
+    }
+
+    // Check if the disconnection is still active (opponent didn't reconnect)
+    const currentDisconnectedAt =
+      disconnectedPlayer === "player1"
+        ? game.player1DisconnectedAt
+        : game.player2DisconnectedAt;
+
+    // If disconnection was cleared (opponent reconnected), don't forfeit
+    if (!currentDisconnectedAt || currentDisconnectedAt !== disconnectedAt) {
+      console.log(
+        `[handleDisconnectionForfeit] Game ${gameId} - opponent reconnected, skipping forfeit`,
+      );
+      return { handled: false, reason: "opponent_reconnected" };
+    }
+
+    // Forfeit the game - the connected player wins
+    const winner = disconnectedPlayer === "player1" ? "player2" : "player1";
+    const winnerId =
+      disconnectedPlayer === "player1" ? game.player2Id : game.player1Id;
+    const loserId =
+      disconnectedPlayer === "player1" ? game.player1Id : game.player2Id;
+
+    console.log(
+      `[handleDisconnectionForfeit] Game ${gameId} - ${winner} wins by disconnection timeout`,
+    );
+
+    // Calculate game duration
+    const gameDuration = Date.now() - (game.gameTimeStarted || game.createdAt);
+
+    // Update game status
+    await ctx.db.patch(gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: "timeout",
+    });
+
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, { status: "finished" });
+
+    // Clean up presence
+    await presence.removeRoom(ctx, gameId as string);
+    await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
+
+    // Update profiles
+    const [winnerProfile, loserProfile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", winnerId))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", loserId))
+        .unique(),
+    ]);
+
+    if (winnerProfile) {
+      await ctx.db.patch(winnerProfile._id, {
+        gameId: undefined,
+      });
+
+      // Update profile stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, {
+        userId: winnerId,
+        won: true,
+        gameTime: gameDuration,
+      });
+    }
+
+    if (loserProfile) {
+      await ctx.db.patch(loserProfile._id, {
+        gameId: undefined,
+      });
+
+      // Update profile stats with game duration
+      await ctx.runMutation(api.profiles.updateProfileStats, {
+        userId: loserId,
+        won: false,
+        gameTime: gameDuration,
+      });
+    }
+
+    // Update ELO ratings for quick match games only
+    const isQuickMatch = await isQuickMatchGame(ctx, game.lobbyId);
+    if (isQuickMatch && winnerProfile && loserProfile) {
+      await updateEloRatings(
+        ctx,
+        winnerId,
+        loserId,
+        winnerProfile.elo ?? 1500,
+        loserProfile.elo ?? 1500,
+        winnerProfile.gamesPlayed,
+        loserProfile.gamesPlayed,
+      );
+    }
+
+    // Check achievements
+    if (winnerProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, {
+        profileId: winnerProfile._id,
+      });
+    }
+    if (loserProfile) {
+      await ctx.runMutation(api.achievements.checkAchievements, {
+        profileId: loserProfile._id,
+      });
+    }
+
+    return { handled: true, winner };
+  },
+});
+
 // Get current user's active game - Optimized to reduce queries
+
 export const getCurrentUserGame = query({
   args: {},
   handler: async (ctx) => {
@@ -1218,19 +1730,23 @@ export const getCurrentUserGame = query({
       ctx.db
         .query("games")
         .withIndex("by_player1", (q) => q.eq("player1Id", userId))
-        .filter((q) => q.or(
-          q.eq(q.field("status"), "setup"),
-          q.eq(q.field("status"), "playing")
-        ))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "setup"),
+            q.eq(q.field("status"), "playing"),
+          ),
+        )
         .first(),
       ctx.db
         .query("games")
         .withIndex("by_player2", (q) => q.eq("player2Id", userId))
-        .filter((q) => q.or(
-          q.eq(q.field("status"), "setup"),
-          q.eq(q.field("status"), "playing")
-        ))
-        .first()
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "setup"),
+            q.eq(q.field("status"), "playing"),
+          ),
+        )
+        .first(),
     ]);
 
     // Return the most recent active game
@@ -1238,23 +1754,25 @@ export const getCurrentUserGame = query({
     if (activeGame) return activeGame;
 
     // If no active game, check for recently finished games that need acknowledgment
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
-    
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
     // Optimized: Single query with filter for both players
     const finishedGames = await ctx.db
       .query("games")
-      .withIndex("by_status_finished", (q) => q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo))
-      .filter((q) => 
+      .withIndex("by_status_finished", (q) =>
+        q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo),
+      )
+      .filter((q) =>
         q.or(
           q.and(
             q.eq(q.field("player1Id"), userId),
-            q.neq(q.field("player1ResultAcknowledged"), true)
+            q.neq(q.field("player1ResultAcknowledged"), true),
           ),
           q.and(
             q.eq(q.field("player2Id"), userId),
-            q.neq(q.field("player2ResultAcknowledged"), true)
-          )
-        )
+            q.neq(q.field("player2ResultAcknowledged"), true),
+          ),
+        ),
       )
       .order("desc")
       .first();
@@ -1263,12 +1781,76 @@ export const getCurrentUserGame = query({
   },
 });
 
+// BANDWIDTH OPTIMIZED: Lightweight query that returns only game ID
+// Use this on lobby pages instead of getCurrentUserGame to reduce sync bandwidth by ~80%
+export const getCurrentUserGameId = query({
+  args: {},
+  returns: v.union(v.id("games"), v.null()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    // Query both player indexes in parallel, returning only the _id
+    const [player1Game, player2Game] = await Promise.all([
+      ctx.db
+        .query("games")
+        .withIndex("by_player1", (q) => q.eq("player1Id", userId))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "setup"),
+            q.eq(q.field("status"), "playing"),
+          ),
+        )
+        .first(),
+      ctx.db
+        .query("games")
+        .withIndex("by_player2", (q) => q.eq("player2Id", userId))
+        .filter((q) =>
+          q.or(
+            q.eq(q.field("status"), "setup"),
+            q.eq(q.field("status"), "playing"),
+          ),
+        )
+        .first(),
+    ]);
+
+    // Return just the game ID, not the full document
+    const activeGame = player1Game || player2Game;
+    if (activeGame) return activeGame._id;
+
+    // Check for recently finished games needing acknowledgment
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+    const finishedGame = await ctx.db
+      .query("games")
+      .withIndex("by_status_finished", (q) =>
+        q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo),
+      )
+      .filter((q) =>
+        q.or(
+          q.and(
+            q.eq(q.field("player1Id"), userId),
+            q.neq(q.field("player1ResultAcknowledged"), true),
+          ),
+          q.and(
+            q.eq(q.field("player2Id"), userId),
+            q.neq(q.field("player2ResultAcknowledged"), true),
+          ),
+        ),
+      )
+      .order("desc")
+      .first();
+
+    return finishedGame?._id ?? null;
+  },
+});
+
 export const checkOpponentTimeout = mutation({
   args: {
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "playing") {
@@ -1286,16 +1868,24 @@ export const checkOpponentTimeout = mutation({
     const currentPlayer = game.currentTurn;
     const opponent = currentPlayer === "player1" ? "player2" : "player1";
 
-    const currentPlayerTimeUsed = currentPlayer === "player1" ? game.player1TimeUsed || 0 : game.player2TimeUsed || 0;
-    const opponentTimeUsed = opponent === "player1" ? game.player1TimeUsed || 0 : game.player2TimeUsed || 0;
+    const currentPlayerTimeUsed =
+      currentPlayer === "player1"
+        ? game.player1TimeUsed || 0
+        : game.player2TimeUsed || 0;
+    const opponentTimeUsed =
+      opponent === "player1"
+        ? game.player1TimeUsed || 0
+        : game.player2TimeUsed || 0;
 
     // Calculate remaining time: total allowed - current player's time used + opponent's time used
-    const remainingTime = totalAllowedTime - currentPlayerTimeUsed + opponentTimeUsed;
+    const remainingTime =
+      totalAllowedTime - currentPlayerTimeUsed + opponentTimeUsed;
 
     if (remainingTime < 0) {
       // Timeout the opponent
       const winner = currentPlayer;
-      const winnerId = currentPlayer === "player1" ? game.player1Id : game.player2Id;
+      const winnerId =
+        currentPlayer === "player1" ? game.player1Id : game.player2Id;
       const loserId = opponent === "player1" ? game.player1Id : game.player2Id;
 
       // Calculate game duration
@@ -1309,10 +1899,10 @@ export const checkOpponentTimeout = mutation({
         gameEndReason: "timeout" as const,
       });
 
-    // Update lobby status
-    await ctx.db.patch(game.lobbyId, {
-      status: "finished",
-    });
+      // Update lobby status
+      await ctx.db.patch(game.lobbyId, {
+        status: "finished",
+      });
 
       // Clean up presence room when game ends
       await presence.removeRoom(ctx, args.gameId as string);
@@ -1321,19 +1911,21 @@ export const checkOpponentTimeout = mutation({
       await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
       // Clean up spectator chat when game ends
-      await ctx.runMutation(api.spectate.cleanupSpectatorChat, { gameId: args.gameId });
+      await ctx.runMutation(api.spectate.cleanupSpectatorChat, {
+        gameId: args.gameId,
+      });
 
       // Update player stats
       await ctx.runMutation(api.profiles.updateProfileStats, {
         userId: winnerId,
         won: true,
-        gameTime: gameDuration
+        gameTime: gameDuration,
       });
 
       await ctx.runMutation(api.profiles.updateProfileStats, {
         userId: loserId,
         won: false,
-        gameTime: gameDuration
+        gameTime: gameDuration,
       });
 
       // Check achievements for both players
@@ -1357,26 +1949,29 @@ export const checkOpponentTimeout = mutation({
           winnerProfile.elo ?? 1500,
           loserProfile.elo ?? 1500,
           winnerProfile.gamesPlayed,
-          loserProfile.gamesPlayed
+          loserProfile.gamesPlayed,
         );
       }
 
       if (winnerProfile) {
         void Promise.all([
-          await ctx.runMutation(api.achievements.checkAchievements, { profileId: winnerProfile._id }),
-          await ctx.db.patch(winnerProfile._id, {
+          ctx.runMutation(api.achievements.checkAchievements, {
+            profileId: winnerProfile._id,
+          }),
+          ctx.db.patch(winnerProfile._id, {
             gameId: undefined,
-          })
+          }),
         ]);
-
       }
-      
+
       if (loserProfile) {
         void Promise.all([
-          await ctx.runMutation(api.achievements.checkAchievements, { profileId: loserProfile._id }),
-          await ctx.db.patch(loserProfile._id, {
+          ctx.runMutation(api.achievements.checkAchievements, {
+            profileId: loserProfile._id,
+          }),
+          ctx.db.patch(loserProfile._id, {
             gameId: undefined,
-          })
+          }),
         ]);
       }
 
@@ -1384,20 +1979,25 @@ export const checkOpponentTimeout = mutation({
       await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
         gameId: args.gameId,
         winnerId,
-        loserId
+        loserId,
       });
 
-      return { success: true, timedOut: true, winner, reason: "opponent_timeout" };
+      return {
+        success: true,
+        timedOut: true,
+        winner,
+        reason: "opponent_timeout",
+      };
     }
 
     return { success: true, timedOut: false };
   },
-})
+});
 
 // Update timer for current player (called periodically for sync) - REMOVED FOR PERFORMANCE
 // This function was causing too many unnecessary requests. Timer is now handled client-side.
 
-// Update timer for current player - REMOVED FOR PERFORMANCE  
+// Update timer for current player - REMOVED FOR PERFORMANCE
 // This function was causing too many unnecessary requests. Timer is now handled client-side.
 
 // Check and handle timeouts - DEPRECATED - REMOVE FOR PERFORMANCE
@@ -1411,7 +2011,7 @@ export const getMatchResult = query({
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) return null;
 
     if (game.status !== "finished") return null;
@@ -1420,8 +2020,13 @@ export const getMatchResult = query({
     const moveCount = game.moveCount || 0;
 
     // Determine the reason for game ending
-    let reason: "flag_captured" | "flag_reached_base" | "timeout" | "surrender" | "elimination" = "flag_captured";
-    
+    let reason:
+      | "flag_captured"
+      | "flag_reached_base"
+      | "timeout"
+      | "surrender"
+      | "elimination" = "flag_captured";
+
     if (game.gameEndReason === "timeout") {
       reason = "timeout";
     } else if (game.gameEndReason === "surrender") {
@@ -1436,7 +2041,7 @@ export const getMatchResult = query({
           .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
           .order("desc")
           .take(1);
-        
+
         const lastMove = moves[0];
         if (lastMove?.challengeResult?.defender === "Flag") {
           reason = "flag_captured";
@@ -1450,7 +2055,9 @@ export const getMatchResult = query({
 
     // Duration should measure actual play time (exclude setup). Fallback to createdAt for legacy games.
     const startedAt = game.gameTimeStarted || game.createdAt;
-    const duration = game.finishedAt ? Math.floor((game.finishedAt - startedAt) / 1000) : 0;
+    const duration = game.finishedAt
+      ? Math.floor((game.finishedAt - startedAt) / 1000)
+      : 0;
 
     return {
       winner: game.winner || "draw",
@@ -1474,29 +2081,53 @@ export const getMatchHistory = query({
     }),
   },
   returns: v.object({
-    page: v.array(v.object({
-      _id: v.id("games"),
-      opponentUsername: v.string(),
-      isWin: v.boolean(),
-      isDraw: v.boolean(),
-      reason: v.string(),
-      duration: v.number(),
-      moves: v.number(),
-      createdAt: v.number(),
-      rankAtTime: v.string(),
-      gameId: v.id("games"),
-      lobbyName: v.string(),
-    })),
+    page: v.array(
+      v.object({
+        _id: v.id("games"),
+        opponentUsername: v.string(),
+        isWin: v.boolean(),
+        isDraw: v.boolean(),
+        reason: v.string(),
+        duration: v.number(),
+        moves: v.number(),
+        createdAt: v.number(),
+        rankAtTime: v.string(),
+        gameId: v.id("games"),
+        lobbyName: v.string(),
+      }),
+    ),
     isDone: v.boolean(),
     continueCursor: v.union(v.string(), v.null()),
     hasMore: v.boolean(),
   }),
   handler: async (ctx, args) => {
-    const userId = args.userId || await getAuthUserId(ctx);
+    const userId = args.userId || (await getAuthUserId(ctx));
     if (!userId) throw new Error("Not authenticated");
 
+    // Check subscription tier for replay limits
+    const subscription = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+
+    const tier = subscription?.tier || "free";
+    const status = subscription?.status || "active";
+    const expiresAt = subscription?.expiresAt || null;
+    const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+    // Check if subscription is active using shared helper
+    const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
+
+    // Replay limits: Free (1), Pro (50), Pro+ (100)
+    const replayLimits: Record<string, number> = {
+      free: 1,
+      pro: 50,
+      pro_plus: 100,
+    };
+    const maxReplays = isActive ? replayLimits[tier] || 1 : 1;
+
     const { paginationOpts } = args;
-    const limit = Math.min(paginationOpts.numItems, 20);
+    const limit = Math.min(paginationOpts.numItems, Math.min(20, maxReplays));
 
     // Get user's profile once for rank info
     const profile = await ctx.db
@@ -1512,17 +2143,17 @@ export const getMatchHistory = query({
       ctx.db
         .query("games")
         .withIndex("by_player1_finished", (q) =>
-          q.eq("player1Id", userId).eq("status", "finished")
+          q.eq("player1Id", userId).eq("status", "finished"),
         )
         .order("desc")
         .take(fetchLimit),
       ctx.db
         .query("games")
         .withIndex("by_player2_finished", (q) =>
-          q.eq("player2Id", userId).eq("status", "finished")
+          q.eq("player2Id", userId).eq("status", "finished"),
         )
         .order("desc")
-        .take(fetchLimit)
+        .take(fetchLimit),
     ]);
 
     // Merge and sort results by finishedAt descending, then by _id for tie-breaking
@@ -1537,26 +2168,34 @@ export const getMatchHistory = query({
     let filteredGames = allGames;
     if (paginationOpts.cursor && paginationOpts.cursor.trim() !== "") {
       // Filter out games we've already seen (games before cursor)
-      filteredGames = allGames.filter(game => game._id > paginationOpts.cursor!);
+      filteredGames = allGames.filter(
+        (game) => game._id > paginationOpts.cursor!,
+      );
     }
 
-    // Take the requested page size
-    const pageGames = filteredGames.slice(0, limit);
+    // Apply replay limit based on subscription tier
+    const limitedGames = filteredGames.slice(0, maxReplays);
 
-    // Determine if we have more results
-    const hasMore = filteredGames.length > limit;
+    // Take the requested page size (within the replay limit)
+    const pageGames = limitedGames.slice(0, limit);
+
+    // Determine if we have more results (within replay limit)
+    const hasMore = limitedGames.length > limit;
 
     const result = {
       page: pageGames,
       isDone: !hasMore,
-      continueCursor: pageGames.length > 0 ? pageGames[pageGames.length - 1]._id : null,
+      continueCursor:
+        pageGames.length > 0 ? pageGames[pageGames.length - 1]._id : null,
     };
 
     // Transform games into match history format
     const matchHistory = await Promise.all(
       result.page.map(async (game) => {
         const isPlayer1 = game.player1Id === userId;
-        const opponentUsername = isPlayer1 ? game.player2Username : game.player1Username;
+        const opponentUsername = isPlayer1
+          ? game.player2Username
+          : game.player1Username;
         const isWin = game.winner === (isPlayer1 ? "player1" : "player2");
         const isDraw = game.winner === undefined;
 
@@ -1571,7 +2210,10 @@ export const getMatchHistory = query({
           reason: game.gameEndReason || "flag_captured",
           // Use gameTimeStarted to reflect actual play duration (exclude setup). Fallback for legacy games.
           duration: game.finishedAt
-            ? Math.floor((game.finishedAt - (game.gameTimeStarted || game.createdAt)) / 1000)
+            ? Math.floor(
+                (game.finishedAt - (game.gameTimeStarted || game.createdAt)) /
+                  1000,
+              )
             : 0,
           moves: movesCount,
           createdAt: game.createdAt,
@@ -1579,7 +2221,7 @@ export const getMatchHistory = query({
           gameId: game._id,
           lobbyName: game.lobbyName || "Unknown",
         };
-      })
+      }),
     );
 
     return {
@@ -1598,7 +2240,7 @@ export const getGameReplay = query({
     moveLimit: v.optional(v.number()), // Allow limiting moves for large games
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "finished") {
@@ -1616,24 +2258,28 @@ export const getGameReplay = query({
       .take(moveLimit);
 
     // Filter out setup moves and keep only game moves
-    const gameMoves = allMoves.filter(move => move.moveType === "move" || move.moveType === "challenge");
+    const gameMoves = allMoves.filter(
+      (move) => move.moveType === "move" || move.moveType === "challenge",
+    );
 
     // Use the saved initial setup board, or reconstruct from current board if not available
     let initialBoard = game.initialSetupBoard;
-    
+
     if (!initialBoard) {
       // Fallback for games created before we saved initial setup
       // Try to reconstruct initial positions from final board and moves
-      initialBoard = game.board.map(row => 
-        row.map(cell => cell ? { ...cell, revealed: false } : null)
+      initialBoard = game.board.map((row) =>
+        row.map((cell) => (cell ? { ...cell, revealed: false } : null)),
       );
-      
+
       // If we have moves, try to reverse them to get initial positions
       // This is a best-effort reconstruction for legacy games
       if (gameMoves.length > 0) {
         // For now, just use the final board with pieces hidden
         // A more sophisticated approach could reverse-engineer the moves
-        console.warn("Game missing initial setup board, using fallback reconstruction");
+        console.warn(
+          "Game missing initial setup board, using fallback reconstruction",
+        );
       }
     }
 
@@ -1658,7 +2304,7 @@ export const acknowledgeGameResult = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("Not authenticated");
 
-    const game = await ctx.db.get(args.gameId);
+    const game = await ctx.db.get("games", args.gameId);
     if (!game) throw new Error("Game not found");
 
     if (game.status !== "finished") {
@@ -1673,8 +2319,10 @@ export const acknowledgeGameResult = mutation({
     }
 
     // Update the acknowledgment field for the current player
-    const updateField = isPlayer1 ? "player1ResultAcknowledged" : "player2ResultAcknowledged";
-    
+    const updateField = isPlayer1
+      ? "player1ResultAcknowledged"
+      : "player2ResultAcknowledged";
+
     await ctx.db.patch(args.gameId, {
       [updateField]: true,
     });
@@ -1683,20 +2331,21 @@ export const acknowledgeGameResult = mutation({
   },
 });
 
-// Internal function to cleanup stale games (setup >40 mins, playing >40 mins)
+// Internal function to cleanup stale games (failsafe - primary cleanup via scheduled handlers)
+// Threshold reduced since scheduled handleSetupTimeout handles most cases
 export const cleanupStaleGames = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const fortyMinutesAgo = Date.now() - (40 * 60 * 1000); // 40 minutes in milliseconds
+    const tenMinutesAgo = Date.now() - 10 * 60 * 1000; // 10 minutes in milliseconds
     let deletedSetupGames = 0;
     let forfeitedPlayingGames = 0;
 
-    // Handle stale setup games (>40 minutes old)
+    // Handle stale setup games (>10 minutes old - should have been handled by scheduled timeout)
     // OPTIMIZED: Added limit to prevent excessive document scanning
     const staleSetupGames = await ctx.db
       .query("games")
       .withIndex("by_status_setup_time", (q) =>
-        q.eq("status", "setup").lt("setupTimeStarted", fortyMinutesAgo)
+        q.eq("status", "setup").lt("setupTimeStarted", tenMinutesAgo),
       )
       .take(100); // Process in batches to avoid timeout
 
@@ -1746,12 +2395,13 @@ export const cleanupStaleGames = internalMutation({
       }
     }
 
-    // Handle stale playing games (>40 minutes old)
+    // Handle stale playing games (>20 minutes old - games should finish within time limit + buffer)
+    const twentyMinutesAgo = Date.now() - 20 * 60 * 1000; // 20 minutes in milliseconds
     // OPTIMIZED: Added limit to prevent excessive document scanning
     const stalePlayingGames = await ctx.db
       .query("games")
       .withIndex("by_status_game_time", (q) =>
-        q.eq("status", "playing").lt("gameTimeStarted", fortyMinutesAgo)
+        q.eq("status", "playing").lt("gameTimeStarted", twentyMinutesAgo),
       )
       .take(100); // Process in batches to avoid timeout
 
@@ -1766,11 +2416,160 @@ export const cleanupStaleGames = internalMutation({
 
         forfeitedPlayingGames++;
       } catch (error) {
-        console.error(`Error forfeiting stale playing game ${game._id}:`, error);
+        console.error(
+          `Error forfeiting stale playing game ${game._id}:`,
+          error,
+        );
       }
     }
 
-    console.log(`Cleaned up ${deletedSetupGames} stale setup games and ${forfeitedPlayingGames} stale playing games`);
+    console.log(
+      `Cleaned up ${deletedSetupGames} stale setup games and ${forfeitedPlayingGames} stale playing games`,
+    );
     return { deletedSetupGames, forfeitedPlayingGames };
+  },
+});
+
+// Handle setup phase timeout - called 5 minutes after game starts
+export const handleSetupTimeout = internalMutation({
+  args: {
+    gameId: v.id("games"),
+  },
+  handler: async (ctx, { gameId }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game) {
+      console.log(
+        `[handleSetupTimeout] Game ${gameId} not found, already cleaned up`,
+      );
+      return { handled: false, reason: "game_not_found" };
+    }
+
+    // If game already progressed past setup, nothing to do
+    if (game.status !== "setup") {
+      console.log(
+        `[handleSetupTimeout] Game ${gameId} already in ${game.status} status, skipping`,
+      );
+      return { handled: false, reason: "already_progressed" };
+    }
+
+    const player1Ready = game.player1Setup;
+    const player2Ready = game.player2Setup;
+
+    // Both players completed setup (shouldn't happen but handle gracefully)
+    if (player1Ready && player2Ready) {
+      console.log(
+        `[handleSetupTimeout] Game ${gameId} both players ready, transitioning to playing`,
+      );
+      await ctx.db.patch(gameId, {
+        status: "playing",
+        gameTimeStarted: Date.now(),
+      });
+      return { handled: true, reason: "both_ready" };
+    }
+
+    // Determine outcome based on who completed setup
+    if (!player1Ready && !player2Ready) {
+      // Both abandoned - delete the game
+      console.log(
+        `[handleSetupTimeout] Game ${gameId} both players abandoned setup`,
+      );
+
+      // Clear gameId from profiles
+      const [player1Profile, player2Profile] = await Promise.all([
+        ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", game.player1Id))
+          .unique(),
+        ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", game.player2Id))
+          .unique(),
+      ]);
+
+      if (player1Profile)
+        await ctx.db.patch(player1Profile._id, {
+          gameId: undefined,
+          lobbyId: undefined,
+        });
+      if (player2Profile)
+        await ctx.db.patch(player2Profile._id, {
+          gameId: undefined,
+          lobbyId: undefined,
+        });
+
+      // Delete lobby and game
+      await ctx.db.delete(game.lobbyId);
+      await ctx.db.delete(gameId);
+
+      // Cleanup presence
+      await presence.removeRoom(ctx, gameId as string);
+      await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+      await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
+
+      return { handled: true, reason: "both_abandoned" };
+    }
+
+    // One player ready - they win by default
+    const winner = player1Ready ? "player1" : "player2";
+    const winnerId = player1Ready ? game.player1Id : game.player2Id;
+    const loserId = player1Ready ? game.player2Id : game.player1Id;
+
+    console.log(
+      `[handleSetupTimeout] Game ${gameId} - ${winner} wins by default (opponent didn't complete setup)`,
+    );
+
+    // Update game status
+    await ctx.db.patch(gameId, {
+      status: "finished",
+      winner,
+      finishedAt: Date.now(),
+      gameEndReason: "timeout", // Setup timeout counts as timeout
+    });
+
+    // Update lobby status
+    await ctx.db.patch(game.lobbyId, { status: "finished" });
+
+    // Update profiles
+    const [winnerProfile, loserProfile] = await Promise.all([
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", winnerId))
+        .unique(),
+      ctx.db
+        .query("profiles")
+        .withIndex("by_user", (q) => q.eq("userId", loserId))
+        .unique(),
+    ]);
+
+    if (winnerProfile) {
+      await ctx.db.patch(winnerProfile._id, {
+        wins: winnerProfile.wins + 1,
+        gamesPlayed: winnerProfile.gamesPlayed + 1,
+        winStreak: (winnerProfile.winStreak || 0) + 1,
+        bestWinStreak: Math.max(
+          winnerProfile.bestWinStreak || 0,
+          (winnerProfile.winStreak || 0) + 1,
+        ),
+        gameId: undefined,
+        lobbyId: undefined,
+      });
+    }
+
+    if (loserProfile) {
+      await ctx.db.patch(loserProfile._id, {
+        losses: loserProfile.losses + 1,
+        gamesPlayed: loserProfile.gamesPlayed + 1,
+        winStreak: 0,
+        gameId: undefined,
+        lobbyId: undefined,
+      });
+    }
+
+    // Cleanup presence
+    await presence.removeRoom(ctx, gameId as string);
+    await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
+    await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
+
+    return { handled: true, reason: "one_abandoned", winner };
   },
 });

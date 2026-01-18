@@ -2,6 +2,8 @@ import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
+import { isSubscriptionActive } from "./featureGating";
+import { Doc } from "./_generated/dataModel";
 
 // Rank weights for skill calculation
 const RANK_WEIGHTS = {
@@ -22,7 +24,7 @@ const RANK_WEIGHTS = {
 };
 
 // Calculate skill rating from player profile
-function calculateSkillRating(profile: any): number {
+function calculateSkillRating(profile: Doc<"profiles">): number {
   const winRate = profile.gamesPlayed > 0 ? profile.wins / profile.gamesPlayed : 0;
   const rankWeight = RANK_WEIGHTS[profile.rank as keyof typeof RANK_WEIGHTS] || 0;
   const gamesPlayed = profile.gamesPlayed;
@@ -274,9 +276,52 @@ export const attemptMatch = internalMutation({
       return { success: false, matchesCreated: 0, playersMatched: 0 };
     }
 
+    // Get subscription status for all players to determine priority (parallelized)
+    const playerSubscriptions = new Map<string, { tier: string; isActive: boolean }>();
+    
+    // Fetch all subscriptions in parallel
+    const subscriptionResults = await Promise.all(
+      waitingPlayers.map(async (player) => {
+        const subscription = await ctx.db
+          .query("subscriptions")
+          .withIndex("by_user", (q) => q.eq("userId", player.userId))
+          .unique();
+        return { userId: player.userId, subscription };
+      })
+    );
+    
+    // Process subscription results
+    for (const { userId, subscription } of subscriptionResults) {
+      const tier = subscription?.tier || "free";
+      const status = subscription?.status || "active";
+      const expiresAt = subscription?.expiresAt || null;
+      const gracePeriodEndsAt = subscription?.gracePeriodEndsAt || null;
+
+      // Check if subscription is active using shared helper
+      const isActive = isSubscriptionActive(status, expiresAt, gracePeriodEndsAt);
+
+      playerSubscriptions.set(userId, { tier, isActive });
+    }
+
+    // Sort players: Pro/Pro+ with active subscriptions first
+    waitingPlayers.sort((a, b) => {
+      const subA = playerSubscriptions.get(a.userId);
+      const subB = playerSubscriptions.get(b.userId);
+      
+      const priorityA = (subA?.tier === "pro" || subA?.tier === "pro_plus") && subA?.isActive ? 1 : 0;
+      const priorityB = (subB?.tier === "pro" || subB?.tier === "pro_plus") && subB?.isActive ? 1 : 0;
+      
+      if (priorityA !== priorityB) {
+        return priorityB - priorityA; // Pro/Pro+ users first
+      }
+      
+      // Then by skill rating
+      return a.skillRating - b.skillRating;
+    });
+
     // Skill-based matching algorithm
     const matchedUsers = new Set<string>();
-    const matches: Array<{ player1: any; player2: any }> = [];
+    const matches: Array<{ player1: Doc<"matchmakingQueue">; player2: Doc<"matchmakingQueue"> }> = [];
 
     for (let i = 0; i < waitingPlayers.length; i++) {
       if (matchedUsers.has(waitingPlayers[i].userId)) continue;
@@ -291,8 +336,15 @@ export const attemptMatch = internalMutation({
         const skillDiff = Math.abs(waitingPlayers[i].skillRating - waitingPlayers[j].skillRating);
         const waitTimeBonus = (Date.now() - waitingPlayers[j].joinedAt) / 60000; // Minutes waited
 
-        // Score = skill difference - wait time bonus (lower is better)
-        const matchScore = skillDiff - (waitTimeBonus * 10);
+        // Priority bonus for Pro/Pro+ users
+        const subI = playerSubscriptions.get(waitingPlayers[i].userId);
+        const subJ = playerSubscriptions.get(waitingPlayers[j].userId);
+        const priorityBonusI = (subI?.tier === "pro" || subI?.tier === "pro_plus") && subI?.isActive ? 50 : 0;
+        const priorityBonusJ = (subJ?.tier === "pro" || subJ?.tier === "pro_plus") && subJ?.isActive ? 50 : 0;
+        const priorityBonus = Math.max(priorityBonusI, priorityBonusJ);
+
+        // Score = skill difference - wait time bonus - priority bonus (lower is better)
+        const matchScore = skillDiff - (waitTimeBonus * 10) - priorityBonus;
 
         if (matchScore < bestMatchScore) {
           bestMatchScore = matchScore;

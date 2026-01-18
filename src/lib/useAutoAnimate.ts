@@ -10,9 +10,9 @@ interface AutoAnimateOptions {
 }
 
 export function useAutoAnimate<T extends HTMLElement = HTMLDivElement>(
-  options?: AutoAnimateOptions
-): RefObject<T | null> {
-  const ref = useRef<T>(null);
+  options?: AutoAnimateOptions,
+): RefObject<T> {
+  const ref = useRef<T>(null!);
 
   useEffect(() => {
     if (ref.current) {
@@ -25,9 +25,14 @@ export function useAutoAnimate<T extends HTMLElement = HTMLDivElement>(
 }
 
 // Hook for enabling/disabling animations dynamically
-export function useAutoAnimateController<T extends HTMLElement = HTMLDivElement>(
-  options?: AutoAnimateOptions
-): [RefObject<T | null>, { enable: () => void; disable: () => void; isEnabled: () => boolean }] {
+export function useAutoAnimateController<
+  T extends HTMLElement = HTMLDivElement,
+>(
+  options?: AutoAnimateOptions,
+): [
+  RefObject<T | null>,
+  { enable: () => void; disable: () => void; isEnabled: () => boolean },
+] {
   const ref = useRef<T>(null);
   const controllerRef = useRef<any>(null);
 

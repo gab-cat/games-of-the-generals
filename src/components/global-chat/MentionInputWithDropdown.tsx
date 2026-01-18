@@ -1,9 +1,7 @@
 "use client";
 
 import { forwardRef, useState, useRef, useCallback, useEffect } from "react";
-import { useQuery } from "convex/react";
 import { useDebounce } from "use-debounce";
-import { api } from "../../../convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
 
@@ -16,7 +14,7 @@ interface MentionInputWithDropdownProps extends Omit<React.InputHTMLAttributes<H
   maxLength?: number;
   className?: string;
   handleSendMessage: () => void;
-  onlineUsers?: Array<{ username: string; avatarUrl?: string; rank?: string; userId: string }>;
+  onlineUsers?: Array<{ username: string; avatarUrl?: string; rank?: string; userId: string; avatarFrame?: string }>;
 }
 
 // Online user interface - no need for rank colors/icons since we're simplifying
@@ -296,6 +294,7 @@ export const MentionInputWithDropdown = forwardRef<HTMLInputElement, MentionInpu
                           avatarUrl={user.avatarUrl}
                           rank={user.rank}
                           size="xs"
+                          frame={user.avatarFrame}
                           className="ring-1 ring-white/20 flex-shrink-0"
                         />
 

@@ -1,126 +1,201 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { Shield, AlertTriangle, MessageSquareOff } from "lucide-react";
+import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
+import {
+  Shield,
+  AlertTriangle,
+  MessageSquareOff,
+  Siren,
+  Terminal,
+  AlertOctagon,
+  CheckCircle2,
+} from "lucide-react";
+import { motion } from "framer-motion";
 
 interface SpamWarningModalProps {
   isOpen: boolean;
   onClose: () => void;
-  spamType: 'repeated' | 'caps' | 'excessive' | 'profanity' | 'generic';
+  spamType: "repeated" | "caps" | "excessive" | "profanity" | "generic";
   message?: string;
 }
 
-export function SpamWarningModal({ isOpen, onClose, spamType, message }: SpamWarningModalProps) {
-  const getSpamMessage = () => {
+export function SpamWarningModal({
+  isOpen,
+  onClose,
+  spamType,
+  message,
+}: SpamWarningModalProps) {
+  const getSpamConfig = () => {
     switch (spamType) {
-      case 'profanity':
+      case "profanity":
         return {
-          title: "Inappropriate Language",
-          description: "Your message contains inappropriate or offensive language. Please keep the conversation respectful.",
+          title: "LANGUAGE_VIOLATION",
+          subtitle: "PROFANITY DETECTED",
+          description:
+            "Communication protocols require professional language. Offensive content has been intercepted.",
           icon: Shield,
-          severity: 'error'
+          color: "text-red-500",
+          borderColor: "border-red-500",
+          bgEffect: "bg-red-500/10",
+          badge: "SEVERITY: HIGH",
         };
-      case 'repeated':
+      case "repeated":
         return {
-          title: "Repeated Message",
-          description: "You sent the same message multiple times. Please vary your messages.",
+          title: "REPETITION_DETECTED",
+          subtitle: "DUPLICATE INPUT STREAM",
+          description:
+            "Redundant data patterns detected. Please vary your communication output.",
           icon: MessageSquareOff,
-          severity: 'warning'
+          color: "text-amber-500",
+          borderColor: "border-amber-500",
+          bgEffect: "bg-amber-500/10",
+          badge: "SEVERITY: MEDIUM",
         };
-      case 'caps':
+      case "caps":
         return {
-          title: "Excessive Caps",
-          description: "Your message contains too many capital letters. Please use proper capitalization.",
+          title: "SYNTAX_WARNING",
+          subtitle: "EXCESSIVE CAPITALIZATION",
+          description:
+            "Message volume/amplitude exceeds standard parameters. Disengage caps lock.",
           icon: AlertTriangle,
-          severity: 'warning'
+          color: "text-yellow-500",
+          borderColor: "border-yellow-500",
+          bgEffect: "bg-yellow-500/10",
+          badge: "SEVERITY: LOW",
         };
-      case 'excessive':
+      case "excessive":
         return {
-          title: "Excessive Messaging",
-          description: "You're sending messages too frequently. Please slow down.",
-          icon: Shield,
-          severity: 'error'
+          title: "RATE_LIMIT_EXCEEDED",
+          subtitle: "MESSAGE FLOOD DETECTED",
+          description:
+            "Output frequency too high. Temporary cooldown initiated to preserve channel integrity.",
+          icon: Siren,
+          color: "text-red-500",
+          borderColor: "border-red-500",
+          bgEffect: "bg-red-500/10",
+          badge: "SEVERITY: HIGH",
         };
       default:
         return {
-          title: "Message Filtered",
-          description: "Your message was flagged by our spam filter.",
-          icon: Shield,
-          severity: 'error'
+          title: "SYSTEM_INTERVENTION",
+          subtitle: "CONTENT FLAGGED",
+          description:
+            "Message intercepted by automated filter heuristic analysis.",
+          icon: AlertOctagon,
+          color: "text-orange-500",
+          borderColor: "border-orange-500",
+          bgEffect: "bg-orange-500/10",
+          badge: "SYSTEM ALERT",
         };
     }
   };
 
-  const spamInfo = getSpamMessage();
-  const IconComponent = spamInfo.icon;
+  const config = getSpamConfig();
+  const IconComponent = config.icon;
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gray-950/80 backdrop-blur-xl border border-white/10 rounded-2xl p-6 max-w-md mx-4 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-md w-full bg-zinc-900 backdrop-blur-xl border border-white/10 p-0 overflow-hidden shadow-2xl text-white rounded-sm">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{config.title}</DialogTitle>
+          <DialogDescription>{config.description}</DialogDescription>
+        </DialogHeader>
+
+        {/* Top Security Header */}
+        <div className="w-full flex items-center justify-between px-6 py-2 border-b border-white/10 bg-black/40">
+          <div className="flex items-center gap-2">
+            <Shield className="w-3 h-3 text-white/40" />
+            <span className="text-[10px] font-mono text-white/40 tracking-[0.2em]">
+              AUTO_MODERATION_SYSTEM // V.2.0
+            </span>
+          </div>
+          <Badge
+            variant="outline"
+            className={`text-[9px] h-4 border-white/10 bg-white/5 ${config.color} font-mono rounded-sm`}
           >
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <div className={`p-3 rounded-full ${
-                  spamInfo.severity === 'error'
-                    ? 'bg-red-500/20'
-                    : 'bg-yellow-500/20'
-                }`}>
-                  <IconComponent className={`w-8 h-8 ${
-                    spamInfo.severity === 'error'
-                      ? 'text-red-400'
-                      : 'text-yellow-400'
-                  }`} />
+            {config.badge}
+          </Badge>
+        </div>
+
+        <div className="p-6 relative">
+          {/* Background Technical Elements */}
+          <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(45deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:10px_10px]" />
+
+          <div className="relative flex flex-col items-center text-center">
+            {/* Animated Icon */}
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200 }}
+              className={`w-16 h-16 mb-4 rounded-xl border flex items-center justify-center relative ${config.borderColor} ${config.bgEffect}`}
+            >
+              <div
+                className={`absolute inset-0 ${config.bgEffect} animate-pulse rounded-xl`}
+              />
+              <IconComponent className={`w-8 h-8 ${config.color}`} />
+            </motion.div>
+
+            {/* Main Title */}
+            <h2
+              className={`text-xl font-bold font-mono tracking-tighter mb-1 ${config.color}`}
+            >
+              {config.title}
+            </h2>
+            <p className="text-[10px] font-mono text-white/50 uppercase tracking-[0.2em] mb-4">
+              {config.subtitle}
+            </p>
+
+            {/* Description */}
+            <p className="text-sm text-white/70 mb-6 leading-relaxed">
+              {config.description}
+            </p>
+
+            {/* Evidence Display (The Flagged Message) */}
+            {message && (
+              <div className="w-full mb-6 text-left">
+                <div className="flex items-center gap-2 mb-1 opacity-50">
+                  <Terminal className="w-3 h-3" />
+                  <span className="text-[10px] font-mono uppercase tracking-wider">
+                    Intercepted Payload
+                  </span>
+                </div>
+                <div className="w-full bg-black/50 border border-white/5 rounded-sm p-3 font-mono text-xs text-white/80 break-words relative overflow-hidden group">
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 w-[2px] ${config.bgEffect.replace("/10", "")}`}
+                  />
+                  "
+                  {message.length > 150
+                    ? `${message.substring(0, 150)}...`
+                    : message}
+                  "
                 </div>
               </div>
+            )}
 
-              <h3 className="text-xl font-semibold text-white mb-2">
-                {spamInfo.title}
-              </h3>
+            {/* Action Button */}
+            <Button
+              onClick={onClose}
+              className="w-full bg-white text-black hover:bg-white/90 font-mono text-xs font-bold tracking-widest h-10 rounded-sm"
+            >
+              <CheckCircle2 className="w-3 h-3 mr-2" />
+              I_UNDERSTAND
+            </Button>
 
-              <p className="text-white/70 text-sm mb-4">
-                {spamInfo.description}
-              </p>
-
-              {message && (
-                <div className="bg-black/40 rounded-lg p-3 mb-4">
-                  <div className="text-white/60 text-xs mb-1">Your message:</div>
-                  <div className="text-white/90 text-sm italic">
-                    "{message.length > 100 ? `${message.substring(0, 100)}...` : message}"
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-3">
-                <Button
-                  onClick={onClose}
-                  className="flex-1 bg-white/10 hover:bg-white/20 text-white"
-                >
-                  I understand
-                </Button>
-              </div>
-
-              <div className="mt-4 text-xs text-white/50">
-                <Shield className="w-3 h-3 inline mr-1" />
-                Our spam filter helps maintain a positive chat experience for everyone
-              </div>
+            <div className="mt-3 text-[9px] text-white/30 font-mono uppercase">
+              Compliance with community protocols is mandatory
             </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,15 +1,23 @@
-import fs from 'fs';
-import path from 'path';
+import fs from "fs";
+import path from "path";
 
 /**
  * Generate sitemap.xml and robots.txt based on file routes in src/routes
  */
 async function main() {
-  const projectRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
-  const routesDir = path.join(projectRoot, 'src', 'routes');
-  const publicDir = path.join(projectRoot, 'public');
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Skipping for non-production builds.");
+    return;
+  }
+  const projectRoot = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "..",
+  );
+  const routesDir = path.join(projectRoot, "src", "routes");
+  const publicDir = path.join(projectRoot, "public");
 
-  const siteUrlRaw = process.env.SITE_URL || process.env.VERCEL_URL || 'http://localhost:5173';
+  const siteUrlRaw =
+    process.env.SITE_URL || process.env.VERCEL_URL || "http://localhost:5173";
   const siteUrl = normalizeSiteUrl(siteUrlRaw);
 
   const routes = await collectStaticRoutes(routesDir);
@@ -21,28 +29,32 @@ async function main() {
   const sitemapXml = buildSitemapXml(siteUrl, routes);
   const robotsTxt = buildRobotsTxt(siteUrl);
 
-  fs.writeFileSync(path.join(publicDir, 'sitemap.xml'), sitemapXml, 'utf8');
-  fs.writeFileSync(path.join(publicDir, 'robots.txt'), robotsTxt, 'utf8');
+  fs.writeFileSync(path.join(publicDir, "sitemap.xml"), sitemapXml, "utf8");
+  fs.writeFileSync(path.join(publicDir, "robots.txt"), robotsTxt, "utf8");
 
-   
-  console.log(`Generated sitemap with ${routes.length} routes at ${path.join(publicDir, 'sitemap.xml')}`);
+  console.log(
+    `Generated sitemap with ${routes.length} routes at ${path.join(publicDir, "sitemap.xml")}`,
+  );
 }
 
 function normalizeSiteUrl(input) {
-  if (!input) return 'http://localhost:5173';
-  
+  if (!input) return "http://localhost:5173";
+
   // If env provides just the domain (e.g my-app.vercel.app), add https://
   if (!/^https?:\/\//i.test(input)) {
     return `https://${input}`;
   }
-  
-  let normalized = input.replace(/\/$/, '');
-  
+
+  let normalized = input.replace(/\/$/, "");
+
   // Ensure www version for production domain
-  if (normalized.includes('generalsonline.app')) {
-    normalized = normalized.replace(/https?:\/\/(?:www\.)?generalsonline\.app/i, 'https://www.generalsonline.app');
+  if (normalized.includes("generalsonline.app")) {
+    normalized = normalized.replace(
+      /https?:\/\/(?:www\.)?generalsonline\.app/i,
+      "https://www.generalsonline.app",
+    );
   }
-  
+
   return normalized;
 }
 
@@ -53,27 +65,37 @@ async function collectStaticRoutes(routesDir) {
   for (const entry of entries) {
     if (entry.isDirectory()) {
       // Support nested routes if present (not used currently)
-      const nested = await collectStaticRoutes(path.join(routesDir, entry.name));
-      routes.push(...nested.map((r) => `/${entry.name}${r === '/' ? '' : r}`));
+      const nested = await collectStaticRoutes(
+        path.join(routesDir, entry.name),
+      );
+      routes.push(...nested.map((r) => `/${entry.name}${r === "/" ? "" : r}`));
       continue;
     }
 
-    if (!entry.name.endsWith('.tsx')) continue;
+    if (!entry.name.endsWith(".tsx")) continue;
 
-    const base = entry.name.replace(/\.tsx$/, '');
+    const base = entry.name.replace(/\.tsx$/, "");
 
     // Skip special or dynamic routes
-    if (base === '__root__' || base === '__root' || base === '$' || base.includes('[')) continue;
+    if (
+      base === "__root__" ||
+      base === "__root" ||
+      base === "$" ||
+      base.includes("[")
+    )
+      continue;
 
-    if (base === 'index') {
-      routes.push('/');
+    if (base === "index") {
+      routes.push("/");
     } else {
       routes.push(`/${base}`);
     }
   }
 
   // Ensure unique & sorted
-  return Array.from(new Set(routes)).sort((a, b) => (a === '/' ? -1 : b === '/' ? 1 : a.localeCompare(b)));
+  return Array.from(new Set(routes)).sort((a, b) =>
+    a === "/" ? -1 : b === "/" ? 1 : a.localeCompare(b),
+  );
 }
 
 function buildSitemapXml(siteUrl, routes) {
@@ -81,14 +103,16 @@ function buildSitemapXml(siteUrl, routes) {
   const urlEntries = routes
     .map((route) => {
       const loc = `${siteUrl}${route}`;
-      return `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${now}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>${route === '/' ? '1.0' : '0.7'}</priority>\n  </url>`;
+      return `  <url>\n    <loc>${escapeXml(loc)}</loc>\n    <lastmod>${now}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>${route === "/" ? "1.0" : "0.7"}</priority>\n  </url>`;
     })
-    .join('\n');
+    .join("\n");
 
-  return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+  return (
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     `${urlEntries}\n` +
-    `</urlset>\n`;
+    `</urlset>\n`
+  );
 }
 
 function buildRobotsTxt(siteUrl) {
@@ -98,17 +122,14 @@ function buildRobotsTxt(siteUrl) {
 
 function escapeXml(str) {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 main().catch((err) => {
-   
   console.error(err);
   process.exit(1);
 });
-
-

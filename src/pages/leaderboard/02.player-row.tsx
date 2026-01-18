@@ -1,16 +1,23 @@
 import { motion } from "framer-motion";
-import { Trophy, Medal, Crown, Target } from "lucide-react";
-import { Card, CardContent } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
-import { UserAvatar } from "../../components/UserAvatar";
-import { ExpandableCard } from "../../components/ExpandableCard";
+import { Trophy, Medal, Crown, Crosshair, ChevronDown } from "lucide-react";
+
+import { UserAvatar } from "@/components/UserAvatar";
+import { UserNameWithBadge } from "@/components/UserNameWithBadge";
+import { ExpandableCard } from "@/components/ExpandableCard";
 import { ExpandedPlayerStats } from "./06.expanded-player-stats";
-import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
+import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../../components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { useQuery } from "convex-helpers/react/cache";
-import { useSound } from "../../lib/SoundProvider";
+import { useSound } from "@/lib/SoundProvider";
+import { cn } from "@/lib/utils";
 
 interface Player {
   _id: string;
@@ -23,6 +30,10 @@ interface Player {
   winRate: number;
   elo: number;
   position: number;
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
+  usernameColor?: string;
+  avatarFrame?: string;
 }
 
 interface PlayerRowProps {
@@ -32,381 +43,297 @@ interface PlayerRowProps {
   onToggle: () => void;
 }
 
-export function PlayerRow({ player, index, isExpanded, onToggle }: PlayerRowProps) {
+export function PlayerRow({
+  player,
+  index,
+  isExpanded,
+  onToggle,
+}: PlayerRowProps) {
   const [showCongrats, setShowCongrats] = useState(false);
 
   // Fetch detailed profile stats when expanded
-  const { data: profileStats, isPending: isLoadingStats } = useConvexQueryWithOptions(
-    api.profiles.getProfileStatsByUsername,
-    { username: player.username },
-    { enabled: isExpanded }
-  );
+  const { data: profileStats, isPending: isLoadingStats } =
+    useConvexQueryWithOptions(
+      api.profiles.getProfileStatsByUsername,
+      { username: player.username },
+      { enabled: isExpanded },
+    );
 
   // Get current user profile
   const currentProfile = useQuery(api.profiles.getCurrentProfile, {});
   const { playSFX } = useSound();
 
-  // Show congratulations only for the current user in top positions (once per day)
+  // Show congratulations logic (maintained from original)
   useEffect(() => {
-    if (player.position <= 10 && currentProfile && player.username === currentProfile.username) {
+    if (
+      player.position <= 10 &&
+      currentProfile &&
+      player.username === currentProfile.username
+    ) {
       const storageKey = `leaderboard_congrats_${player.position}_${currentProfile.username}`;
       const lastShown = localStorage.getItem(storageKey);
       const now = Date.now();
-      const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+      const oneDay = 24 * 60 * 60 * 1000;
 
-      // Show congratulations if never shown before or if more than 24 hours have passed
-      const shouldShow = !lastShown || (now - parseInt(lastShown)) > oneDay;
+      const shouldShow = !lastShown || now - parseInt(lastShown) > oneDay;
 
       if (shouldShow) {
-        const timer = setTimeout(() => {
-          setShowCongrats(true);
-          // Play leaderboard SFX when congratulations modal appears
-          playSFX("leaderboard");
-          // Mark as shown today
-          localStorage.setItem(storageKey, now.toString());
-        }, 500 + (index * 200)); // Stagger the congratulations
+        const timer = setTimeout(
+          () => {
+            setShowCongrats(true);
+            playSFX("leaderboard");
+            localStorage.setItem(storageKey, now.toString());
+          },
+          500 + index * 200,
+        );
         return () => clearTimeout(timer);
       }
     }
-  }, [player.position, index, currentProfile, player.username]);
+  }, [player.position, index, currentProfile, player.username, playSFX]);
 
-  const getCongratulationsContent = () => {
-    switch (player.position) {
-      case 1:
-        return {
-          title: "🏆 CHAMPION OF THE REALM! 🏆",
-          description: `Incredible victory, ${player.username}! You've claimed the throne as the ultimate strategist. Your tactical brilliance and commanding presence have earned you the highest honor in the kingdom of Generals.`,
-          emoji: "👑",
-          bgColor: "from-yellow-500/20 to-amber-600/20",
-          borderColor: "border-yellow-400",
-          textColor: "text-yellow-300",
-          stats: `With ${player.wins} victories and a ${player.winRate.toFixed(1)}% win rate, you stand unrivaled!`
-        };
-      case 2:
-        return {
-          title: "🥈 SILVER COMMANDER! 🥈",
-          description: `Outstanding performance, ${player.username}! You've secured the silver medal and proven yourself as a master strategist. Your tactical prowess places you among the elite.`,
-          emoji: "🥈",
-          bgColor: "from-slate-400/20 to-gray-500/20",
-          borderColor: "border-slate-400",
-          textColor: "text-slate-300",
-          stats: `${player.wins} wins and ${player.winRate.toFixed(1)}% win rate - a testament to your strategic excellence!`
-        };
-      case 3:
-        return {
-          title: "🥉 BRONZE WARRIOR! 🥉",
-          description: `Impressive achievement, ${player.username}! You've earned the bronze medal and proven your mettle on the battlefield. Your strategic mind commands respect from all.`,
-          emoji: "🥉",
-          bgColor: "from-orange-500/20 to-amber-600/20",
-          borderColor: "border-orange-400",
-          textColor: "text-orange-300",
-          stats: `Commanding ${player.wins} victories with a ${player.winRate.toFixed(1)}% win rate!`
-        };
-      case 4:
-      case 5:
-        return {
-          title: "🎖️ ELITE STRATEGIST! 🎖️",
-          description: `Well done, ${player.username}! You've reached the elite ranks and proven your strategic prowess. Your skills place you among the top contenders.`,
-          emoji: "🎖️",
-          bgColor: "from-purple-500/20 to-indigo-500/20",
-          borderColor: "border-purple-400",
-          textColor: "text-purple-300",
-          stats: `${player.wins} wins at ${player.winRate.toFixed(1)}% - elite performance!`
-        };
-      case 6:
-      case 7:
-      case 8:
-      case 9:
-      case 10:
-        return {
-          title: "⭐ TOP 10 CONTENDER! ⭐",
-          description: `Congratulations, ${player.username}! You've secured a spot in the top 10 and demonstrated exceptional strategic ability. Keep climbing the ranks!`,
-          emoji: "⭐",
-          bgColor: "from-blue-500/20 to-cyan-500/20",
-          borderColor: "border-blue-400",
-          textColor: "text-blue-300",
-          stats: `Position #${player.position} with ${player.wins} victories!`
-        };
-      default:
-        return null;
-    }
+  const getRankStyles = (position: number) => {
+    if (position === 1)
+      return {
+        border: "border-yellow-500/50",
+        bg: "bg-yellow-500/5 hover:bg-yellow-500/10",
+        text: "text-yellow-500",
+        glow: "shadow-[0_0_30px_-5px_rgba(234,179,8,0.2)]",
+        icon: <Crown className="w-5 h-5 text-yellow-500 fill-yellow-500/20" />,
+      };
+    if (position === 2)
+      return {
+        border: "border-slate-400/50",
+        bg: "bg-slate-400/5 hover:bg-slate-400/10",
+        text: "text-slate-300",
+        glow: "shadow-[0_0_30px_-5px_rgba(148,163,184,0.2)]",
+        icon: <Medal className="w-5 h-5 text-slate-400 fill-slate-400/20" />,
+      };
+    if (position === 3)
+      return {
+        border: "border-orange-500/50",
+        bg: "bg-orange-500/5 hover:bg-orange-500/10",
+        text: "text-orange-400",
+        glow: "shadow-[0_0_30px_-5px_rgba(249,115,22,0.2)]",
+        icon: <Trophy className="w-5 h-5 text-orange-500 fill-orange-500/20" />,
+      };
+    return {
+      border: "border-white/5",
+      bg: "bg-zinc-900/40 hover:bg-zinc-800/60",
+      text: "text-zinc-500",
+      glow: "",
+      icon: (
+        <span className="font-mono font-bold text-zinc-600">#{position}</span>
+      ),
+    };
   };
 
-  // Expanded content component
+  const rankStyle = getRankStyles(player.position);
+
+  // Expanded content
   const expandedContent = (
-    <div className="flex justify-center items-center min-h-[50vh]">
-      <div className="bg-black/60 backdrop-blur-sm rounded-xl border border-white/10 p-6 py-0 w-full max-w-4xl">
+    <div className="flex justify-center items-center py-8">
+      <div className="w-full max-w-5xl">
         {isLoadingStats ? (
-          <div className="flex justify-center items-center py-12">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent"
-            />
+          <div className="flex flex-col items-center justify-center py-12 gap-4">
+            <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <span className="font-mono text-blue-400 text-xs tracking-widest uppercase animate-pulse">
+              Retrieving Dossier...
+            </span>
           </div>
         ) : profileStats ? (
           <ExpandedPlayerStats profileStats={profileStats} />
         ) : (
-          <div className="text-center py-8 text-red-400 text-sm">
-            Failed to load profile stats
+          <div className="text-center py-8 text-red-400 font-mono text-sm border border-red-500/20 bg-red-500/5 rounded-lg">
+            Error: Profile Data Corrupted
           </div>
         )}
       </div>
     </div>
   );
 
-  const getRankIcon = (position: number) => {
-    switch (position) {
-      case 1:
-        return <Crown className="h-5 w-5 text-yellow-500" />;
-      case 2:
-        return <Medal className="h-5 w-5 text-gray-400" />;
-      case 3:
-        return <Trophy className="h-5 w-5 text-orange-500" />;
-      default:
-        return <Target className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
-
-  const getRankColor = (position: number) => {
-    switch (position) {
-      case 1:
-        return "bg-gradient-to-r from-yellow-500/20 via-amber-400/20 to-orange-500/20 backdrop-blur-md border-2 border-yellow-400/50 shadow-2xl shadow-yellow-500/20 relative overflow-hidden";
-      case 2:
-        return "bg-gradient-to-r from-slate-300/20 via-gray-400/20 to-slate-500/20 backdrop-blur-md border-2 border-slate-400/50 shadow-xl shadow-slate-400/15 relative overflow-hidden";
-      case 3:
-        return "bg-gradient-to-r from-amber-600/20 via-orange-500/20 to-red-500/20 backdrop-blur-md border-2 border-orange-500/50 shadow-xl shadow-orange-500/15 relative overflow-hidden";
-      default:
-        if (position <= 10) {
-          return "bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-indigo-500/10 backdrop-blur-sm border border-blue-500/20 shadow-lg shadow-blue-500/10";
-        }
-        return "bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg";
-    }
-  };
-
   return (
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.1 }}
+      transition={{ delay: index * 0.05 }}
     >
       <ExpandableCard
         isExpanded={isExpanded}
         onExpand={onToggle}
         onCollapse={onToggle}
         overlay={true}
-        overlayClassName="w-full max-w-2xl max-h-[80vh] overflow-y-auto"
-        className={isExpanded ? "z-30" : ""}
+        overlayClassName="w-full max-w-4xl p-0 bg-transparent shadow-none"
+        // contentClassName="bg-zinc-950 border border-white/10 rounded-sm overflow-hidden shadow-2xl"
         expandedContent={expandedContent}
       >
-        <Card
-          className={`${getRankColor(player.position)} mx-auto max-w-4xl hover:bg-white/10 hover:scale-[1.01] cursor-pointer transition-all duration-200 ${
-            player.position <= 3 ? 'transform-gpu' : ''
-          }`}
+        <div
+          className={cn(
+            "relative flex items-center gap-4 p-3 sm:p-4 border transition-all duration-300 group cursor-pointer backdrop-blur-sm",
+            "rounded-sm", // Sharper corners
+            rankStyle.border,
+            rankStyle.bg,
+            rankStyle.glow,
+          )}
         >
-          {/* Special top 3 effects */}
-          {player.position === 1 && (
-            <>
-              <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-transparent to-yellow-500/5 animate-pulse"></div>
-              <div className="absolute -top-1 -left-1 w-6 h-6 bg-yellow-400 rounded-full animate-ping opacity-20"></div>
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full animate-ping opacity-20 animation-delay-1000"></div>
-            </>
-          )}
-          {player.position === 2 && (
-            <>
-              <div className="absolute inset-0 bg-gradient-to-r from-slate-400/5 via-transparent to-slate-400/5"></div>
-              <div className="absolute -top-1 -left-1 w-5 h-5 bg-slate-400 rounded-full animate-pulse opacity-15"></div>
-            </>
-          )}
-          {player.position === 3 && (
-            <>
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/5 via-transparent to-orange-500/5"></div>
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 rounded-full animate-pulse opacity-15"></div>
-            </>
-          )}
+          {/* Tech Corners */}
+          <div className="absolute top-0 left-0 w-1 h-1 border-t border-l border-white/20" />
+          <div className="absolute bottom-0 right-0 w-1 h-1 border-b border-r border-white/20" />
+          {/* Rank Indicator */}
+          <div className="flex items-center justify-center w-10 h-10 shrink-0">
+            {rankStyle.icon}
+          </div>
 
-          <CardContent className={`relative z-10 ${player.position <= 3 ? 'p-4 sm:p-5' : 'p-2 sm:p-3'} flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3`}>
-            {/* Main Info Section - Always visible */}
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-              <div className={`flex items-center gap-1.5 min-w-[40px] sm:min-w-[48px] flex-shrink-0 ${
-                player.position <= 3 ? 'gap-2' : ''
-              }`}>
-                <div className={player.position <= 3 ? 'relative' : ''}>
-                  {getRankIcon(player.position)}
-                  {player.position <= 3 && (
-                    <div className={`absolute -inset-1 rounded-full blur-sm ${
-                      player.position === 1 ? 'bg-yellow-400/30' :
-                      player.position === 2 ? 'bg-slate-400/30' :
-                      'bg-orange-500/30'
-                    }`}></div>
-                  )}
-                </div>
-                <span className={`font-bold text-white/90 ${
-                  player.position <= 3 ? 'text-lg sm:text-xl' : 'text-sm sm:text-base'
-                }`}>
-                  #{player.position}
-                </span>
-              </div>
+          {/* Player Info */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <UserAvatar
+              username={player.username}
+              avatarUrl={player.avatarUrl}
+              rank={player.rank}
+              size="md"
+              frame={player.avatarFrame}
+              className={cn(
+                "ring-2 ring-offset-2 ring-offset-black/50 transition-all duration-300",
+                player.position <= 3
+                  ? "ring-white/20 group-hover:ring-white/40"
+                  : "ring-transparent group-hover:ring-white/10",
+              )}
+            />
 
-              <UserAvatar
+            <div className="flex flex-col min-w-0">
+              <UserNameWithBadge
                 username={player.username}
-                avatarUrl={player.avatarUrl}
-                rank={player.rank}
-                size={player.position <= 3 ? "md" : "sm"}
-                className={`flex-shrink-0 ${
-                  player.position <= 3 ? 'ring-2 ring-white/30 shadow-lg' : 'ring-1 ring-white/20'
-                }`}
+                tier={player.tier}
+                isDonor={player.isDonor}
+                usernameColor={player.usernameColor}
+                className="font-display text-lg tracking-wide truncate"
               />
-
-              <div className="min-w-0 flex-1">
-                <h4 className={`font-semibold text-white/90 truncate leading-tight ${
-                  player.position <= 3 ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
-                }`}>
-                  {player.username}
-                </h4>
-                <Badge variant="outline" className={`flex items-center gap-1 w-fit text-xs px-1.5 py-0.5 mt-0.5 ${
-                  player.position <= 3
-                    ? 'bg-gradient-to-r from-white/20 to-white/10 text-white border-white/30'
-                    : 'bg-blue-500/20 text-blue-300 border-blue-500/30'
-                }`}>
-                  <Target className="h-2.5 w-2.5" />
-                  <span className="text-xs hidden sm:inline">{player.rank}</span>
-                  <span className="text-xs sm:hidden">
-                    {player.rank === "Colonel" ? "Col" :
-                     player.rank === "Major" ? "Maj" :
-                     player.rank === "Captain" ? "Cpt" :
-                     player.rank === "Lieutenant" ? "Lt" :
-                     player.rank === "Sergeant" ? "Sgt" :
-                     player.rank}
-                  </span>
-                </Badge>
+              <div className="flex items-center gap-2">
+                <div className="px-1.5 py-0.5 rounded bg-white/5 border border-white/10 text-[10px] uppercase font-mono text-zinc-400 flex items-center gap-1">
+                  <Crosshair className="w-3 h-3" />
+                  {player.rank}
+                </div>
+                {player.tier && player.tier !== "free" && (
+                  <div
+                    className={cn(
+                      "px-1.5 py-0.5 rounded text-[10px] uppercase font-mono font-bold border",
+                      player.tier === "pro_plus"
+                        ? "bg-amber-500/10 border-amber-500/20 text-amber-500"
+                        : "bg-blue-500/10 border-blue-500/20 text-blue-400",
+                    )}
+                  >
+                    {player.tier === "pro_plus" ? "General" : "Officer"}
+                  </div>
+                )}
               </div>
             </div>
+          </div>
 
-            {/* Stats Section - Desktop: inline, Mobile: below */}
-            <div className={`grid grid-cols-5 gap-2 sm:gap-4 text-center flex-shrink-0 mt-3 sm:mt-0 border-t border-white/10 sm:border-t-0 pt-3 sm:pt-0 ${
-              player.position <= 3 ? 'min-w-[200px] sm:min-w-[220px]' : 'min-w-[180px] sm:min-w-[200px]'
-            }`}>
-              <div>
-                <div className={`font-bold leading-tight ${
-                  player.position <= 3 ? 'text-base sm:text-lg text-green-300' : 'text-sm sm:text-base text-green-400'
-                }`}>
-                  {player.wins}
-                </div>
-                <div className="text-xs text-white/60 leading-tight">
-                  <span className="hidden sm:inline">Wins</span>
-                  <span className="sm:hidden">W</span>
-                </div>
+          {/* Stats (Desktop) */}
+          <div className="hidden sm:grid grid-cols-4 gap-8 mr-4">
+            <div className="text-center">
+              <div className="text-lg font-mono font-bold text-white">
+                {player.elo ?? 1500}
               </div>
-              <div>
-                <div className={`font-bold leading-tight ${
-                  player.position <= 3 ? 'text-base sm:text-lg text-red-300' : 'text-sm sm:text-base text-red-400'
-                }`}>
-                  {player.losses}
-                </div>
-                <div className="text-xs text-white/60 leading-tight">
-                  <span className="hidden sm:inline">Losses</span>
-                  <span className="sm:hidden">L</span>
-                </div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
+                Rating
               </div>
-              <div>
-                <div className={`font-bold leading-tight ${
-                  player.position <= 3 ? 'text-base sm:text-lg text-white' : 'text-sm sm:text-base text-white/90'
-                }`}>
-                  {player.gamesPlayed}
-                </div>
-                <div className="text-xs text-white/60 leading-tight">
-                  <span className="hidden sm:inline">Battles</span>
-                  <span className="sm:hidden">G</span>
-                </div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-mono font-bold text-green-400">
+                {player.wins}
               </div>
-              <div>
-                <div className={`font-bold leading-tight ${
-                  player.winRate >= 70
-                    ? player.position <= 3 ? 'text-green-300' : 'text-green-400'
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
+                Wins
+              </div>
+            </div>
+            <div className="text-center">
+              <div
+                className={cn(
+                  "text-lg font-mono font-bold",
+                  player.winRate >= 60
+                    ? "text-blue-400"
                     : player.winRate >= 50
-                    ? player.position <= 3 ? 'text-yellow-300' : 'text-yellow-400'
-                    : player.position <= 3 ? 'text-red-300' : 'text-red-400'
-                } ${
-                  player.position <= 3 ? 'text-base sm:text-lg' : 'text-sm sm:text-base'
-                }`}>
-                  {player.winRate.toFixed(1)}%
-                </div>
-                <div className="text-xs text-white/60 leading-tight">
-                  <span className="hidden sm:inline">Win Rate</span>
-                  <span className="sm:hidden">WR</span>
-                </div>
+                      ? "text-zinc-300"
+                      : "text-zinc-500",
+                )}
+              >
+                {player.winRate.toFixed(1)}%
               </div>
-              <div>
-                <div className={`font-bold leading-tight ${
-                  player.position <= 3 ? 'text-base sm:text-lg text-yellow-300' : 'text-sm sm:text-base text-yellow-400'
-                }`}>
-                  {player.elo ?? 1500}
-                </div>
-                <div className="text-xs text-white/60 leading-tight">
-                  <span className="hidden sm:inline">ELO</span>
-                  <span className="sm:hidden">E</span>
-                </div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
+                WR
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="text-center">
+              <div className="text-lg font-mono font-bold text-white/50">
+                {player.gamesPlayed}
+              </div>
+              <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono">
+                Btls
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Stats (Compact) */}
+          <div className="sm:hidden flex flex-col items-end gap-1">
+            <span className="text-sm font-mono font-bold text-white">
+              {player.elo ?? 1500} ELO
+            </span>
+            <span
+              className={cn(
+                "text-xs font-mono",
+                player.winRate >= 50 ? "text-green-400" : "text-zinc-400",
+              )}
+            >
+              {player.winRate.toFixed(0)}% WR
+            </span>
+          </div>
+
+          {/* Expand Arrow */}
+          <div className="pl-2 border-l border-white/5 mx-2">
+            <ChevronDown
+              className={cn(
+                "w-5 h-5 text-zinc-500 transition-transform duration-300",
+                isExpanded
+                  ? "rotate-180 text-white"
+                  : "group-hover:text-zinc-300",
+              )}
+            />
+          </div>
+        </div>
       </ExpandableCard>
 
-      {/* Congratulations Dialog */}
-      {(() => {
-        const congrats = getCongratulationsContent();
-        return congrats ? (
-          <Dialog open={showCongrats} onOpenChange={setShowCongrats}>
-            <DialogContent className={`max-w-md border-2 ${congrats.borderColor} bg-gradient-to-br ${congrats.bgColor} backdrop-blur-xl`}>
-              <DialogHeader className="text-center space-y-4">
-                <div className="flex justify-center">
-                  <motion.div
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", duration: 0.8, delay: 0.2 }}
-                    className="text-6xl"
-                  >
-                    {congrats.emoji}
-                  </motion.div>
-                </div>
-
-                <DialogTitle className={`text-xl sm:text-2xl font-bold ${congrats.textColor} leading-tight`}>
-                  {congrats.title}
-                </DialogTitle>
-
-                <DialogDescription className="text-white/90 text-sm sm:text-base leading-relaxed">
-                  {congrats.description}
-                </DialogDescription>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className={`text-center p-3 rounded-lg bg-black/20 border border-white/10 ${congrats.textColor} font-semibold`}
-                >
-                  {congrats.stats}
-                </motion.div>
-              </DialogHeader>
-
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
-                className="flex justify-center mt-4"
-              >
-                <UserAvatar
-                  username={player.username}
-                  avatarUrl={player.avatarUrl}
-                  rank={player.rank}
-                  size="lg"
-                  className="ring-2 ring-white/30"
-                />
-              </motion.div>
-            </DialogContent>
-          </Dialog>
-        ) : null;
-      })()}
+      {/* Legacy Congrats Modal */}
+      <Dialog open={showCongrats} onOpenChange={setShowCongrats}>
+        <DialogContent className="border border-yellow-500/20 bg-zinc-950/90 backdrop-blur-xl">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-display text-yellow-500 uppercase tracking-widest">
+              Rank Achievement
+            </DialogTitle>
+            <DialogDescription className="text-center font-mono text-zinc-400 pt-2">
+              Outstanding performance recorded. You have secured a top ranking
+              position.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center py-6">
+            <UserAvatar
+              username={player.username}
+              avatarUrl={player.avatarUrl}
+              rank={player.rank}
+              size="xl"
+              frame={player.avatarFrame}
+              className="ring-4 ring-yellow-500/20"
+            />
+          </div>
+          <div className="text-center space-y-2 pb-4">
+            <div className="text-3xl font-mono font-bold text-white">
+              #{player.position}
+            </div>
+            <div className="text-sm text-zinc-500 uppercase tracking-wider">
+              Global Leaderboard
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

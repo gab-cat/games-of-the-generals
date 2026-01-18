@@ -60,10 +60,11 @@ crons.cron(
   {}
 );
 
-// Run every hour to delete inactive waiting lobbies (>30 minutes)
+// Run every 5 minutes to delete inactive waiting lobbies (>5 minutes without activity)
+// This is a failsafe - primary cleanup happens via heartbeat-based abandonment detection
 crons.cron(
-  "Delete inactive waiting lobbies (>30 minutes)",
-  "0 * * * *", // Every hour
+  "Delete inactive waiting lobbies (>5 minutes)",
+  "*/5 * * * *", // Every 5 minutes
   internal.lobbies.deleteInactiveLobbies,
   {}
 );
@@ -76,10 +77,11 @@ crons.cron(
   {}
 );
 
-// Run every hour to cleanup stale games (>40 minutes)
+// Run every 10 minutes to cleanup stale games (>10 minutes)
+// This is a failsafe - primary cleanup happens via scheduled handleSetupTimeout
 crons.cron(
-  "Cleanup stale games (>40 minutes)",
-  "0 * * * *", // Every hour
+  "Cleanup stale games (>10 minutes)",
+  "*/10 * * * *", // Every 10 minutes
   internal.games.cleanupStaleGames,
   {}
 );
@@ -89,6 +91,30 @@ crons.cron(
   "Cleanup stale AI game sessions (>1 hour old)",
   "30 */6 * * *", // Every 6 hours at minute 30
   internal.aiGame.cleanupStaleAIGameSessions,
+  {}
+);
+
+// Run every hour to check and update expired subscriptions
+crons.cron(
+  "Check and update expired subscriptions",
+  "5 * * * *", // Every hour at minute 5 (staggered from other hourly jobs)
+  internal.subscriptions.checkAndUpdateExpiredSubscriptions,
+  {}
+);
+
+// Run daily at 00:10 UTC (08:10 Philippines time) to send expiry notifications
+crons.cron(
+  "Send subscription expiry notifications",
+  "10 0 * * *", // Daily at 00:10 UTC
+  internal.subscriptions.sendExpiryNotifications,
+  {}
+);
+
+// Run daily at 00:15 UTC (08:15 Philippines time) to reset daily usage counters
+crons.cron(
+  "Reset daily subscription usage counters",
+  "15 0 * * *", // Daily at 00:15 UTC
+  internal.subscriptions.resetDailyUsage,
   {}
 );
 

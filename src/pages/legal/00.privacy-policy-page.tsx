@@ -9,7 +9,7 @@ export function PrivacyPolicyPage() {
         className="max-w-3xl mx-auto space-y-6 text-white/90"
       >
         <h1 className="text-4xl font-display font-semibold">Privacy Policy</h1>
-        <p className="text-white/60 text-sm">Last updated: 2025-11-14</p>
+        <p className="text-white/60 text-sm">Last updated: 2026-01-17</p>
 
         <div className="space-y-6 text-white/90">
           <p className="text-white/80 leading-relaxed">
@@ -53,9 +53,10 @@ export function PrivacyPolicyPage() {
 
           <h3 className="text-lg font-medium mt-6 text-white/90">1.3 Personal Data from Third Parties</h3>
           <ul className="list-disc pl-6 space-y-3 text-sm text-white/70 leading-relaxed">
-            <li><strong className="text-white/80">Payment Processors:</strong> Transaction data when using paid features (processed by third-party providers)</li>
-            <li><strong className="text-white/80">Analytics Services:</strong> Aggregated usage statistics and crash reports</li>
-            <li><strong className="text-white/80">Social Features:</strong> Information from friends or when sharing content</li>
+            <li><strong className="text-white/80">PayMongo:</strong> We use PayMongo to process and verify payments. PayMongo may collect payment method details, contact information, and transaction metadata.</li>
+            <li><strong className="text-white/80">Transaction Data:</strong> We receive transaction status, payment IDs, and amounts from PayMongo to activate and manage your subscription.</li>
+            <li><strong className="text-white/80">Analytics Services:</strong> Aggregated usage statistics and crash reports.</li>
+            <li><strong className="text-white/80">Social Features:</strong> Information from friends or when sharing content.</li>
           </ul>
 
           <h2 className="text-xl font-semibold mt-8 text-white">2. Legal Basis for Processing (Republic Act No. 10173)</h2>
@@ -87,7 +88,7 @@ export function PrivacyPolicyPage() {
             <li><strong className="text-white/80">Database Services:</strong> Data management and backup solutions</li>
             <li><strong className="text-white/80">Analytics Services:</strong> Usage analytics and performance monitoring</li>
             <li><strong className="text-white/80">Communication Services:</strong> Email delivery and push notification services</li>
-            <li><strong className="text-white/80">Payment Processors:</strong> Transaction processing for premium features</li>
+            <li><strong className="text-white/80">Payment Processors:</strong> PayMongo (Payment processing and fraud detection)</li>
           </ul>
 
           <h3 className="text-lg font-medium mt-6 text-white/90">4.2 Legal Requirements</h3>
@@ -99,7 +100,14 @@ export function PrivacyPolicyPage() {
             <li>To respond to emergency situations threatening public safety</li>
           </ul>
 
-          <h3 className="text-lg font-medium mt-6 text-white/90">4.3 Business Transfers</h3>
+          <h3 className="text-lg font-medium mt-6 text-white/90">4.3 Third-Party Payment Processing</h3>
+          <p className="text-white/75 leading-relaxed">
+            When you make a purchase, your payment information (such as credit card numbers or Gcash details) is provided directly to PayMongo.
+            We do not store or process sensitive payment credentials on our servers. PayMongo's use of your personal information is governed
+            by their Privacy Policy, which can be viewed at <a href="https://www.paymongo.com/privacy" className="underline">paymongo.com/privacy</a>.
+          </p>
+
+          <h3 className="text-lg font-medium mt-6 text-white/90">4.4 Business Transfers</h3>
           <p className="text-white/75 leading-relaxed">In the event of a merger, acquisition, or sale of assets, your personal data may be transferred to the new entity, subject to continued compliance with this Policy and Philippine data protection laws.</p>
 
           <h2 className="text-xl font-semibold mt-8 text-white">5. International Data Transfers</h2>
@@ -138,8 +146,8 @@ export function PrivacyPolicyPage() {
                 <td className="p-3 text-white/70">2 years for security and compliance</td>
               </tr>
               <tr className="border-t border-white/20">
-                <td className="p-3 border-r border-white/20 text-white/70">Payment Information</td>
-                <td className="p-3 text-white/70">7 years for tax and financial compliance</td>
+                <td className="p-3 border-r border-white/20 text-white/70">Payment & Transaction Records</td>
+                <td className="p-3 text-white/70">7 years (for tax, accounting, and financial compliance)</td>
               </tr>
               <tr className="border-t border-white/20">
                 <td className="p-3 border-r border-white/20 text-white/70">Marketing Data</td>
@@ -334,7 +342,7 @@ export function PrivacyPolicyPage() {
               <strong>Data Protection Officer:</strong> dpo@generalsonline.app<br/>
               <strong>Phone:</strong> +63 (931) 028-3773<br/>
               <strong>Address:</strong> Naga City, Philippines<br/>
-              <strong>Last Updated:</strong> 2025-11-14
+              <strong>Last Updated:</strong> 2026-01-17
             </p>
           </div>
         </div>

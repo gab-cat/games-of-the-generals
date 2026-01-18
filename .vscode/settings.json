@@ -1,0 +1,39 @@
+{
+  // Use oxlint as the default linter
+  "oxlint.enable": true,
+
+  // Disable ESLint to avoid conflicts
+  "eslint.enable": false,
+
+  // Enable oxlint for TypeScript and JavaScript files
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+  "[javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit"
+    }
+  },
+
+  // Run oxlint on save (if extension supports it)
+  "editor.formatOnSave": true,
+
+  // Show oxlint diagnostics in problems panel
+  "problems.showCurrentInStatus": true
+}

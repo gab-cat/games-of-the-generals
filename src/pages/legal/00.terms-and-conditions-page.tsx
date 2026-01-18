@@ -9,7 +9,7 @@ export function TermsAndConditionsPage() {
         className="max-w-3xl mx-auto space-y-6 text-white/90"
       >
         <h1 className="text-4xl font-display font-semibold">Terms of Service</h1>
-        <p className="text-white/60 text-sm">Last updated: 2025-11-14</p>
+        <p className="text-white/60 text-sm">Last updated: 2026-01-17</p>
 
         <div className="space-y-6 text-white/90">
           <p className="text-white/80 leading-relaxed">
@@ -141,7 +141,20 @@ export function TermsAndConditionsPage() {
             <li>Any claim that your User Content caused damage to a third party.</li>
           </ul>
 
-          <h2 className="text-xl font-semibold mt-8 text-white">11. Termination</h2>
+          <h2 className="text-xl font-semibold mt-8 text-white">11. Payments and Subscriptions</h2>
+          <p className="text-white/75 leading-relaxed">
+            The Service offers paid subscription tiers ("Pro" and "Pro+") and donation options to support platform development.
+          </p>
+          <ul className="list-disc pl-6 space-y-3 text-sm text-white/65 leading-relaxed">
+            <li><strong className="text-white/80">Subscription Tiers:</strong> "Pro" at ₱99.00/month and "Pro+" at ₱199.00/month.</li>
+            <li><strong className="text-white/80">Prepaid Model:</strong> Subscriptions are prepaid for one or more months. We offer progressive discounts for multi-month purchases (3, 6, or 12 months).</li>
+            <li><strong className="text-white/80">Payment Processing:</strong> All payments are processed through PayMongo, a secure third-party payment gateway. We support QR PH and other Philippine-standard payment methods.</li>
+            <li><strong className="text-white/80">Expiry and Grace Period:</strong> Subscriptions expire at the end of the prepaid period. We provide a 48-hour grace period before access to premium features is restricted.</li>
+            <li><strong className="text-white/80">No Automatic Billing:</strong> We do not store your payment credentials or perform automatic recurring billing. Users must manually renew their subscriptions.</li>
+            <li><strong className="text-white/80">Refund Policy:</strong> In accordance with Philippine law for digital services, all payments are non-refundable once the service has been accessed or the subscription activated.</li>
+          </ul>
+
+          <h2 className="text-xl font-semibold mt-8 text-white">12. Termination</h2>
           <p className="text-white/75 leading-relaxed">
             Either party may terminate this agreement at any time. We may terminate or suspend your access
             immediately, without prior notice, for violations of these Terms or applicable law.
@@ -149,11 +162,11 @@ export function TermsAndConditionsPage() {
           <ul className="list-disc pl-6 space-y-3 text-sm text-white/65 leading-relaxed">
             <li>Upon termination, your right to use the Service ceases immediately.</li>
             <li>We may delete your account and associated data in accordance with our Privacy Policy.</li>
-            <li>Sections 8, 9, 10, 12, 13, and 14 survive termination.</li>
-            <li>No refunds will be provided for terminated accounts.</li>
+            <li>Sections 8, 9, 10, 11, 13, 14, and 15 survive termination.</li>
+            <li>No refunds will be provided for prepaid subscription time in the event of account termination for violations.</li>
           </ul>
 
-          <h2 className="text-xl font-semibold mt-8 text-white">12. Force Majeure</h2>
+          <h2 className="text-xl font-semibold mt-8 text-white">13. Force Majeure</h2>
           <p className="text-white/75 leading-relaxed">
             We shall not be liable for any delay or failure to perform our obligations under these Terms
             if such delay or failure is caused by events beyond our reasonable control, including but not limited to:
@@ -166,11 +179,11 @@ export function TermsAndConditionsPage() {
             <li>Any other force majeure events recognized under Philippine law.</li>
           </ul>
 
-          <h2 className="text-xl font-semibold mt-8 text-white">13. Governing Law and Dispute Resolution</h2>
+          <h2 className="text-xl font-semibold mt-8 text-white">14. Governing Law and Dispute Resolution</h2>
           <p className="text-white/90 font-medium text-sm leading-relaxed">
             These Terms are governed by and construed in accordance with the laws of the Republic of the Philippines,
             specifically Republic Act No. 10173 (Data Privacy Act), Republic Act No. 10175 (Cybercrime Prevention Act),
-            and Republic Act No. 7394 (Consumer Act of the Philippines).
+            Republic Act No. 7394 (Consumer Act of the Philippines), and Republic Act No. 8792 (Electronic Commerce Act).
           </p>
           <ul className="list-disc pl-6 space-y-3 text-sm text-white/65 leading-relaxed">
             <li><strong className="text-white/80">Jurisdiction:</strong> Exclusive jurisdiction lies with the courts of Metro Manila, Philippines.</li>
@@ -180,7 +193,7 @@ export function TermsAndConditionsPage() {
             <li><strong className="text-white/80">Class Action Waiver:</strong> You agree to resolve disputes individually and waive any right to participate in class actions.</li>
           </ul>
 
-          <h2 className="text-xl font-semibold mt-8 text-white">14. Consumer Rights and Remedies</h2>
+          <h2 className="text-xl font-semibold mt-8 text-white">15. Consumer Rights and Remedies</h2>
           <p className="text-white/75 leading-relaxed">
             In accordance with Republic Act No. 7394 (Consumer Act of the Philippines), you may be entitled to certain consumer protections:
           </p>
@@ -212,7 +225,7 @@ export function TermsAndConditionsPage() {
           <p className="text-white/60 text-sm mt-6">
             <strong>Contact:</strong> support@generalsonline.app<br/>
             <strong>Data Protection Officer:</strong> dpo@generalsonline.app<br/>
-            <strong>Last Updated:</strong> January 1, 2025
+            <strong>Last Updated:</strong> January 17, 2026
           </p>
         </div>
       </motion.div>
