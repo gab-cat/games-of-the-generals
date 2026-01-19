@@ -175,7 +175,7 @@ export function ProfileSetup() {
                       onChange={(e) =>
                         setUsername(e.target.value.replace(/\s/g, ""))
                       }
-                      className="w-full bg-zinc-950/50 border border-zinc-800 text-zinc-100 pl-10 pr-4 py-3 rounded-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 placeholder:text-zinc-700 font-mono text-sm transition-all uppercase tracking-wider"
+                      className="w-full bg-zinc-950/50 border border-zinc-800 text-zinc-100 pl-10 pr-4 py-3 rounded-sm focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 placeholder:text-zinc-700 font-mono text-sm transition-all tracking-wider"
                       placeholder="ENTER_CODENAME"
                       required
                       minLength={3}

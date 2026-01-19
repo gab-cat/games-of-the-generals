@@ -735,12 +735,12 @@ export function SpectatorView({ gameId, profile, onBack }: SpectatorViewProps) {
                 ) : (
                   <div className="w-full max-w-3xl mx-auto p-4 sm:p-8">
                     {/* Board Container */}
-                    <div className="relative aspect-square">
+                    <div className="relative aspect-[9/8]">
                       {/* Board Frame */}
                       <div className="absolute -inset-4 border border-white/5 rounded-sm pointer-events-none" />
                       <div className="absolute -inset-1 border border-white/10 rounded-sm pointer-events-none" />
 
-                      <div className="grid grid-cols-9 gap-0.5 sm:gap-1 w-full h-full bg-zinc-900/80 p-1 sm:p-2 rounded-sm border border-white/10 shadow-2xl relative z-10">
+                      <div className="grid grid-cols-9 gap-0 w-full h-full bg-zinc-900/80 p-1 sm:p-2 rounded-sm border border-white/10 shadow-2xl relative z-10">
                         {game.board.map((row, rowIndex) =>
                           row.map((cell, colIndex) => {
                             // Check if this is part of the last move (for highlighting)
