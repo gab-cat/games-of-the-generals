@@ -33,7 +33,11 @@ const queryClient = new QueryClient({
 convexQueryClient.connect(queryClient);
 
 // Create a new router instance
-const router = createRouter({ routeTree });
+const router = createRouter({
+  routeTree,
+  defaultPreloadStaleTime: 0,
+  scrollRestoration: true,
+});
 
 // Register the router instance for type safety
 declare module "@tanstack/react-router" {

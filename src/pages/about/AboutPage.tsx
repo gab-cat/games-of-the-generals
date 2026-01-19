@@ -198,7 +198,7 @@ export function AboutPage() {
             <Button
               size="lg"
               className="bg-white text-zinc-950 hover:bg-zinc-200 font-bold px-8 h-12 text-sm uppercase tracking-wide"
-              onClick={() => navigate({ to: "/auth" })}
+              onClick={() => navigate({ to: "/" })}
             >
               Initialize Account
             </Button>
