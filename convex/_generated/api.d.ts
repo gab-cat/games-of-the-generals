@@ -18,6 +18,8 @@ import type * as auth from "../auth.js";
 import type * as comments from "../comments.js";
 import type * as crons from "../crons.js";
 import type * as customizations from "../customizations.js";
+import type * as emailPreview from "../emailPreview.js";
+import type * as emailTemplates from "../emailTemplates.js";
 import type * as featureGating from "../featureGating.js";
 import type * as fileUpload from "../fileUpload.js";
 import type * as gamePresence from "../gamePresence.js";
@@ -63,6 +65,8 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   crons: typeof crons;
   customizations: typeof customizations;
+  emailPreview: typeof emailPreview;
+  emailTemplates: typeof emailTemplates;
   featureGating: typeof featureGating;
   fileUpload: typeof fileUpload;
   gamePresence: typeof gamePresence;

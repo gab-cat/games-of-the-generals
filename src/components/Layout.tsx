@@ -142,6 +142,7 @@ export function Layout({
       path: "/support",
       search: { ticketId: undefined },
     },
+    { icon: Shield, label: "About System", path: "/about" },
     { icon: User, label: "Pricing", path: "/pricing" },
     { icon: Lock, label: "Privacy Policy", path: "/privacy" },
     { icon: ScrollText, label: "Terms of Service", path: "/terms" },
@@ -740,6 +741,16 @@ export function Layout({
                             <span>Settings</span>
                           </div>
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => void navigate({ to: "/about" })}
+                          className="group flex items-center justify-between px-2 py-1.5 text-xs font-medium text-white/70 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Shield className="h-3.5 w-3.5 opacity-60 group-hover:opacity-100 transition-opacity" />
+                            <span>About System</span>
+                          </div>
+                        </DropdownMenuItem>
+
                         <DropdownMenuItem
                           onClick={() =>
                             void navigate({

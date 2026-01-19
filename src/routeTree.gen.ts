@@ -24,11 +24,13 @@ import { Route as MatchHistoryRouteImport } from './routes/match-history'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GameRouteImport } from './routes/game'
+import { Route as EmailPreviewRouteImport } from './routes/email-preview'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AiGameRouteImport } from './routes/ai-game'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AchievementsRouteImport } from './routes/achievements'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
@@ -111,6 +113,11 @@ const GameRoute = GameRouteImport.update({
   path: '/game',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EmailPreviewRoute = EmailPreviewRouteImport.update({
+  id: '/email-preview',
+  path: '/email-preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -134,6 +141,11 @@ const AdminRoute = AdminRouteImport.update({
 const AchievementsRoute = AchievementsRouteImport.update({
   id: '/achievements',
   path: '/achievements',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SplatRoute = SplatRouteImport.update({
@@ -170,11 +182,13 @@ const AdminSubscriptionsRoute = AdminSubscriptionsRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/about': typeof AboutRoute
   '/achievements': typeof AchievementsRoute
   '/admin': typeof AdminRouteWithChildren
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
+  '/email-preview': typeof EmailPreviewRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/maintenance': typeof MaintenanceRoute
@@ -198,10 +212,12 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/about': typeof AboutRoute
   '/achievements': typeof AchievementsRoute
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
+  '/email-preview': typeof EmailPreviewRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/maintenance': typeof MaintenanceRoute
@@ -226,11 +242,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$': typeof SplatRoute
+  '/about': typeof AboutRoute
   '/achievements': typeof AchievementsRoute
   '/admin': typeof AdminRouteWithChildren
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
+  '/email-preview': typeof EmailPreviewRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/maintenance': typeof MaintenanceRoute
@@ -256,11 +274,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/$'
+    | '/about'
     | '/achievements'
     | '/admin'
     | '/ai-game'
     | '/announcements'
     | '/auth'
+    | '/email-preview'
     | '/game'
     | '/leaderboard'
     | '/maintenance'
@@ -284,10 +304,12 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/$'
+    | '/about'
     | '/achievements'
     | '/ai-game'
     | '/announcements'
     | '/auth'
+    | '/email-preview'
     | '/game'
     | '/leaderboard'
     | '/maintenance'
@@ -311,11 +333,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/$'
+    | '/about'
     | '/achievements'
     | '/admin'
     | '/ai-game'
     | '/announcements'
     | '/auth'
+    | '/email-preview'
     | '/game'
     | '/leaderboard'
     | '/maintenance'
@@ -340,11 +364,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SplatRoute: typeof SplatRoute
+  AboutRoute: typeof AboutRoute
   AchievementsRoute: typeof AchievementsRoute
   AdminRoute: typeof AdminRouteWithChildren
   AiGameRoute: typeof AiGameRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
   AuthRoute: typeof AuthRoute
+  EmailPreviewRoute: typeof EmailPreviewRoute
   GameRoute: typeof GameRoute
   LeaderboardRoute: typeof LeaderboardRoute
   MaintenanceRoute: typeof MaintenanceRoute
@@ -469,6 +495,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/email-preview': {
+      id: '/email-preview'
+      path: '/email-preview'
+      fullPath: '/email-preview'
+      preLoaderRoute: typeof EmailPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -502,6 +535,13 @@ declare module '@tanstack/react-router' {
       path: '/achievements'
       fullPath: '/achievements'
       preLoaderRoute: typeof AchievementsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$': {
@@ -568,11 +608,13 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SplatRoute: SplatRoute,
+  AboutRoute: AboutRoute,
   AchievementsRoute: AchievementsRoute,
   AdminRoute: AdminRouteWithChildren,
   AiGameRoute: AiGameRoute,
   AnnouncementsRoute: AnnouncementsRoute,
   AuthRoute: AuthRoute,
+  EmailPreviewRoute: EmailPreviewRoute,
   GameRoute: GameRoute,
   LeaderboardRoute: LeaderboardRoute,
   MaintenanceRoute: MaintenanceRoute,

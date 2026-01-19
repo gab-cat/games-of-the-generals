@@ -102,36 +102,40 @@ function LobbyInviteMessage({
   const isOwnMessage = message.senderId === currentUserId;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3 font-mono">
       {/* Header with icon and lobby name */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Users className="w-4 h-4 text-blue-400" />
-          <span>Lobby Invite</span>
+      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-400">
+          <Users className="w-3 h-3" />
+          <span>LOBBY_INVITE_PROTOCOL</span>
         </div>
         {message.lobbyName && (
-          <span className="text-xs text-white/70 font-mono bg-white/10 px-2 py-1 rounded break-words max-w-[120px] truncate">
+          <span className="text-[10px] text-zinc-500 font-mono bg-zinc-950/50 px-2 py-0.5 rounded border border-white/5">
             {message.lobbyName}
           </span>
         )}
-      </div>{" "}
+      </div>
+
       {/* Status indicator */}
       {lobbyInfo ? (
         <div className="flex items-center justify-between">
           {lobbyInfo.status === "waiting" ? (
-            <div className="text-xs text-green-400 flex items-center gap-1">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              Available • {lobbyInfo.playerId ? "2/2" : "1/2"} players
+            <div className="text-[10px] text-green-400 flex items-center gap-2 uppercase tracking-wide">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              STATUS: OPEN ({lobbyInfo.playerId ? "2/2" : "1/2"})
             </div>
           ) : lobbyInfo.status === "playing" ? (
-            <div className="text-xs text-yellow-400 flex items-center gap-1">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-              In Progress
+            <div className="text-[10px] text-amber-400 flex items-center gap-2 uppercase tracking-wide">
+              <div className="w-2 h-2 bg-amber-400 rounded-sm animate-pulse"></div>
+              STATUS: ENGAGED
             </div>
           ) : (
-            <div className="text-xs text-red-400 flex items-center gap-1">
-              <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-              Ended
+            <div className="text-[10px] text-red-400 flex items-center gap-2 uppercase tracking-wide">
+              <div className="w-2 h-2 bg-red-400 rounded-sm"></div>
+              STATUS: TERMINATED
             </div>
           )}
 
@@ -142,9 +146,10 @@ function LobbyInviteMessage({
                 size="sm"
                 variant="ghost"
                 onClick={() => copyLobbyCode(message.lobbyCode!)}
-                className="h-6 px-2 text-xs text-white/80 hover:text-white hover:bg-white/20"
+                className="h-6 px-2 text-[10px] font-mono uppercase bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
               >
-                <Copy className="w-3 h-3" />
+                <Copy className="w-3 h-3 mr-1" />
+                Code
               </Button>
             )}
             {!isOwnMessage &&
@@ -154,9 +159,9 @@ function LobbyInviteMessage({
                 <Button
                   size="sm"
                   onClick={() => onJoinLobby(message.lobbyId!)}
-                  className="h-6 px-3 text-xs bg-green-600 hover:bg-green-700"
+                  className="h-6 px-3 text-[10px] font-bold font-mono uppercase bg-green-600/20 text-green-400 border border-green-500/50 hover:bg-green-600/40 hover:text-green-300"
                 >
-                  Join
+                  Confirm Join
                 </Button>
               )}
             {!isOwnMessage &&
@@ -167,18 +172,18 @@ function LobbyInviteMessage({
                 <Button
                   size="sm"
                   onClick={() => onNavigateToLobby(message.lobbyId!)}
-                  className="h-6 px-3 text-xs bg-purple-600 hover:bg-purple-700"
+                  className="h-6 px-3 text-[10px] font-bold font-mono uppercase bg-purple-600/20 text-purple-400 border border-purple-500/50 hover:bg-purple-600/40 hover:text-purple-300"
                   disabled={lobbyInfo.status === "finished"}
                 >
-                  View
+                  Observe
                 </Button>
               )}
           </div>
         </div>
       ) : message.lobbyId ? (
-        <div className="text-xs text-red-300/80 flex items-center gap-1">
-          <div className="w-2 h-2 bg-red-400 rounded-full"></div>
-          Invite expired • Lobby no longer exists
+        <div className="text-[10px] text-red-400/80 flex items-center gap-2 uppercase font-mono">
+          <AlertCircle className="w-3 h-3" />
+          UPLINK_EXPIRED // TARGET_LOST
         </div>
       ) : (
         message.lobbyCode && (
@@ -187,9 +192,10 @@ function LobbyInviteMessage({
               size="sm"
               variant="ghost"
               onClick={() => copyLobbyCode(message.lobbyCode!)}
-              className="h-6 px-2 text-xs text-white/80 hover:text-white hover:bg-white/20"
+              className="h-6 px-2 text-[10px] font-mono uppercase bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
             >
-              <Copy className="w-3 h-3" />
+              <Copy className="w-3 h-3 mr-1" />
+              Code
             </Button>
           </div>
         )
@@ -829,43 +835,45 @@ export function ConversationView({
     isOptimistic = false,
   ) => {
     const showAvatar =
-      messagePosition === "single" || messagePosition === "first";
+      !isOwn && (messagePosition === "single" || messagePosition === "last"); // Show avatar at the bottom for incoming
     const showTimestamp =
       messagePosition === "single" || messagePosition === "last";
 
     // Adjust spacing based on message position
     const marginBottom =
       messagePosition === "last" || messagePosition === "single"
-        ? "mb-4"
-        : "mb-1";
+        ? "mb-6"
+        : "mb-0.5";
 
-    // Adjust border radius based on message position and owner
+    // Angular tactical corners
     const getBorderRadius = () => {
-      const baseRadius = "rounded-2xl";
+      const baseRadius = "rounded-sm"; // Default sharp corners
 
       if (isOwn) {
+        // Own messages (Right side)
         switch (messagePosition) {
           case "single":
-            return "rounded-2xl"; // Single messages should have fully equal edges
+            return "rounded-lg rounded-tr-none";
           case "first":
-            return "rounded-2xl rounded-br-md";
+            return "rounded-lg rounded-tr-none rounded-br-none";
           case "middle":
-            return "rounded-r-md rounded-l-2xl";
+            return "rounded-lg rounded-r-none";
           case "last":
-            return "rounded-2xl rounded-tr-md";
+            return "rounded-lg rounded-br-none rounded-tr-none";
           default:
             return baseRadius;
         }
       } else {
+        // Other messages (Left side)
         switch (messagePosition) {
           case "single":
-            return "rounded-2xl"; // Single messages should have fully equal edges
+            return "rounded-lg rounded-tl-none";
           case "first":
-            return "rounded-2xl rounded-bl-md";
+            return "rounded-lg rounded-tl-none rounded-bl-none";
           case "middle":
-            return "rounded-l-md rounded-r-2xl";
+            return "rounded-lg rounded-l-none";
           case "last":
-            return "rounded-2xl rounded-tl-md";
+            return "rounded-lg rounded-bl-none rounded-tl-none";
           default:
             return baseRadius;
         }
@@ -875,20 +883,21 @@ export function ConversationView({
     return (
       <motion.div
         key={message._id}
-        initial={{ opacity: 0, y: 10 }}
+        initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15 }}
         className={cn(
-          "flex gap-2 items-end",
+          "flex gap-3 items-end group",
           marginBottom,
           isOwn ? "justify-end" : "justify-start",
         )}
       >
         {!isOwn && (
-          <div className="w-8 flex flex-col justify-start">
+          <div className="w-8 flex flex-col justify-end self-end shrink-0">
             {showAvatar ? (
               isNotificationConversation ? (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center mb-1">
-                  <Bell className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                  <Bell className="w-4 h-4 text-blue-400" />
                 </div>
               ) : (
                 <UserAvatar
@@ -908,183 +917,201 @@ export function ConversationView({
           </div>
         )}
 
-        {/* Timestamp and status for own messages (left side) */}
+        {/* Timestamp and status for own messages (left side of bubble) */}
         {isOwn && showTimestamp && (
-          <div className="flex gap-1 flex-row items-end justify-end mb-1 min-w-0">
-            <div className="text-xs text-white/50">
+          <div className="flex gap-1.5 items-center mb-1 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isOptimistic && (
+              <div className="flex items-center">
+                {message.readAt ? (
+                  <CheckCheck className="w-3 h-3 text-amber-500" />
+                ) : message.deliveredAt ? (
+                  <Check className="w-3 h-3 text-zinc-600" />
+                ) : (
+                  <div className="w-2 h-2 rounded-full border border-zinc-600" />
+                )}
+              </div>
+            )}
+            <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">
               {formatTime(
                 "isOptimistic" in message
                   ? message._creationTime
                   : message.timestamp,
               )}
             </div>
-            {!isOptimistic && (
-              <div className="flex items-center mt-0.5">
-                {message.readAt ? (
-                  <CheckCheck className="w-3 h-3 text-blue-400" />
-                ) : message.deliveredAt ? (
-                  <Check className="w-3 h-3 text-white/50" />
-                ) : (
-                  <AlertCircle className="w-3 h-3 text-yellow-400" />
-                )}
-              </div>
-            )}
             {isOptimistic && "status" in message && (
-              <div className="flex items-center mt-0.5">
+              <div className="flex items-center">
                 {message.status === "sending" ? (
-                  <div className="w-3 h-3 border border-white/30 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-2 h-2 border border-amber-500/50 border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-4 px-1 text-xs text-red-400 hover:text-red-300"
-                    onClick={() =>
-                      void retryFailedMessage(message._id, message.content)
-                    }
-                  >
-                    Retry
-                  </Button>
+                  <span className="text-[9px] text-red-500 font-mono uppercase">
+                    ERR
+                  </span>
                 )}
               </div>
             )}
           </div>
         )}
 
-        <div className={cn("max-w-[70%]", isOwn ? "items-end" : "items-start")}>
-          {/* Message bubble with tooltip */}
-          <Tooltip>
-            <TooltipTrigger asChild>
+        <div
+          className={cn(
+            "max-w-[75%] relative",
+            isOwn ? "items-end" : "items-start",
+          )}
+        >
+          {/* Message bubble */}
+          <div
+            className={cn(
+              "px-4 py-3 shadow-sm relative backdrop-blur-sm border transition-all duration-200",
+              getBorderRadius(),
+              isOwn
+                ? "bg-amber-500/10 border-amber-500/20 text-amber-100/90 shadow-[0_0_15px_-5px_rgba(245,158,11,0.1)]"
+                : isNotificationConversation
+                  ? "bg-blue-900/10 border-blue-500/20 text-blue-100/90"
+                  : "bg-zinc-900/80 border-white/5 text-zinc-300 hover:border-zinc-700",
+              message.messageType !== "text" &&
+                !isOwn &&
+                "bg-transparent border-transparent px-0 py-0 shadow-none hover:border-transparent",
+              message.messageType !== "text" &&
+                isOwn &&
+                "bg-transparent border-transparent px-0 py-0 shadow-none hover:border-transparent",
+              isOptimistic &&
+                "opacity-70 border-dashed border-amber-500/30 bg-transparent",
+            )}
+          >
+            {message.messageType === "lobby_invite" ? (
               <div
                 className={cn(
-                  "px-4 py-2 shadow-sm relative",
-                  getBorderRadius(),
+                  "p-3 rounded border w-full min-w-[260px]",
                   isOwn
-                    ? "bg-blue-600 text-white"
-                    : isNotificationConversation
-                      ? "bg-blue-600/20 border border-blue-500/30 text-white"
-                      : "bg-white/10 text-white",
-                  message.messageType !== "text" && "border border-white/20",
-                  isOptimistic && "opacity-70",
+                    ? "bg-amber-950/30 border-amber-500/20"
+                    : "bg-zinc-900/50 border-white/10",
                 )}
               >
-                {message.messageType === "lobby_invite" ? (
-                  <LobbyInviteMessage
-                    message={message}
-                    onNavigateToLobby={onNavigateToLobby}
-                    copyLobbyCode={(code) => void copyLobbyCode(code)}
-                    currentUserId={currentUserProfile?.userId}
-                    onJoinLobby={(lobbyId) => void handleJoinLobby(lobbyId)}
-                  />
-                ) : message.messageType === "game_invite" ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <ExternalLink className="w-4 h-4 text-purple-400" />
-                        <span>Game Invite</span>
-                      </div>
-                      {message.gameId && onNavigateToGame && (
-                        <Button
-                          size="sm"
-                          onClick={() => onNavigateToGame(message.gameId!)}
-                          className="h-6 px-3 text-xs bg-purple-600 hover:bg-purple-700"
-                        >
-                          Watch
-                        </Button>
-                      )}
+                <LobbyInviteMessage
+                  message={message}
+                  onNavigateToLobby={onNavigateToLobby}
+                  copyLobbyCode={(code) => void copyLobbyCode(code)}
+                  currentUserId={currentUserProfile?.userId}
+                  onJoinLobby={(lobbyId) => void handleJoinLobby(lobbyId)}
+                />
+              </div>
+            ) : message.messageType === "game_invite" ? (
+              <div
+                className={cn(
+                  "p-3 rounded border min-w-[240px]",
+                  isOwn
+                    ? "bg-amber-950/30 border-amber-500/20"
+                    : "bg-zinc-900/50 border-white/10",
+                )}
+              >
+                <div className="space-y-2 font-mono">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-400">
+                      <ExternalLink className="w-3 h-3" />
+                      <span>GAME_SPECTATE_LINK</span>
                     </div>
                   </div>
-                ) : (
-                  <div
-                    className={cn(
-                      "text-sm whitespace-pre-wrap break-words",
-                      isNotificationConversation && "text-blue-100",
+                  <div className="flex justify-end pt-1">
+                    {message.gameId && onNavigateToGame && (
+                      <Button
+                        size="sm"
+                        onClick={() => onNavigateToGame(message.gameId!)}
+                        className="h-6 px-3 text-[10px] font-bold font-mono uppercase bg-purple-600/20 text-purple-400 border border-purple-500/50 hover:bg-purple-600/40 hover:text-purple-300"
+                      >
+                        Initialize Uplink
+                      </Button>
                     )}
-                  >
-                    {isNotificationConversation
-                      ? (() => {
-                          // Parse notification content for clickable ticket links
-                          const ticketLinkMatch = message.content.match(
-                            /Ticket:\s*(https?:\/\/[^\s]+)/,
-                          );
-                          if (ticketLinkMatch) {
-                            const [fullMatch, url] = ticketLinkMatch;
-                            const beforeLink = message.content.substring(
-                              0,
-                              message.content.indexOf(fullMatch),
-                            );
-                            const afterLink = message.content.substring(
-                              message.content.indexOf(fullMatch) +
-                                fullMatch.length,
-                            );
-
-                            const handleTicketLinkClick = (
-                              e: React.MouseEvent<HTMLAnchorElement>,
-                            ) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-
-                              // Extract ticket ID from URL (format: /support/TICKET_ID)
-                              const urlParts = url.split("/support/");
-                              if (urlParts.length > 1) {
-                                const ticketId = urlParts[1];
-                                // Call the callback if provided
-                                if (onNavigateToTicket) {
-                                  onNavigateToTicket(ticketId);
-                                }
-                                // Navigate to support page with ticket ID as query parameter
-                                void navigate({
-                                  to: "/support",
-                                  search: { ticketId },
-                                });
-                              }
-                            };
-
-                            return (
-                              <>
-                                {beforeLink}
-                                <a
-                                  href={url}
-                                  onClick={handleTicketLinkClick}
-                                  className="text-blue-300 hover:text-blue-200 underline font-medium inline-flex items-center gap-1 cursor-pointer transition-colors"
-                                >
-                                  View Ticket
-                                  <ExternalLink className="w-3 h-3" />
-                                </a>
-                                {afterLink}
-                              </>
-                            );
-                          }
-                          return message.content;
-                        })()
-                      : message.content}
                   </div>
-                )}
+                </div>
               </div>
-            </TooltipTrigger>
-            <TooltipContent className="backdrop-blur-xl z-[320] py-1 bg-black/40 text-xs text-white/80 rounded-xl p-2">
-              <p className="text-xs">
-                {formatFullTimestamp(
-                  "isOptimistic" in message
-                    ? message._creationTime
-                    : message.timestamp,
+            ) : (
+              <div
+                className={cn(
+                  "text-sm whitespace-pre-wrap break-words leading-relaxed",
+                  !isOwn && !isNotificationConversation && "font-sans",
+                  isOwn && "font-sans",
                 )}
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+              >
+                {isNotificationConversation
+                  ? (() => {
+                      // Parse notification content for clickable ticket links
+                      const ticketLinkMatch = message.content.match(
+                        /Ticket:\s*(https?:\/\/[^\s]+)/,
+                      );
+                      if (ticketLinkMatch) {
+                        const [fullMatch, url] = ticketLinkMatch;
+                        const beforeLink = message.content.substring(
+                          0,
+                          message.content.indexOf(fullMatch),
+                        );
+                        const afterLink = message.content.substring(
+                          message.content.indexOf(fullMatch) + fullMatch.length,
+                        );
 
-        {/* Timestamp for other user messages (right side) */}
-        {!isOwn && showTimestamp && (
-          <div className="flex flex-col items-start justify-end mb-1 min-w-0">
-            <div className="text-xs text-white/50">
+                        const handleTicketLinkClick = (
+                          e: React.MouseEvent<HTMLAnchorElement>,
+                        ) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+
+                          // Extract ticket ID from URL (format: /support/TICKET_ID)
+                          const urlParts = url.split("/support/");
+                          if (urlParts.length > 1) {
+                            const ticketId = urlParts[1];
+                            // Call the callback if provided
+                            if (onNavigateToTicket) {
+                              onNavigateToTicket(ticketId);
+                            }
+                            // Navigate to support page with ticket ID as query parameter
+                            void navigate({
+                              to: "/support",
+                              search: { ticketId },
+                            });
+                          }
+                        };
+
+                        return (
+                          <div className="font-mono text-xs">
+                            {beforeLink}
+                            <div className="my-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded flex items-center justify-between">
+                              <span className="text-blue-200">
+                                SUPPORT_TICKET_REF
+                              </span>
+                              <a
+                                href={url}
+                                onClick={handleTicketLinkClick}
+                                className="text-blue-400 hover:text-blue-300 uppercase font-bold text-[10px] flex items-center gap-1"
+                              >
+                                ACCESS
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                            {afterLink}
+                          </div>
+                        );
+                      }
+                      return (
+                        <span className="font-mono text-xs text-blue-200/80">
+                          {message.content}
+                        </span>
+                      );
+                    })()
+                  : message.content}
+              </div>
+            )}
+          </div>
+
+          {/* Timestamp for other user messages (right side, outside bubble) */}
+          {!isOwn && showTimestamp && (
+            <div className="absolute -right-12 bottom-0 text-[9px] font-mono text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity">
               {formatTime(
                 "isOptimistic" in message
                   ? message._creationTime
                   : message.timestamp,
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </motion.div>
     );
   };
@@ -1107,23 +1134,23 @@ export function ConversationView({
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col bg-gray-900/20">
+      <div className="h-full flex flex-col bg-zinc-950 text-zinc-300">
         {/* Chat Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-white/10 bg-gray-900/40">
+        <div className="flex items-center gap-3 p-4 border-b border-white/5 bg-zinc-900/50 backdrop-blur-md">
           {onBack && (
             <Button
-              variant="secondary"
+              variant="ghost"
               size="sm"
               onClick={onBack}
-              className="p-2 text-white/80 hover:text-white hover:bg-white/10"
+              className="p-2 h-8 w-8 text-zinc-500 hover:text-white hover:bg-white/10 rounded-sm"
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
           )}
           <div className="relative">
             {isNotificationConversation ? (
-              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
-                <Bell className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
+                <Bell className="w-5 h-5 text-blue-400" />
               </div>
             ) : (
               <UserAvatar
@@ -1140,16 +1167,16 @@ export function ConversationView({
                   otherUserProfile?.username,
                 );
                 return indicator ? (
-                  <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                  <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5 border border-zinc-900">
                     {indicator}
                   </div>
                 ) : null;
               })()}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             {isNotificationConversation ? (
-              <h3 className="font-sm text-white transition-colors">
-                Notifications
+              <h3 className="text-sm font-display font-bold uppercase tracking-wide text-white">
+                Command_Notifications
               </h3>
             ) : (
               <UserNameWithBadge
@@ -1164,7 +1191,7 @@ export function ConversationView({
                 isDonor={otherUserProfile?.isDonor}
                 usernameColor={otherUserProfile?.usernameColor}
                 size="md"
-                className="cursor-pointer hover:opacity-80"
+                className="cursor-pointer hover:opacity-80 font-display tracking-wide"
                 onClick={() => {
                   if (otherUserProfile?.username) {
                     void navigate({
@@ -1176,7 +1203,9 @@ export function ConversationView({
               />
             )}
             {isNotificationConversation ? (
-              <p className="text-xs text-blue-400">System Notifications</p>
+              <p className="text-[10px] font-mono text-blue-400/80 uppercase tracking-wider">
+                System Uplink Active
+              </p>
             ) : (
               (() => {
                 const status = getHeaderStatus(otherUserProfile?.username);
@@ -1187,14 +1216,19 @@ export function ConversationView({
                       ? "text-green-400"
                       : status.text === "In Game"
                         ? "text-red-400"
-                        : "text-yellow-400"; // In AI Game
+                        : "text-amber-400"; // In AI Game
                   return (
-                    <div className={`text-xs ${colorClass}`}>{status.text}</div>
+                    <div
+                      className={`text-[10px] font-mono uppercase tracking-wider ${colorClass} flex items-center gap-2`}
+                    >
+                      <span className="w-1.5 h-1.5 rounded-sm bg-current animate-pulse"></span>
+                      {status.text}
+                    </div>
                   );
                 }
                 // Generally online: show bio/wins like before
                 return (
-                  <p className="text-xs text-white/60">
+                  <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate">
                     {otherUserProfile.bio
                       ? otherUserProfile.bio.length > 50
                         ? `${otherUserProfile.bio.substring(0, 50)}...`
@@ -1208,46 +1242,24 @@ export function ConversationView({
         </div>
 
         {/* Retention notice */}
-        <div className="px-4 py-2 border-b border-white/10 bg-gray-900/30">
+        <div className="px-4 py-2 border-b border-white/5 bg-amber-500/5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 text-xs text-white/60 cursor-help">
-                <AlertCircle className="w-4 h-4 text-yellow-400" />
-                <span>
-                  Messages older than 7 days are automatically deleted.
-                </span>
+              <div className="flex items-center gap-2 text-[10px] font-mono text-amber-500/60 cursor-help uppercase tracking-wider justify-center">
+                <AlertCircle className="w-3 h-3 text-amber-500/60" />
+                <span>AUTO_PURGE_PROTOCOL: T-MINUS 7 DAYS</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent className="backdrop-blur-xl z-[320] pointer-events-auto py-3 px-4 bg-black/40 text-white/90 rounded-xl max-w-sm text-xs space-y-3">
-              <div className="space-y-2">
-                <p className="font-medium text-white">
-                  Message Retention Policy
+            <TooltipContent className="backdrop-blur-xl z-[320] pointer-events-auto py-3 px-4 bg-zinc-950 border border-white/10 text-zinc-300 rounded-sm max-w-sm text-xs space-y-3 shadow-2xl">
+              <div className="space-y-2 font-mono">
+                <p className="font-bold text-amber-500 uppercase tracking-wider border-b border-amber-500/20 pb-1">
+                  Retention Policy Protocol
                 </p>
-                <div className="space-y-1 text-white/70">
-                  <p>• Messages are automatically deleted after 7 days</p>
-                  <p>
-                    • This applies to all message types (text, invites, etc.)
-                  </p>
-                  <p>• Deletion is permanent and cannot be recovered</p>
-                  <p>• This helps maintain performance and data privacy</p>
-                </div>
-                <div className="pt-1 border-t border-white/20">
-                  <p className="text-white/70 mb-2">Learn more:</p>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => void navigate({ to: "/privacy" })}
-                      className="text-blue-300 hover:text-blue-200 underline text-xs transition-colors"
-                    >
-                      Privacy Policy
-                    </button>
-                    <span className="text-white/50">•</span>
-                    <button
-                      onClick={() => void navigate({ to: "/terms" })}
-                      className="text-blue-300 hover:text-blue-200 underline text-xs transition-colors"
-                    >
-                      Terms of Service
-                    </button>
-                  </div>
+                <div className="space-y-1 text-zinc-400 text-[10px]">
+                  <p>• DATA_EXPIRATION: 168 HOURS (7 DAYS)</p>
+                  <p>• SCOPE: ALL TRANSMISSION TYPES</p>
+                  <p>• STATUS: IRREVERSIBLE DELETION</p>
+                  <p>• PURPOSE: OPTIMIZE DATABASE INTEGRITY</p>
                 </div>
               </div>
             </TooltipContent>
@@ -1260,44 +1272,50 @@ export function ConversationView({
             <div className="space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex gap-2 animate-pulse">
-                  <div className="w-8 h-8 rounded-full bg-white/10" />
+                  <div className="w-8 h-8 rounded bg-white/5 border border-white/5" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-white/10 rounded w-3/4" />
-                    <div className="h-4 bg-white/10 rounded w-1/2" />
+                    <div className="h-4 bg-white/5 rounded-sm w-3/4" />
+                    <div className="h-4 bg-white/5 rounded-sm w-1/2" />
                   </div>
                 </div>
               ))}
             </div>
           ) : messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-blue-600/20 flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="w-8 h-8 text-blue-400" />
+              <div className="text-center opacity-50">
+                <div className="w-16 h-16 rounded bg-zinc-900 border border-white/5 flex items-center justify-center mx-auto mb-4 grayscale">
+                  {isNotificationConversation ? (
+                    <Bell className="w-8 h-8 text-zinc-500" />
+                  ) : (
+                    <AlertCircle className="w-8 h-8 text-zinc-500" />
+                  )}
                 </div>
-                <p className="text-white/60 mb-2">
+                <p className="text-zinc-500 font-display uppercase tracking-widest text-sm mb-2">
                   {isNotificationConversation
-                    ? "No notifications yet"
-                    : "No messages yet"}
+                    ? "NO_ALERTS"
+                    : "NO_TRANSMISSIONS"}
                 </p>
-                <p className="text-sm text-white/40">
+                <p className="text-[10px] font-mono text-zinc-700 uppercase tracking-wider">
                   {isNotificationConversation
-                    ? "You'll receive notifications about your support tickets here"
-                    : `Start the conversation with ${otherUserProfile?.username}!`}
+                    ? "SYSTEM_STATUS_NORMAL"
+                    : `LINK_ESTABLISHED: ${otherUserProfile?.username}`}
                 </p>
               </div>
             </div>
           ) : (
             <div className="space-y-1">
               {hasMoreOlder && (
-                <div className="flex justify-center">
+                <div className="flex justify-center mb-6">
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => void loadOlderMessages()}
                     disabled={isFetchingOlder}
-                    className="h-6 px-3 text-xs text-white/80 hover:text-white hover:bg-white/10"
+                    className="h-6 px-4 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10"
                   >
-                    {isFetchingOlder ? "Loading…" : "Load previous messages"}
+                    {isFetchingOlder
+                      ? "ACCESSING_ARCHIVES..."
+                      : "LOAD_ARCHIVED_DATA"}
                   </Button>
                 </div>
               )}
@@ -1349,8 +1367,8 @@ export function ConversationView({
                 );
               })}
               {typingStatus?.isTyping && (
-                <div className="flex gap-2 items-end mb-4 justify-start">
-                  <div className="w-8 flex flex-col justify-start">
+                <div className="flex gap-3 items-end mb-4 justify-start">
+                  <div className="w-8 flex flex-col justify-end self-end shrink-0">
                     <UserAvatar
                       username={otherUserProfile.username}
                       avatarUrl={otherUserProfile.avatarUrl}
@@ -1360,11 +1378,11 @@ export function ConversationView({
                     />
                   </div>
                   <div className="max-w-[70%] items-start">
-                    <div className="px-4 py-2 shadow-sm relative rounded-2xl rounded-bl-md bg-white/10 text-white">
+                    <div className="px-3 py-2 shadow-sm relative rounded-lg rounded-bl-none bg-zinc-900/50 border border-white/5 text-zinc-400">
                       <div className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
-                        <span className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
-                        <span className="w-1.5 h-1.5 bg-white/70 rounded-full animate-bounce"></span>
+                        <span className="w-1 h-1 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
+                        <span className="w-1 h-1 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
+                        <span className="w-1 h-1 bg-zinc-500 rounded-full animate-bounce"></span>
                       </div>
                     </div>
                   </div>
@@ -1377,25 +1395,24 @@ export function ConversationView({
 
         {/* Message Input - Hidden for notification conversations */}
         {!isNotificationConversation && (
-          <div className="p-4 border-t bg-slate-900/50">
+          <div className="p-4 border-t border-white/5 bg-zinc-900/50 backdrop-blur-md">
             <div className="flex gap-2">
               <Input
                 ref={inputRef}
-                placeholder={`Message ${otherUserProfile?.username}...`}
+                placeholder={`Transmitting to ${otherUserProfile?.username}...`}
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
                   signalTyping();
                 }}
                 onKeyPress={handleKeyPress}
-                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/20 focus:ring-0"
+                className="flex-1 bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 font-mono text-sm h-10 transition-all font-medium rounded-sm"
               />
               <Button
                 onClick={() => void handleSendMessage()}
                 disabled={!newMessage.trim() || isLoading}
                 size="sm"
-                variant="gradient"
-                className="disabled:opacity-50 rounded-full"
+                className="bg-amber-600 hover:bg-amber-500 text-white border border-amber-500/50 rounded-sm w-10 h-10 p-0 flex items-center justify-center disabled:opacity-50 disabled:bg-zinc-800 disabled:border-zinc-700"
               >
                 <Send className="w-4 h-4" />
               </Button>

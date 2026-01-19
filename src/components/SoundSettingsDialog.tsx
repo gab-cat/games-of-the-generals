@@ -1,22 +1,26 @@
-import React from 'react';
-import { Volume2, VolumeX, Music, Gamepad2 } from 'lucide-react';
+import React from "react";
+import { Volume2, VolumeX, Music, Gamepad2, AlertCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from './ui/dialog';
-import { Slider } from './ui/slider';
-import { useSound } from '../lib/SoundProvider';
-import { cn } from '../lib/utils';
+} from "./ui/dialog";
+import { Slider } from "./ui/slider";
+import { useSound } from "../lib/SoundProvider";
+import { cn } from "../lib/utils";
+import { Button } from "./ui/button";
 
 interface SoundSettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export function SoundSettingsDialog({ isOpen, onClose }: SoundSettingsDialogProps) {
+export function SoundSettingsDialog({
+  isOpen,
+  onClose,
+}: SoundSettingsDialogProps) {
   const { bgmVolume, sfxVolume, setBGMVolume, setSFXVolume } = useSound();
 
   const formatVolume = (volume: number) => {
@@ -35,33 +39,51 @@ export function SoundSettingsDialog({ isOpen, onClose }: SoundSettingsDialogProp
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange} modal={true}>
-      <DialogContent className="sm:max-w-md bg-black/50 backdrop-blur-lg border border-white/20 shadow-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-white/90">
-            <Volume2 className="h-5 w-5" />
-            Sound Settings
+      <DialogContent className="sm:max-w-md bg-zinc-950 border border-amber-500/20 backdrop-blur-xl shadow-2xl p-0 overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500/50 to-transparent opacity-50" />
+
+        <DialogHeader className="p-6 bg-zinc-900/30 border-b border-white/5 space-y-1">
+          <DialogTitle className="flex items-center gap-3 text-white font-display uppercase tracking-widest text-lg">
+            <div className="w-8 h-8 rounded bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+              <Volume2 className="h-4 w-4 text-amber-500" />
+            </div>
+            Audio Configuration
           </DialogTitle>
-          <DialogDescription className="text-white/60">
-            Adjust background music and sound effects volume levels.
+          <DialogDescription className="text-zinc-500 font-mono text-xs uppercase tracking-wider ml-11">
+            Adjust system audio output levels
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-8 py-4">
+        <div className="p-6 space-y-8">
           {/* BGM Volume Control */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Music className="h-4 w-4 text-blue-400" />
-                <label className="text-sm font-medium text-white/90">
-                  Background Music
-                </label>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-zinc-900 flex items-center justify-center border border-white/5 group-hover:border-amber-500/30 transition-colors">
+                  <Music className="h-4 w-4 text-zinc-400" />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-zinc-100 uppercase tracking-wide block">
+                    BGM_CHANNEL
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-mono uppercase">
+                    Background Ambience
+                  </span>
+                </div>
               </div>
-              <span className="text-xs text-white/60 font-mono">
-                {formatVolume(bgmVolume)}
-              </span>
+              <div className="flex items-center gap-2 bg-zinc-900/50 px-2 py-1 rounded border border-white/5">
+                <span className="text-xs font-mono text-amber-500 w-8 text-right font-bold">
+                  {formatVolume(bgmVolume)}
+                </span>
+              </div>
             </div>
 
-            <div className="px-2">
+            <div className="relative pt-2">
+              <div className="absolute -top-1 left-0 w-full flex justify-between px-1">
+                {[0, 25, 50, 75, 100].map((tick) => (
+                  <div key={tick} className="w-px h-1 bg-white/10" />
+                ))}
+              </div>
               <Slider
                 value={[bgmVolume]}
                 onValueChange={(value) => setBGMVolume(value[0])}
@@ -71,31 +93,37 @@ export function SoundSettingsDialog({ isOpen, onClose }: SoundSettingsDialogProp
                 className="w-full"
               />
             </div>
-
-            <div className="flex justify-between text-xs text-white/50">
-              <span>Muted</span>
-              <span>Max</span>
-            </div>
           </div>
 
-          {/* Divider */}
-          <div className="border-t border-white/10" />
-
           {/* SFX Volume Control */}
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Gamepad2 className="h-4 w-4 text-green-400" />
-                <label className="text-sm font-medium text-white/90">
-                  Sound Effects
-                </label>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-sm bg-zinc-900 flex items-center justify-center border border-white/5 group-hover:border-amber-500/30 transition-colors">
+                  <Gamepad2 className="h-4 w-4 text-zinc-400" />
+                </div>
+                <div>
+                  <label className="text-sm font-bold text-zinc-100 uppercase tracking-wide block">
+                    SFX_CHANNEL
+                  </label>
+                  <span className="text-[10px] text-zinc-500 font-mono uppercase">
+                    System Effects
+                  </span>
+                </div>
               </div>
-              <span className="text-xs text-white/60 font-mono">
-                {formatVolume(sfxVolume)}
-              </span>
+              <div className="flex items-center gap-2 bg-zinc-900/50 px-2 py-1 rounded border border-white/5">
+                <span className="text-xs font-mono text-amber-500 w-8 text-right font-bold">
+                  {formatVolume(sfxVolume)}
+                </span>
+              </div>
             </div>
 
-            <div className="px-2">
+            <div className="relative pt-2">
+              <div className="absolute -top-1 left-0 w-full flex justify-between px-1">
+                {[0, 25, 50, 75, 100].map((tick) => (
+                  <div key={tick} className="w-px h-1 bg-white/10" />
+                ))}
+              </div>
               <Slider
                 value={[sfxVolume]}
                 onValueChange={(value) => setSFXVolume(value[0])}
@@ -105,37 +133,25 @@ export function SoundSettingsDialog({ isOpen, onClose }: SoundSettingsDialogProp
                 className="w-full"
               />
             </div>
-
-            <div className="flex justify-between text-xs text-white/50">
-              <span>Muted</span>
-              <span>Max</span>
-            </div>
           </div>
+        </div>
 
-          {/* Volume Indicators */}
-          <div className="flex items-center justify-center gap-4 pt-2">
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <Music className="h-3 w-3" />
-              <span>BGM</span>
-              {React.createElement(getVolumeIcon(bgmVolume), {
-                className: cn(
-                  "h-3 w-3",
-                  bgmVolume === 0 ? "text-red-400" : "text-blue-400"
-                )
-              })}
-            </div>
-
-            <div className="flex items-center gap-2 text-xs text-white/60">
-              <Gamepad2 className="h-3 w-3" />
-              <span>SFX</span>
-              {React.createElement(getVolumeIcon(sfxVolume), {
-                className: cn(
-                  "h-3 w-3",
-                  sfxVolume === 0 ? "text-red-400" : "text-green-400"
-                )
-              })}
-            </div>
+        {/* Footer / Info */}
+        <div className="px-6 py-4 bg-zinc-900/30 border-t border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+              Audio Driver Active
+            </span>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="h-7 text-xs font-mono uppercase text-zinc-400 hover:text-white"
+          >
+            Close Panel
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

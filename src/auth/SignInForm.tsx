@@ -473,6 +473,13 @@ export function SignInForm() {
               </button>
               <div className="h-3 w-px bg-zinc-800" />
               <button
+                onClick={() => navigate({ to: "/about" })}
+                className="hover:text-amber-500 transition-colors"
+              >
+                About System
+              </button>
+              <div className="h-3 w-px bg-zinc-800" />
+              <button
                 onClick={() => navigate({ to: "/privacy" })}
                 className="hover:text-amber-500 transition-colors"
               >

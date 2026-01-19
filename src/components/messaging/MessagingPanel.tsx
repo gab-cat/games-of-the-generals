@@ -105,20 +105,18 @@ function NewMessageView({
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-zinc-950">
       {/* Search */}
-      <div className="p-4 border-b border-white/10 space-y-3">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
+      <div className="p-4 border-b border-white/5 space-y-3">
+        <div className="relative group">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-amber-500 transition-colors" />
           <Input
             placeholder={
-              inviteLobbyId
-                ? "Search for player to invite..."
-                : "Search by username..."
+              inviteLobbyId ? "SEARCH_FOR_OPERATIVE..." : "SEARCH_USERNAME..."
             }
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
+            className="pl-10 bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 font-mono text-sm h-10 transition-all font-medium"
             autoFocus
           />
         </div>
@@ -126,9 +124,9 @@ function NewMessageView({
           <Button
             disabled={isSubscribing}
             onClick={onEnablePush}
-            className="w-full bg-blue-600 hover:bg-blue-700"
+            className="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-mono uppercase tracking-wider h-8"
           >
-            Enable push notifications on this device
+            Enable push uplink
           </Button>
         )}
       </div>
@@ -137,20 +135,22 @@ function NewMessageView({
       <div className="flex-1 overflow-y-auto">
         {searchLoading && debouncedSearchTerm.length >= 2 ? (
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-            <p className="text-white/60 text-sm ml-3">Searching...</p>
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500"></div>
+            <p className="text-zinc-500 text-xs font-mono ml-3 uppercase tracking-wider">
+              Scanning Database...
+            </p>
           </div>
         ) : debouncedSearchTerm.length < 2 ? (
           <div className="space-y-4">
             {/* Recent Conversations */}
             {recentConversations.length > 0 && (
               <div className="space-y-2">
-                <div className="px-4 py-2">
-                  <h3 className="text-sm font-medium text-white/80">
-                    Recent Conversations
+                <div className="px-4 py-2 border-b border-white/5">
+                  <h3 className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
+                    Recent Comms
                   </h3>
                 </div>
-                <div className="space-y-1 px-2">
+                <div className="space-y-px px-2">
                   {recentConversations.map((conversation: any) => (
                     <div
                       key={conversation._id}
@@ -160,13 +160,13 @@ function NewMessageView({
                           conversation.otherParticipant.username,
                         )
                       }
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+                      className="flex items-center gap-3 p-3 rounded-sm border-l-2 border-transparent hover:border-amber-500 hover:bg-zinc-900/50 cursor-pointer transition-all"
                     >
                       <div className="relative">
                         {conversation.otherParticipant.username ===
                         "Notifications" ? (
-                          <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
-                            <Bell className="w-5 h-5 text-white" />
+                          <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                            <Bell className="w-5 h-5 text-blue-400" />
                           </div>
                         ) : (
                           <UserAvatar
@@ -182,7 +182,7 @@ function NewMessageView({
                           getOnlineStatusIndicator(
                             conversation.otherParticipant.username,
                           ) && (
-                            <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                            <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5">
                               {getOnlineStatusIndicator(
                                 conversation.otherParticipant.username,
                               )}
@@ -200,12 +200,12 @@ function NewMessageView({
                           size="sm"
                         />
                         {conversation.otherParticipant.rank && (
-                          <p className="text-sm text-white/60">
+                          <p className="text-xs text-zinc-500 font-mono">
                             {conversation.otherParticipant.rank}
                           </p>
                         )}
                       </div>
-                      <div className="text-xs text-white/40">
+                      <div className="text-[10px] uppercase font-mono text-zinc-600 tracking-wider">
                         {inviteLobbyId ? "Invite" : "Message"}
                       </div>
                     </div>
@@ -215,13 +215,16 @@ function NewMessageView({
             )}
 
             {/* Search Instructions */}
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-12">
               <div className="text-center">
-                <MessageCircle className="w-12 h-12 text-white/40 mx-auto mb-4" />
-                <p className="text-white/60 mb-2">Search for more players</p>
-                <p className="text-sm text-white/40">
-                  Type at least 2 characters to search for players to{" "}
-                  {inviteLobbyId ? "invite" : "message"}
+                <div className="w-16 h-16 rounded-full bg-zinc-900/50 flex items-center justify-center mx-auto mb-4 border border-white/5">
+                  <Search className="w-8 h-8 text-zinc-600" />
+                </div>
+                <p className="text-zinc-400 mb-2 font-display tracking-wide">
+                  SEARCH DATABASE
+                </p>
+                <p className="text-xs text-zinc-600 font-mono uppercase tracking-wider max-w-[200px] mx-auto">
+                  Type at least 2 characters to locate personnel
                 </p>
               </div>
             </div>
@@ -229,18 +232,24 @@ function NewMessageView({
         ) : searchResults.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
-              <Search className="w-12 h-12 text-white/40 mx-auto mb-4" />
-              <p className="text-white/60 mb-2">No players found</p>
-              <p className="text-sm text-white/40">Try a different username</p>
+              <div className="w-16 h-16 rounded-full bg-red-900/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
+                <Search className="w-8 h-8 text-red-500/50" />
+              </div>
+              <p className="text-zinc-400 mb-2 font-display tracking-wide">
+                NO MATCHES FOUND
+              </p>
+              <p className="text-xs text-zinc-600 font-mono uppercase tracking-wider">
+                Verify username parameters
+              </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-1 p-2">
+          <div className="space-y-px p-2">
             {searchResults.map((user: SearchResult) => (
               <div
                 key={user.userId}
                 onClick={() => handleSelectUser(user.userId, user.username)}
-                className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/10 cursor-pointer transition-colors"
+                className="flex items-center gap-3 p-3 rounded-sm border-l-2 border-transparent hover:border-amber-500 hover:bg-zinc-900/50 cursor-pointer transition-all"
               >
                 <div className="relative">
                   <UserAvatar
@@ -251,7 +260,7 @@ function NewMessageView({
                   />
                   {/* Online status indicator */}
                   {getOnlineStatusIndicator(user.username) && (
-                    <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                    <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5">
                       {getOnlineStatusIndicator(user.username)}
                     </div>
                   )}
@@ -265,10 +274,12 @@ function NewMessageView({
                     size="sm"
                   />
                   {user.rank && (
-                    <p className="text-sm text-white/60">{user.rank}</p>
+                    <p className="text-xs text-zinc-500 font-mono">
+                      {user.rank}
+                    </p>
                   )}
                 </div>
-                <div className="text-xs text-white/40">
+                <div className="text-[10px] uppercase font-mono text-zinc-600 tracking-wider">
                   {inviteLobbyId ? "Invite" : "Message"}
                 </div>
               </div>
@@ -523,35 +534,42 @@ export function MessagingPanel({
       <Sheet open={isOpen} onOpenChange={onClose}>
         <SheetContent
           side="right"
-          className="w-full max-w-md p-0 focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none bg-gray-700/20 backdrop-blur-xl border-white/20 text-white"
+          className="w-full max-w-md p-0 focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none bg-zinc-950 border-l border-white/10 text-white shadow-2xl"
           tabIndex={-1}
         >
           <SheetHeader
             className={cn(
-              "p-4 border-b border-white/20 bg-gray-900/40",
+              "p-4 border-b border-white/10 bg-zinc-900/50 backdrop-blur-sm",
               selectedConversation && "hidden", // Hide header when in conversation view
             )}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <MessageSquareText className="w-6 h-6 text-white/80" />
+                <div className="w-8 h-8 rounded bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
+                  <MessageSquareText className="w-4 h-4 text-amber-500" />
+                </div>
                 {showNewMessage ? (
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
                     onClick={() => setShowNewMessage(false)}
-                    className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10"
+                    className="p-2 h-8 w-8 rounded hover:bg-white/10"
                   >
                     <ArrowLeft className="w-4 h-4" />
                   </Button>
                 ) : null}
-                <SheetTitle className="text-lg font-semibold text-white">
-                  {showNewMessage ? "New Message" : "Messages"}
-                </SheetTitle>
+                <div className="flex flex-col items-start">
+                  <SheetTitle className="text-lg font-display font-medium tracking-wide text-white uppercase">
+                    {showNewMessage ? "New Transmission" : "Comms Relay"}
+                  </SheetTitle>
+                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                    {showNewMessage ? "Select Recipient" : "Active Channels"}
+                  </span>
+                </div>
                 {!showNewMessage && unreadCount > 0 && (
                   <Badge
                     variant="destructive"
-                    className="bg-red-500 text-white rounded-full"
+                    className="bg-red-500/20 text-red-400 border border-red-500/50 font-mono text-xs ml-2"
                   >
                     {unreadCount}
                   </Badge>
@@ -561,13 +579,13 @@ export function MessagingPanel({
               <div className="flex items-center mr-8 gap-1">
                 {!showNewMessage && (
                   <Button
-                    variant="secondary"
+                    variant="ghost"
                     size="sm"
                     onClick={handleNewMessage}
-                    className="p-2 text-white/80 rounded-full hover:text-white hover:bg-white/10"
+                    className="h-8 px-3 text-xs font-mono uppercase tracking-wider text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span className="">New Message</span>
+                    <Plus className="w-3 h-3 mr-2" />
+                    New
                   </Button>
                 )}
               </div>
@@ -577,7 +595,7 @@ export function MessagingPanel({
           {/* Content */}
           <div
             className={cn(
-              "flex-1 overflow-hidden",
+              "flex-1 overflow-hidden bg-zinc-950",
               selectedConversation ? "h-full" : "h-[calc(100vh-80px)]",
             )}
           >
@@ -601,23 +619,23 @@ export function MessagingPanel({
             ) : (
               <div className="h-full flex flex-col">
                 {/* Search */}
-                <div className="p-4 space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-white/60" />
+                <div className="p-4 space-y-3 border-b border-white/5">
+                  <div className="relative group">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-amber-500 transition-colors" />
                     <Input
-                      placeholder="Search conversations..."
+                      placeholder="SEARCH_CHANNELS..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/60 focus:border-white/40"
+                      className="pl-10 bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 font-mono text-sm h-10 transition-all font-medium"
                     />
                   </div>
                   {shouldShowEnablePush && (
                     <Button
                       disabled={isSubscribing}
                       onClick={() => void handleEnablePush()}
-                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      className="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-mono uppercase tracking-wider h-8"
                     >
-                      Enable push notifications on this device
+                      Enable push uplink
                     </Button>
                   )}
                 </div>
@@ -629,12 +647,12 @@ export function MessagingPanel({
                       {[...Array(5)].map((_, i) => (
                         <div
                           key={i}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-white/5 animate-pulse"
+                          className="flex items-center gap-3 p-3 rounded-sm border border-white/5 bg-zinc-900/20 animate-pulse"
                         >
-                          <div className="w-12 h-12 rounded-full bg-white/10" />
+                          <div className="w-10 h-10 rounded bg-white/5" />
                           <div className="flex-1 space-y-2">
-                            <div className="h-4 bg-white/10 rounded w-24" />
-                            <div className="h-3 bg-white/10 rounded w-32" />
+                            <div className="h-3 bg-white/5 rounded w-24" />
+                            <div className="h-2 bg-white/5 rounded w-32" />
                           </div>
                         </div>
                       ))}
@@ -642,30 +660,32 @@ export function MessagingPanel({
                   ) : filteredConversations.length === 0 ? (
                     <div className="h-full flex items-center justify-center p-8">
                       <div className="text-center">
-                        <MessageCircle className="w-12 h-12 text-white/40 mx-auto mb-4" />
-                        <p className="text-white/60 mb-2">
+                        <div className="w-16 h-16 rounded-full bg-zinc-900/50 flex items-center justify-center mx-auto mb-4 border border-white/5">
+                          <MessageCircle className="w-8 h-8 text-zinc-600" />
+                        </div>
+                        <p className="text-zinc-400 mb-2 font-display tracking-wide">
                           {debouncedSearchTerm
-                            ? "No conversations found"
-                            : "No messages yet"}
+                            ? "NO CHANNELS FOUND"
+                            : "NO TRANSMISSIONS"}
                         </p>
-                        <p className="text-sm text-white/40 mb-4">
+                        <p className="text-xs font-mono text-zinc-600 mb-6">
                           {debouncedSearchTerm
-                            ? "Try a different search term"
-                            : "Start a conversation with other players"}
+                            ? "REVISE SEARCH PARAMETERS"
+                            : "INITIALIZE NEW COMMUNICATION UPLINK"}
                         </p>
                         {!debouncedSearchTerm && (
                           <Button
                             onClick={handleNewMessage}
-                            className="bg-blue-600 hover:bg-blue-700"
+                            className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs uppercase tracking-wider"
                           >
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Message
+                            <Plus className="w-3 h-3 mr-2" />
+                            Initialize
                           </Button>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-1 p-2">
+                    <div className="space-y-px">
                       {filteredConversations.map((conversation: any) => (
                         <div
                           key={conversation._id}
@@ -674,13 +694,19 @@ export function MessagingPanel({
                               conversation.otherParticipant.id,
                             )
                           }
-                          className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-white/10 cursor-pointer transition-colors"
+                          className={cn(
+                            "flex items-center gap-4 px-4 py-4 cursor-pointer transition-all border-l-2",
+                            "hover:bg-zinc-900/50",
+                            conversation.unreadCount > 0
+                              ? "bg-zinc-900/30 border-amber-500"
+                              : "bg-transparent border-transparent hover:border-zinc-700",
+                          )}
                         >
                           <div className="relative">
                             {conversation.otherParticipant.username ===
                             "Notifications" ? (
-                              <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center ring-1 ring-white/20">
-                                <Bell className="w-5 h-5 text-white" />
+                              <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                <Bell className="w-5 h-5 text-blue-400" />
                               </div>
                             ) : (
                               <UserAvatar
@@ -702,7 +728,7 @@ export function MessagingPanel({
                               getOnlineStatusIndicator(
                                 conversation.otherParticipant.username,
                               ) && (
-                                <div className="absolute -bottom-1 -right-1 bg-gray-700 rounded-full p-0.5">
+                                <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5">
                                   {getOnlineStatusIndicator(
                                     conversation.otherParticipant.username,
                                   )}
@@ -726,7 +752,7 @@ export function MessagingPanel({
                                   conversation.unreadCount > 0 && "font-medium",
                                 )}
                               />
-                              <span className="text-xs text-white/50 flex-shrink-0">
+                              <span className="text-[10px] font-mono text-zinc-500 flex-shrink-0 uppercase">
                                 {formatTime(conversation.lastMessageAt)}
                               </span>
                             </div>
@@ -734,47 +760,55 @@ export function MessagingPanel({
                             <div className="flex items-center gap-2">
                               <p
                                 className={cn(
-                                  "text-xs truncate flex-1",
+                                  "text-xs truncate flex-1 font-mono",
                                   conversation.unreadCount > 0
-                                    ? "text-white/90"
-                                    : "text-white/60",
+                                    ? "text-zinc-300"
+                                    : "text-zinc-500",
                                 )}
                               >
                                 {conversation.lastMessage ? (
                                   <>
                                     {conversation.lastMessage.messageType ===
                                       "lobby_invite" && (
-                                      <span className="inline-flex items-center gap-1">
+                                      <span className="inline-flex items-center gap-1 text-blue-400">
                                         <Users className="w-3 h-3" />
-                                        Lobby invite:
+                                        INVITE_PROTOCOL_RECEIVED
                                       </span>
                                     )}
                                     {conversation.lastMessage.messageType ===
                                       "game_invite" && (
-                                      <span className="inline-flex items-center gap-1">
+                                      <span className="inline-flex items-center gap-1 text-amber-400">
                                         <ExternalLink className="w-3 h-3" />
-                                        Game invite:
+                                        GAME_UPLINK_RECEIVED
                                       </span>
                                     )}
-                                    {currentProfile &&
-                                    conversation.lastMessage.senderId ===
-                                      currentProfile.userId &&
-                                    conversation.otherParticipant.username !==
-                                      "Notifications"
-                                      ? `You: ${truncateMessage(conversation.lastMessage.content)}`
-                                      : truncateMessage(
+                                    {conversation.lastMessage.messageType ===
+                                      "text" && (
+                                      <>
+                                        {currentProfile &&
+                                          conversation.lastMessage.senderId ===
+                                            currentProfile.userId &&
+                                          conversation.otherParticipant
+                                            .username !== "Notifications" && (
+                                            <span className="text-zinc-600 mr-1">
+                                              YOU:
+                                            </span>
+                                          )}
+                                        {truncateMessage(
                                           conversation.lastMessage.content,
                                         )}
+                                      </>
+                                    )}
                                   </>
                                 ) : (
-                                  "No messages yet"
+                                  "NO_DATA"
                                 )}
                               </p>
 
                               {conversation.unreadCount > 0 && (
                                 <Badge
                                   variant="default"
-                                  className="bg-red-500 border-none rounded-full text-white min-w-[20px] h-5 text-xs flex items-center justify-center"
+                                  className="bg-amber-500 text-black border-none rounded-sm min-w-[18px] h-4 text-[9px] font-mono font-bold flex items-center justify-center"
                                 >
                                   {conversation.unreadCount > 9
                                     ? "9+"
