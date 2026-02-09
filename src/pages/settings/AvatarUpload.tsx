@@ -68,11 +68,12 @@ export function AvatarUpload({
   );
 
   const generateUploadUrlMutation = useConvexMutationWithQuery(
-    api.fileUpload.generateUploadUrl,
+    api.fileUpload.generateAvatarUploadUrl,
   );
   const processAvatarUploadMutation = useConvexMutationWithQuery(
     api.fileUpload.processAvatarUpload,
   );
+  const deleteFileMutation = useConvexMutationWithQuery(api.fileUpload.deleteFile);
 
   const updateAvatarMutation = useConvexMutationWithQuery(
     api.profiles.updateAvatar,
@@ -93,6 +94,8 @@ export function AvatarUpload({
       toast.error("Custom avatar uploads are for Pro and Donor members only.");
       return;
     }
+
+    let uploadedStorageId: string | null = null;
 
     try {
       setIsUploading(true);
@@ -117,7 +120,7 @@ export function AvatarUpload({
       const previewObjectUrl = URL.createObjectURL(compressedBlob);
       setPreviewUrl(previewObjectUrl);
 
-      // Get upload URL from Convex
+      // Get upload URL from Convex (Gated specifically for avatars)
       const uploadUrl = await new Promise<string>((resolve, reject) => {
         generateUploadUrlMutation.mutate(
           {},
@@ -136,10 +139,12 @@ export function AvatarUpload({
       });
 
       if (!uploadResponse.ok) {
-        throw new Error("Failed to upload image");
+        const errorText = await uploadResponse.text();
+        throw new Error(`Upload failed: ${uploadResponse.status} ${errorText || "Unknown error"}`);
       }
 
       const { storageId } = await uploadResponse.json();
+      uploadedStorageId = storageId;
 
       // Process the upload to get the file URL
       const result = await new Promise<{
@@ -156,13 +161,21 @@ export function AvatarUpload({
       });
 
       if (!result.fileUrl) {
-        throw new Error("Failed to get file URL");
+        throw new Error("Failed to resolve file URL after upload");
       }
 
       // Update avatar in database with the file URL and storage ID
-      updateAvatarMutation.mutate({
-        avatarUrl: result.fileUrl,
-        avatarStorageId: storageId,
+      await new Promise<void>((resolve, reject) => {
+        updateAvatarMutation.mutate(
+          {
+            avatarUrl: result.fileUrl!,
+            avatarStorageId: storageId,
+          },
+          {
+            onSuccess: () => resolve(),
+            onError: reject,
+          },
+        );
       });
 
       onAvatarUpdate?.(result.fileUrl);
@@ -171,6 +184,12 @@ export function AvatarUpload({
       URL.revokeObjectURL(previewObjectUrl);
     } catch (error) {
       console.error("Error uploading avatar:", error);
+      
+      // Cleanup attempt: if storage was successful but update failed, delete the orphaned file
+      if (uploadedStorageId) {
+        void deleteFileMutation.mutate({ storageId: uploadedStorageId as any });
+      }
+
       toast.error(
         error instanceof Error ? error.message : "Failed to upload avatar",
       );

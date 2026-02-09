@@ -45,10 +45,13 @@ export function isSubscriptionActive(
  * @returns Subscription context with tier, status, and isActive flag
  */
 export async function getSubscriptionContext(ctx: MutationCtx | QueryCtx, userId: Id<"users">) {
+  // Use .first() or take(1) instead of .unique() to handle rare cases of duplicate subscription records
+  // ordered by _creationTime desc to pick the most recent one
   const subscription = await ctx.db
     .query("subscriptions")
     .withIndex("by_user", (q) => q.eq("userId", userId))
-    .unique();
+    .order("desc")
+    .first();
 
   const tier = subscription?.tier || "free";
   const status = subscription?.status || "active";

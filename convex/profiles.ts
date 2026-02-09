@@ -449,7 +449,8 @@ export const updateAvatar = mutation({
       const subscription = await ctx.db
         .query("subscriptions")
         .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique();
+        .order("desc")
+        .first();
 
       const tier = subscription?.tier || "free";
       const status = subscription?.status || "active";
@@ -463,17 +464,22 @@ export const updateAvatar = mutation({
         gracePeriodEndsAt,
       );
 
-      // Free tier cannot upload custom avatars
-      if (tier === "free") {
+      const isDonor = currentProfile.isDonor ?? false;
+      const isAdmin =
+        currentProfile.adminRole === "admin" ||
+        currentProfile.adminRole === "moderator";
+
+      // Check if user is eligible for custom avatar (Pro/Pro+ OR Donor OR Admin)
+      if (tier === "free" && !isDonor && !isAdmin) {
         throw new Error(
-          "Custom avatar upload is only available for Pro and Pro+ subscribers. Upgrade to unlock this feature.",
+          "Custom avatar upload is only available for Pro subscribers and Donors. Upgrade or contribute to unlock this feature.",
         );
       }
 
-      // Pro/Pro+ users need active subscription
-      if (!isActive) {
+      // Pro/Pro+ users need active subscription (unless they are also donors or admins)
+      if (tier !== "free" && !isActive && !isDonor && !isAdmin) {
         throw new Error(
-          "Your subscription has expired. Please renew to upload custom avatars.",
+          "Your Pro subscription has expired. Please renew to upload custom avatars.",
         );
       }
     }
