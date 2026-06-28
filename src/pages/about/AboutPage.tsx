@@ -144,7 +144,7 @@ export function AboutPage() {
                   className="border-white/10 text-zinc-300 hover:text-white hover:bg-white/5 gap-2"
                   onClick={() =>
                     window.open(
-                      "https://www.linkedin.com/in/gabriel-catimbang/",
+                      "https://www.linkedin.com/in/gabrielcatimbang/",
                       "_blank",
                     )
                   }

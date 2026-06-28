@@ -192,7 +192,7 @@ export function SignInForm() {
                   <span>Source Code</span>
                 </a>
                 <a
-                  href="https://www.linkedin.com/in/gabriel-catimbang/"
+                  href="https://www.linkedin.com/in/gabrielcatimbang/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 hover:text-blue-400 transition-colors group"
