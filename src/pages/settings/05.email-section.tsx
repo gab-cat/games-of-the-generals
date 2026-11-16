@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Mail, Check, AlertCircle, ArrowRight } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import {
@@ -9,9 +9,18 @@ import {
 import { useConvexAction } from "@convex-dev/react-query";
 import { api } from "../../../convex/_generated/api";
 import { getRouteApi } from "@tanstack/react-router";
-import { SettingsCard } from "./components/SettingsCard";
+import {
+  Field,
+  SaveMessage,
+  SettingsCard,
+  plainError,
+  type SaveStatus,
+} from "./components/SettingsCard";
+import { PasswordInput } from "./components/PasswordInput";
 
 const route = getRouteApi("/settings");
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 interface EmailSectionProps {
   currentEmail?: string;
@@ -22,11 +31,11 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
   const [password, setPassword] = useState("");
   const [verificationCode, setVerificationCode] = useState("");
   const [showEmailChange, setShowEmailChange] = useState(false);
-  const [showConvertForm, setShowConvertForm] = useState(false);
   const [showVerificationForm, setShowVerificationForm] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [status, setStatus] = useState<SaveStatus>(null);
+  const [touched, setTouched] = useState({ email: false, password: false });
   const [isRequestingEmailChange, setIsRequestingEmailChange] = useState(false);
+  const [isConverting, setIsConverting] = useState(false);
 
   const search = route.useSearch();
   const { data: userSettings } = useConvexQuery(api.settings.getUserSettings);
@@ -40,14 +49,21 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
     api.settings.verifyEmailChange,
     {
       onSuccess: (result: any) => {
-        setSuccess(result.message);
+        setStatus({
+          kind: "success",
+          message: result?.message || "Email changed.",
+        });
         setShowVerificationForm(false);
         setVerificationCode("");
       },
       onError: (err: any) => {
-        setError(
-          err instanceof Error ? err.message : "Failed to verify email change",
-        );
+        setStatus({
+          kind: "error",
+          message: plainError(
+            err,
+            "That code did not work. Check it and try again.",
+          ),
+        });
       },
     },
   );
@@ -58,12 +74,13 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
       onSuccess: () => {
         setShowVerificationForm(false);
         setVerificationCode("");
-        setSuccess("Email change request cancelled");
+        setStatus({ kind: "success", message: "Email change cancelled." });
       },
       onError: (err: any) => {
-        setError(
-          err instanceof Error ? err.message : "Failed to cancel email change",
-        );
+        setStatus({
+          kind: "error",
+          message: plainError(err, "Could not cancel the change. Try again."),
+        });
       },
     },
   );
@@ -72,14 +89,7 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
     api.settings.convertAnonymousAccount,
   );
 
-  // Check if we should show the convert form based on URL parameter
-  useEffect(() => {
-    if (search.convert === "1" && userSettings?.isAnonymous) {
-      setShowConvertForm(true);
-    }
-  }, [search.convert, userSettings?.isAnonymous]);
-
-  // Check if there's a pending email change
+  // A pending change keeps the code form open, also after a reload.
   useEffect(() => {
     if (pendingEmailChange) {
       setShowVerificationForm(true);
@@ -87,292 +97,302 @@ export function EmailSection({ currentEmail }: EmailSectionProps) {
     }
   }, [pendingEmailChange]);
 
-  const handleRequestEmailChange = () => {
-    if (!email.trim()) {
-      setError("Please enter an email address");
-      return;
-    }
+  const isAnonymous = userSettings?.isAnonymous;
+  const trimmedEmail = email.trim();
+  const emailError =
+    touched.email && !trimmedEmail
+      ? "Enter an email address."
+      : touched.email && !EMAIL_PATTERN.test(trimmedEmail)
+        ? "That does not look like an email address."
+        : null;
+  const passwordError =
+    touched.password && !password
+      ? "Choose a password."
+      : touched.password && password.length < 8
+        ? "Use at least 8 characters."
+        : null;
 
-    setError("");
-    setSuccess("");
+  const handleRequestEmailChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched((t) => ({ ...t, email: true }));
+    setStatus(null);
+    if (!trimmedEmail || !EMAIL_PATTERN.test(trimmedEmail)) return;
+
     setIsRequestingEmailChange(true);
-
-    requestEmailChange({ newEmail: email.trim() })
+    requestEmailChange({ newEmail: trimmedEmail })
       .then((result) => {
-        setSuccess(result.message);
+        setStatus({ kind: "success", message: result.message });
         setShowEmailChange(false);
         setShowVerificationForm(true);
         setEmail("");
+        setTouched({ email: false, password: false });
       })
       .catch((err) => {
-        setError(
-          err instanceof Error ? err.message : "Failed to request email change",
-        );
+        setStatus({
+          kind: "error",
+          message: plainError(err, "Could not send the code. Try again."),
+        });
       })
       .finally(() => {
         setIsRequestingEmailChange(false);
       });
   };
 
-  const handleVerifyEmailChange = () => {
+  const handleVerifyEmailChange = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStatus(null);
     if (!verificationCode.trim()) {
-      setError("Please enter the verification code");
+      setStatus({ kind: "error", message: "Enter the code from the email." });
       return;
     }
-
-    setError("");
-    setSuccess("");
     verifyEmailChange.mutate({ verificationCode: verificationCode.trim() });
   };
 
   const handleCancelEmailChange = () => {
-    setError("");
+    setStatus(null);
     cancelEmailChange.mutate({});
   };
 
-  const handleConvertAccount = () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Please enter both email and password");
+  const handleConvertAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    setTouched({ email: true, password: true });
+    setStatus(null);
+    if (
+      !trimmedEmail ||
+      !EMAIL_PATTERN.test(trimmedEmail) ||
+      password.length < 8
+    ) {
       return;
     }
 
-    setError("");
-    setSuccess("");
-
+    setIsConverting(true);
     convertAnonymousAccount({
-      email: email.trim(),
+      email: trimmedEmail,
       password: password.trim(),
     })
       .then((result) => {
-        setSuccess(result.message);
-        setShowConvertForm(false);
+        setStatus({ kind: "success", message: result.message });
         setEmail("");
         setPassword("");
-
-        // Refresh the page to reflect the changes
+        // Reload so the page shows the full account settings.
         setTimeout(() => {
           window.location.reload();
         }, 2000);
       })
       .catch((err) => {
-        setError(
-          err instanceof Error ? err.message : "Failed to convert account",
-        );
+        setStatus({
+          kind: "error",
+          message: plainError(err, "Could not save the account. Try again."),
+        });
+        setIsConverting(false);
       });
   };
 
-  const isAnonymous = userSettings?.isAnonymous;
-  const isLoading =
+  if (isAnonymous) {
+    return (
+      <SettingsCard
+        id="keep-account"
+        title="Keep this account"
+        description="Add an email and password to keep this account. Guest accounts are deleted every day at 00:00 UTC."
+      >
+        <form onSubmit={handleConvertAccount} className="space-y-4" noValidate>
+          <Field
+            label="Email"
+            htmlFor="settings-convert-email"
+            error={emailError}
+          >
+            <Input
+              id="settings-convert-email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoFocus={search.convert === "1"}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setStatus(null);
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+              aria-invalid={!!emailError}
+              disabled={isConverting}
+            />
+          </Field>
+          <Field
+            label="Password"
+            htmlFor="settings-convert-password"
+            hint="At least 8 characters."
+            error={passwordError}
+          >
+            <PasswordInput
+              id="settings-convert-password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setStatus(null);
+              }}
+              onBlur={() => setTouched((t) => ({ ...t, password: true }))}
+              aria-invalid={!!passwordError}
+              disabled={isConverting}
+            />
+          </Field>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled={isConverting}>
+              {isConverting && <Loader2 className="animate-spin" />}
+              {isConverting ? "Saving" : "Keep this account"}
+            </Button>
+            <SaveMessage status={status} />
+          </div>
+        </form>
+      </SettingsCard>
+    );
+  }
+
+  const busy =
     isRequestingEmailChange ||
     verifyEmailChange.isPending ||
     cancelEmailChange.isPending;
 
   return (
     <SettingsCard
-      title="Communication Link"
-      description="Mission updates and account recovery channel."
-      icon={<Mail className="w-5 h-5" />}
-      delay={0.3}
-      variant={isAnonymous ? "danger" : "default"}
+      title="Email"
+      description="We use it for sign in and account recovery."
     >
       <div className="space-y-4">
-        {error && (
-          <div className="flex items-center gap-2 text-red-400 text-xs font-mono bg-red-400/10 p-3 rounded-sm border border-red-400/20">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            {error}
+        <div className="space-y-1.5">
+          <div className="text-[13px] font-medium text-foreground">
+            Current email
+          </div>
+          <div className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-white/[0.02] px-3 py-2 text-sm text-foreground">
+            <Check className="size-4 shrink-0 text-emerald-400" />
+            <span className="min-w-0 break-all">
+              {currentEmail || "No email set"}
+            </span>
+          </div>
+        </div>
+
+        {pendingEmailChange && (
+          <div className="rounded-md border border-gold-500/30 bg-gold-500/10 p-3 text-sm text-foreground">
+            <p>
+              We sent a code to your current address to confirm the change to{" "}
+              <strong className="break-all font-semibold">
+                {pendingEmailChange.newEmail}
+              </strong>
+              .
+            </p>
+            <p className="mt-1 text-xs text-foreground/80">
+              The code expires at{" "}
+              {new Date(pendingEmailChange.expiresAt).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+              .
+            </p>
           </div>
         )}
 
-        {success && (
-          <div className="flex items-center gap-2 text-green-400 text-xs font-mono bg-green-400/10 p-3 rounded-sm border border-green-400/20">
-            <Check className="w-4 h-4 flex-shrink-0" />
-            {success}
-          </div>
-        )}
-
-        {isAnonymous ? (
-          <div className="space-y-4">
-            <div className="bg-red-900/10 border border-red-400/30 rounded-sm p-4 relative overflow-hidden">
-              <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(239,68,68,0.05)_1px,transparent_1px)] bg-[size:10px_10px]" />
-              <p className="text-red-300 font-mono text-sm mb-1 uppercase tracking-widest relative z-10">
-                ⚠️ Unsecured Channel
-              </p>
-              <p className="text-red-200/60 text-xs font-mono relative z-10">
-                Anonymous accounts are volatile. Link an email to permanentize
-                your service record.
-              </p>
-            </div>
-
-            {!showConvertForm ? (
-              <Button
-                onClick={() => setShowConvertForm(true)}
-                className="w-full bg-red-600 hover:bg-red-500 text-white font-mono text-xs uppercase tracking-wider h-10 shadow-[0_0_20px_rgba(220,38,38,0.3)] animate-pulse"
-              >
-                Initiate Link Protocol
+        {showVerificationForm ? (
+          <form
+            onSubmit={handleVerifyEmailChange}
+            className="space-y-4"
+            noValidate
+          >
+            <Field label="Code from the email" htmlFor="settings-email-code">
+              <Input
+                id="settings-email-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={verificationCode}
+                onChange={(e) => {
+                  setVerificationCode(e.target.value);
+                  setStatus(null);
+                }}
+                maxLength={6}
+                className="tabular-nums tracking-[0.3em] sm:max-w-[10rem]"
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" variant="secondary" disabled={busy}>
+                {verifyEmailChange.isPending && (
+                  <Loader2 className="animate-spin" />
+                )}
+                {verifyEmailChange.isPending ? "Checking" : "Confirm change"}
               </Button>
-            ) : (
-              <div className="space-y-4 pt-2 border-t border-red-500/20">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-mono tracking-widest text-red-300">
-                    Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter secure email"
-                    className="bg-black/40 border-red-500/20 text-white placeholder:text-white/20 focus:border-red-500/50"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-mono tracking-widest text-red-300">
-                    Password
-                  </label>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Create secure password"
-                    className="bg-black/40 border-red-500/20 text-white placeholder:text-white/20 focus:border-red-500/50"
-                  />
-                  <p className="text-[10px] text-red-400/60 font-mono">
-                    * Minimum 8 characters required
-                  </p>
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleConvertAccount}
-                    disabled={isLoading}
-                    className="flex-1 bg-red-600 hover:bg-red-500 text-white font-mono text-xs uppercase tracking-wider h-9"
-                  >
-                    {isLoading ? "Linking..." : "Confirm Link"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowConvertForm(false);
-                      setEmail("");
-                      setPassword("");
-                      setError("");
-                    }}
-                    variant="outline"
-                    className="border-red-500/20 text-red-400 hover:bg-red-500/10 font-mono text-xs uppercase tracking-wider h-9"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleCancelEmailChange}
+                disabled={busy}
+              >
+                {cancelEmailChange.isPending
+                  ? "Cancelling"
+                  : "Cancel the change"}
+              </Button>
+              <SaveMessage status={status} />
+            </div>
+          </form>
+        ) : showEmailChange ? (
+          <form
+            onSubmit={handleRequestEmailChange}
+            className="space-y-4"
+            noValidate
+          >
+            <Field
+              label="New email"
+              htmlFor="settings-new-email"
+              hint="We email a code to your current address to confirm."
+              error={emailError}
+            >
+              <Input
+                id="settings-new-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setStatus(null);
+                }}
+                onBlur={() => setTouched((t) => ({ ...t, email: true }))}
+                aria-invalid={!!emailError}
+              />
+            </Field>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" variant="secondary" disabled={busy}>
+                {isRequestingEmailChange && (
+                  <Loader2 className="animate-spin" />
+                )}
+                {isRequestingEmailChange ? "Sending" : "Send code"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setShowEmailChange(false);
+                  setEmail("");
+                  setStatus(null);
+                  setTouched({ email: false, password: false });
+                }}
+              >
+                Cancel
+              </Button>
+              <SaveMessage status={status} />
+            </div>
+          </form>
         ) : (
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
-                Registered Email
-              </label>
-              <div className="bg-black/40 border border-white/5 p-3 rounded-sm text-zinc-300 font-mono flex items-center gap-2">
-                <Check className="w-3.5 h-3.5 text-green-500" />
-                {currentEmail || "No email set"}
-              </div>
-            </div>
-
-            {pendingEmailChange && (
-              <div className="bg-amber-900/10 border border-amber-500/30 rounded-sm p-4">
-                <p className="text-amber-400 font-mono text-xs uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <AlertCircle className="w-3.5 h-3.5" />
-                  Verification Pending
-                </p>
-                <p className="text-amber-200/60 text-xs font-mono mb-2">
-                  Transfer to <strong>{pendingEmailChange.newEmail}</strong>{" "}
-                  requires confirmation code sent to current address.
-                </p>
-                <p className="text-amber-200/40 text-[10px] font-mono">
-                  EXPIRES:{" "}
-                  {new Date(pendingEmailChange.expiresAt).toLocaleTimeString()}
-                </p>
-              </div>
-            )}
-
-            {showVerificationForm ? (
-              <div className="space-y-3 pt-4 border-t border-white/5">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
-                    Verification Code
-                  </label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="text"
-                      value={verificationCode}
-                      onChange={(e) => setVerificationCode(e.target.value)}
-                      placeholder="XXXXXX"
-                      maxLength={6}
-                      className="bg-black/20 border-white/10 text-white font-mono tracking-[0.5em] text-center"
-                    />
-                    <Button
-                      onClick={handleVerifyEmailChange}
-                      disabled={isLoading}
-                      className="bg-green-600 hover:bg-green-500 text-white font-mono text-xs uppercase tracking-wider px-6"
-                    >
-                      {isLoading ? "..." : "Verify"}
-                    </Button>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={handleCancelEmailChange}
-                  disabled={isLoading}
-                  variant="ghost"
-                  className="w-full text-zinc-500 hover:text-white font-mono text-[10px] uppercase tracking-wider h-6"
-                >
-                  Abort Transfer
-                </Button>
-              </div>
-            ) : showEmailChange ? (
-              <div className="space-y-4 pt-4 border-t border-white/5">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-mono tracking-widest text-zinc-500">
-                    New Email Address
-                  </label>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter new email address"
-                    className="bg-black/20 border-white/10 text-white font-mono"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleRequestEmailChange}
-                    disabled={isLoading}
-                    className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs uppercase tracking-wider h-9"
-                  >
-                    {isLoading ? "Processing..." : "Send Code"}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowEmailChange(false);
-                      setEmail("");
-                      setError("");
-                    }}
-                    variant="outline"
-                    className="border-white/10 text-zinc-400 hover:bg-white/5 font-mono text-xs uppercase tracking-wider h-9"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <Button
-                onClick={() => setShowEmailChange(true)}
-                className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-mono text-xs uppercase tracking-wider h-10 border border-white/10 hover:border-blue-500/50 hover:text-blue-400 transition-colors"
-                disabled={!!pendingEmailChange}
-              >
-                <div className="flex items-center gap-2">
-                  <ArrowRight className="w-3.5 h-3.5" />
-                  <span>Initiate Transfer</span>
-                </div>
-              </Button>
-            )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setStatus(null);
+                setShowEmailChange(true);
+              }}
+              disabled={!!pendingEmailChange}
+            >
+              Change email
+            </Button>
+            <SaveMessage status={status} />
           </div>
         )}
       </div>

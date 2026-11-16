@@ -1,24 +1,18 @@
 import { useState, useEffect, type ReactNode } from "react";
-import {
-  Search,
-  Plus,
-  ArrowLeft,
-  ExternalLink,
-  Users,
-  MessageCircle,
-  MessageSquareText,
-  Bell,
-} from "lucide-react";
+import { motion } from "framer-motion";
+import { Search, Plus, ArrowLeft, Eye, Users, Loader2 } from "lucide-react";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Badge } from "../ui/badge";
+import { Skeleton } from "../ui/skeleton";
 import { UserAvatar } from "../UserAvatar";
 import { UserNameWithBadge } from "../UserNameWithBadge";
+import { BrandMark } from "../BrandMark";
 import { cn } from "../../lib/utils";
+import { fadeUp, stagger } from "../../lib/motion";
 import { ConversationView } from "./ConversationView";
 import { toast } from "sonner";
 import { useDebounce } from "use-debounce";
@@ -45,6 +39,7 @@ interface MessagingPanelProps {
 interface NewMessageViewProps {
   inviteLobbyId?: string | null;
   onSelectUser: (userId: string, username?: string) => void;
+  pendingUserId: string | null;
   shouldShowEnablePush: boolean;
   isSubscribing: boolean;
   onEnablePush: () => void;
@@ -62,9 +57,95 @@ interface SearchResult {
   isDonor?: boolean;
 }
 
+const NOTIFICATIONS_NAME = "Notifications";
+
+/** Avatar with the online/activity marker. The system "Notifications" thread shows the brand mark. */
+function ParticipantAvatar({
+  username,
+  avatarUrl,
+  frame,
+  indicator,
+}: {
+  username: string;
+  avatarUrl?: string;
+  frame?: string;
+  indicator?: ReactNode;
+}) {
+  return (
+    <div className="relative shrink-0">
+      {username === NOTIFICATIONS_NAME ? (
+        <div className="flex size-10 items-center justify-center">
+          <BrandMark className="size-8" />
+        </div>
+      ) : (
+        <UserAvatar
+          username={username}
+          avatarUrl={avatarUrl}
+          size="md"
+          frame={frame}
+        />
+      )}
+      {indicator ? (
+        <div className="absolute -bottom-1 -right-1 rounded-full bg-card p-0.5">
+          {indicator}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function PushPrompt({
+  isSubscribing,
+  onEnablePush,
+}: {
+  isSubscribing: boolean;
+  onEnablePush: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-white/[0.03] p-3">
+      <p className="text-sm text-foreground">
+        Get an alert on this device when you get a message.
+      </p>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={isSubscribing}
+        onClick={onEnablePush}
+        className="shrink-0"
+      >
+        {isSubscribing ? (
+          <>
+            <Loader2 className="animate-spin" />
+            Turning on
+          </>
+        ) : (
+          "Turn on"
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function ListSkeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div aria-hidden="true" className="px-2 py-1">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-3 px-2 py-3">
+          <Skeleton className="size-10 shrink-0 rounded-full" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-3.5 w-28" />
+            <Skeleton className="h-3 w-44 max-w-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function NewMessageView({
   inviteLobbyId,
   onSelectUser,
+  pendingUserId,
   shouldShowEnablePush,
   isSubscribing,
   onEnablePush,
@@ -72,10 +153,6 @@ function NewMessageView({
 }: NewMessageViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm] = useDebounce(searchTerm, 500);
-
-  // Using online indicators from parent; logging handled at root
-
-  // Helper function now comes from parent via props
 
   const { data: searchResults = [], isLoading: searchLoading } = useConvexQuery(
     api.messages.searchUsers,
@@ -93,10 +170,14 @@ function NewMessageView({
     },
   );
 
-  // Extract conversations from paginated response
-  const recentConversations = Array.isArray(recentConversationsData)
-    ? recentConversationsData.slice(0, 5)
-    : recentConversationsData?.page?.slice(0, 5) || [];
+  // Extract conversations from paginated response; the system thread is not a person
+  const recentConversations = (
+    Array.isArray(recentConversationsData)
+      ? recentConversationsData
+      : recentConversationsData?.page || []
+  )
+    .filter((c: any) => c.otherParticipant.username !== NOTIFICATIONS_NAME)
+    .slice(0, 5);
 
   const handleSelectUser = (userId: string, username: string) => {
     onSelectUser(userId, username);
@@ -104,187 +185,151 @@ function NewMessageView({
     setSearchTerm("");
   };
 
+  const actionLabel = inviteLobbyId ? "Invite" : "Message";
+  const isSearching = debouncedSearchTerm.length >= 2;
+
+  const renderRow = (
+    key: string,
+    person: {
+      id: string;
+      username: string;
+      avatarUrl?: string;
+      avatarFrame?: string;
+      rank?: string;
+      usernameColor?: string;
+      tier?: "free" | "pro" | "pro_plus";
+      isDonor?: boolean;
+    },
+  ) => {
+    const isPending = pendingUserId === person.id;
+    return (
+      <motion.li key={key} variants={fadeUp}>
+        <button
+          type="button"
+          disabled={pendingUserId !== null}
+          onClick={() => handleSelectUser(person.id, person.username)}
+          className="flex min-h-14 w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:bg-white/[0.1] disabled:opacity-60"
+        >
+          <ParticipantAvatar
+            username={person.username}
+            avatarUrl={person.avatarUrl}
+            frame={person.avatarFrame}
+            indicator={getOnlineStatusIndicator(person.username)}
+          />
+          <div className="min-w-0 flex-1">
+            <UserNameWithBadge
+              username={person.username}
+              tier={person.tier}
+              isDonor={person.isDonor}
+              usernameColor={person.usernameColor}
+              size="md"
+            />
+            {person.rank && (
+              <p className="truncate text-xs text-foreground/75">
+                {person.rank}
+              </p>
+            )}
+          </div>
+          <span className="flex shrink-0 items-center gap-1.5 text-sm text-foreground/80">
+            {isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Sending
+              </>
+            ) : (
+              actionLabel
+            )}
+          </span>
+        </button>
+      </motion.li>
+    );
+  };
+
   return (
-    <div className="h-full flex flex-col bg-zinc-950">
-      {/* Search */}
-      <div className="p-4 border-b border-white/5 space-y-3">
-        <div className="relative group">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-amber-500 transition-colors" />
+    <div className="flex h-full flex-col">
+      <div className="space-y-3 border-b border-border p-4">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/60" />
           <Input
             placeholder={
-              inviteLobbyId ? "SEARCH_FOR_OPERATIVE..." : "SEARCH_USERNAME..."
+              inviteLobbyId
+                ? "Search for a player to invite"
+                : "Search players by username"
             }
+            aria-label="Search players"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 font-mono text-sm h-10 transition-all font-medium"
+            className="pl-9"
             autoFocus
           />
         </div>
         {shouldShowEnablePush && (
-          <Button
-            disabled={isSubscribing}
-            onClick={onEnablePush}
-            className="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-mono uppercase tracking-wider h-8"
-          >
-            Enable push uplink
-          </Button>
+          <PushPrompt
+            isSubscribing={isSubscribing}
+            onEnablePush={onEnablePush}
+          />
         )}
       </div>
 
-      {/* Search Results */}
-      <div className="flex-1 overflow-y-auto">
-        {searchLoading && debouncedSearchTerm.length >= 2 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-500"></div>
-            <p className="text-zinc-500 text-xs font-mono ml-3 uppercase tracking-wider">
-              Scanning Database...
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {isSearching && searchLoading ? (
+          <ListSkeleton rows={4} />
+        ) : !isSearching ? (
+          <div className="p-2">
+            {recentConversations.length > 0 ? (
+              <>
+                <h3 className="px-2 pb-1 pt-2 text-sm font-medium text-foreground">
+                  Recent
+                </h3>
+                <motion.ul
+                  variants={stagger(0.03)}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {recentConversations.map((conversation: any) =>
+                    renderRow(conversation._id, {
+                      id: conversation.otherParticipant.id,
+                      username: conversation.otherParticipant.username,
+                      avatarUrl: conversation.otherParticipant.avatarUrl,
+                      avatarFrame: conversation.otherParticipant.avatarFrame,
+                      rank: conversation.otherParticipant.rank,
+                      usernameColor:
+                        conversation.otherParticipant.usernameColor,
+                      tier: conversation.otherParticipant.tier,
+                      isDonor: conversation.otherParticipant.isDonor,
+                    }),
+                  )}
+                </motion.ul>
+              </>
+            ) : null}
+            <p className="px-2 py-6 text-center text-sm text-foreground/80">
+              Type at least 2 letters of a username.
             </p>
           </div>
-        ) : debouncedSearchTerm.length < 2 ? (
-          <div className="space-y-4">
-            {/* Recent Conversations */}
-            {recentConversations.length > 0 && (
-              <div className="space-y-2">
-                <div className="px-4 py-2 border-b border-white/5">
-                  <h3 className="text-[10px] font-mono font-bold text-zinc-500 uppercase tracking-widest">
-                    Recent Comms
-                  </h3>
-                </div>
-                <div className="space-y-px px-2">
-                  {recentConversations.map((conversation: any) => (
-                    <div
-                      key={conversation._id}
-                      onClick={() =>
-                        handleSelectUser(
-                          conversation.otherParticipant.id,
-                          conversation.otherParticipant.username,
-                        )
-                      }
-                      className="flex items-center gap-3 p-3 rounded-sm border-l-2 border-transparent hover:border-amber-500 hover:bg-zinc-900/50 cursor-pointer transition-all"
-                    >
-                      <div className="relative">
-                        {conversation.otherParticipant.username ===
-                        "Notifications" ? (
-                          <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                            <Bell className="w-5 h-5 text-blue-400" />
-                          </div>
-                        ) : (
-                          <UserAvatar
-                            username={conversation.otherParticipant.username}
-                            avatarUrl={conversation.otherParticipant.avatarUrl}
-                            size="md"
-                            frame={conversation.otherParticipant.avatarFrame}
-                          />
-                        )}
-                        {/* Online status indicator - hide for Notifications */}
-                        {conversation.otherParticipant.username !==
-                          "Notifications" &&
-                          getOnlineStatusIndicator(
-                            conversation.otherParticipant.username,
-                          ) && (
-                            <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5">
-                              {getOnlineStatusIndicator(
-                                conversation.otherParticipant.username,
-                              )}
-                            </div>
-                          )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <UserNameWithBadge
-                          username={conversation.otherParticipant.username}
-                          tier={conversation.otherParticipant.tier}
-                          isDonor={conversation.otherParticipant.isDonor}
-                          usernameColor={
-                            conversation.otherParticipant.usernameColor
-                          }
-                          size="sm"
-                        />
-                        {conversation.otherParticipant.rank && (
-                          <p className="text-xs text-zinc-500 font-mono">
-                            {conversation.otherParticipant.rank}
-                          </p>
-                        )}
-                      </div>
-                      <div className="text-[10px] uppercase font-mono text-zinc-600 tracking-wider">
-                        {inviteLobbyId ? "Invite" : "Message"}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Search Instructions */}
-            <div className="flex items-center justify-center py-12">
-              <div className="text-center">
-                <div className="w-16 h-16 rounded-full bg-zinc-900/50 flex items-center justify-center mx-auto mb-4 border border-white/5">
-                  <Search className="w-8 h-8 text-zinc-600" />
-                </div>
-                <p className="text-zinc-400 mb-2 font-display tracking-wide">
-                  SEARCH DATABASE
-                </p>
-                <p className="text-xs text-zinc-600 font-mono uppercase tracking-wider max-w-[200px] mx-auto">
-                  Type at least 2 characters to locate personnel
-                </p>
-              </div>
-            </div>
-          </div>
         ) : searchResults.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-full bg-red-900/10 flex items-center justify-center mx-auto mb-4 border border-red-500/20">
-                <Search className="w-8 h-8 text-red-500/50" />
-              </div>
-              <p className="text-zinc-400 mb-2 font-display tracking-wide">
-                NO MATCHES FOUND
-              </p>
-              <p className="text-xs text-zinc-600 font-mono uppercase tracking-wider">
-                Verify username parameters
-              </p>
-            </div>
-          </div>
+          <p className="px-6 py-10 text-center text-sm text-foreground/80">
+            No player found for "{debouncedSearchTerm}". Check the spelling.
+          </p>
         ) : (
-          <div className="space-y-px p-2">
-            {searchResults.map((user: SearchResult) => (
-              <div
-                key={user.userId}
-                onClick={() => handleSelectUser(user.userId, user.username)}
-                className="flex items-center gap-3 p-3 rounded-sm border-l-2 border-transparent hover:border-amber-500 hover:bg-zinc-900/50 cursor-pointer transition-all"
-              >
-                <div className="relative">
-                  <UserAvatar
-                    username={user.username}
-                    avatarUrl={user.avatarUrl}
-                    size="md"
-                    frame={user.avatarFrame}
-                  />
-                  {/* Online status indicator */}
-                  {getOnlineStatusIndicator(user.username) && (
-                    <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5">
-                      {getOnlineStatusIndicator(user.username)}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <UserNameWithBadge
-                    username={user.username}
-                    tier={user.tier}
-                    isDonor={user.isDonor}
-                    usernameColor={user.usernameColor}
-                    size="sm"
-                  />
-                  {user.rank && (
-                    <p className="text-xs text-zinc-500 font-mono">
-                      {user.rank}
-                    </p>
-                  )}
-                </div>
-                <div className="text-[10px] uppercase font-mono text-zinc-600 tracking-wider">
-                  {inviteLobbyId ? "Invite" : "Message"}
-                </div>
-              </div>
-            ))}
-          </div>
+          <motion.ul
+            variants={stagger(0.03)}
+            initial="hidden"
+            animate="show"
+            className="p-2"
+          >
+            {searchResults.map((user: SearchResult) =>
+              renderRow(user.userId, {
+                id: user.userId,
+                username: user.username,
+                avatarUrl: user.avatarUrl,
+                avatarFrame: user.avatarFrame,
+                rank: user.rank,
+                usernameColor: user.usernameColor,
+                tier: user.tier,
+                isDonor: user.isDonor,
+              }),
+            )}
+          </motion.ul>
         )}
       </div>
     </div>
@@ -306,13 +351,12 @@ export function MessagingPanel({
   const [searchTerm, setSearchTerm] = useState("");
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [vapidKey, setVapidKey] = useState<string | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isMobile, setIsMobile] = useState(false);
   const [localEndpoint, setLocalEndpoint] = useState<string | null>(null);
   const [hasLocalSubscription, setHasLocalSubscription] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
   // Get online users data at root
-  const { onlineUsers } = useOnlineUsers();
+  const { onlineUsers } = useOnlineUsers(isOpen);
 
   // Shared helper at root used by both list and NewMessageView
   const getOnlineStatusIndicator = (username: string) => {
@@ -404,16 +448,9 @@ export function MessagingPanel({
     return message.substring(0, maxLength) + "...";
   };
 
-  // Setup env and mobile detection
+  // Setup env
   useEffect(() => {
     setVapidKey(import.meta.env.VITE_VAPID_PUBLIC_KEY || null);
-    if (typeof window !== "undefined" && "matchMedia" in window) {
-      const mq = window.matchMedia("(max-width: 768px)");
-      const update = () => setIsMobile(mq.matches);
-      update();
-      mq.addEventListener("change", update);
-      return () => mq.removeEventListener("change", update);
-    }
   }, []);
 
   // Check local push subscription
@@ -465,25 +502,27 @@ export function MessagingPanel({
           await saveSubscription({
             subscription: serializeSubscription(existing),
           });
-          toast.success("Push notifications enabled on this device");
+          toast.success("Alerts are on for this device.");
           setShouldShowEnablePush(false);
           return;
         }
       }
       if (!vapidKey) {
-        toast.error("Push is not configured");
+        toast.error("Alerts aren't available right now.");
         return;
       }
       const sub = await subscribeUserToPush(vapidKey);
       if (!sub) {
-        toast.error("Permission denied or subscription failed");
+        toast.error(
+          "Alerts are blocked. Allow notifications in your browser settings.",
+        );
         return;
       }
       await saveSubscription({ subscription: serializeSubscription(sub) });
-      toast.success("Push notifications enabled on this device");
+      toast.success("Alerts are on for this device.");
       setShouldShowEnablePush(false);
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to enable push");
+    } catch {
+      toast.error("Couldn't turn on alerts. Try again.");
     } finally {
       setIsSubscribing(false);
     }
@@ -492,6 +531,7 @@ export function MessagingPanel({
   if (!isAuthenticated) return null;
 
   const handleUserSelect = (userId: string, username?: string) => {
+    if (pendingUserId) return;
     if (inviteLobbyId) {
       // Handle lobby invite - we need to get the username first
       const conversation = conversations.find(
@@ -501,21 +541,23 @@ export function MessagingPanel({
         username || conversation?.otherParticipant.username;
 
       if (recipientUsername) {
+        setPendingUserId(userId);
         sendMessage({
           recipientUsername,
-          content: `Join my lobby!`,
+          content: `Join my lobby`,
           messageType: "lobby_invite",
           lobbyId: inviteLobbyId as Id<"lobbies">,
         })
           .then(() => {
-            toast.success("Lobby invite sent!");
+            toast.success(`Lobby invite sent to ${recipientUsername}.`);
             setShowNewMessage(false);
             onClose(); // Close the messaging panel after sending invite
           })
           .catch((error: any) => {
             console.error("Failed to send lobby invite:", error);
-            toast.error("Failed to send lobby invite");
-          });
+            toast.error("Couldn't send the invite. Try again.");
+          })
+          .finally(() => setPendingUserId(null));
       }
     } else {
       // For regular messages, open the conversation
@@ -529,304 +571,245 @@ export function MessagingPanel({
     setSelectedConversation(null);
   };
 
+  const lastMessagePreview = (conversation: any) => {
+    const last = conversation.lastMessage;
+    if (!last) {
+      return <span className="text-foreground/70">No messages yet</span>;
+    }
+    if (last.messageType === "lobby_invite") {
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          <Users className="size-3.5 shrink-0" />
+          Lobby invite
+        </span>
+      );
+    }
+    if (last.messageType === "game_invite") {
+      return (
+        <span className="inline-flex items-center gap-1.5">
+          <Eye className="size-3.5 shrink-0" />
+          Game to watch
+        </span>
+      );
+    }
+    const mine =
+      currentProfile &&
+      last.senderId === currentProfile.userId &&
+      conversation.otherParticipant.username !== NOTIFICATIONS_NAME;
+    return (
+      <>
+        {mine && <span className="text-foreground/60">You: </span>}
+        {truncateMessage(last.content)}
+      </>
+    );
+  };
+
+  const title = showNewMessage
+    ? inviteLobbyId
+      ? "Invite to lobby"
+      : "New message"
+    : "Messages";
+
   return (
-    <>
-      <Sheet open={isOpen} onOpenChange={onClose}>
-        <SheetContent
-          side="right"
-          className="w-full max-w-md p-0 focus:ring-0 focus:outline-none focus-visible:ring-0 focus-visible:outline-none bg-zinc-950 border-l border-white/10 text-white shadow-2xl"
-          tabIndex={-1}
-        >
-          <SheetHeader
-            className={cn(
-              "p-4 border-b border-white/10 bg-zinc-900/50 backdrop-blur-sm",
-              selectedConversation && "hidden", // Hide header when in conversation view
+    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <SheetContent
+        side="right"
+        aria-describedby={undefined}
+        className="flex w-full flex-col gap-0 bg-card p-0 text-foreground focus:outline-none focus-visible:outline-none sm:max-w-md"
+        tabIndex={-1}
+      >
+        {selectedConversation ? (
+          <SheetTitle className="sr-only">Conversation</SheetTitle>
+        ) : (
+          <SheetHeader className="shrink-0 flex-row items-center gap-2 space-y-0 border-b border-border py-3 pl-4 pr-14 text-left">
+            {showNewMessage && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowNewMessage(false)}
+                aria-label="Back to messages"
+                className="-ml-2 h-10 w-10 shrink-0"
+              >
+                <ArrowLeft />
+              </Button>
             )}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded bg-amber-500/10 flex items-center justify-center border border-amber-500/20">
-                  <MessageSquareText className="w-4 h-4 text-amber-500" />
+            <SheetTitle className="min-w-0 truncate">{title}</SheetTitle>
+            {!showNewMessage && unreadCount > 0 && (
+              <span
+                className="rounded bg-primary px-1.5 text-xs font-semibold leading-5 tabular-nums text-primary-foreground"
+                aria-label={`${unreadCount} unread`}
+              >
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+            {!showNewMessage && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleNewMessage}
+                className="ml-auto shrink-0"
+              >
+                <Plus />
+                New message
+              </Button>
+            )}
+          </SheetHeader>
+        )}
+
+        <div className="min-h-0 flex-1">
+          {selectedConversation ? (
+            <ConversationView
+              otherUserId={selectedConversation}
+              onNavigateToLobby={onNavigateToLobby}
+              onNavigateToGame={onNavigateToGame}
+              onBack={() => setSelectedConversation(null)}
+              onNavigateToTicket={() => onClose()}
+            />
+          ) : showNewMessage ? (
+            <NewMessageView
+              inviteLobbyId={inviteLobbyId}
+              onSelectUser={handleUserSelect}
+              pendingUserId={pendingUserId}
+              shouldShowEnablePush={shouldShowEnablePush}
+              isSubscribing={isSubscribing}
+              onEnablePush={() => void handleEnablePush()}
+              getOnlineStatusIndicator={getOnlineStatusIndicator}
+            />
+          ) : (
+            <div className="flex h-full flex-col">
+              <div className="space-y-3 border-b border-border p-4">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-foreground/60" />
+                  <Input
+                    placeholder="Search your messages"
+                    aria-label="Search your messages"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
                 </div>
-                {showNewMessage ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowNewMessage(false)}
-                    className="p-2 h-8 w-8 rounded hover:bg-white/10"
-                  >
-                    <ArrowLeft className="w-4 h-4" />
-                  </Button>
-                ) : null}
-                <div className="flex flex-col items-start">
-                  <SheetTitle className="text-lg font-display font-medium tracking-wide text-white uppercase">
-                    {showNewMessage ? "New Transmission" : "Comms Relay"}
-                  </SheetTitle>
-                  <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                    {showNewMessage ? "Select Recipient" : "Active Channels"}
-                  </span>
-                </div>
-                {!showNewMessage && unreadCount > 0 && (
-                  <Badge
-                    variant="destructive"
-                    className="bg-red-500/20 text-red-400 border border-red-500/50 font-mono text-xs ml-2"
-                  >
-                    {unreadCount}
-                  </Badge>
+                {shouldShowEnablePush && (
+                  <PushPrompt
+                    isSubscribing={isSubscribing}
+                    onEnablePush={() => void handleEnablePush()}
+                  />
                 )}
               </div>
 
-              <div className="flex items-center mr-8 gap-1">
-                {!showNewMessage && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleNewMessage}
-                    className="h-8 px-3 text-xs font-mono uppercase tracking-wider text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20"
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                {conversationsLoading ? (
+                  <ListSkeleton />
+                ) : filteredConversations.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center px-8 py-12 text-center">
+                    <p className="text-base font-medium text-foreground">
+                      {debouncedSearchTerm
+                        ? `No messages from "${debouncedSearchTerm}"`
+                        : "No messages yet"}
+                    </p>
+                    <p className="mt-1 max-w-xs text-sm text-foreground/75">
+                      {debouncedSearchTerm
+                        ? "Check the spelling or clear the search."
+                        : "Start a conversation with another player."}
+                    </p>
+                    {!debouncedSearchTerm && (
+                      <Button onClick={handleNewMessage} className="mt-5">
+                        <Plus />
+                        New message
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <motion.ul
+                    variants={stagger(0.03)}
+                    initial="hidden"
+                    animate="show"
+                    className="p-2"
                   >
-                    <Plus className="w-3 h-3 mr-2" />
-                    New
-                  </Button>
+                    {filteredConversations.map((conversation: any) => {
+                      const unread = conversation.unreadCount > 0;
+                      const name = conversation.otherParticipant.username;
+                      return (
+                        <motion.li key={conversation._id} variants={fadeUp}>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedConversation(
+                                conversation.otherParticipant.id,
+                              )
+                            }
+                            className={cn(
+                              "flex min-h-16 w-full items-center gap-3 rounded-md px-2 py-2.5 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:bg-white/[0.1]",
+                              unread && "bg-gold-500/[0.05]",
+                            )}
+                          >
+                            <ParticipantAvatar
+                              username={name}
+                              avatarUrl={
+                                conversation.otherParticipant.avatarUrl
+                              }
+                              frame={conversation.otherParticipant.avatarFrame}
+                              indicator={
+                                name !== NOTIFICATIONS_NAME
+                                  ? getOnlineStatusIndicator(name)
+                                  : null
+                              }
+                            />
+
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <UserNameWithBadge
+                                  username={name}
+                                  tier={conversation.otherParticipant.tier}
+                                  isDonor={
+                                    conversation.otherParticipant.isDonor
+                                  }
+                                  usernameColor={
+                                    conversation.otherParticipant.usernameColor
+                                  }
+                                  size="md"
+                                  className={cn(
+                                    unread && "[&>span]:font-semibold",
+                                  )}
+                                />
+                                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                  {formatTime(conversation.lastMessageAt)}
+                                </span>
+                              </div>
+
+                              <div className="mt-0.5 flex items-center gap-2">
+                                <p
+                                  className={cn(
+                                    "min-w-0 flex-1 truncate text-sm",
+                                    unread
+                                      ? "text-foreground"
+                                      : "text-foreground/75",
+                                  )}
+                                >
+                                  {lastMessagePreview(conversation)}
+                                </p>
+                                {unread && (
+                                  <span
+                                    className="shrink-0 rounded bg-primary px-1.5 text-xs font-semibold leading-5 tabular-nums text-primary-foreground"
+                                    aria-label={`${conversation.unreadCount} unread`}
+                                  >
+                                    {conversation.unreadCount > 9
+                                      ? "9+"
+                                      : conversation.unreadCount}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </button>
+                        </motion.li>
+                      );
+                    })}
+                  </motion.ul>
                 )}
               </div>
             </div>
-          </SheetHeader>
-
-          {/* Content */}
-          <div
-            className={cn(
-              "flex-1 overflow-hidden bg-zinc-950",
-              selectedConversation ? "h-full" : "h-[calc(100vh-80px)]",
-            )}
-          >
-            {selectedConversation ? (
-              <ConversationView
-                otherUserId={selectedConversation}
-                onNavigateToLobby={onNavigateToLobby}
-                onNavigateToGame={onNavigateToGame}
-                onBack={() => setSelectedConversation(null)}
-                onNavigateToTicket={() => onClose()}
-              />
-            ) : showNewMessage ? (
-              <NewMessageView
-                inviteLobbyId={inviteLobbyId}
-                onSelectUser={handleUserSelect}
-                shouldShowEnablePush={shouldShowEnablePush}
-                isSubscribing={isSubscribing}
-                onEnablePush={() => void handleEnablePush()}
-                getOnlineStatusIndicator={getOnlineStatusIndicator}
-              />
-            ) : (
-              <div className="h-full flex flex-col">
-                {/* Search */}
-                <div className="p-4 space-y-3 border-b border-white/5">
-                  <div className="relative group">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-zinc-500 group-focus-within:text-amber-500 transition-colors" />
-                    <Input
-                      placeholder="SEARCH_CHANNELS..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10 bg-zinc-900/50 border-zinc-800 text-white placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 font-mono text-sm h-10 transition-all font-medium"
-                    />
-                  </div>
-                  {shouldShowEnablePush && (
-                    <Button
-                      disabled={isSubscribing}
-                      onClick={() => void handleEnablePush()}
-                      className="w-full bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-mono uppercase tracking-wider h-8"
-                    >
-                      Enable push uplink
-                    </Button>
-                  )}
-                </div>
-
-                {/* Conversations List */}
-                <div className="flex-1 overflow-y-auto">
-                  {conversationsLoading ? (
-                    <div className="p-4 space-y-3">
-                      {[...Array(5)].map((_, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-3 p-3 rounded-sm border border-white/5 bg-zinc-900/20 animate-pulse"
-                        >
-                          <div className="w-10 h-10 rounded bg-white/5" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-3 bg-white/5 rounded w-24" />
-                            <div className="h-2 bg-white/5 rounded w-32" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : filteredConversations.length === 0 ? (
-                    <div className="h-full flex items-center justify-center p-8">
-                      <div className="text-center">
-                        <div className="w-16 h-16 rounded-full bg-zinc-900/50 flex items-center justify-center mx-auto mb-4 border border-white/5">
-                          <MessageCircle className="w-8 h-8 text-zinc-600" />
-                        </div>
-                        <p className="text-zinc-400 mb-2 font-display tracking-wide">
-                          {debouncedSearchTerm
-                            ? "NO CHANNELS FOUND"
-                            : "NO TRANSMISSIONS"}
-                        </p>
-                        <p className="text-xs font-mono text-zinc-600 mb-6">
-                          {debouncedSearchTerm
-                            ? "REVISE SEARCH PARAMETERS"
-                            : "INITIALIZE NEW COMMUNICATION UPLINK"}
-                        </p>
-                        {!debouncedSearchTerm && (
-                          <Button
-                            onClick={handleNewMessage}
-                            className="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs uppercase tracking-wider"
-                          >
-                            <Plus className="w-3 h-3 mr-2" />
-                            Initialize
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-px">
-                      {filteredConversations.map((conversation: any) => (
-                        <div
-                          key={conversation._id}
-                          onClick={() =>
-                            setSelectedConversation(
-                              conversation.otherParticipant.id,
-                            )
-                          }
-                          className={cn(
-                            "flex items-center gap-4 px-4 py-4 cursor-pointer transition-all border-l-2",
-                            "hover:bg-zinc-900/50",
-                            conversation.unreadCount > 0
-                              ? "bg-zinc-900/30 border-amber-500"
-                              : "bg-transparent border-transparent hover:border-zinc-700",
-                          )}
-                        >
-                          <div className="relative">
-                            {conversation.otherParticipant.username ===
-                            "Notifications" ? (
-                              <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                                <Bell className="w-5 h-5 text-blue-400" />
-                              </div>
-                            ) : (
-                              <UserAvatar
-                                username={
-                                  conversation.otherParticipant.username
-                                }
-                                avatarUrl={
-                                  conversation.otherParticipant.avatarUrl
-                                }
-                                size="md"
-                                frame={
-                                  conversation.otherParticipant.avatarFrame
-                                }
-                              />
-                            )}
-                            {/* Online status indicator - hide for Notifications */}
-                            {conversation.otherParticipant.username !==
-                              "Notifications" &&
-                              getOnlineStatusIndicator(
-                                conversation.otherParticipant.username,
-                              ) && (
-                                <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5">
-                                  {getOnlineStatusIndicator(
-                                    conversation.otherParticipant.username,
-                                  )}
-                                </div>
-                              )}
-                          </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <UserNameWithBadge
-                                username={
-                                  conversation.otherParticipant.username
-                                }
-                                tier={conversation.otherParticipant.tier}
-                                isDonor={conversation.otherParticipant.isDonor}
-                                usernameColor={
-                                  conversation.otherParticipant.usernameColor
-                                }
-                                size="sm"
-                                className={cn(
-                                  conversation.unreadCount > 0 && "font-medium",
-                                )}
-                              />
-                              <span className="text-[10px] font-mono text-zinc-500 flex-shrink-0 uppercase">
-                                {formatTime(conversation.lastMessageAt)}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <p
-                                className={cn(
-                                  "text-xs truncate flex-1 font-mono",
-                                  conversation.unreadCount > 0
-                                    ? "text-zinc-300"
-                                    : "text-zinc-500",
-                                )}
-                              >
-                                {conversation.lastMessage ? (
-                                  <>
-                                    {conversation.lastMessage.messageType ===
-                                      "lobby_invite" && (
-                                      <span className="inline-flex items-center gap-1 text-blue-400">
-                                        <Users className="w-3 h-3" />
-                                        INVITE_PROTOCOL_RECEIVED
-                                      </span>
-                                    )}
-                                    {conversation.lastMessage.messageType ===
-                                      "game_invite" && (
-                                      <span className="inline-flex items-center gap-1 text-amber-400">
-                                        <ExternalLink className="w-3 h-3" />
-                                        GAME_UPLINK_RECEIVED
-                                      </span>
-                                    )}
-                                    {conversation.lastMessage.messageType ===
-                                      "text" && (
-                                      <>
-                                        {currentProfile &&
-                                          conversation.lastMessage.senderId ===
-                                            currentProfile.userId &&
-                                          conversation.otherParticipant
-                                            .username !== "Notifications" && (
-                                            <span className="text-zinc-600 mr-1">
-                                              YOU:
-                                            </span>
-                                          )}
-                                        {truncateMessage(
-                                          conversation.lastMessage.content,
-                                        )}
-                                      </>
-                                    )}
-                                  </>
-                                ) : (
-                                  "NO_DATA"
-                                )}
-                              </p>
-
-                              {conversation.unreadCount > 0 && (
-                                <Badge
-                                  variant="default"
-                                  className="bg-amber-500 text-black border-none rounded-sm min-w-[18px] h-4 text-[9px] font-mono font-bold flex items-center justify-center"
-                                >
-                                  {conversation.unreadCount > 9
-                                    ? "9+"
-                                    : conversation.unreadCount}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-    </>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }

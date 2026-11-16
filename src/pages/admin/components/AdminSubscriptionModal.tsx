@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { UserAvatar } from "@/components/UserAvatar";
-import { Search, Loader2, X, Calendar, Terminal, Shield } from "lucide-react";
+import { Search, Loader2, X } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 
@@ -104,7 +105,7 @@ export function AdminSubscriptionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) {
-      toast.error("Please select a user");
+      toast.error("Choose a user first");
       return;
     }
 
@@ -132,133 +133,133 @@ export function AdminSubscriptionModal({
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error(error instanceof Error ? error.message : "An error occurred");
+      toast.error("Could not save the subscription. Try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden shadow-2xl">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[80px] -z-10" />
-
-        <DialogHeader className="p-6 border-b border-white/5 bg-zinc-900/50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-zinc-800 border border-white/10 rounded-sm">
-              <Shield className="w-5 h-5 text-blue-400" />
-            </div>
-            <div>
-              <DialogTitle className="text-xl font-display tracking-tight uppercase">
-                {isEdit ? "Update Contract" : "Initialize New Contract"}
-              </DialogTitle>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest mt-0.5">
-                <Terminal className="w-3 h-3" />
-                <span>
-                  Registry System: {isEdit ? "Modification" : "Insertion"}
-                </span>
-              </div>
-            </div>
-          </div>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && !isSubmitting && onClose()}
+    >
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {isEdit ? "Edit subscription" : "New subscription"}
+          </DialogTitle>
+          <DialogDescription>
+            {isEdit
+              ? "Changes apply to the user right away."
+              : "Choose a user, then set the plan, status and end date."}
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* User Selection (Only for Create) */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           {!isEdit && (
-            <div className="space-y-3">
-              <Label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                Target Entity
-              </Label>
+            <div className="space-y-2">
+              <Label htmlFor="sub-user-search">User</Label>
               {selectedUser ? (
-                <div className="flex items-center justify-between p-3 bg-zinc-900 border border-blue-500/30 rounded-sm group">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between rounded-md border border-gold-500/30 bg-gold-500/10 p-3">
+                  <div className="flex min-w-0 items-center gap-3">
                     <UserAvatar
                       username={selectedUser.username}
                       avatarUrl={selectedUser.avatarUrl}
                       size="sm"
-                      className="ring-1 ring-white/10"
                     />
-                    <div>
-                      <p className="text-sm font-medium">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {selectedUser.username}
                       </p>
-                      <p className="text-[10px] font-mono text-zinc-500">
+                      <p className="truncate text-xs text-foreground/70">
                         {selectedUser.email}
                       </p>
                     </div>
                   </div>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Choose a different user"
                     onClick={() => {
                       setSelectedUser(null);
                       setUserId("");
                     }}
-                    className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
                   >
-                    <X className="w-4 h-4" />
-                  </button>
+                    <X className="size-4" />
+                  </Button>
                 </div>
               ) : (
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="SCANNING FOR USERS..."
+                    id="sub-user-search"
+                    placeholder="Search by username"
+                    autoComplete="off"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-zinc-900 border-white/10 text-zinc-300 font-mono text-xs uppercase focus:border-blue-500/50 rounded-sm"
+                    className="pl-9"
                   />
                   {searchQuery.length >= 2 &&
                     searchUsers &&
                     searchUsers.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-zinc-900 border border-white/10 shadow-2xl z-50 rounded-sm overflow-hidden">
+                      <ul className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border border-border-strong bg-card shadow-lg">
                         {searchUsers.map((user) => (
-                          <button
-                            key={user.userId}
-                            type="button"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setUserId(user.userId);
-                              setSearchQuery("");
-                            }}
-                            className="w-full flex items-center gap-3 p-3 hover:bg-white/5 transition-colors text-left border-b border-white/5 last:border-0"
-                          >
-                            <UserAvatar
-                              username={user.username}
-                              avatarUrl={user.avatarUrl}
-                              size="sm"
-                            />
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">
-                                {user.username}
-                              </p>
-                              <p className="text-[10px] font-mono text-zinc-500 truncate">
-                                {user.email}
-                              </p>
-                            </div>
-                          </button>
+                          <li key={user.userId}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setUserId(user.userId);
+                                setSearchQuery("");
+                              }}
+                              className="flex min-h-12 w-full items-center gap-3 border-b border-border p-3 text-left transition-colors last:border-0 hover:bg-white/[0.06] focus-visible:bg-white/[0.06] focus-visible:outline-none"
+                            >
+                              <UserAvatar
+                                username={user.username}
+                                avatarUrl={user.avatarUrl}
+                                size="sm"
+                              />
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium text-foreground">
+                                  {user.username}
+                                </p>
+                                <p className="truncate text-xs text-foreground/70">
+                                  {user.email}
+                                </p>
+                              </div>
+                            </button>
+                          </li>
                         ))}
-                      </div>
+                      </ul>
+                    )}
+                  {searchQuery.length >= 2 &&
+                    searchUsers &&
+                    searchUsers.length === 0 && (
+                      <p className="mt-2 text-sm text-foreground/80">
+                        No users match "{searchQuery}".
+                      </p>
                     )}
                 </div>
               )}
             </div>
           )}
 
-          {isEdit && (
-            <div className="space-y-3">
-              <Label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                Active Entity
-              </Label>
-              <div className="flex items-center gap-3 p-3 bg-zinc-900 border border-white/10 rounded-sm">
+          {isEdit && subscription && (
+            <div className="space-y-2">
+              <Label>User</Label>
+              <div className="flex items-center gap-3 rounded-md border border-border bg-white/[0.03] p-3">
                 <UserAvatar
                   username={subscription.username ?? "Unknown"}
                   avatarUrl={subscription.avatarUrl}
                   size="sm"
-                  className="ring-1 ring-white/10"
                 />
-                <div>
-                  <p className="text-sm font-medium">{subscription.username}</p>
-                  <p className="text-[10px] font-mono text-zinc-500">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {subscription.username}
+                  </p>
+                  <p className="truncate text-xs text-foreground/70">
                     {subscription.email}
                   </p>
                 </div>
@@ -268,87 +269,75 @@ export function AdminSubscriptionModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                Access Level
-              </Label>
+              <Label>Plan</Label>
               <Select value={tier} onValueChange={(val: any) => setTier(val)}>
-                <SelectTrigger className="bg-zinc-900 border-white/10 text-zinc-300 text-xs font-mono uppercase tracking-wider rounded-sm focus:ring-0 focus:border-blue-500/50">
+                <SelectTrigger aria-label="Plan">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-sm">
-                  <SelectItem value="free">FREE</SelectItem>
-                  <SelectItem value="pro">PRO</SelectItem>
-                  <SelectItem value="pro_plus">PRO+</SelectItem>
+                <SelectContent>
+                  <SelectItem value="free">Free</SelectItem>
+                  <SelectItem value="pro">Pro</SelectItem>
+                  <SelectItem value="pro_plus">Pro+</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                Operational Status
-              </Label>
+              <Label>Status</Label>
               <Select
                 value={status}
                 onValueChange={(val: any) => setStatus(val)}
               >
-                <SelectTrigger className="bg-zinc-900 border-white/10 text-zinc-300 text-xs font-mono uppercase tracking-wider rounded-sm focus:ring-0 focus:border-blue-500/50">
+                <SelectTrigger aria-label="Status">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="bg-zinc-950 border-white/10 text-white rounded-sm">
-                  <SelectItem value="active">ACTIVE</SelectItem>
-                  <SelectItem value="expired">EXPIRED</SelectItem>
-                  <SelectItem value="grace_period">GRACE PERIOD</SelectItem>
-                  <SelectItem value="canceled">CANCELED</SelectItem>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="grace_period">Grace period</SelectItem>
+                  <SelectItem value="canceled">Canceled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest leading-relaxed">
-              Termination Date
-            </Label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <Input
-                type="date"
-                value={expiresAt}
-                onChange={(e) => setExpiresAt(e.target.value)}
-                className="pl-10 bg-zinc-900 border-white/10 text-zinc-300 font-mono text-xs uppercase focus:border-blue-500/50 rounded-sm"
-              />
-            </div>
+            <Label htmlFor="sub-expires">Valid until</Label>
+            <Input
+              id="sub-expires"
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              className=""
+            />
           </div>
         </form>
 
-        <DialogFooter className="p-6 bg-zinc-900/30 border-t border-white/5 sm:justify-between items-center gap-4">
-          <p className="hidden sm:block text-[9px] font-mono text-zinc-500 max-w-[150px] leading-tight uppercase">
-            All administrative overrides are logged and audited. Procedural
-            integrity verified.
-          </p>
-          <div className="flex gap-3 w-full sm:w-auto">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1 sm:flex-none bg-transparent border-white/10 hover:bg-white/5 text-zinc-400 font-mono text-[10px] uppercase tracking-wider rounded-sm h-9"
-            >
-              Abort
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white font-mono text-[10px] uppercase tracking-widest rounded-sm h-9 px-6 min-w-[140px]"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : isEdit ? (
-                "[ EXECUTE UPDATE ]"
-              ) : (
-                "[ COMMIT REGISTRATION ]"
-              )}
-            </Button>
-          </div>
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting || (!isEdit && !userId)}
+            className="min-w-32"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Saving
+              </>
+            ) : isEdit ? (
+              "Save changes"
+            ) : (
+              "Create subscription"
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

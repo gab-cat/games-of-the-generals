@@ -23,7 +23,7 @@
     <meta name="author" content="Games of the Generals" />
     <meta name="robots" content="index, follow" />
     <meta name="language" content="English" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#0b0b0d" />
     <meta name="msapplication-TileColor" content="#0f172a" />
     <link rel="canonical" href="https://www.generalsonline.app" />
 
@@ -106,13 +106,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- Preload critical Inter fonts (most commonly used weights) -->
-    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZ9hiJ-Ek-_EeA.woff2" as="font" type="font/woff2" crossorigin />
 
     <!-- Optimized font loading with reduced weights -->
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
 
@@ -120,16 +117,17 @@
     <style>
       /* CSS Variables for theming */
       :root {
-        --background: 240 5.9% 10%;
-        --foreground: 210 40% 98%;
-        --primary: 217.2 91.2% 59.8%;
-        --primary-foreground: 222.2 84% 4.9%;
-        --secondary: 217.2 32.6% 17.5%;
-        --secondary-foreground: 210 40% 98%;
-        --muted-foreground: 215 20.2% 65.1%;
-        --border: 217.2 32.6% 17.5%;
-        --input: 217.2 32.6% 17.5%;
-        --ring: 212.7 26.8% 83.9%;
+        /* Season 3 palette. Keep in sync with src/index.css and DESIGN.md */
+        --background: 240 8% 5%;
+        --foreground: 40 20% 95%;
+        --primary: 39 67% 55%;
+        --primary-foreground: 30 42% 7%;
+        --secondary: 240 5% 11%;
+        --secondary-foreground: 40 20% 95%;
+        --muted-foreground: 40 5% 64%;
+        --border: 240 5% 15%;
+        --input: 240 5% 18%;
+        --ring: 40 80% 75%;
         --radius: 0.5rem;
       }
 
@@ -142,19 +140,35 @@
         background-color: hsl(var(--background));
         color: hsl(var(--foreground));
         overflow-x: hidden;
-        font-family: Inter, "Inter Variable", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-        /* Add subtle grain texture for depth */
-        background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.15) 1px, transparent 0);
-        background-size: 20px 20px;
+        font-family: Poppins, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
 
       /* Font fallbacks to prevent FOIT */
       .font-display {
-        font-family: "Playfair Display", Georgia, "Times New Roman", Times, serif;
+        font-family: Poppins, ui-sans-serif, system-ui, sans-serif;
       }
 
       .font-mono {
-        font-family: "JetBrains Mono", "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+        font-family: Poppins, ui-sans-serif, system-ui, sans-serif;
+      }
+
+      /* First-paint loader. Keep in sync with src/components/LoadingSpinner.tsx */
+      .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: hsl(var(--background)); }
+      .boot-mark { overflow: visible; }
+      .boot-name { margin: 0; font-size: 14px; font-weight: 600; color: hsl(var(--foreground) / 0.8); }
+      .boot-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+      .boot-blue, .boot-red, .boot-flash { animation: 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+      .boot-blue { animation-name: boot-blue; }
+      .boot-red { animation-name: boot-red; }
+      .boot-flash { transform-origin: 24px 12px; transform-box: view-box; animation-name: boot-flash; }
+      @keyframes boot-blue { 0% { transform: translateX(-9px); opacity: 0; } 38%, 62% { transform: none; opacity: 1; } 100% { transform: translateX(-9px); opacity: 0; } }
+      @keyframes boot-red { 0% { transform: translateX(9px); opacity: 0; } 38%, 62% { transform: none; opacity: 1; } 100% { transform: translateX(9px); opacity: 0; } }
+      @keyframes boot-flash { 0%, 36% { opacity: 0; transform: scaleY(0.2); } 42% { opacity: 1; transform: none; } 70%, 100% { opacity: 0; transform: none; } }
+      @media (prefers-reduced-motion: reduce) {
+        .boot-blue, .boot-red, .boot-flash { animation: none; }
+        .boot-flash { opacity: 0.9; }
       }
     </style>
 
@@ -169,9 +183,8 @@
     <link rel="preload" href="/src/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="high">
     <link rel="modulepreload" href="/src/main.tsx" fetchpriority="high">
     <noscript><link rel="stylesheet" href="/src/index.css"></noscript>
-  </head>
-  <body>
-    <!-- Deferred Structured Data for better LCP -->
+
+    <!-- Structured data -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
@@ -337,7 +350,17 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- First paint before the app loads: the loader's blue and red chevrons
+         meeting (LoadingSpinner.tsx draws the same mark). React replaces it. -->
+    <div id="root"><div class="boot" role="status" aria-live="polite">
+      <svg class="boot-mark" viewBox="0 0 48 24" width="96" height="48" aria-hidden="true">
+        <polygon class="boot-blue" points="2,0 13,0 23,12 13,24 2,24 12,12" fill="#3b82f6" />
+        <polygon class="boot-red" points="46,0 35,0 25,12 35,24 46,24 36,12" fill="#ef4b40" />
+        <rect class="boot-flash" x="23.25" y="-3" width="1.5" height="30" rx="0.75" fill="#f3d28a" />
+      </svg>
+      <p class="boot-name">Games of the Generals</p>
+      <span class="boot-sr">Loading</span>
+    </div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

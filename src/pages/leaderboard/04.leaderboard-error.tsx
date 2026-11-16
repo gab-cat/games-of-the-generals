@@ -1,34 +1,42 @@
-import { motion } from "framer-motion";
-import { Trophy } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { useNavigate } from "@tanstack/react-router";
+import { LeaderboardHeader } from "./01.leaderboard-header";
 
 interface LeaderboardErrorProps {
   hasError: boolean;
 }
 
 export function LeaderboardError({ hasError }: LeaderboardErrorProps) {
-  if (hasError) {
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="text-center py-12"
-      >
-        <Trophy className="h-12 w-12 text-red-400 mx-auto mb-4" />
-        <p className="text-red-400">Failed to load leaderboard</p>
-        <p className="text-sm text-white/40">Please try refreshing the page</p>
-      </motion.div>
-    );
-  }
+  const navigate = useNavigate();
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="text-center py-12"
-    >
-      <Trophy className="h-12 w-12 text-white/40 mx-auto mb-4" />
-      <p className="text-white/60">No commanders ranked yet.</p>
-      <p className="text-sm text-white/40">Be the first to claim your position!</p>
-    </motion.div>
+    <div className="space-y-6 sm:space-y-8">
+      <LeaderboardHeader />
+      {hasError ? (
+        <EmptyState
+          title="The leaderboard didn't load"
+          body="Check your connection and try again."
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </Button>
+          }
+        />
+      ) : (
+        <EmptyState
+          title="No ranked players yet"
+          body="Win a game to be the first on the board."
+          action={
+            <Button onClick={() => void navigate({ to: "/" })}>
+              Find a game
+            </Button>
+          }
+        />
+      )}
+    </div>
   );
 }

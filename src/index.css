@@ -2,85 +2,159 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Season 3 design tokens. See DESIGN.md for how to use them.
+ * Near-black surfaces, warm off-white text, one gold accent.
+ * Keep the critical subset in index.html in sync.
+ */
 @layer base {
   :root {
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
-}
+    --background: 240 8% 5%; /* #0b0b0d */
+    --foreground: 40 20% 95%; /* warm off-white */
 
-@layer base {
+    --card: 240 6% 7%; /* #111114 */
+    --card-foreground: 40 20% 95%;
+    --surface-raised: 240 5% 10%; /* hover / nested */
+    --popover: 240 6% 7%;
+    --popover-foreground: 40 20% 95%;
+
+    --primary: 39 67% 55%; /* gold #d9a441 */
+    --primary-hover: 40 72% 62%; /* #e4b55a */
+    --primary-foreground: 30 42% 7%; /* #17110a */
+
+    --secondary: 240 5% 11%;
+    --secondary-foreground: 40 20% 95%;
+    --muted: 240 5% 11%;
+    --muted-foreground: 40 5% 64%; /* timestamps, placeholders, disabled only */
+    --accent: 240 5% 13%;
+    --accent-foreground: 40 20% 95%;
+
+    --destructive: 0 72% 60%;
+    --destructive-foreground: 40 20% 95%;
+    --success: 152 55% 52%;
+    --warning: 39 90% 60%;
+
+    --border: 240 5% 15%;
+    --border-strong: 240 5% 22%;
+    --input: 240 5% 18%;
+    --ring: 40 80% 75%; /* #f3d28a */
+    --radius: 0.5rem; /* 8px cards; md = 6px buttons/inputs; sm = 4px badges */
+
+    --chart-1: 39 67% 55%;
+    --chart-2: 152 55% 52%;
+    --chart-3: 0 72% 60%;
+    --chart-4: 210 60% 62%;
+    --chart-5: 40 5% 64%;
+  }
+
   * {
     @apply border-border;
   }
+
+  html {
+    color-scheme: dark;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Poppins runs wide at large sizes; tighten headings slightly */
+  .font-display,
+  h1,
+  h2 {
+    letter-spacing: -0.015em;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.3);
+    color: hsl(var(--foreground));
+  }
+
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Elements that draw their own ring don't need the outline too */
+  [class*="focus-visible:ring"]:focus-visible {
+    outline: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
-/* Enhanced backdrop blur utilities */
 @layer utilities {
+  /* Legacy glass utilities, kept so old markup still renders in the new look. Prefer `surface`. */
   .glass-card {
-    @apply bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20;
+    @apply bg-card border border-border;
   }
 
   .glass-surface {
-    @apply bg-white/5 backdrop-blur-sm border border-white/10 shadow-lg;
+    @apply bg-white/[0.03] border border-border;
   }
 
   .glass-button {
-    @apply bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 hover:bg-white/20;
+    @apply bg-white/[0.06] border border-border text-foreground hover:bg-white/10;
   }
 
   .glass-input {
-    @apply bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50;
+    @apply bg-white/[0.04] border border-input text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/60 focus:border-transparent;
   }
 
-  /* Custom scrollbar styles */
+  /* A flat panel: 8px corners, 1px border, no shadow */
+  .surface {
+    @apply rounded-lg border border-border bg-card;
+  }
+
+  .surface-raised {
+    background-color: hsl(var(--surface-raised));
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
   .no-scrollbar {
-    -ms-overflow-style: none; /* IE and Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   .no-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+    display: none;
   }
 
   .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   }
-
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
+    height: 6px;
   }
-
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.16);
     border-radius: 3px;
-    transition: background-color 0.2s ease;
   }
-
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.28);
   }
-
   .scrollbar-track-transparent::-webkit-scrollbar-track {
     background: transparent;
   }
-
   .scrollbar-thumb-white\/20::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0.2);
   }
@@ -92,9 +166,9 @@
 }
 
 .auth-input-field {
-  @apply glass-input w-full px-4 py-3 rounded-lg transition-all;
+  @apply glass-input w-full h-11 px-3.5 rounded-md text-base sm:text-sm transition-colors;
 }
 
 .auth-button {
-  @apply w-full px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold transition-all duration-200 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed rounded-lg;
+  @apply inline-flex w-full h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-[hsl(var(--primary-hover))] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50;
 }

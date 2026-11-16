@@ -1,18 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import {
-  Ban,
-  Mail,
-  LogOut,
-  MessageSquare,
-  Clock,
-  User,
-  AlertTriangle,
-  Send,
-  ShieldAlert,
-  Terminal,
-} from "lucide-react";
+import { LogOut, Loader2, Mail, MessageSquare } from "lucide-react";
 import { useConvexQueryWithOptions } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { useConvexAuth } from "convex/react";
@@ -22,17 +11,18 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "./ui/dialog";
 import { Textarea } from "./ui/textarea";
 import { Label } from "./ui/label";
+import { riseIn } from "../lib/motion";
 
 import { toast } from "sonner";
 import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
-import Squares from "./backgrounds/Squares/Squares";
 
 export function BanScreen() {
   const { isAuthenticated } = useConvexAuth();
@@ -44,6 +34,7 @@ export function BanScreen() {
   const [isAppealDialogOpen, setIsAppealDialogOpen] = useState(false);
   const [appealMessage, setAppealMessage] = useState("");
   const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   // Get ban details
   const { data: banDetails } = useConvexQueryWithOptions(
@@ -63,7 +54,7 @@ export function BanScreen() {
     const now = Date.now();
     const remainingMs = expiresAt - now;
 
-    if (remainingMs <= 0) return "Expired";
+    if (remainingMs <= 0) return "Ending now";
 
     const seconds = Math.floor(remainingMs / 1000);
     const minutes = Math.floor(seconds / 60);
@@ -71,13 +62,13 @@ export function BanScreen() {
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days} day${days > 1 ? "s" : ""}`;
+      return `${days} ${days === 1 ? "day" : "days"} left`;
     } else if (hours > 0) {
-      return `${hours} hour${hours > 1 ? "s" : ""}`;
+      return `${hours} ${hours === 1 ? "hour" : "hours"} left`;
     } else if (minutes > 0) {
-      return `${minutes} minute${minutes > 1 ? "s" : ""}`;
+      return `${minutes} ${minutes === 1 ? "minute" : "minutes"} left`;
     } else {
-      return `${seconds} second${seconds > 1 ? "s" : ""}`;
+      return `${seconds} ${seconds === 1 ? "second" : "seconds"} left`;
     }
   };
 
@@ -94,12 +85,12 @@ export function BanScreen() {
 
   const handleSendAppeal = async () => {
     if (!appealMessage.trim()) {
-      toast.error("Please enter your appeal message");
+      toast.error("Write your appeal first.");
       return;
     }
 
     if (appealMessage.length < 50) {
-      toast.error("Appeal message must be at least 50 characters");
+      toast.error("Write at least 50 characters.");
       return;
     }
 
@@ -114,8 +105,13 @@ export function BanScreen() {
       setIsAppealDialogOpen(false);
     } catch (error) {
       console.error("Failed to send appeal:", error);
+      const message = error instanceof Error ? error.message : "";
       toast.error(
-        error instanceof Error ? error.message : "Failed to send appeal",
+        message.includes("last 24 hours")
+          ? "You already sent an appeal in the last 24 hours. Try again later."
+          : message.includes("No administrators")
+            ? "No admins are available right now. Try again later."
+            : "Couldn't send your appeal. Try again.",
       );
     } finally {
       setIsSubmittingAppeal(false);
@@ -123,225 +119,162 @@ export function BanScreen() {
   };
 
   const handleLogout = async () => {
+    setIsSigningOut(true);
     try {
       await markUserOffline();
       await signOut();
-      toast.success("Logged out successfully");
+      toast.success("Signed out");
     } catch (error) {
       console.error("Failed to logout:", error);
-      toast.error("Failed to logout");
+      toast.error("Couldn't sign out. Try again.");
+      setIsSigningOut(false);
     }
   };
 
+  const nextAppealTime = getNextAppealTime();
+  const appealTooShort =
+    appealMessage.trim().length > 0 && appealMessage.trim().length < 50;
+
   return (
-    <div className="min-h-screen text-zinc-100 font-mono relative pt-0 overflow-hidden flex flex-col items-center justify-center p-2">
-      <div className="relative z-10 w-full max-w-2xl">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-          className="backdrop-blur-xl border border-zinc-800 shadow-2xl overflow-hidden relative"
-        >
-          {/* Top Decorative Bar */}
-          <div className="bg-red-950/20 p-3 flex items-center justify-between border-b border-red-900/30">
-            <div className="flex items-center gap-2 text-xs text-red-500 font-bold uppercase tracking-wider">
-              <ShieldAlert className="w-4 h-4" />
-              <span>Security Protocol /// Active</span>
+    <div className="mx-auto w-full max-w-xl py-4 sm:py-10">
+      <motion.div {...riseIn} className="space-y-6">
+        <div>
+          <h1 className="font-display text-3xl font-semibold leading-tight text-foreground sm:text-4xl">
+            Your account is suspended
+          </h1>
+          <p className="mt-3 text-base text-foreground/90">
+            You can't play or chat while the suspension is active. You can
+            appeal it or sign out below.
+          </p>
+        </div>
+
+        {banDetails && (
+          <dl className="divide-y divide-border rounded-lg border border-border bg-card">
+            <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+              <dt className="text-sm text-foreground/80">Length</dt>
+              <dd className="text-sm font-medium text-foreground">
+                {banDetails.expiresAt
+                  ? formatRemainingTime(banDetails.expiresAt)
+                  : "Permanent"}
+              </dd>
             </div>
-            <div className="flex gap-1.5 items-center">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-              <div className="h-4 w-[1px] bg-red-900/50" />
-              <div className="text-[10px] text-red-500/50 font-mono">
-                SUSPENDED
-              </div>
+            <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+              <dt className="text-sm text-foreground/80">Issued by</dt>
+              <dd className="text-sm font-medium text-foreground">
+                {banDetails.moderatorUsername}
+              </dd>
             </div>
-          </div>
+            <div className="space-y-1 px-4 py-3">
+              <dt className="text-sm text-foreground/80">Reason</dt>
+              <dd className="text-sm text-foreground">
+                {banDetails.reason || "No reason was given."}
+              </dd>
+            </div>
+          </dl>
+        )}
 
-          <div className="p-8 md:p-12 relative">
-            {/* Scanline Effect */}
-            <motion.div
-              className="absolute top-0 left-0 right-0 h-[1px] bg-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.5)] z-20 pointer-events-none"
-              animate={{ top: ["0%", "100%"] }}
-              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-            />
-
-            <div className="flex flex-col items-center text-center space-y-8">
-              {/* Central Graphic */}
-              <div className="relative group">
-                <div className="absolute inset-0 bg-red-500/20 blur-3xl rounded-full opacity-40 group-hover:opacity-60 transition-opacity duration-1000" />
-                <div className="bg-zinc-950 p-6 rounded-full border border-red-500/30 relative shadow-[0_0_30px_rgba(220,38,38,0.1)]">
-                  <Ban className="w-16 h-16 text-red-500" />
-                </div>
-                <div className="absolute inset-[-10px] border border-dashed border-red-900/50 rounded-full animate-[spin_60s_linear_infinite]" />
-              </div>
-
-              {/* Text Content */}
-              <div className="space-y-4 max-w-lg">
-                <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tight text-white drop-shadow-xl">
-                  Access
-                  <br />
-                  <span className="text-red-500">Denied</span>
-                </h1>
-                <p className="text-zinc-400 text-sm md:text-base leading-relaxed border-l-2 border-red-500/50 pl-4 text-left bg-red-950/10 p-2 rounded-r">
-                  Your command clearance has been revoked. Tactical operations
-                  are suspended immediately.
-                </p>
-              </div>
-
-              {/* Ban Details Grid */}
-              {banDetails && (
-                <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-px bg-zinc-800 border border-zinc-800 overflow-hidden rounded-sm">
-                  {/* Status Box */}
-                  <div className="bg-zinc-900/80 p-4 flex flex-col items-start gap-1">
-                    <div className="flex items-center gap-2 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">
-                      <Clock className="w-3 h-3" /> Duration
-                    </div>
-                    <div className="text-zinc-100 font-mono font-medium">
-                      {banDetails.expiresAt ? (
-                        <span className="text-amber-500">
-                          {formatRemainingTime(banDetails.expiresAt)}
-                        </span>
-                      ) : (
-                        <span className="text-red-500 font-bold">
-                          PERMANENT
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Moderator Box */}
-                  <div className="bg-zinc-900/80 p-4 flex flex-col items-start gap-1">
-                    <div className="flex items-center gap-2 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">
-                      <User className="w-3 h-3" /> Issued By
-                    </div>
-                    <div className="text-zinc-100 font-mono font-medium">
-                      {banDetails.moderatorUsername}
-                    </div>
-                  </div>
-
-                  {/* Reason Box - Full Width */}
-                  <div className="col-span-1 md:col-span-2 bg-zinc-900/80 p-4 flex flex-col items-start gap-1 border-t border-zinc-800">
-                    <div className="flex items-center gap-2 text-zinc-500 text-[10px] uppercase tracking-widest font-bold">
-                      <Terminal className="w-3 h-3" /> Violation Code
-                    </div>
-                    <div className="text-zinc-300 font-mono text-sm text-left leading-relaxed">
-                      {banDetails.reason || "No explicit reason provided."}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full">
-                {/* Appeal Action */}
-                <Dialog
-                  open={isAppealDialogOpen}
-                  onOpenChange={setIsAppealDialogOpen}
-                >
-                  <DialogTrigger asChild>
-                    <Button
-                      disabled={hasSentAppeal}
-                      variant="outline"
-                      className="h-12 border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:border-zinc-500 text-zinc-400 font-mono uppercase tracking-wider text-xs transition-all duration-300"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 mr-2" />
-                      {hasSentAppeal ? "Appeal Pending" : "Submit Appeal"}
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-zinc-950 border-zinc-800 text-zinc-100 sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle className="text-white font-mono uppercase tracking-wider flex items-center gap-2 text-base">
-                        <Send className="w-4 h-4 text-amber-500" />
-                        Appeal Submission
-                      </DialogTitle>
-                      <DialogDescription className="text-zinc-500 text-xs font-mono">
-                        Provide a detailed explanation for administrative
-                        review.
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label
-                          htmlFor="appeal-message"
-                          className="text-xs uppercase text-zinc-500 font-mono tracking-wider"
-                        >
-                          Official Statement
-                        </Label>
-                        <Textarea
-                          id="appeal-message"
-                          placeholder="State your case..."
-                          value={appealMessage}
-                          onChange={(e) => setAppealMessage(e.target.value)}
-                          className="bg-zinc-900/50 border-zinc-800 text-zinc-100 placeholder:text-zinc-700 focus:border-amber-500/50 text-sm font-mono min-h-[150px]"
-                        />
-                        <div className="flex justify-between text-[10px] text-zinc-600 font-mono">
-                          <span>MIN: 50 CHARS</span>
-                          <span>{appealMessage.length}/1000</span>
-                        </div>
-                      </div>
-
-                      <div className="flex gap-2 pt-2">
-                        <Button
-                          onClick={() => setIsAppealDialogOpen(false)}
-                          variant="ghost"
-                          className="flex-1 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900"
-                        >
-                          CANCEL
-                        </Button>
-                        <Button
-                          onClick={() => void handleSendAppeal()}
-                          disabled={
-                            isSubmittingAppeal || appealMessage.length < 50
-                          }
-                          className="flex-1 bg-amber-600 hover:bg-amber-500 text-black font-bold font-mono tracking-wider"
-                        >
-                          {isSubmittingAppeal
-                            ? "TRANSMITTING..."
-                            : "SEND APPEAL"}
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-
-                {/* Email Support Action */}
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    (window.location.href = "mailto:support@generalsonline.app")
-                  }
-                  className="h-12 border-zinc-700 bg-zinc-900/50 hover:bg-zinc-800 hover:text-white hover:border-zinc-500 text-zinc-400 font-mono uppercase tracking-wider text-xs transition-all duration-300"
-                >
-                  <Mail className="w-3.5 h-3.5 mr-2" />
-                  Contact Admin
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Dialog
+              open={isAppealDialogOpen}
+              onOpenChange={setIsAppealDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button size="lg" disabled={hasSentAppeal}>
+                  <MessageSquare />
+                  {hasSentAppeal ? "Appeal sent" : "Appeal the suspension"}
                 </Button>
-              </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Appeal your suspension</DialogTitle>
+                  <DialogDescription>
+                    Explain what happened and why it should be lifted. An admin
+                    will read it. You can send one appeal every 24 hours.
+                  </DialogDescription>
+                </DialogHeader>
 
-              {/* Logout - Primary Action */}
-              <Button
-                onClick={() => void handleLogout()}
-                className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-900/30 hover:border-red-500/50 h-10 font-mono text-xs uppercase tracking-widest transition-all"
-              >
-                <LogOut className="w-3.5 h-3.5 mr-2" />
-                Disconnect Session
-              </Button>
-            </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="appeal-message">Your message</Label>
+                  <Textarea
+                    id="appeal-message"
+                    value={appealMessage}
+                    onChange={(e) => setAppealMessage(e.target.value)}
+                    maxLength={1000}
+                    disabled={isSubmittingAppeal}
+                    aria-invalid={appealTooShort ? true : undefined}
+                    className="min-h-[150px]"
+                  />
+                  <div className="flex justify-between gap-3 text-xs">
+                    <span
+                      className={
+                        appealTooShort ? "text-red-300" : "text-foreground/70"
+                      }
+                    >
+                      {appealTooShort
+                        ? `${50 - appealMessage.trim().length} more characters needed.`
+                        : "At least 50 characters."}
+                    </span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {appealMessage.length}/1000
+                    </span>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setIsAppealDialogOpen(false)}
+                    disabled={isSubmittingAppeal}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => void handleSendAppeal()}
+                    disabled={
+                      isSubmittingAppeal || appealMessage.trim().length < 50
+                    }
+                  >
+                    {isSubmittingAppeal && <Loader2 className="animate-spin" />}
+                    {isSubmittingAppeal ? "Sending" : "Send appeal"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              variant="secondary"
+              size="lg"
+              onClick={() =>
+                (window.location.href = "mailto:support@generalsonline.app")
+              }
+            >
+              <Mail />
+              Email support
+            </Button>
           </div>
 
-          {/* Bottom Footer Bar */}
-          <div className="bg-zinc-950 border-t border-zinc-800 p-2 flex justify-between items-center px-4">
-            <div className="flex gap-1.5">
-              <div className="w-1 h-1 bg-zinc-700 rounded-full" />
-              <div className="w-1 h-1 bg-zinc-700 rounded-full" />
-              <div className="w-1 h-1 bg-zinc-700 rounded-full" />
-            </div>
-            <span className="text-[9px] text-zinc-600 font-mono tracking-widest uppercase">
-              ID: {isAuthenticated ? "USER_LOCKED" : "GUEST"} /// V2.5
-            </span>
-          </div>
-        </motion.div>
-      </div>
+          {hasSentAppeal && (
+            <p className="text-sm text-foreground/85" role="status">
+              An admin will review your appeal.
+              {nextAppealTime
+                ? ` You can send another after ${new Date(nextAppealTime).toLocaleString()}.`
+                : ""}
+            </p>
+          )}
+
+          <Button
+            variant="ghost"
+            onClick={() => void handleLogout()}
+            disabled={isSigningOut}
+            className="-ml-2"
+          >
+            {isSigningOut ? <Loader2 className="animate-spin" /> : <LogOut />}
+            {isSigningOut ? "Signing out" : "Sign out"}
+          </Button>
+        </div>
+      </motion.div>
     </div>
   );
 }

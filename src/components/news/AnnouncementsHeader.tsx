@@ -1,43 +1,42 @@
+import { format } from "date-fns";
 import { motion } from "framer-motion";
+import { EASE } from "@/components/season/art";
 
-export function AnnouncementsHeader() {
+/** The season the game is in. Shown on the news dateline. */
+export const CURRENT_SEASON = "Season 3";
+
+/**
+ * The news nameplate: "News" set like a broadsheet's name, over a double rule
+ * with today's date and the season on the line.
+ */
+export function AnnouncementsHeader({
+  actions,
+}: {
+  actions?: React.ReactNode;
+}) {
+  const today = format(new Date(), "EEEE, d MMMM yyyy");
   return (
-    <div className="relative mb-8 sm:mb-12">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10"
-      >
-        <div className="flex items-center gap-3 mb-2">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: 24 }}
-            transition={{ delay: 0.5, duration: 0.8, ease: "circOut" }}
-            className="h-[2px] bg-blue-500"
-          />
-          <span className="text-blue-500 font-mono text-xs tracking-[0.2em] uppercase">
-            System Updates
+    <header>
+      <div className="flex items-end justify-between gap-4">
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+          className="font-display text-[88px] font-bold leading-[0.85] tracking-tighter text-foreground sm:text-[160px]"
+        >
+          News
+        </motion.h1>
+        {actions && <div className="shrink-0 pb-2">{actions}</div>}
+      </div>
+      <div className="mt-4 border-y-2 border-foreground py-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 text-sm text-foreground">
+          <time dateTime={format(new Date(), "yyyy-MM-dd")}>{today}</time>
+          <span className="font-semibold">{CURRENT_SEASON}</span>
+          <span className="hidden sm:inline">
+            Updates from the Games of the Generals team
           </span>
         </div>
-
-        <h1 className="text-4xl sm:text-5xl font-display text-white tracking-tight">
-          Intelligence Feed
-        </h1>
-
-        <p className="mt-2 text-white/40 text-xs sm:text-sm max-w-lg font-light leading-relaxed">
-          Operational logs, strategic updates, and field reports from the
-          Generals HQ.
-        </p>
-      </motion.div>
-
-      {/* Decorative background element */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1, duration: 2 }}
-        className="absolute -top-12 -left-12 w-64 h-64 bg-blue-500/5 blur-[100px] rounded-full pointer-events-none z-0"
-      />
-    </div>
+      </div>
+    </header>
   );
 }

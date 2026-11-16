@@ -4,12 +4,12 @@ import { Anonymous } from "@convex-dev/auth/providers/Anonymous";
 import Google from "@auth/core/providers/google";
 import GitHub from "@auth/core/providers/github";
 import { query } from "./_generated/server";
-import { ResendOTPPasswordReset } from "./ResendOTPPasswordReset";
+import { PasswordResetOTP } from "./PasswordResetOTP";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Password({ 
-      reset: ResendOTPPasswordReset 
+      reset: PasswordResetOTP
     }), 
     Anonymous,
     Google,

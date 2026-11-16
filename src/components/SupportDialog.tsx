@@ -1,7 +1,13 @@
 import { useState, useRef } from "react";
-import { Send, X, Loader2, Plus, Paperclip } from "lucide-react";
+import { Send, X, Loader2, Paperclip } from "lucide-react";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import {
   Select,
   SelectContent,
@@ -25,34 +31,25 @@ interface SupportDialogProps {
 const categoryOptions = [
   {
     value: "bug_report",
-    label: "BUG REPORT",
-    description: "System anomaly or error",
-    icon: "🐞",
+    label: "Bug report",
+    description: "Something is broken",
   },
   {
     value: "feature_request",
-    label: "FEATURE REQ",
-    description: "Proposed enhancement",
-    icon: "✨",
+    label: "Feature request",
+    description: "An idea for the game",
   },
   {
     value: "account_issue",
-    label: "ACCOUNT",
-    description: "Access or profile issues",
-    icon: "👤",
+    label: "Account",
+    description: "Sign in or profile problems",
   },
   {
     value: "game_issue",
-    label: "GAMEPLAY",
-    description: "Match or rules dispute",
-    icon: "🎮",
+    label: "Gameplay",
+    description: "A match or a rules question",
   },
-  {
-    value: "other",
-    label: "GENERAL",
-    description: "Other inquiries",
-    icon: "💬",
-  },
+  { value: "other", label: "Other", description: "Anything else" },
 ];
 
 export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
@@ -111,7 +108,7 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
       setAttachmentFile(compressedFile);
     } catch (error) {
       console.error("Error processing file:", error);
-      toast.error("Failed to process file. Please try again.");
+      toast.error("Could not read that image. Try another one.");
     }
   };
 
@@ -150,7 +147,7 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
     e.preventDefault();
 
     if (!category || !subject.trim() || !description.trim()) {
-      toast.error("Please fill in all required fields");
+      toast.error("Choose a topic and fill in the subject and details.");
       return;
     }
 
@@ -225,184 +222,137 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
         );
       });
 
-      toast.success("Ticket initialized successfully. Stand by for response.");
+      toast.success("Ticket sent. We will reply in the ticket.");
       handleClose();
     } catch (error) {
       console.error("Error submitting support ticket:", error);
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : "Failed to submit support ticket",
-      );
+      toast.error("Could not send your ticket. Try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl bg-zinc-900 border border-white/10 text-white shadow-2xl p-0 overflow-hidden">
-        {/* Decorative corner accents */}
-        <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-white/20 z-20 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-white/20 z-20 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-white/20 z-20 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-white/20 z-20 pointer-events-none" />
+  const canSubmit =
+    !isSubmitting && !!category && !!subject.trim() && !!description.trim();
 
-        <DialogHeader className="p-6 border-b border-white/5 bg-white/[0.02]">
-          <DialogTitle className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/10 rounded-sm border border-blue-500/20">
-              <Plus className="w-4 h-4 text-blue-400" />
-            </div>
-            <div className="space-y-0.5">
-              <div className="font-display text-lg tracking-wide uppercase text-zinc-100">
-                Initialize Support Ticket
-              </div>
-              <div className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                Secure Channel • Encrypted
-              </div>
-            </div>
-          </DialogTitle>
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && !isSubmitting && handleClose()}
+    >
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>New ticket</DialogTitle>
+          <DialogDescription>
+            Tell us what happened. We reply in the ticket.
+          </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={(e) => void handleSubmit(e)} className="p-6 space-y-6">
-          {/* Category Selection */}
+        <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
           <div className="space-y-2">
-            <Label
-              htmlFor="category"
-              className="text-zinc-400 font-mono text-xs uppercase tracking-wider"
+            <Label htmlFor="category">Topic</Label>
+            <Select
+              value={category}
+              onValueChange={setCategory}
+              disabled={isSubmitting}
             >
-              Classification <span className="text-red-400">*</span>
-            </Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="bg-zinc-900/40 border-zinc-800 text-zinc-300 font-mono text-sm h-11 focus:ring-1 focus:ring-blue-500/50 hover:bg-zinc-900/60 transition-colors">
-                <SelectValue placeholder="SELECT CATEGORY..." />
+              <SelectTrigger id="category">
+                <SelectValue placeholder="Choose a topic" />
               </SelectTrigger>
-              <SelectContent className="bg-zinc-950 border-zinc-800">
+              <SelectContent>
                 {categoryOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="font-mono text-xs uppercase focus:bg-white/5 text-zinc-400 focus:text-zinc-200 cursor-pointer py-3"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="opacity-50">{option.icon}</span>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-white/80">
-                          {option.label}
-                        </span>
-                        <span className="text-[10px] text-zinc-600 normal-case tracking-normal">
-                          {option.description}
-                        </span>
-                      </div>
-                    </div>
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                    <span className="ml-2 text-foreground/70">
+                      {option.description}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Subject */}
           <div className="space-y-2">
-            <Label
-              htmlFor="subject"
-              className="text-zinc-400 font-mono text-xs uppercase tracking-wider"
-            >
-              Subject Line <span className="text-red-400">*</span>
-            </Label>
+            <Label htmlFor="subject">Subject</Label>
             <Input
               id="subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="BRIEF SUMMARY OF ISSUE..."
-              className="bg-zinc-900/40 border-zinc-800 focus:border-blue-500/50 text-white font-mono text-sm h-11 placeholder:text-zinc-700 transition-all uppercase"
+              placeholder="A short summary"
               maxLength={200}
+              disabled={isSubmitting}
             />
           </div>
 
-          {/* Description */}
           <div className="space-y-2">
-            <Label
-              htmlFor="description"
-              className="text-zinc-400 font-mono text-xs uppercase tracking-wider"
-            >
-              Details <span className="text-red-400">*</span>
-            </Label>
-            <div className="relative">
-              <Textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Provide detailed situational report..."
-                className="bg-zinc-900/40 border-zinc-800 focus:border-blue-500/50 text-white min-h-[140px] resize-none transition-all placeholder:text-zinc-700 font-mono text-sm p-4 leading-relaxed"
-                maxLength={2000}
-              />
-              <div className="absolute bottom-2 right-2 text-[10px] font-mono text-zinc-700">
-                {description.length}/2000
-              </div>
-            </div>
+            <Label htmlFor="description">Details</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What happened, and what did you expect?"
+              className="min-h-[140px] resize-none"
+              maxLength={2000}
+              disabled={isSubmitting}
+            />
+            <p className="text-right text-xs tabular-nums text-muted-foreground">
+              {description.length} / 2000
+            </p>
           </div>
 
-          {/* Attachment */}
           <div className="space-y-2">
-            <Label className="text-zinc-400 font-mono text-xs uppercase tracking-wider flex items-center justify-between">
-              <span>Attachment</span>
-              <span className="text-[10px] text-zinc-600">
-                OPTIONAL • MAX 5MB
-              </span>
-            </Label>
-
-            {/* Attachment Preview */}
-            <AnimatePresence mode="wait">
+            <Label>Screenshot (optional, image up to 5 MB)</Label>
+            <AnimatePresence mode="wait" initial={false}>
               {attachmentPreview ? (
                 <motion.div
-                  initial={{ opacity: 0, y: 10 }}
+                  key="preview"
+                  initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="relative group bg-zinc-900/40 border border-zinc-800 rounded-lg p-2 flex items-start gap-4"
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-3 rounded-lg border border-border bg-white/[0.03] p-2"
                 >
                   <img
                     src={attachmentPreview}
-                    alt="Preview"
-                    className="h-20 w-20 object-cover rounded bg-zinc-950 border border-white/5"
+                    alt="Selected screenshot"
+                    className="h-16 w-16 rounded-md border border-border object-cover"
                   />
-                  <div className="flex-1 min-w-0 pt-1">
-                    <div className="text-sm font-mono text-white/80 truncate">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-foreground">
                       {attachmentFile?.name}
-                    </div>
-                    <div className="text-xs text-zinc-500 mt-1">
+                    </p>
+                    <p className="text-xs tabular-nums text-muted-foreground">
                       {((attachmentFile?.size || 0) / 1024).toFixed(1)} KB
-                    </div>
+                    </p>
                   </div>
                   <Button
                     type="button"
                     onClick={removeAttachment}
                     variant="ghost"
                     size="icon"
-                    className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 h-8 w-8"
+                    aria-label="Remove screenshot"
+                    disabled={isSubmitting}
                   >
-                    <X className="w-4 h-4" />
+                    <X />
                   </Button>
                 </motion.div>
               ) : (
-                <motion.div
+                <motion.button
+                  key="drop"
+                  type="button"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onDragOver={handleDragOver}
                   onDrop={handleDrop}
-                  className="border border-dashed border-zinc-800 rounded-lg p-6 text-center hover:border-blue-500/40 hover:bg-blue-500/5 transition-all duration-300 cursor-pointer group bg-zinc-900/20"
                   onClick={() => fileInputRef.current?.click()}
+                  disabled={isSubmitting}
+                  className="flex min-h-[72px] w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border-strong px-4 py-4 text-sm text-foreground transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:opacity-50"
                 >
-                  <div className="w-10 h-10 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:border-blue-500/40 transition-colors">
-                    <Paperclip className="w-4 h-4 text-zinc-600 group-hover:text-blue-400 transition-colors" />
-                  </div>
-                  <p className="text-xs text-zinc-400 font-mono uppercase tracking-wide">
-                    Click to upload or drag image
-                  </p>
-                </motion.div>
+                  <Paperclip className="size-4" />
+                  Choose an image or drop one here
+                </motion.button>
               )}
             </AnimatePresence>
-
             <input
               ref={fileInputRef}
               type="file"
@@ -412,38 +362,18 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
             />
           </div>
 
-          {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/5">
+          <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="text-zinc-500 hover:text-white hover:bg-white/5 font-mono text-xs uppercase tracking-wider"
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={
-                isSubmitting ||
-                !category ||
-                !subject.trim() ||
-                !description.trim()
-              }
-              className="bg-blue-600/90 hover:bg-blue-500 text-white font-mono text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] border-0 min-w-[140px]"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                  Transmitting...
-                </>
-              ) : (
-                <>
-                  <Send className="w-3.5 h-3.5 mr-2" />
-                  Submit Ticket
-                </>
-              )}
+            <Button type="submit" disabled={!canSubmit}>
+              {isSubmitting ? <Loader2 className="animate-spin" /> : <Send />}
+              {isSubmitting ? "Sending" : "Send ticket"}
             </Button>
           </div>
         </form>

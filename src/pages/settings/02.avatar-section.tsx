@@ -1,4 +1,3 @@
-import { Camera } from "lucide-react";
 import { AvatarUpload } from "./AvatarUpload";
 import { SettingsCard } from "./components/SettingsCard";
 
@@ -19,10 +18,8 @@ export function AvatarSection({
 }: AvatarSectionProps) {
   return (
     <SettingsCard
-      title="Identity Matrix"
-      description="Update your visual identification protocol."
-      icon={<Camera className="w-5 h-5" />}
-      delay={0.1}
+      title="Profile picture"
+      description="Pick a picture other players see next to your name."
     >
       <AvatarUpload
         username={username}

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useConvexAction } from "@convex-dev/react-query";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
-import { CreditCard, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { formatPeso } from "./plan-copy";
 
 interface PaymentButtonProps {
   tier: "pro" | "pro_plus";
@@ -19,16 +20,18 @@ export function PaymentButton({
   tier,
   months = 1,
   className = "",
-  variant = "gradient",
+  variant = "default",
   onSuccess: _onSuccess,
 }: PaymentButtonProps) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const createPayment = useConvexAction(api.subscriptions.createPayMongoPayment);
+  const createPayment = useConvexAction(
+    api.subscriptions.createPayMongoPayment,
+  );
 
   const handlePayment = async () => {
     try {
       setIsProcessing(true);
-      
+
       const result = await createPayment({
         tier,
         months,
@@ -38,13 +41,12 @@ export function PaymentButton({
       if (result.checkoutUrl) {
         window.location.href = result.checkoutUrl;
       } else {
-        toast.error("Failed to get checkout URL");
+        toast.error("The payment page did not open. Try again.");
         setIsProcessing(false);
       }
-      
     } catch (error) {
       console.error("Payment error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to create payment");
+      toast.error("Could not start the payment. Try again in a moment.");
       setIsProcessing(false);
     }
   };
@@ -55,12 +57,14 @@ export function PaymentButton({
   // 12 months: 25% discount (pay 9 months)
   const getPrice = () => {
     const basePrice = tier === "pro" ? 99 : 199;
-    
+
     let monthsToPay = months;
-    if (months === 12) monthsToPay = 9;      // 25% discount
-    else if (months === 6) monthsToPay = 4.8; // 20% discount
+    if (months === 12)
+      monthsToPay = 9; // 25% discount
+    else if (months === 6)
+      monthsToPay = 4.8; // 20% discount
     else if (months === 3) monthsToPay = 2.55; // 15% discount
-    
+
     return Math.round(basePrice * monthsToPay);
   };
 
@@ -73,14 +77,11 @@ export function PaymentButton({
     >
       {isProcessing ? (
         <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          Processing...
+          <Loader2 className="animate-spin" />
+          Opening payment page
         </>
       ) : (
-        <>
-          <CreditCard className="w-4 h-4 mr-2" />
-          Pay ₱{getPrice()}
-        </>
+        <>Pay {formatPeso(getPrice())}</>
       )}
     </Button>
   );

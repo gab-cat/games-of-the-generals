@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { FixedDigits } from "@/components/ui/fixed-digits";
 import { motion } from "framer-motion";
 import { Clock, AlertTriangle } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -18,7 +19,7 @@ export const Timer = memo(function Timer({
   duration,
   onTimeout,
   label,
-  variant = "game",
+  variant: _variant = "game",
   isActive = false,
   timeUsed = 0,
   onTimeUpdate: _onTimeUpdate,
@@ -91,117 +92,48 @@ export const Timer = memo(function Timer({
   const isLowTime = timeLeft <= 60; // Last minute
   const isCritical = timeLeft <= 30; // Last 30 seconds
 
-  const getVariantStyles = useCallback(() => {
-    if (variant === "setup") {
-      return {
-        bgColor: isCritical
-          ? "bg-red-500/10"
-          : isLowTime
-            ? "bg-yellow-500/10"
-            : "bg-blue-500/10",
-        borderColor: isCritical
-          ? "border-red-500/30"
-          : isLowTime
-            ? "border-yellow-500/30"
-            : "border-blue-500/30",
-        textColor: isCritical
-          ? "text-red-400"
-          : isLowTime
-            ? "text-yellow-400"
-            : "text-blue-400",
-        iconColor: isCritical
-          ? "text-red-500"
-          : isLowTime
-            ? "text-yellow-500"
-            : "text-blue-500",
-      };
-    } else {
-      return {
-        bgColor: isCritical
-          ? "bg-red-500/10"
-          : isLowTime
-            ? "bg-orange-500/10"
-            : !isActive
-              ? "bg-gray-500/10"
-              : "bg-green-500/10",
-        borderColor: isCritical
-          ? "border-red-500/30"
-          : isLowTime
-            ? "border-orange-500/30"
-            : !isActive
-              ? "border-gray-500/30"
-              : "border-green-500/30",
-        textColor: isCritical
-          ? "text-red-400"
-          : isLowTime
-            ? "text-orange-400"
-            : !isActive
-              ? "text-gray-400"
-              : "text-green-400",
-        iconColor: isCritical
-          ? "text-red-500"
-          : isLowTime
-            ? "text-orange-500"
-            : !isActive
-              ? "text-gray-500"
-              : "text-green-500",
-      };
-    }
-  }, [variant, isCritical, isLowTime, isActive]);
-
-  const styles = getVariantStyles();
+  const timeColor =
+    isActive && isCritical
+      ? "text-red-400"
+      : isActive && isLowTime
+        ? "text-gold-300"
+        : "text-foreground";
 
   return (
     <motion.div
-      initial={{ scale: 0.95, opacity: 0 }}
-      animate={{
-        scale: isCritical && isActive ? [1, 1.02, 1] : 1,
-        opacity: !isActive ? 0.6 : 1,
-      }}
-      transition={{
-        scale:
-          isCritical && isActive
-            ? { repeat: Infinity, duration: 1 }
-            : { duration: 0.3 },
-        opacity: { duration: 0.3 },
-      }}
-      className={`${styles.bgColor} ${styles.borderColor} border backdrop-blur-md rounded-sm p-3 font-mono shadow-[0_0_15px_rgba(0,0,0,0.3)]`}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: !isActive ? 0.7 : 1, y: 0 }}
+      transition={{ duration: 0.25 }}
+      className={`rounded-lg border bg-white/[0.03] px-3 py-2.5 ${
+        isActive && isCritical ? "border-red-500/40" : "border-border"
+      }`}
+      role="timer"
+      aria-label={label}
     >
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-6">
+        <span className="flex items-center gap-2 text-[13px] text-foreground/80">
           {isCritical && isActive ? (
-            <AlertTriangle
-              className={`h-4 w-4 ${styles.iconColor} animate-pulse`}
-            />
+            <AlertTriangle className="h-4 w-4 text-red-400" />
           ) : (
-            <Clock className={`h-4 w-4 ${styles.iconColor}`} />
+            <Clock className="h-4 w-4 text-foreground/70" />
           )}
-          <span className="text-xs font-bold tracking-widest text-muted-foreground mr-4 uppercase">
-            {label} {!isActive && "(WAITING)"}
-          </span>
-        </div>
+          {label}
+          {!isActive && <span className="text-foreground/60">(paused)</span>}
+        </span>
         <span
-          className={`text-xl font-black ${styles.textColor} tracking-tight`}
+          className={`text-xl font-semibold tabular-nums ${timeColor}`}
         >
-          {formatTime(timeLeft)}
+          <FixedDigits>{formatTime(timeLeft)}</FixedDigits>
         </span>
       </div>
 
       <Progress
         value={progressValue}
-        className="h-2"
-        // Note: We might need to add custom color variants to the Progress component
+        className={`mt-2 h-1 ${isActive && isCritical ? "[&>div]:bg-red-400" : ""}`}
       />
 
       {isCritical && isActive && (
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: [0, 1, 0] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="text-xs text-red-400 mt-2 text-center font-medium"
-        >
-          TIME RUNNING OUT!
-        </motion.p>
+        <p className="mt-2 text-xs text-red-300">Time is almost up.</p>
       )}
     </motion.div>
   );

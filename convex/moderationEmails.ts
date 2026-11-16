@@ -1,115 +1,69 @@
-import { components } from "./_generated/api";
-import { Resend } from "@convex-dev/resend";
 import { internalAction } from "./_generated/server";
 import { v } from "convex/values";
-import {
-  createBanEmailTemplate,
-  createMuteEmailTemplate,
-  createUnbanEmailTemplate,
-  createUnmuteEmailTemplate,
-} from "./emailTemplates";
+import { sendEmail } from "./cloudflareEmail";
+import { banEmail, muteEmail, unbanEmail, unmuteEmail } from "./emails/templates";
 
-export const resend: Resend = new Resend(components.resend, {
-  testMode: false,
-});
+const moderationArgs = {
+  targetEmail: v.string(),
+  targetUsername: v.string(),
+  moderatorUsername: v.string(),
+  reason: v.optional(v.string()),
+};
 
-// Internal actions to send moderation emails
 export const sendMuteEmail = internalAction({
-  args: {
-    targetEmail: v.string(),
-    targetUsername: v.string(),
-    moderatorUsername: v.string(),
-    reason: v.optional(v.string()),
-    duration: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const { html, text } = createMuteEmailTemplate(
-      args.targetUsername,
-      args.moderatorUsername,
-      args.reason,
-      args.duration,
-    );
-
-    await resend.sendEmail(ctx, {
-      from: "Games of the Generals <noreply@generalsonline.app>",
+  args: { ...moderationArgs, duration: v.optional(v.number()) },
+  handler: async (_ctx, args) => {
+    await sendEmail({
       to: args.targetEmail,
-      subject: "Chat Mute Notice - Games of the Generals",
-      html,
-      text,
+      ...muteEmail({
+        username: args.targetUsername,
+        moderatorUsername: args.moderatorUsername,
+        reason: args.reason,
+        durationMs: args.duration,
+      }),
     });
   },
 });
 
 export const sendBanEmail = internalAction({
-  args: {
-    targetEmail: v.string(),
-    targetUsername: v.string(),
-    moderatorUsername: v.string(),
-    reason: v.optional(v.string()),
-    duration: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const { html, text } = createBanEmailTemplate(
-      args.targetUsername,
-      args.moderatorUsername,
-      args.reason,
-      args.duration,
-    );
-
-    await resend.sendEmail(ctx, {
-      from: "Games of the Generals <noreply@generalsonline.app>",
+  args: { ...moderationArgs, duration: v.optional(v.number()) },
+  handler: async (_ctx, args) => {
+    await sendEmail({
       to: args.targetEmail,
-      subject: "Game Ban Notice - Games of the Generals",
-      html,
-      text,
+      ...banEmail({
+        username: args.targetUsername,
+        moderatorUsername: args.moderatorUsername,
+        reason: args.reason,
+        durationMs: args.duration,
+      }),
     });
   },
 });
 
 export const sendUnmuteEmail = internalAction({
-  args: {
-    targetEmail: v.string(),
-    targetUsername: v.string(),
-    moderatorUsername: v.string(),
-    reason: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const { html, text } = createUnmuteEmailTemplate(
-      args.targetUsername,
-      args.moderatorUsername,
-      args.reason,
-    );
-
-    await resend.sendEmail(ctx, {
-      from: "Games of the Generals <noreply@generalsonline.app>",
+  args: moderationArgs,
+  handler: async (_ctx, args) => {
+    await sendEmail({
       to: args.targetEmail,
-      subject: "Chat Mute Lifted - Games of the Generals",
-      html,
-      text,
+      ...unmuteEmail({
+        username: args.targetUsername,
+        moderatorUsername: args.moderatorUsername,
+        reason: args.reason,
+      }),
     });
   },
 });
 
 export const sendUnbanEmail = internalAction({
-  args: {
-    targetEmail: v.string(),
-    targetUsername: v.string(),
-    moderatorUsername: v.string(),
-    reason: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    const { html, text } = createUnbanEmailTemplate(
-      args.targetUsername,
-      args.moderatorUsername,
-      args.reason,
-    );
-
-    await resend.sendEmail(ctx, {
-      from: "Games of the Generals <noreply@generalsonline.app>",
+  args: moderationArgs,
+  handler: async (_ctx, args) => {
+    await sendEmail({
       to: args.targetEmail,
-      subject: "Game Ban Lifted - Games of the Generals",
-      html,
-      text,
+      ...unbanEmail({
+        username: args.targetUsername,
+        moderatorUsername: args.moderatorUsername,
+        reason: args.reason,
+      }),
     });
   },
 });

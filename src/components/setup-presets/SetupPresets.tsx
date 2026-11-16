@@ -9,34 +9,43 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Input } from "../ui/input";
+import { Skeleton } from "../ui/skeleton";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "../ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../ui/alert-dialog";
+import {
   Save,
-  Download,
   Trash2,
   Star,
-  StarOff,
-  Bookmark,
   ChevronDown,
   ChevronUp,
-  Plus,
-  Edit,
+  Pencil,
   Check,
   X,
-  AlertTriangle,
+  Loader2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { cn } from "../../lib/utils";
+import { fadeUp, stagger } from "../../lib/motion";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -103,6 +112,12 @@ export const SetupPresets = React.memo(
     const [newPresetName, setNewPresetName] = useState("");
     const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState("");
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [pendingDelete, setPendingDelete] = useState<{
+      id: Id<"setupPresets">;
+      name: string;
+    } | null>(null);
     const hasAutoLoaded = useRef(false);
 
     const navigate = useNavigate();
@@ -219,10 +234,11 @@ export const SetupPresets = React.memo(
 
     const handleSavePreset = useCallback(async () => {
       if (!newPresetName.trim()) {
-        alert("Please enter a preset name");
+        toast.error("Enter a name for this preset");
         return;
       }
 
+      setIsSaving(true);
       try {
         const pieces = getCurrentPieces;
         await savePreset({
@@ -231,9 +247,12 @@ export const SetupPresets = React.memo(
         });
         setNewPresetName("");
         setShowSaveDialog(false);
+        toast.success("Preset saved");
       } catch (error) {
         console.error("Failed to save preset:", error);
-        alert("Failed to save preset");
+        toast.error("Could not save the preset. Try again.");
+      } finally {
+        setIsSaving(false);
       }
     }, [newPresetName, getCurrentPieces, savePreset]);
 
@@ -337,7 +356,7 @@ export const SetupPresets = React.memo(
 
           setEditingPresetId(null);
           setEditingName("");
-          toast.success("Preset renamed successfully!");
+          toast.success("Preset renamed.");
         } catch (error) {
           toast.error(
             error instanceof Error ? error.message : "Failed to rename preset",
@@ -367,427 +386,463 @@ export const SetupPresets = React.memo(
       [defaultPresets],
     );
 
+    // Run a preset action and show a spinner on that row while it works.
+    const runBusy = async (id: string, fn: () => Promise<void>) => {
+      setBusyId(id);
+      try {
+        await fn();
+      } finally {
+        setBusyId(null);
+      }
+    };
+
+    const titleBlock = (
+      <div className="min-w-0">
+        <h3 className="text-base font-semibold text-foreground">
+          Setup presets
+        </h3>
+        {presetLimit ? (
+          <p className="mt-0.5 flex flex-wrap items-center gap-2 text-[13px] text-foreground/75">
+            <span className="tabular-nums">
+              {presetLimit.limit === Infinity
+                ? "Unlimited saves"
+                : `${presetLimit.current}/${presetLimit.limit} saved`}
+            </span>
+            {presetLimit.tier !== "free" &&
+              presetLimit.status === "grace_period" && (
+                <Badge>Grace period</Badge>
+              )}
+            {presetLimit.tier !== "free" &&
+              presetLimit.status === "expired" && (
+                <Badge variant="destructive">Expired</Badge>
+              )}
+          </p>
+        ) : null}
+      </div>
+    );
+
     if (presets === undefined) {
       return (
-        <Card
+        <div
           className={cn(
-            "bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm",
+            "rounded-lg border border-border bg-card p-4",
             className,
           )}
         >
-          <CardContent className="p-4">
-            <div className="text-white/60 text-sm">Loading presets...</div>
-          </CardContent>
-        </Card>
+          {titleBlock}
+          <div className="mt-3 flex gap-2">
+            <Skeleton className="h-10 w-40" />
+            <Skeleton className="h-10 w-28" />
+          </div>
+        </div>
       );
     }
 
+    const hasAny = builtInPresets.length > 0 || customPresets.length > 0;
+
+    const rowShell =
+      "flex items-center justify-between gap-2 border-b border-border py-1.5 last:border-b-0";
+
     return (
-      <Card
-        className={cn(
-          "bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-xl shadow-black/20 rounded-sm",
-          className,
-        )}
-      >
-        <CardHeader className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <CardTitle className="flex items-center gap-2 text-white/90 text-lg">
-                <Bookmark className="h-5 w-5 text-blue-400" />
-                Setup Presets
-              </CardTitle>
-              {presetLimit && (
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs font-light text-white/60">
-                    {presetLimit.limit === Infinity
-                      ? "Unlimited"
-                      : `${presetLimit.current}/${presetLimit.limit} custom preset${presetLimit.limit !== 1 ? "s" : ""}`}
-                  </span>
-                  {presetLimit.tier !== "free" &&
-                    presetLimit.status === "grace_period" && (
-                      <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] font-mono rounded-sm px-2">
-                        Grace Period
-                      </Badge>
-                    )}
-                  {presetLimit.tier !== "free" &&
-                    presetLimit.status === "expired" && (
-                      <Badge className="bg-red-500/10 text-red-400 border-red-500/20 text-[10px] font-mono rounded-sm px-2">
-                        Expired
-                      </Badge>
-                    )}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              {defaultPreset && onApplyDefault && (
-                <Button
-                  onClick={() => void handleApplyDefault()}
-                  variant="outline"
-                  size="sm"
-                  className="bg-yellow-500/20 border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30"
-                >
-                  <Star className="h-4 w-4 mr-1" />
-                  Default
-                </Button>
-              )}
+      <div className={cn("rounded-lg border border-border bg-card", className)}>
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            {titleBlock}
+            {defaultPreset && onApplyDefault && (
               <Button
-                onClick={() => setIsExpanded(!isExpanded)}
-                variant="ghost"
+                onClick={() => void handleApplyDefault()}
+                variant="secondary"
                 size="sm"
-                className="text-white/70 hover:text-white"
               >
-                {isExpanded ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
+                <Star />
+                Use default
               </Button>
-            </div>
+            )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
               <DialogTrigger asChild>
-                <Button
-                  size="sm"
-                  className="bg-emerald-600/80 hover:bg-emerald-500/80 text-white font-mono text-xs rounded-sm border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save Current
+                <Button variant="secondary">
+                  <Save />
+                  Save this setup
                 </Button>
               </DialogTrigger>
-              <DialogContent className="bg-zinc-950 border border-white/10 rounded-sm shadow-2xl">
+              <DialogContent>
                 <DialogHeader>
-                  <DialogTitle className="text-white">
-                    Save Setup Preset
-                  </DialogTitle>
-                  {presetLimit && (
-                    <div className="mt-2">
-                      {!presetLimit.canCreate &&
-                        presetLimit.reason === "limit_reached" && (
-                          <div className="bg-amber-500/20 border border-amber-500/30 rounded-lg p-3 mb-3">
-                            <div className="flex items-center gap-2 text-amber-300 text-sm">
-                              <AlertTriangle className="w-4 h-4" />
-                              <span className="font-medium">Limit Reached</span>
-                            </div>
-                            <p className="text-amber-300/80 text-xs mt-1 font-light">
-                              You've reached the limit of {presetLimit.limit}{" "}
-                              custom presets for{" "}
-                              {presetLimit.tier === "free"
-                                ? "Free"
-                                : presetLimit.tier === "pro"
-                                  ? "Pro"
-                                  : "Pro+"}{" "}
-                              tier.
-                              {presetLimit.tier === "free" && (
-                                <Button
-                                  variant="link"
-                                  size="sm"
-                                  onClick={() =>
-                                    navigate({
-                                      to: "/pricing",
-                                      search: {
-                                        donation: undefined,
-                                      },
-                                    })
-                                  }
-                                  className="text-amber-300 hover:text-amber-200 p-0 h-auto ml-1 font-light underline"
-                                >
-                                  Upgrade to Pro for unlimited presets.
-                                </Button>
-                              )}
-                            </p>
-                          </div>
+                  <DialogTitle>Save this setup</DialogTitle>
+                  <DialogDescription>
+                    Name it so you can load it in a later game.
+                  </DialogDescription>
+                </DialogHeader>
+                {presetLimit &&
+                  !presetLimit.canCreate &&
+                  presetLimit.reason === "limit_reached" && (
+                    <div className="rounded-lg border border-gold-500/30 bg-gold-500/10 p-3 text-sm text-foreground">
+                      <p className="font-medium">Preset limit reached</p>
+                      <p className="mt-1 text-foreground/80">
+                        You have {presetLimit.limit} saved on the{" "}
+                        {presetLimit.tier === "free"
+                          ? "Free"
+                          : presetLimit.tier === "pro"
+                            ? "Pro"
+                            : "Pro+"}{" "}
+                        plan. Delete one to save another.
+                        {presetLimit.tier === "free" && (
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() =>
+                              navigate({
+                                to: "/pricing",
+                                search: { donation: undefined },
+                              })
+                            }
+                            className="ml-1 h-auto p-0 text-[length:inherit]"
+                          >
+                            Upgrade for unlimited presets.
+                          </Button>
                         )}
-                      {!presetLimit.canCreate &&
-                        presetLimit.reason === "subscription_expired" && (
-                          <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mb-3">
-                            <div className="flex items-center gap-2 text-red-300 text-sm">
-                              <AlertTriangle className="w-4 h-4" />
-                              <span className="font-medium">
-                                Subscription Expired
-                              </span>
-                            </div>
-                            <p className="text-red-300/80 text-xs mt-1 font-light">
-                              Your subscription has expired. Please renew to
-                              create more custom presets.
-                              <Button
-                                variant="link"
-                                size="sm"
-                                onClick={() =>
-                                  navigate({
-                                    to: "/subscription",
-                                    search: {
-                                      subscription: undefined,
-                                    },
-                                  })
-                                }
-                                className="text-red-300 hover:text-red-200 p-0 h-auto ml-1 font-light underline"
-                              >
-                                Renew Now
-                              </Button>
-                            </p>
-                          </div>
-                        )}
-                      {presetLimit.canCreate && (
-                        <div className="text-white/60 text-xs font-light">
-                          {presetLimit.limit === Infinity
-                            ? "Unlimited custom presets"
-                            : `You can save ${presetLimit.limit - presetLimit.current} more preset${presetLimit.limit - presetLimit.current !== 1 ? "s" : ""} (${presetLimit.current}/${presetLimit.limit})`}
-                        </div>
-                      )}
+                      </p>
                     </div>
                   )}
-                </DialogHeader>
-                <div className="space-y-4">
+                {presetLimit &&
+                  !presetLimit.canCreate &&
+                  presetLimit.reason === "subscription_expired" && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-foreground">
+                      <p className="font-medium">Subscription expired</p>
+                      <p className="mt-1 text-foreground/80">
+                        Renew to save more presets.
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() =>
+                            navigate({
+                              to: "/subscription",
+                              search: { subscription: undefined },
+                            })
+                          }
+                          className="ml-1 h-auto p-0 text-[length:inherit]"
+                        >
+                          Renew
+                        </Button>
+                      </p>
+                    </div>
+                  )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void handleSavePreset();
+                  }}
+                  className="grid gap-4"
+                >
                   <Input
-                    placeholder="Enter preset name..."
+                    placeholder="Preset name"
+                    aria-label="Preset name"
                     value={newPresetName}
                     onChange={(e) => setNewPresetName(e.target.value)}
-                    className="bg-zinc-900/50 border-white/10 text-white placeholder:text-white/30 font-mono text-sm focus-visible:ring-blue-500/50 focus-visible:border-blue-500/50"
                     maxLength={30}
+                    disabled={isSaving}
+                    autoFocus
                   />
-                  <div className="flex justify-end gap-2">
+                  <DialogFooter>
                     <Button
+                      type="button"
                       variant="outline"
                       onClick={() => setShowSaveDialog(false)}
-                      className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                      disabled={isSaving}
                     >
                       Cancel
                     </Button>
-                    <Button
-                      onClick={() => void handleSavePreset()}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      Save Preset
+                    <Button type="submit" disabled={isSaving}>
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="animate-spin" />
+                          Saving
+                        </>
+                      ) : (
+                        "Save preset"
+                      )}
                     </Button>
-                  </div>
-                  <div className="text-xs text-white/40 font-mono">
-                    You can save up to 5 custom presets. ({customPresets.length}
-                    /5)
-                  </div>
-                </div>
+                  </DialogFooter>
+                </form>
               </DialogContent>
             </Dialog>
-          </div>
-        </CardHeader>
 
-        <AnimatePresence>
+            <Button
+              variant="ghost"
+              onClick={() => setIsExpanded(!isExpanded)}
+              aria-expanded={isExpanded}
+              aria-controls="setup-presets-list"
+            >
+              {isExpanded ? "Hide presets" : "Show presets"}
+              {isExpanded ? <ChevronUp /> : <ChevronDown />}
+            </Button>
+          </div>
+        </div>
+
+        <AnimatePresence initial={false}>
           {isExpanded && (
             <motion.div
+              id="setup-presets-list"
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.2 }}
+              className="overflow-hidden"
             >
-              <CardContent className="p-4 pt-0 space-y-4">
-                {/* Built-in Presets */}
+              <div className="space-y-5 border-t border-border p-4">
                 {builtInPresets.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-white/80 mb-2 flex items-center gap-1">
-                      <Star className="h-4 w-4 text-yellow-400" />
-                      Popular Setups
+                  <section>
+                    <h4 className="text-sm font-semibold text-foreground">
+                      Popular setups
                     </h4>
-                    <div className="grid grid-cols-1 gap-2">
+                    <motion.ul
+                      variants={stagger(0.04)}
+                      initial="hidden"
+                      animate="show"
+                      className="mt-1"
+                    >
                       {builtInPresets.map((preset: DefaultPresetData) => (
-                        <motion.div
+                        <motion.li
                           key={preset._id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center justify-between p-2 rounded-sm bg-zinc-900/40 border border-white/5 hover:border-white/10 transition-colors"
+                          variants={fadeUp}
+                          className={rowShell}
                         >
-                          <div className="flex items-center gap-2 flex-1">
-                            <Badge
-                              variant="outline"
-                              className="bg-amber-500/10 text-amber-300 border-amber-500/20 text-[10px] font-mono rounded-sm px-2"
-                            >
-                              Popular
-                            </Badge>
-                            <span
-                              className={cn(
-                                "text-white/90 text-sm font-medium",
-                                preset.isDefault && "text-yellow-500 underline",
-                              )}
-                            >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-sm text-foreground">
                               {preset.name}
                             </span>
                             {preset.upvotes && preset.upvotes > 0 ? (
-                              <span className="text-xs text-white/50">
-                                ({preset.upvotes} upvotes)
+                              <span className="shrink-0 text-xs tabular-nums text-foreground/70">
+                                {preset.upvotes}{" "}
+                                {preset.upvotes === 1 ? "upvote" : "upvotes"}
                               </span>
                             ) : null}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              onClick={() =>
-                                void handleLoadPreset(preset._id, true)
-                              }
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                            >
-                              <Download className="h-4 w-4 text-blue-400" />
-                            </Button>
-                          </div>
-                        </motion.div>
+                          <Button
+                            onClick={() =>
+                              void runBusy(preset._id, () =>
+                                handleLoadPreset(preset._id, true),
+                              )
+                            }
+                            variant="secondary"
+                            size="sm"
+                            disabled={busyId !== null}
+                            aria-label={`Use ${preset.name}`}
+                          >
+                            {busyId === preset._id && (
+                              <Loader2 className="animate-spin" />
+                            )}
+                            Use
+                          </Button>
+                        </motion.li>
                       ))}
-                    </div>
-                  </div>
+                    </motion.ul>
+                  </section>
                 )}
 
-                {/* Custom Presets */}
                 {customPresets.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-medium text-white/80 mb-2 flex items-center gap-1">
-                      <Plus className="h-4 w-4 text-blue-400" />
-                      My Presets
+                  <section>
+                    <h4 className="text-sm font-semibold text-foreground">
+                      My presets
                     </h4>
-                    <div className="grid grid-cols-1 gap-2">
+                    <motion.ul
+                      variants={stagger(0.04)}
+                      initial="hidden"
+                      animate="show"
+                      className="mt-1"
+                    >
                       {customPresets.map((preset: PresetData) => (
-                        <motion.div
+                        <motion.li
                           key={preset._id}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          className="flex items-center justify-between p-2 rounded-sm bg-zinc-900/40 border border-white/5 hover:border-white/10 transition-colors"
+                          variants={fadeUp}
+                          className={rowShell}
                         >
-                          <div className="flex items-center gap-2 flex-1">
-                            {editingPresetId === preset._id ? (
-                              <div className="flex items-center gap-2 flex-1">
-                                <Input
-                                  value={editingName}
-                                  onChange={(e) =>
-                                    setEditingName(e.target.value)
-                                  }
-                                  className="bg-white/10 border-white/20 text-white h-8 text-sm"
-                                  autoFocus
-                                  maxLength={30}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      void handleEditPreset(
-                                        preset._id,
-                                        editingName,
-                                      );
-                                    } else if (e.key === "Escape") {
-                                      cancelEditing();
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  onClick={() =>
-                                    void handleEditPreset(
-                                      preset._id,
-                                      editingName,
-                                    )
-                                  }
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Check className="h-4 w-4 text-green-400" />
-                                </Button>
-                                <Button
-                                  onClick={cancelEditing}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <X className="h-4 w-4 text-red-400" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <>
-                                <span
-                                  className={cn(
-                                    "text-white/90 text-sm font-medium",
-                                    preset.isDefault &&
-                                      "text-yellow-500 underline",
-                                  )}
-                                >
-                                  {preset.name}
-                                </span>
-                                {preset.upvotes && preset.upvotes > 0 ? (
-                                  <span className="text-xs text-white/50">
-                                    ({preset.upvotes} upvotes)
-                                  </span>
-                                ) : null}
-                              </>
-                            )}
-                          </div>
-                          {editingPresetId !== preset._id && (
-                            <div className="flex items-center gap-1">
+                          {editingPresetId === preset._id ? (
+                            <form
+                              className="flex min-w-0 flex-1 items-center gap-1"
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                void runBusy(preset._id, () =>
+                                  handleEditPreset(preset._id, editingName),
+                                );
+                              }}
+                            >
+                              <Input
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                aria-label="Preset name"
+                                autoFocus
+                                maxLength={30}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Escape") cancelEditing();
+                                }}
+                                className="min-w-0 flex-1"
+                              />
                               <Button
-                                onClick={() =>
-                                  void handleToggleDefault(
-                                    preset._id,
-                                    preset.isDefault,
-                                  )
-                                }
+                                type="submit"
                                 variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
+                                size="icon"
+                                aria-label="Save name"
+                                disabled={busyId !== null}
                               >
-                                {preset.isDefault ? (
-                                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                                {busyId === preset._id ? (
+                                  <Loader2 className="animate-spin" />
                                 ) : (
-                                  <StarOff className="h-4 w-4 text-white/40" />
+                                  <Check className="text-emerald-400" />
                                 )}
                               </Button>
                               <Button
-                                onClick={() =>
-                                  startEditing(preset._id, preset.name)
-                                }
+                                type="button"
+                                onClick={cancelEditing}
                                 variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
+                                size="icon"
+                                aria-label="Cancel rename"
                               >
-                                <Edit className="h-4 w-4 text-white/60" />
+                                <X />
                               </Button>
-                              <Button
-                                onClick={() =>
-                                  void handleLoadPreset(preset._id, false)
-                                }
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                              >
-                                <Download className="h-4 w-4 text-blue-400" />
-                              </Button>
-                              <Button
-                                onClick={() =>
-                                  void handleDeletePreset(
-                                    preset._id,
-                                    preset.name,
-                                  )
-                                }
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-400" />
-                              </Button>
-                            </div>
+                            </form>
+                          ) : (
+                            <>
+                              <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate text-sm text-foreground">
+                                  {preset.name}
+                                </span>
+                                {preset.isDefault && <Badge>Default</Badge>}
+                              </div>
+                              <div className="flex shrink-0 items-center">
+                                <Button
+                                  onClick={() =>
+                                    void runBusy(preset._id, () =>
+                                      handleLoadPreset(preset._id, false),
+                                    )
+                                  }
+                                  variant="secondary"
+                                  size="sm"
+                                  disabled={busyId !== null}
+                                  aria-label={`Use ${preset.name}`}
+                                  className="mr-1"
+                                >
+                                  {busyId === preset._id && (
+                                    <Loader2 className="animate-spin" />
+                                  )}
+                                  Use
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    void runBusy(preset._id, () =>
+                                      handleToggleDefault(
+                                        preset._id,
+                                        preset.isDefault,
+                                      ),
+                                    )
+                                  }
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={busyId !== null}
+                                  aria-label={
+                                    preset.isDefault
+                                      ? "Clear default"
+                                      : "Make default"
+                                  }
+                                  title={
+                                    preset.isDefault
+                                      ? "Clear default"
+                                      : "Make default"
+                                  }
+                                >
+                                  <Star
+                                    className={
+                                      preset.isDefault
+                                        ? "fill-gold-400 text-gold-400"
+                                        : ""
+                                    }
+                                  />
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    startEditing(preset._id, preset.name)
+                                  }
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Rename"
+                                  title="Rename"
+                                >
+                                  <Pencil />
+                                </Button>
+                                <Button
+                                  onClick={() =>
+                                    setPendingDelete({
+                                      id: preset._id,
+                                      name: preset.name,
+                                    })
+                                  }
+                                  variant="ghost"
+                                  size="icon"
+                                  aria-label="Delete"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="text-red-400" />
+                                </Button>
+                              </div>
+                            </>
                           )}
-                        </motion.div>
+                        </motion.li>
                       ))}
-                    </div>
-                  </div>
+                    </motion.ul>
+                  </section>
                 )}
 
-                {(!defaultPresets || defaultPresets.length === 0) &&
-                  (!presets || presets.length === 0) && (
-                    <div className="text-center py-4 text-white/60">
-                      <Bookmark className="h-8 w-8 mx-auto mb-2 text-white/40" />
-                      <p className="text-sm">No presets found</p>
-                      <p className="text-xs">
-                        Save your current setup to create your first preset!
-                      </p>
-                    </div>
-                  )}
-              </CardContent>
+                {!hasAny && (
+                  <div className="py-2 text-center">
+                    <p className="text-sm font-medium text-foreground">
+                      No presets yet
+                    </p>
+                    <p className="mt-1 text-sm text-foreground/75">
+                      Place your pieces, then save the setup to reuse it.
+                    </p>
+                  </div>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </Card>
+
+        <AlertDialog
+          open={pendingDelete !== null}
+          onOpenChange={(open) => {
+            if (!open) setPendingDelete(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this preset?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingDelete
+                  ? `"${pendingDelete.name}" will be removed. This can't be undone.`
+                  : ""}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep it</AlertDialogCancel>
+              <AlertDialogAction
+                className="border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200"
+                onClick={() => {
+                  if (pendingDelete) {
+                    void handleDeletePreset(
+                      pendingDelete.id,
+                      pendingDelete.name,
+                    );
+                  }
+                }}
+              >
+                Delete preset
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
     );
   },
 );

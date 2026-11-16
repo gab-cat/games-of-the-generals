@@ -1,142 +1,231 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { Progress } from "../../components/ui/progress";
-import { Lock, Scan } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { EASE } from "@/components/season/art";
+import { formatDate, formatExact } from "../match-history/format";
+import { percentOf, ribbonStripes, type Progress } from "./progress";
 
-interface Achievement {
+export interface Achievement {
   id: string;
   name: string;
   description: string;
   icon: string;
+  category: string;
   unlocked: boolean;
   unlockedAt?: number;
+  /** From the server, in percent. Rarely set; the profile-based count wins. */
   progress?: number;
 }
 
-interface AchievementCardProps {
-  achievement: Achievement;
-}
+/** Progress shown for a locked ribbon: the profile count, else the server's percent. */
+export type RibbonProgress = { count: Progress | null; percent: number };
 
-export function AchievementCard({ achievement }: AchievementCardProps) {
-  const formatDate = (timestamp?: number) => {
-    if (!timestamp) return "";
-    return new Date(timestamp)
-      .toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
-      .toUpperCase();
-  };
+export const ribbonItem = {
+  hidden: { opacity: 0, y: 6 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: EASE } },
+};
+
+/**
+ * One ribbon bar. Earned: full colour with a woven texture and a thin metal
+ * edge. Locked: the same stripes, muted, behind a dashed outline, with the
+ * part already earned filled in at full colour and a gold line under it.
+ */
+export function Ribbon({
+  achievement,
+  progress,
+  selected,
+  onSelect,
+  className,
+}: {
+  achievement: Achievement;
+  progress: RibbonProgress;
+  selected: boolean;
+  onSelect: () => void;
+  className?: string;
+}) {
+  const bg = useMemo(() => ribbonStripes(achievement.id), [achievement.id]);
+  const { unlocked } = achievement;
+  const pct = progress.percent;
+  const label = unlocked
+    ? `${achievement.name}. Earned`
+    : progress.count
+      ? `${achievement.name}. ${progress.count.current} of ${progress.count.target} ${progress.count.unit}`
+      : `${achievement.name}. Locked`;
 
   return (
+    <motion.button
+      type="button"
+      variants={ribbonItem}
+      onMouseEnter={onSelect}
+      onFocus={onSelect}
+      onClick={onSelect}
+      aria-pressed={selected}
+      aria-label={label}
+      className={cn(
+        "group relative h-10 w-full overflow-hidden rounded-[3px] outline-none transition-transform duration-150 ease-out",
+        "hover:-translate-y-0.5 active:scale-[0.98]",
+        "focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        selected && "ring-2 ring-gold-400 ring-offset-2 ring-offset-background",
+        className,
+      )}
+    >
+      {unlocked ? (
+        <>
+          <span className="absolute inset-0" style={{ backgroundImage: bg }} />
+          <span
+            className="absolute inset-0 opacity-30 mix-blend-multiply"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(0deg, rgba(0,0,0,.35) 0 1px, transparent 1px 3px)",
+            }}
+          />
+          <span className="absolute inset-x-0 top-0 h-px bg-[#f3d28a]/70" />
+          <span className="absolute inset-x-0 bottom-0 h-px bg-black/50" />
+        </>
+      ) : (
+        <>
+          {/* The whole ribbon, muted, so it reads as a goal */}
+          <span
+            className="absolute inset-0 opacity-40 grayscale-[0.35] transition-opacity group-hover:opacity-55"
+            style={{ backgroundImage: bg }}
+          />
+          {/* The part already earned, at full colour */}
+          <motion.span
+            className="absolute inset-y-0 left-0 overflow-hidden"
+            initial={{ width: 0 }}
+            animate={{ width: `${pct}%` }}
+            transition={{ duration: 0.8, ease: EASE, delay: 0.4 }}
+          >
+            <span
+              className="absolute inset-y-0 left-0"
+              style={{
+                backgroundImage: bg,
+                width: pct > 0 ? `${10000 / pct}%` : "100%",
+              }}
+            />
+          </motion.span>
+          <span className="absolute inset-0 rounded-[3px] border border-dashed border-foreground/45" />
+          {pct > 0 && (
+            <motion.span
+              className="absolute bottom-0 left-0 h-[3px] bg-gold-400"
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.8, ease: EASE, delay: 0.4 }}
+            />
+          )}
+        </>
+      )}
+    </motion.button>
+  );
+}
+
+/** The ribbon with its name and count under it, for the full list. */
+export function RibbonTile({
+  achievement,
+  progress,
+  selected,
+  onSelect,
+}: {
+  achievement: Achievement;
+  progress: RibbonProgress;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <div className="min-w-0 space-y-1.5">
+      <Ribbon
+        achievement={achievement}
+        progress={progress}
+        selected={selected}
+        onSelect={onSelect}
+      />
+      <div className="flex items-baseline justify-between gap-2 text-sm">
+        <span className="truncate text-foreground" title={achievement.name}>
+          {achievement.name}
+        </span>
+        {!achievement.unlocked && progress.count && (
+          <span className="shrink-0 text-xs text-foreground/80">
+            {progress.count.current}/{progress.count.target}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** What the ribbon under the pointer, focus or last tap is for. */
+export function RibbonDetail({
+  achievement,
+  progress,
+}: {
+  achievement: Achievement;
+  progress: RibbonProgress;
+}) {
+  const bg = ribbonStripes(achievement.id);
+  return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.01, translateY: -2 }}
-      transition={{ duration: 0.2 }}
-      className="h-full"
+      key={achievement.id}
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: EASE }}
+      className="space-y-4"
     >
       <div
-        className={`relative h-full overflow-hidden rounded-sm border transition-all duration-300 group ${
-          achievement.unlocked
-            ? "bg-gradient-to-br from-zinc-900/90 to-black/90 border-yellow-500/30 shadow-[0_0_15px_-3px_rgba(234,179,8,0.1)]"
-            : "bg-black/60 border-white/5 hover:border-white/10"
-        }`}
-      >
-        {/* Background decorative elements */}
-        {achievement.unlocked && (
-          <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-500/10 blur-[50px] rounded-full pointer-events-none" />
+        className={cn(
+          "h-10 w-full rounded-[3px]",
+          !achievement.unlocked && "opacity-45 grayscale-[0.35]",
         )}
-        <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-[0.03] pointer-events-none" />
-
-        {/* Card Content */}
-        <div className="relative p-5 flex flex-col h-full">
-          {/* Header Section */}
-          <div className="flex items-start justify-between mb-4">
-            <div
-              className={`p-3 rounded-sm border ${
-                achievement.unlocked
-                  ? "bg-yellow-500/10 border-yellow-500/20 text-yellow-400"
-                  : "bg-white/5 border-white/5 text-white/20"
-              } relative overflow-hidden group-hover:scale-105 transition-transform duration-300`}
-            >
-              <div className="text-3xl relative z-10">{achievement.icon}</div>
-              {achievement.unlocked && (
-                <div className="absolute inset-0 bg-yellow-400/10 blur-sm animate-pulse" />
-              )}
-            </div>
-
-            <div className="flex flex-col items-end">
-              {achievement.unlocked ? (
-                <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-400/10 px-2 py-1 rounded border border-emerald-400/20">
-                  <Scan className="w-3 h-3" />
-                  <span>ACQUIRED</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold text-white/40 bg-white/5 px-2 py-1 rounded-sm border border-white/5">
-                  <Lock className="w-3 h-3" />
-                  <span>LOCKED</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Text Content */}
-          <div className="flex-1 space-y-2">
-            <h3
-              className={`font-display text-lg tracking-wide ${
-                achievement.unlocked ? "text-white" : "text-white/40"
-              }`}
-            >
-              {achievement.name}
-            </h3>
-            <p
-              className={`text-sm leading-relaxed ${
-                achievement.unlocked ? "text-white/60" : "text-white/20"
-              }`}
-            >
-              {achievement.description}
-            </p>
-          </div>
-
-          {/* Footer / Progress */}
-          <div className="mt-6 pt-4 border-t border-white/5">
-            {achievement.unlocked ? (
-              <div className="flex items-center justify-between text-xs font-mono">
-                <span className="text-white/30 uppercase tracking-wider">
-                  Date Acquired
-                </span>
-                <span className="text-yellow-500/80">
-                  {formatDate(achievement.unlockedAt)}
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {achievement.progress !== undefined ? (
-                  <>
-                    <div className="flex justify-between text-[10px] uppercase font-mono tracking-wider text-white/30">
-                      <span>Progress Protocol</span>
-                      <span>{Math.round(achievement.progress)}%</span>
-                    </div>
-                    <Progress
-                      value={achievement.progress}
-                      className="h-1 bg-white/5"
-                    />
-                  </>
-                ) : (
-                  <div className="text-[10px] uppercase font-mono tracking-wider text-white/20 text-right">
-                    Locked Content
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Decorative Corner Accents */}
-          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors" />
-          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors" />
-        </div>
+        style={{ backgroundImage: bg }}
+      />
+      <div className="space-y-1">
+        <h3 className="text-xl font-semibold text-foreground">
+          {achievement.name}
+        </h3>
+        <p className="text-sm text-foreground">{achievement.description}</p>
       </div>
+      {achievement.unlocked ? (
+        <p className="text-sm text-emerald-400">
+          Earned
+          {achievement.unlockedAt ? (
+            <>
+              {" "}
+              <time
+                title={formatExact(achievement.unlockedAt)}
+                dateTime={new Date(achievement.unlockedAt).toISOString()}
+              >
+                {formatDate(achievement.unlockedAt)}
+              </time>
+            </>
+          ) : null}
+        </p>
+      ) : progress.count ? (
+        <div className="space-y-2">
+          <div className="flex justify-between gap-3 text-sm text-foreground">
+            <span>Progress</span>
+            <span>
+              {progress.count.current} of {progress.count.target}{" "}
+              {progress.count.unit}
+            </span>
+          </div>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percentOf(progress.count)}
+            aria-label={`${achievement.name} progress`}
+          >
+            <div
+              className="h-full bg-gold-500 transition-[width] duration-500"
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+        </div>
+      ) : progress.percent > 0 ? (
+        <p className="text-sm text-foreground">{progress.percent}% of the way</p>
+      ) : (
+        <p className="text-sm text-foreground">Earned in a single game.</p>
+      )}
     </motion.div>
   );
 }

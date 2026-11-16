@@ -10,12 +10,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { PaymentButton } from "./PaymentButton";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { AlertTriangle, Shield } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatLongDate, formatPeso } from "./plan-copy";
 
 interface SubscriptionPaymentModalProps {
   open: boolean;
@@ -24,6 +24,13 @@ interface SubscriptionPaymentModalProps {
   tier?: "pro" | "pro_plus"; // Required for upgrade mode
   onSuccess?: () => void;
 }
+
+const DURATIONS: { months: number; discount: number }[] = [
+  { months: 1, discount: 0 },
+  { months: 3, discount: 15 },
+  { months: 6, discount: 20 },
+  { months: 12, discount: 25 },
+];
 
 export function SubscriptionPaymentModal({
   open,
@@ -49,23 +56,13 @@ export function SubscriptionPaymentModal({
           ? "pro_plus"
           : "pro";
   const tierValue = tier === "pro" ? "pro" : "pro_plus";
+  const tierName = tierValue === "pro" ? "Pro" : "Pro+";
   const expiresAt = subscription?.expiresAt;
-
-  const isBlue = tierValue === "pro";
 
   // For extend mode, hide if user is on free tier
   if (mode === "extend" && subscriptionTier === "free") {
     return null;
   }
-
-  const formatDate = (timestamp: number | null) => {
-    if (!timestamp) return "Never";
-    return new Date(timestamp).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
 
   const calculateNewExpiry = () => {
     if (mode === "upgrade") {
@@ -122,179 +119,130 @@ export function SubscriptionPaymentModal({
     onOpenChange(false);
   };
 
-  const getTitle = () => {
-    return mode === "upgrade"
-      ? "Secure Clearance Upgrade"
-      : "Extend Operational License";
-  };
-
-  const getDescription = () => {
-    return mode === "upgrade"
-      ? "Select contract duration. Multi-cycle commitments receive funding allocation discounts."
-      : "Extend license validity period. Advance payment ensures uninterrupted tactical access.";
-  };
+  const hasActivePlan =
+    subscriptionTier !== "free" && !!expiresAt && expiresAt > Date.now();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "sm:max-w-md bg-zinc-950 border backdrop-blur-xl",
-          isBlue ? "border-blue-500/20" : "border-amber-500/20",
-        )}
-      >
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-display font-medium text-white flex items-center gap-2">
-            <Shield
-              className={cn(
-                "w-5 h-5",
-                isBlue ? "text-blue-500" : "text-amber-500",
-              )}
-            />
-            {getTitle()}
+          <DialogTitle>
+            {mode === "upgrade" ? `Get ${tierName}` : `Extend ${tierName}`}
           </DialogTitle>
-          <DialogDescription className="text-zinc-500 font-mono text-xs">
-            {getDescription()}
+          <DialogDescription>
+            {mode === "upgrade"
+              ? "Choose how many months to pay for. Longer plans cost less per month."
+              : "Add months to your plan. The new months start after your current expiry date."}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          {/* Active Plan Header */}
-          <div
-            className={cn(
-              "flex items-center justify-between p-4 rounded-lg border",
-              isBlue
-                ? "bg-blue-900/10 border-blue-500/20"
-                : "bg-amber-900/10 border-amber-500/20",
-            )}
-          >
-            <div className="flex flex-col">
-              <span
-                className={cn(
-                  "font-bold uppercase tracking-wider text-sm",
-                  isBlue ? "text-blue-400" : "text-amber-400",
-                )}
-              >
-                {tierValue === "pro" ? "Officer Class" : "General Class"}
-              </span>
-              <span className="text-zinc-400 text-xs font-mono">
-                {tierValue === "pro" ? "Pro Clearance" : "Pro+ Clearance"}
-              </span>
-            </div>
-            <div className="text-right">
-              <div className="text-xl text-white font-mono font-bold">
-                ₱{priceInfo.discountedPrice.toLocaleString()}
-              </div>
-              {priceInfo.hasDiscount && (
-                <div className="flex gap-2 items-center justify-end text-[10px] font-mono">
-                  <span className="text-zinc-500 line-through">
-                    ₱{priceInfo.originalPrice.toLocaleString()}
-                  </span>
-                  <span className="text-green-400 bg-green-500/10 px-1 rounded">
-                    SAVE ₱{priceInfo.savings.toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">
-              Contract Duration
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 3, 6, 12].map((months) => {
+        <div className="space-y-4">
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-medium text-foreground">
+              Months
+            </legend>
+            <div
+              className="grid grid-cols-2 gap-2 sm:grid-cols-4"
+              role="radiogroup"
+            >
+              {DURATIONS.map(({ months, discount }) => {
                 const isSelected = selectedMonths === months;
-                const hasDiscount =
-                  months === 12 || months === 6 || months === 3;
-
                 return (
                   <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     key={months}
                     onClick={() => setSelectedMonths(months)}
                     className={cn(
-                      "relative flex flex-col items-center justify-center py-3 px-1 rounded-md border transition-all duration-200",
+                      "flex min-h-[3.5rem] flex-col items-center justify-center rounded-md border px-2 py-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:scale-[0.98]",
                       isSelected
-                        ? isBlue
-                          ? "border-blue-500 bg-blue-500/10 text-white shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-                          : "border-amber-500 bg-amber-500/10 text-white shadow-[0_0_15px_rgba(245,158,11,0.3)]"
-                        : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300",
+                        ? "border-gold-500/60 bg-gold-500/10 text-foreground"
+                        : "border-border bg-white/[0.04] text-foreground hover:border-border-strong hover:bg-white/[0.08]",
                     )}
                   >
-                    <span className="text-sm font-bold">{months}</span>
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase">
-                      Mo{months > 1 ? "s" : ""}
+                    <span className="text-base font-semibold tabular-nums">
+                      {months}
                     </span>
-
-                    {hasDiscount && (
-                      <div className="absolute -top-2 -right-1">
-                        <Badge
-                          variant="secondary"
-                          className="px-1 py-0 h-4 text-[9px] bg-green-500/20 text-green-400 border-green-500/30"
-                        >
-                          {months === 3
-                            ? "-15%"
-                            : months === 6
-                              ? "-20%"
-                              : "-25%"}
-                        </Badge>
-                      </div>
-                    )}
+                    <span className="text-xs text-foreground/80">
+                      {discount
+                        ? `${discount}% off`
+                        : months === 1
+                          ? "month"
+                          : "months"}
+                    </span>
                   </button>
                 );
               })}
             </div>
-          </div>
+          </fieldset>
 
-          {/* Warning for tier upgrades with remaining time */}
-          {mode === "upgrade" &&
-            subscriptionTier !== "free" &&
-            expiresAt &&
-            expiresAt > Date.now() && (
-              <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-lg flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                <p className="text-[10px] text-amber-500/80 font-mono leading-relaxed">
-                  <span className="font-bold">NOTICE:</span> Active license
-                  detected. Current expiration date ({formatDate(expiresAt)})
-                  will be overwritten upon upgrade activation.
-                </p>
-              </div>
-            )}
-
-          <div className="text-xs text-zinc-500 font-mono pt-2 border-t border-white/5 space-y-1">
-            <div className="flex justify-between">
-              <span>NEW_EXPIRY_DATE:</span>
-              <span className={cn(isBlue ? "text-blue-400" : "text-amber-400")}>
-                {formatDate(calculateNewExpiry())}
-              </span>
+          <dl className="space-y-2 rounded-md border border-border bg-white/[0.02] p-4 text-sm">
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-foreground/80">
+                {tierName}, {selectedMonths}{" "}
+                {selectedMonths === 1 ? "month" : "months"}
+              </dt>
+              <dd className="text-lg font-semibold tabular-nums text-foreground">
+                {formatPeso(priceInfo.discountedPrice)}
+              </dd>
             </div>
-            {mode === "extend" && expiresAt && (
-              <div className="flex justify-between text-zinc-600">
-                <span>CURRENT_EXPIRY:</span>
-                <span>{formatDate(expiresAt)}</span>
+            {priceInfo.hasDiscount && (
+              <div className="flex items-baseline justify-between gap-4 text-xs">
+                <dt className="text-foreground/80">You save</dt>
+                <dd className="tabular-nums text-emerald-400">
+                  {formatPeso(priceInfo.savings)}
+                  <span className="ml-2 text-foreground/60 line-through">
+                    {formatPeso(priceInfo.originalPrice)}
+                  </span>
+                </dd>
               </div>
             )}
-          </div>
+            {mode === "extend" && expiresAt && (
+              <div className="flex justify-between gap-4 border-t border-border pt-2 text-xs">
+                <dt className="text-foreground/80">Now expires</dt>
+                <dd className="text-foreground">{formatLongDate(expiresAt)}</dd>
+              </div>
+            )}
+            <div
+              className={cn(
+                "flex justify-between gap-4 text-xs",
+                mode === "upgrade" && "border-t border-border pt-2",
+              )}
+            >
+              <dt className="text-foreground/80">New expiry</dt>
+              <dd className="font-medium text-gold-300">
+                {formatLongDate(calculateNewExpiry())}
+              </dd>
+            </div>
+          </dl>
+
+          {mode === "upgrade" && hasActivePlan && (
+            <div className="flex items-start gap-2 rounded-md border border-gold-500/30 bg-gold-500/10 p-3 text-xs text-foreground">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0 text-gold-300" />
+              <p>
+                You already have a plan until {formatLongDate(expiresAt)}. The
+                new plan starts now and replaces that date.
+              </p>
+            </div>
+          )}
+
+          <p className="text-xs text-foreground/70">
+            You pay on the PayMongo checkout page. We never see your card
+            details.
+          </p>
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            className="text-zinc-500 font-mono hover:text-white"
-          >
-            ABORT
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
           </Button>
           <PaymentButton
             tier={tierValue}
             months={selectedMonths}
             variant="default"
             onSuccess={handleSuccess}
-            className={cn(
-              "min-w-[140px] font-mono text-xs font-bold uppercase tracking-wider text-white",
-              isBlue
-                ? "bg-blue-600 hover:bg-blue-500"
-                : "bg-amber-600 hover:bg-amber-500",
-            )}
+            className="sm:min-w-[160px]"
           />
         </DialogFooter>
       </DialogContent>

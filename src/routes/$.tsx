@@ -1,55 +1,46 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { motion } from 'framer-motion'
-import { Home, ArrowLeft } from 'lucide-react'
-import { Button } from '../components/ui/button'
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { riseIn } from "../lib/motion";
 
 function NotFoundComponent() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="text-center space-y-6"
-      >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-          className="text-8xl font-bold text-white/20"
+    <motion.div
+      {...riseIn}
+      className="mx-auto flex min-h-[50vh] max-w-md flex-col items-center justify-center py-10 text-center"
+    >
+      <p className="text-5xl font-medium tabular-nums text-gold-400">
+        404
+      </p>
+      <h1 className="mt-4 font-display text-3xl font-semibold leading-tight text-foreground sm:text-4xl">
+        Page not found
+      </h1>
+      <p className="mt-3 text-base text-foreground/90">
+        This address doesn't lead anywhere. The link may be wrong, or the page
+        has moved.
+      </p>
+
+      <div className="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+        <Button asChild size="lg">
+          <Link to="/" search={{ lobbyId: undefined }}>
+            Back to lobbies
+          </Link>
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          size="lg"
+          onClick={() => window.history.back()}
         >
-          404
-        </motion.div>
-        
-        <div className="space-y-2">
-          <h1 className="text-2xl font-bold text-white/90">Page Not Found</h1>
-          <p className="text-white/60">The page you're looking for doesn't exist.</p>
-        </div>
-        
-        <div className="flex gap-4 justify-center">
-          <Button
-            asChild
-            variant="outline"
-            className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20"
-          >
-            <Link to="/">
-              <Home className="h-4 w-4 mr-2" />
-              Back to Lobby
-            </Link>
-          </Button>
-          
-          <Button
-            onClick={() => window.history.back()}
-            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Go Back
-          </Button>
-        </div>
-      </motion.div>
-    </div>
-  )
+          <ArrowLeft />
+          Go back
+        </Button>
+      </div>
+    </motion.div>
+  );
 }
 
-export const Route = createFileRoute('/$')({
+export const Route = createFileRoute("/$")({
   component: NotFoundComponent,
-})
+});

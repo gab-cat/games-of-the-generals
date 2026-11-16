@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { useMutation } from "convex/react";
+import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
+import { Check, Eye, EyeOff, Loader2, Lock } from "lucide-react";
 import {
   useConvexQueryWithOptions,
   useConvexQuery,
@@ -8,106 +11,83 @@ import {
 import { api } from "../../../convex/_generated/api";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
+import { PageHeader, SectionHeader } from "../../components/ui/page-header";
 import {
-  Loader2,
-  Bot,
-  User,
-  Star,
-  Zap,
-  Crown,
-  Shield,
-  Target,
-  Feather,
-  Eye,
-  EyeOff,
-  Lock,
-  ChevronRight,
-  AlertTriangle,
-  Terminal,
-  Cpu,
-  Activity,
-  Swords,
-} from "lucide-react";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../../components/ui/alert-dialog";
 import { cn } from "../../lib/utils";
+import { easeOut, fadeUp, riseIn, stagger } from "../../lib/motion";
+import {
+  Insignia,
+  Painting,
+  type Crop,
+  type PlayerRank,
+} from "../../components/season/art";
 import { AIGameBoard } from "../../components/ai-game/AIGameBoard";
-import { motion } from "framer-motion";
-import { useNavigate } from "@tanstack/react-router";
 import { UpgradeDonationCTA } from "../../components/subscription/UpgradeDonationCTA";
 
 type Difficulty = "easy" | "medium" | "hard";
 type Behavior = "aggressive" | "defensive" | "passive" | "balanced";
 
-const difficultyConfig = {
+const difficultyConfig: Record<
+  Difficulty,
+  { label: string; description: string; rank: PlayerRank; portrait: Crop }
+> = {
   easy: {
-    label: "RECRUIT",
-    subLabel: "Easy Difficulty",
-    description:
-      "Simulation target with limited tactical processing. Makes random moves.",
-    icon: Star,
-    color: "text-emerald-400",
-    borderColor: "border-emerald-500/30",
-    bgGradient: "from-emerald-500/10 to-transparent",
-    techLevel: "MK-1",
+    label: "Recruit",
+    description: "Moves at random. Good for learning the pieces.",
+    rank: "Private",
+    portrait: "recruit",
   },
   medium: {
-    label: "VETERAN",
-    subLabel: "Medium Difficulty",
-    description:
-      "Standard combat unit. Executes strategic maneuvers and balanced plays.",
-    icon: Zap,
-    color: "text-amber-400",
-    borderColor: "border-amber-500/30",
-    bgGradient: "from-amber-500/10 to-transparent",
-    techLevel: "MK-2",
+    label: "Veteran",
+    description: "Plays a balanced game and plans a few moves ahead.",
+    rank: "Captain",
+    portrait: "veteran",
   },
   hard: {
-    label: "COMMANDER",
-    subLabel: "Hard Difficulty",
-    description:
-      "Elite tactical AI. Uses advanced prediction and aggressive flanking.",
-    icon: Crown,
-    color: "text-rose-500",
-    borderColor: "border-rose-500/30",
-    bgGradient: "from-rose-500/10 to-transparent",
-    techLevel: "MK-3",
+    label: "Commander",
+    description: "Predicts your moves and attacks on the flanks.",
+    rank: "General",
+    portrait: "commander",
   },
 };
 
-// Reordered: Balanced first (Default)
-const behaviorConfig: Record<
-  Behavior,
+const DIFFICULTIES: Difficulty[] = ["easy", "medium", "hard"];
+
+const behaviorConfig: Record<Behavior, { label: string; description: string }> =
   {
-    label: string;
-    description: string;
-    icon: React.ComponentType<{ className?: string }>;
-    color: string;
-  }
-> = {
-  balanced: {
-    label: "BALANCED",
-    description: "Adapt & Overcome. Mixed tactics.",
-    icon: Target,
-    color: "text-purple-400",
-  },
-  aggressive: {
-    label: "AGGRESSIVE",
-    description: "Seek & Destroy. Prioritizes captures.",
-    icon: Swords,
-    color: "text-orange-400",
-  },
-  defensive: {
-    label: "DEFENSIVE",
-    description: "Hold the Line. Prioritizes safety.",
-    icon: Shield,
-    color: "text-blue-400",
-  },
-  passive: {
-    label: "PASSIVE",
-    description: "Avoid Conflict. Advances cautiously.",
-    icon: Feather,
-    color: "text-emerald-400",
-  },
-};
+    balanced: {
+      label: "Balanced",
+      description: "Mixes attack and defence.",
+    },
+    aggressive: {
+      label: "Aggressive",
+      description: "Goes after your pieces first.",
+    },
+    defensive: {
+      label: "Defensive",
+      description: "Protects its own pieces first.",
+    },
+    passive: {
+      label: "Passive",
+      description: "Advances slowly and avoids fights.",
+    },
+  };
+
+const rules = [
+  "Capture the enemy flag to win.",
+  "Or reach the far row with your own flag.",
+  "A higher rank captures a lower rank.",
+  "The Spy captures any General.",
+];
 
 export function AIGamePage() {
   const navigate = useNavigate();
@@ -116,6 +96,8 @@ export function AIGamePage() {
   const [selectedBehavior, setSelectedBehavior] =
     useState<Behavior>("balanced");
   const [isStarting, setIsStarting] = useState(false);
+  const [isQuitting, setIsQuitting] = useState(false);
+  const [confirmQuitOpen, setConfirmQuitOpen] = useState(false);
   const [revealAIPieces, setRevealAIPieces] = useState(false);
 
   // Mutations
@@ -155,46 +137,46 @@ export function AIGamePage() {
     { difficulty: "hard" },
   );
 
-  // Derived state for access checking
-  // If user has access to HARD, they are PRO/PRO+. This is our reliable check for "Is Pro?"
-  // without needing to inspect the profile string directly which might vary.
+  const accessFor = (d: Difficulty) =>
+    d === "easy" ? easyAccess : d === "medium" ? mediumAccess : hardAccess;
+
+  // If the user has access to Commander they are on Pro or Pro+. This is our
+  // reliable check for "is Pro?" without inspecting the profile directly.
   const isPro = hardAccess?.hasAccess === true;
 
-  // NOTE: We no longer auto-cleanup finished sessions here.
-  // The result modal in AIGameBoard handles "Play Again" and "Return to Lobby" actions,
-  // which will cleanup the session appropriately. This allows the modal to show.
+  const selectedAccess = accessFor(selectedDifficulty);
+  const isDifficultyLocked = !!selectedAccess && !selectedAccess.hasAccess;
+  const isExpired = selectedAccess?.reason === "subscription_expired";
+  const isBehaviorLocked = selectedBehavior !== "balanced" && !isPro;
+  const needsUpgrade = isDifficultyLocked || isBehaviorLocked;
+
+  const goToUpgrade = () => {
+    if (isDifficultyLocked && isExpired) {
+      navigate({ to: "/subscription", search: { subscription: undefined } });
+    } else {
+      navigate({ to: "/pricing", search: { donation: undefined } });
+    }
+  };
 
   const handleStartGame = () => {
     if (!profile) return;
 
-    // 1. Check Difficulty Access
-    const diffAccessCheck =
-      selectedDifficulty === "easy"
-        ? easyAccess
-        : selectedDifficulty === "medium"
-          ? mediumAccess
-          : hardAccess;
     const difficultyLabel = difficultyConfig[selectedDifficulty].label;
 
-    if (diffAccessCheck && !diffAccessCheck.hasAccess) {
-      if (diffAccessCheck.reason === "subscription_expired") {
-        toast.error(
-          `Clearance denied. Renew subscription for ${difficultyLabel} access.`,
-        );
+    if (isDifficultyLocked) {
+      if (isExpired) {
+        toast.error(`Renew your subscription to play ${difficultyLabel}.`);
         navigate({ to: "/subscription", search: { subscription: undefined } });
       } else {
-        toast.error(
-          `Clearance denied. ${difficultyLabel} is restricted to Pro agents.`,
-        );
+        toast.error(`${difficultyLabel} needs Pro.`);
         navigate({ to: "/pricing", search: { donation: undefined } });
       }
       return;
     }
 
-    // 2. Check Behavior Access
-    // "Rule: selection behavior is only allowed on pro" (Default 'balanced' is free, others Pro)
-    if (selectedBehavior !== "balanced" && !isPro) {
-      toast.error("Advanced Combat Doctrines are restricted to Pro agents.");
+    // Only the Balanced style is free.
+    if (isBehaviorLocked) {
+      toast.error(`${behaviorConfig[selectedBehavior].label} style needs Pro.`);
       navigate({ to: "/pricing", search: { donation: undefined } });
       return;
     }
@@ -207,11 +189,7 @@ export function AIGamePage() {
     })
       .catch((error) => {
         console.error("Failed to start AI game:", error);
-        toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to initiate combat simulation",
-        );
+        toast.error("Could not start the game. Try again.");
       })
       .finally(() => {
         setIsStarting(false);
@@ -219,560 +197,373 @@ export function AIGamePage() {
   };
 
   const handleQuitGame = () => {
-    if (!currentSession) return;
-    cleanupSession({ sessionId: currentSession.sessionId }).catch((error) => {
-      console.error("Failed to quit game:", error);
-    });
+    if (!currentSession || isQuitting) return;
+    setIsQuitting(true);
+    cleanupSession({ sessionId: currentSession.sessionId })
+      .catch((error) => {
+        console.error("Failed to quit game:", error);
+        toast.error("Could not quit the game. Try again.");
+      })
+      .finally(() => {
+        setIsQuitting(false);
+        setConfirmQuitOpen(false);
+      });
   };
 
-  // --------------------------------------------------------------------------------
-  // ACTIVE GAME OVERLAY
-  // --------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // Active game
+  // --------------------------------------------------------------------------
   if (
     currentSession &&
     (currentSession.status === "setup" ||
       currentSession.status === "playing" ||
       currentSession.status === "finished")
   ) {
+    const isPlaying = currentSession.status === "playing";
+    const isPlayerTurn = currentSession.currentTurn === "player1";
+    const sessionDifficulty =
+      difficultyConfig[currentSession.difficulty as Difficulty]?.label ??
+      currentSession.difficulty;
+    const sessionBehavior =
+      behaviorConfig[currentSession.behavior as Behavior]?.label ??
+      currentSession.behavior;
+
+    const turnLabel =
+      currentSession.status === "setup"
+        ? "Place your pieces"
+        : currentSession.status === "finished"
+          ? "Game over"
+          : isPlayerTurn
+            ? "Your turn"
+            : "AI is thinking";
+
     return (
       <>
-        <div className="min-h-screen relative overflow-hidden bg-zinc-950 rounded-sm">
-          {/* Background Elements */}
-          <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f10_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f10_1px,transparent_1px)] bg-[size:2rem_2rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
-
-          <div className="relative z-10 mx-auto max-w-7xl p-4 sm:p-6 space-y-4 sm:space-y-6">
-            {/* Game Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-sm border border-white/5 bg-zinc-900/50 backdrop-blur-xl">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 text-blue-400">
-                  <Activity className="h-6 w-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] uppercase tracking-widest font-mono text-white/40">
-                      SIMULATION ACTIVE
-                    </span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                  </div>
-                  <h1 className="text-2xl font-display font-medium text-white tracking-tight">
-                    COMBAT SIMULATION
-                  </h1>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="bg-white/5 text-white/70 border-white/10 font-mono rounded-md px-3 py-1"
-                >
-                  <span className="text-white/40 mr-2">OPPONENT:</span>
-                  {
-                    difficultyConfig[
-                      currentSession.difficulty as keyof typeof difficultyConfig
-                    ].label
-                  }
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="bg-white/5 text-white/70 border-white/10 font-mono rounded-md px-3 py-1"
-                >
-                  <span className="text-white/40 mr-2">STRATEGY:</span>
-                  {
-                    behaviorConfig[
-                      currentSession.behavior as keyof typeof behaviorConfig
-                    ].label
-                  }
-                </Badge>
+        <div className="mx-auto max-w-5xl">
+          <PageHeader
+            title="Playing the AI"
+            actions={
+              <>
+                <Badge variant="outline">{sessionDifficulty}</Badge>
+                <Badge variant="outline">{sessionBehavior}</Badge>
                 <Button
-                  variant="destructive"
-                  onClick={handleQuitGame}
-                  className="ml-4 font-mono text-xs uppercase tracking-wider bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-md"
+                  variant="secondary"
+                  onClick={() =>
+                    isPlaying ? setConfirmQuitOpen(true) : handleQuitGame()
+                  }
+                  disabled={isQuitting}
                 >
-                  ABORT SIMULATION
-                </Button>
-              </div>
-            </div>
-
-            {/* Turn Indicator */}
-            <div className="flex items-center justify-between p-2 rounded-sm border border-white/5 bg-zinc-900/30 backdrop-blur-md">
-              <div
-                className={cn(
-                  "flex items-center gap-3 px-4 py-2 rounded-lg border transition-all duration-300",
-                  currentSession.currentTurn === "player1"
-                    ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
-                    : "bg-red-500/10 border-red-500/30 text-red-400",
-                )}
-              >
-                {currentSession.currentTurn === "player1" ? (
-                  <>
-                    <User className="h-4 w-4" />
-                    <span className="font-mono text-xs uppercase tracking-wider font-bold">
-                      YOUR TURN
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Bot className="h-4 w-4" />
-                    <span className="font-mono text-xs uppercase tracking-wider font-bold">
-                      AI CALCULATING...
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {/* Dev Tools */}
-              {import.meta.env.DEV && currentSession.status === "playing" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setRevealAIPieces(!revealAIPieces)}
-                  className="text-yellow-400/70 hover:text-yellow-400 font-mono text-xs"
-                >
-                  {revealAIPieces ? (
-                    <EyeOff className="w-4 h-4 mr-2" />
+                  {isQuitting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      Leaving
+                    </>
+                  ) : isPlaying ? (
+                    "Quit game"
                   ) : (
-                    <Eye className="w-4 h-4 mr-2" />
+                    "Leave game"
                   )}
-                  {revealAIPieces ? "HIDE ENEMY INTEL" : "REVEAL ENEMY INTEL"}
                 </Button>
+              </>
+            }
+          />
+
+          <div className="mb-4 flex min-h-10 items-center justify-between gap-3">
+            <div
+              role="status"
+              aria-live="polite"
+              className={cn(
+                "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium",
+                isPlaying && isPlayerTurn
+                  ? "border-gold-500/30 bg-gold-500/10 text-gold-400"
+                  : "border-border bg-card text-foreground",
               )}
+            >
+              {isPlaying && !isPlayerTurn ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : null}
+              {turnLabel}
             </div>
 
-            {/* Game Board */}
-            <div className="relative">
-              {/* Board Decoration */}
-              <div className="absolute -inset-4 bg-gradient-to-b from-blue-500/5 to-transparent rounded-2xl pointer-events-none" />
-              <AIGameBoard
-                sessionId={currentSession.sessionId}
-                revealAIPieces={revealAIPieces}
-              />
-            </div>
+            {/* Dev tools */}
+            {import.meta.env.DEV && isPlaying && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setRevealAIPieces(!revealAIPieces)}
+              >
+                {revealAIPieces ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
+                {revealAIPieces ? "Hide AI pieces" : "Show AI pieces"}
+              </Button>
+            )}
           </div>
+
+          <AIGameBoard
+            sessionId={currentSession.sessionId}
+            revealAIPieces={revealAIPieces}
+          />
         </div>
-        <UpgradeDonationCTA />
+
+        <AlertDialog open={confirmQuitOpen} onOpenChange={setConfirmQuitOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Quit this game?</AlertDialogTitle>
+              <AlertDialogDescription>
+                The game ends and nothing is saved.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep playing</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleQuitGame();
+                }}
+                disabled={isQuitting}
+              >
+                {isQuitting ? "Quitting" : "Quit game"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </>
     );
   }
 
-  // --------------------------------------------------------------------------------
-  // SELECTION SCREEN ("COMMAND CENTER")
-  // --------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // Pick an opponent
+  // --------------------------------------------------------------------------
+  const startLabel = needsUpgrade
+    ? isDifficultyLocked && isExpired
+      ? "Renew subscription"
+      : "See Pro plans"
+    : "Start game";
+
+  const lockedMessage = isDifficultyLocked
+    ? isExpired
+      ? `Your subscription expired. Renew it to play ${difficultyConfig[selectedDifficulty].label}.`
+      : `${difficultyConfig[selectedDifficulty].label} unlocks with Pro.`
+    : isBehaviorLocked
+      ? `${behaviorConfig[selectedBehavior].label} style unlocks with Pro.`
+      : null;
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="min-h-screen text-white selection:bg-blue-500/30 font-sans p-2 sm:p-6" // Added global padding and roundedness support via container
-    >
-      {/* Ambient Background */}
-      <div className="fixed inset-0 pointer-events-none select-none">
-        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/5 to-transparent" />
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:24px_24px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        <div className="absolute top-0 inset-x-0 h-96 bg-gradient-to-b from-blue-900/5 via-transparent to-transparent opacity-30" />
-      </div>
+    <div className="space-y-6 sm:space-y-8">
+      <motion.header {...riseIn} className="space-y-2">
+        <h1 className="font-display text-4xl font-bold leading-none tracking-[-0.03em] text-foreground sm:text-7xl">
+          Pick your opponent
+        </h1>
+        <p className="text-base text-foreground/90">
+          Then choose how it plays and place your pieces.
+        </p>
+      </motion.header>
 
-      <div className="relative z-10 max-w-7xl mx-auto rounded-sm overflow-hidden min-h-[calc(100vh-3rem)]">
-        {" "}
-        {/* Roundedness reduced for dashboard look */}
-        {/* Header Section */}
-        <div className="mb-12 md:mb-16 space-y-4 px-2 md:px-4">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: "circOut" }}
-            className="flex flex-col gap-2"
-          >
-            <div className="flex items-center gap-3 text-blue-400/60 font-mono text-xs tracking-[0.2em] uppercase">
-              <Terminal className="w-4 h-4" />
-              <span>System Ready</span>
-              <span className="w-px h-3 bg-blue-500/30" />
-              <span>Ver {import.meta.env.VITE_APP_VERSION || "2.4.0"}</span>
-            </div>
-            <h1 className="text-4xl md:text-6xl font-display font-medium text-white tracking-tight leading-none">
-              Tactical <span className="text-white/20">Simulation</span>
-            </h1>
-            <p className="max-w-xl text-white/50 text-sm leading-relaxed font-light">
-              Configure AI opponent parameters for combat simulation. Higher
-              threat levels require advanced strategic clearance.
-            </p>
-          </motion.div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 px-1 md:px-4 pb-12">
-          {/* LEFT COLUMN: Controls */}
-          <div className="lg:col-span-8 space-y-12">
-            {/* 1. THREAT LEVEL */}
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px bg-white/10 flex-1" />
-                <h2 className="font-mono text-xs uppercase tracking-widest text-white/40">
-                  Phase 1 // Select Threat Level
-                </h2>
-                <div className="h-px bg-white/10 w-8" />
-              </div>
+      {/* Opponents: three portraits, the picked one opens wide */}
+      <motion.div
+        role="radiogroup"
+        aria-label="Opponent"
+        variants={stagger(0.08)}
+        initial="hidden"
+        animate="show"
+        className="flex h-[340px] gap-2 sm:h-[460px] sm:gap-3"
+      >
+        {DIFFICULTIES.map((key) => {
+          const config = difficultyConfig[key];
+          const access = accessFor(key);
+          const isLocked = !!access && !access.hasAccess;
+          const isSelected = selectedDifficulty === key;
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {(
-                  Object.entries(difficultyConfig) as [
-                    Difficulty,
-                    typeof difficultyConfig.easy,
-                  ][]
-                ).map(([key, config], i) => {
-                  const accessCheck =
-                    key === "easy"
-                      ? easyAccess
-                      : key === "medium"
-                        ? mediumAccess
-                        : hardAccess;
-                  const isLocked = accessCheck && !accessCheck.hasAccess;
-                  const isSelected = selectedDifficulty === key;
-
-                  return (
-                    <motion.button
-                      key={key}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 + i * 0.1 }}
-                      onClick={() => setSelectedDifficulty(key)}
-                      className={cn(
-                        "group relative flex flex-col items-start text-left p-6 h-full transition-all duration-300 rounded-sm border backdrop-blur-sm overflow-hidden",
-                        isSelected
-                          ? `bg-zinc-900/80 ${config.borderColor} shadow-[0_0_30px_-10px_rgba(0,0,0,0.5)]`
-                          : "bg-zinc-900/30 border-white/5 hover:bg-zinc-900/50 hover:border-white/10",
-                      )}
-                    >
-                      {/* Selection Indicator */}
-                      {isSelected && (
-                        <motion.div
-                          layoutId="active-difficulty"
-                          className={cn(
-                            "absolute inset-0 bg-gradient-to-b opacity-20 pointer-events-none",
-                            config.bgGradient,
-                          )}
-                        />
-                      )}
-                      {/* Tech Lines */}
-                      <div className="absolute top-0 right-0 p-3 opacity-20">
-                        <span className="font-mono text-[10px]">
-                          {config.techLevel}
-                        </span>
-                      </div>
-
-                      <div
-                        className={cn(
-                          "p-3 rounded-lg mb-4 bg-black/20 border border-white/5 transition-colors duration-300",
-                          isSelected
-                            ? config.color
-                            : "text-white/40 group-hover:text-white/70",
-                        )}
-                      >
-                        <config.icon className="w-6 h-6" />
-                      </div>
-
-                      <div className="relative z-10 space-y-2">
-                        <h3
-                          className={cn(
-                            "font-display text-lg font-bold tracking-wide transition-colors duration-300",
-                            isSelected ? "text-white" : "text-white/60",
-                          )}
-                        >
-                          {config.label}
-                        </h3>
-                        <p className="text-xs text-white/40 font-mono leading-relaxed">
-                          {config.description}
-                        </p>
-                      </div>
-
-                      {/* Lock Overlay */}
-                      {isLocked && (
-                        <div className="absolute inset-x-0 bottom-0 p-2 bg-amber-500/10 border-t border-amber-500/20 backdrop-blur-md">
-                          <div className="flex items-center justify-center gap-2 text-[10px] uppercase font-bold text-amber-500 tracking-wider">
-                            <Lock className="w-3 h-3" />
-                            <span>Restricted</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Active Corners */}
-                      {isSelected && (
-                        <>
-                          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/50 transition-colors" />
-                          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/50 transition-colors" />
-                        </>
-                      )}
-                    </motion.button>
-                  );
-                })}
-              </div>
-            </section>
-
-            {/* 2. BEHAVIOR */}
-            <section>
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-px bg-white/10 flex-1" />
-                <h2 className="font-mono text-xs uppercase tracking-widest text-white/40">
-                  Phase 2 // Combat Doctrine
-                </h2>
-                <div className="h-px bg-white/10 w-8" />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {(
-                  Object.entries(behaviorConfig) as [
-                    Behavior,
-                    typeof behaviorConfig.balanced,
-                  ][]
-                ).map(([key, config], i) => {
-                  const isSelected = selectedBehavior === key;
-                  const isLocked = key !== "balanced" && !isPro;
-
-                  return (
-                    <motion.button
-                      key={key}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + i * 0.05 }}
-                      onClick={() => setSelectedBehavior(key)}
-                      className={cn(
-                        "relative flex flex-col items-center justify-center gap-3 py-4 px-2 rounded-sm border transition-all duration-300 overflow-hidden",
-                        isSelected
-                          ? "bg-zinc-900/80 border-white/20"
-                          : "bg-zinc-900/30 border-white/5 hover:bg-zinc-900/50 hover:border-white/10",
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          "transition-colors duration-300 relative",
-                          isSelected ? config.color : "text-white/20",
-                        )}
-                      >
-                        <config.icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex flex-col items-center gap-1">
-                        <span
-                          className={cn(
-                            "text-xs font-mono uppercase tracking-widest transition-colors duration-300",
-                            isSelected ? "text-white" : "text-white/40",
-                          )}
-                        >
-                          {config.label}
-                        </span>
-                        {isLocked && (
-                          <div className="flex items-center gap-1 text-[9px] text-amber-500/80 font-bold uppercase tracking-wider">
-                            <Lock className="w-2.5 h-2.5" />
-                            <span>Pro</span>
-                          </div>
-                        )}
-                      </div>
-
-                      {isSelected && (
-                        <>
-                          <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/40 transition-colors" />
-                          <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/40 transition-colors" />
-                        </>
-                      )}
-                    </motion.button>
-                  );
-                })}
-              </div>
-              {/* Strategy Description */}
-              <motion.div
-                key={selectedBehavior}
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                className="mt-4 p-4 border border-white/5 bg-zinc-900/40 rounded-sm"
-              >
-                <div className="flex items-center justify-center gap-2">
-                  {selectedBehavior !== "balanced" && !isPro ? (
-                    <div className="flex items-center gap-2 text-amber-500">
-                      <AlertTriangle className="w-4 h-4" />
-                      <p className="font-mono text-xs">
-                        Upgrade to Pro to unlock{" "}
-                        {behaviorConfig[selectedBehavior].label} strategy.
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="font-mono text-xs text-white/50 text-center">
-                      <span className="text-white/30 uppercase mr-2">
-                        [Strategy Note]
-                      </span>
-                      {behaviorConfig[selectedBehavior].description}
-                    </p>
-                  )}
-                </div>
-              </motion.div>
-            </section>
-
-            {/* 3. ACTION */}
-            <section className="pt-4">
-              <Button
-                size="lg"
-                className={cn(
-                  "w-full text-base rounded-sm font-mono transition-all duration-500",
-                  "bg-white/90 text-black hover:bg-white hover:tracking-[0.2em] shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)]",
-                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:tracking-normal",
-                )}
-                onClick={handleStartGame}
-                disabled={isStarting || !profile}
-              >
-                {isStarting ? (
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span>Initializing Sequence...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    <Cpu className="w-5 h-5" />
-                    <span>Initiate Simulation</span>
-                    <ChevronRight className="w-5 h-5 opacity-50" />
-                  </div>
-                )}
-              </Button>
-            </section>
-          </div>
-
-          {/* RIGHT COLUMN: Readout */}
-          <div className="lg:col-span-4 space-y-6">
-            {/* Mission Status / Warnings */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5 }}
-              className="p-6 border border-white/10 bg-zinc-900/50 rounded-sm backdrop-blur-md relative overflow-hidden"
+          return (
+            <motion.button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`${config.label}${isLocked ? ", needs Pro" : ""}. ${config.description}`}
+              variants={fadeUp}
+              onClick={() => setSelectedDifficulty(key)}
+              animate={{ flexGrow: isSelected ? 2.6 : 1 }}
+              transition={{ duration: 0.45, ease: easeOut }}
+              style={{ flexBasis: 0 }}
+              className={cn(
+                "group relative min-w-0 overflow-hidden rounded-lg border text-left transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                isSelected
+                  ? "border-gold-500/70"
+                  : "border-border hover:border-border-strong",
+              )}
             >
-              {/* Scanline */}
-              <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_50%,rgba(0,0,0,0.5)_50%)] bg-[size:100%_4px] opacity-20 pointer-events-none" />
+              <Painting
+                crop={config.portrait}
+                fade="bottom"
+                className="absolute inset-0"
+              />
+              {/* Opponents you didn't pick wait in shadow; hover lifts it */}
+              <div
+                aria-hidden="true"
+                className={cn(
+                  "absolute inset-0 bg-black transition-opacity duration-300",
+                  isSelected ? "opacity-0" : "opacity-55 group-hover:opacity-35",
+                )}
+              />
 
-              <h3 className="text-xs font-mono uppercase tracking-widest text-white/40 mb-4 flex items-center gap-2">
-                <Activity className="w-3 h-3" />
-                Simulation Parameters
-              </h3>
-
-              <div className="space-y-4 font-mono text-xs">
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <span className="text-white/40">OPPONENT CLASS</span>
-                  <span
-                    className={cn(
-                      "uppercase",
-                      difficultyConfig[selectedDifficulty].color,
-                    )}
-                  >
-                    {difficultyConfig[selectedDifficulty].label}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <span className="text-white/40">BEHAVIOR MOD</span>
-                  <span
-                    className={cn(
-                      "uppercase",
-                      selectedBehavior !== "balanced" && !isPro
-                        ? "text-amber-500"
-                        : "text-white",
-                    )}
-                  >
-                    {behaviorConfig[selectedBehavior].label}
-                    {selectedBehavior !== "balanced" && !isPro && " (LOCKED)"}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-white/5">
-                  <span className="text-white/40">MAP CONFIG</span>
-                  <span className="text-white/60">STANDARD GRID (9x8)</span>
-                </div>
+              <div
+                className={cn(
+                  "absolute left-3 top-3 text-[#f3ead8] sm:left-5 sm:top-5",
+                  !isSelected && isLocked && "hidden sm:block",
+                )}
+              >
+                <Insignia rank={config.rank} className="h-5 drop-shadow sm:h-8" />
               </div>
+              {isLocked && (
+                <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded border border-white/30 bg-black/60 px-1.5 py-0.5 text-xs font-semibold text-white sm:right-5 sm:top-5">
+                  <Lock className="size-3" />
+                  <span className={cn(!isSelected && "hidden sm:inline")}>Pro</span>
+                </span>
+              )}
 
-              {/* Warnings if locked */}
-              {(() => {
-                const diffAccessCheck =
-                  selectedDifficulty === "easy"
-                    ? easyAccess
-                    : selectedDifficulty === "medium"
-                      ? mediumAccess
-                      : hardAccess;
-                const isDiffLocked =
-                  diffAccessCheck && !diffAccessCheck.hasAccess;
-                const isBehaviorLocked =
-                  selectedBehavior !== "balanced" && !isPro;
+              <div className="absolute inset-x-0 bottom-0 p-3 sm:p-6">
+                <div
+                  className={cn(
+                    "font-bold leading-none tracking-[-0.03em] text-white",
+                    isSelected
+                      ? "text-2xl min-[420px]:text-3xl sm:text-6xl lg:text-7xl"
+                      : "rotate-180 text-lg [writing-mode:vertical-rl] sm:rotate-0 sm:text-4xl sm:[writing-mode:horizontal-tb]",
+                  )}
+                >
+                  {config.label}
+                </div>
+                <AnimatePresence initial={false}>
+                  {isSelected && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25, delay: 0.15, ease: easeOut }}
+                      className="mt-2 max-w-sm sm:mt-3"
+                    >
+                      <p className="text-sm text-white/90 sm:text-base">
+                        {config.description}
+                      </p>
+                      <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-white/80 sm:text-sm">
+                        <Insignia rank={config.rank} className="h-3 sm:h-3.5" />
+                        {config.rank}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.button>
+          );
+        })}
+      </motion.div>
 
-                if (isDiffLocked || isBehaviorLocked) {
-                  return (
-                    <div className="mt-6 p-4 border border-amber-500/30 bg-amber-500/10 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
-                        <div className="space-y-2">
-                          <p className="text-amber-500 font-bold text-xs uppercase tracking-wider">
-                            Authorization Required
-                          </p>
-                          <p className="text-amber-200/60 text-xs leading-relaxed">
-                            {isBehaviorLocked
-                              ? "Selected strategy requires Pro clearance."
-                              : diffAccessCheck?.reason ===
-                                  "subscription_expired"
-                                ? "Clearance expired. Renew license to access."
-                                : "Insufficient clearance level. Upgrade required."}
-                          </p>
-                          <div className="pt-2">
-                            <span className="text-[10px] uppercase text-amber-500/50 block mb-1">
-                              Override Code:
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="w-full text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10 h-8 font-mono"
-                              onClick={() => {
-                                if (
-                                  diffAccessCheck?.reason ===
-                                  "subscription_expired"
-                                ) {
-                                  navigate({
-                                    to: "/subscription",
-                                    search: { subscription: undefined },
-                                  });
-                                } else {
-                                  navigate({
-                                    to: "/pricing",
-                                    search: { donation: undefined },
-                                  });
-                                }
-                              }}
-                            >
-                              ACQUIRE CLEARANCE
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-            </motion.div>
+      {/* Style */}
+      <section className="space-y-3">
+        <SectionHeader
+          title="Playing style"
+          description="How the AI chooses its moves. Only Balanced is free."
+        />
+        <motion.div
+          role="radiogroup"
+          aria-label="AI playing style"
+          variants={stagger(0.04, 0.15)}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-2 gap-2 lg:grid-cols-4"
+        >
+          {(Object.keys(behaviorConfig) as Behavior[]).map((key) => {
+            const config = behaviorConfig[key];
+            const isSelected = selectedBehavior === key;
+            const isLocked = key !== "balanced" && !isPro;
 
-            {/* Operational Guide (Rules in small text) */}
-            <div className="pl-4 border-l border-white/10 space-y-4">
-              <p className="text-[10px] text-white/30 uppercase tracking-widest font-mono">
-                Operational Directives
-              </p>
-              <ul className="space-y-4">
-                {[
-                  "Capture the enemy colors to secure victory.",
-                  "Reach the opposing backline with your flag.",
-                  "Higher ranked officers capture lower ranks.",
-                  "Spies can eliminate Generals.",
-                ].map((rule, i) => (
-                  <li
-                    key={i}
-                    className="flex gap-3 text-xs text-white/50 font-light items-start"
+            return (
+              <motion.button
+                key={key}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                variants={fadeUp}
+                onClick={() => setSelectedBehavior(key)}
+                className={cn(
+                  "flex min-h-16 flex-col items-start justify-center gap-0.5 rounded-md border px-3 py-2.5 text-left transition-colors active:scale-[0.98]",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
+                  isSelected
+                    ? "border-gold-500/60 bg-gold-500/10"
+                    : "border-border bg-card hover:border-border-strong hover:bg-raised",
+                )}
+              >
+                <span className="flex w-full items-center justify-between gap-2">
+                  <span
+                    className={cn(
+                      "text-sm font-semibold text-foreground",
+                      isSelected && "text-gold-300",
+                    )}
                   >
-                    <span className="w-1 h-1 bg-white/20 mt-1.5 rounded-full shrink-0" />
-                    {rule}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
+                    {config.label}
+                  </span>
+                  {isLocked ? (
+                    <Lock
+                      className="size-3.5 shrink-0 text-foreground/70"
+                      aria-label="Needs Pro"
+                    />
+                  ) : isSelected ? (
+                    <Check className="size-4 shrink-0 text-gold-300" />
+                  ) : null}
+                </span>
+                <span className="text-xs text-foreground/80 sm:text-sm">
+                  {config.description}
+                </span>
+              </motion.button>
+            );
+          })}
+        </motion.div>
+      </section>
+
+      {/* Summary and start */}
+      <motion.div
+        {...riseIn}
+        className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+      >
+        <div className="min-w-0 text-sm">
+          <p className="font-semibold text-foreground">
+            {difficultyConfig[selectedDifficulty].label} ·{" "}
+            {behaviorConfig[selectedBehavior].label}
+          </p>
+          <p role="status" className="text-foreground/90">
+            {lockedMessage ?? "Place your pieces, then the game starts."}
+          </p>
         </div>
-      </div>
+        <Button
+          size="lg"
+          className="h-12 w-full shrink-0 text-base sm:w-56"
+          onClick={needsUpgrade ? goToUpgrade : handleStartGame}
+          disabled={isStarting || !profile}
+        >
+          {isStarting ? (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Starting
+            </>
+          ) : (
+            startLabel
+          )}
+        </Button>
+      </motion.div>
+
+      <section className="rounded-lg border border-border p-4 sm:p-5">
+        <h2 className="text-sm font-semibold text-foreground">How to win</h2>
+        <ul className="mt-2 grid gap-1 text-sm text-foreground/90 sm:grid-cols-2">
+          {rules.map((rule) => (
+            <li key={rule}>{rule}</li>
+          ))}
+        </ul>
+      </section>
       <UpgradeDonationCTA />
-    </motion.div>
+    </div>
   );
 }

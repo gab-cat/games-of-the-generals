@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { MoreVertical, Shield, Ban, VolumeX, Volume2, Trash2 } from "lucide-react";
+import {
+  MoreVertical,
+  Shield,
+  Ban,
+  VolumeX,
+  Volume2,
+  Trash2,
+} from "lucide-react";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
@@ -45,10 +52,12 @@ export function MessageModerationMenu({
   className = "",
   size = "sm",
   showText = false,
-  text = "Actions"
+  text = "Actions",
 }: MessageModerationMenuProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogType, setDialogType] = useState<"mute" | "ban" | "delete">("delete");
+  const [dialogType, setDialogType] = useState<"mute" | "ban" | "delete">(
+    "delete",
+  );
   const [reason, setReason] = useState("");
   const [duration, setDuration] = useState<number | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,10 +118,12 @@ export function MessageModerationMenu({
       // Set a timeout to force close the dialog after 30 seconds in case of network issues
       timeoutId = setTimeout(() => {
         if (!isCompleted) {
-          console.warn(`Moderation action (${dialogType}) timed out, forcing dialog close`);
+          console.warn(
+            `Moderation action (${dialogType}) timed out, forcing dialog close`,
+          );
           setDialogOpen(false);
           setIsSubmitting(false);
-          toast.error(`Request timed out. Please try again.`);
+          toast.error("That took too long. Try again.");
         }
       }, 30000);
 
@@ -123,7 +134,9 @@ export function MessageModerationMenu({
             duration,
             reason: reason || "No reason provided",
           });
-          toast.success(`${username} has been muted${duration ? ` for ${Math.round((duration || 0) / (1000 * 60 * 60))} hours` : ' permanently'}`);
+          toast.success(
+            `${username} has been muted${duration ? ` for ${Math.round((duration || 0) / (1000 * 60 * 60))} hours` : " permanently"}`,
+          );
           break;
 
         case "ban":
@@ -132,12 +145,14 @@ export function MessageModerationMenu({
             duration,
             reason: reason || "No reason provided",
           });
-          toast.success(`${username} has been banned${duration ? ` for ${Math.round((duration || 0) / (1000 * 60 * 60 * 24))} days` : ' permanently'}`);
+          toast.success(
+            `${username} has been banned${duration ? ` for ${Math.round((duration || 0) / (1000 * 60 * 60 * 24))} days` : " permanently"}`,
+          );
           break;
 
         case "delete":
           if (!messageId) {
-            toast.error("Cannot delete message: invalid message ID");
+            toast.error("This message can't be deleted.");
             return;
           }
           await deleteMessage({
@@ -171,8 +186,13 @@ export function MessageModerationMenu({
         timeoutId = null;
       }
 
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      toast.error(`Failed to ${dialogType} ${dialogType === "delete" ? "message" : "user"}: ${errorMessage}`);
+      toast.error(
+        dialogType === "delete"
+          ? "Couldn't delete the message. Try again."
+          : dialogType === "mute"
+            ? `Couldn't mute ${username}. Try again.`
+            : `Couldn't ban ${username}. Try again.`,
+      );
       console.error(`${dialogType} error:`, error);
       // Keep dialog open on error so user can try again
     } finally {
@@ -189,7 +209,7 @@ export function MessageModerationMenu({
     try {
       await unmuteUser({
         targetUserId: userId,
-        reason: "Unmute"
+        reason: "Unmute",
       });
       toast.success(`${username} has been unmuted`);
       // Close dialog if it's open
@@ -197,7 +217,7 @@ export function MessageModerationMenu({
         setDialogOpen(false);
       }
     } catch (error) {
-      toast.error("Failed to unmute user");
+      toast.error(`Couldn't unmute ${username}. Try again.`);
       console.error("Unmute error:", error);
     } finally {
       setIsUnmuting(false);
@@ -211,7 +231,7 @@ export function MessageModerationMenu({
     try {
       await unbanUser({
         targetUserId: userId,
-        reason: "Unban"
+        reason: "Unban",
       });
       toast.success(`${username} has been unbanned`);
       // Close dialog if it's open
@@ -219,7 +239,7 @@ export function MessageModerationMenu({
         setDialogOpen(false);
       }
     } catch (error) {
-      toast.error("Failed to unban user");
+      toast.error(`Couldn't unban ${username}. Try again.`);
       console.error("Unban error:", error);
     } finally {
       setIsUnbanning(false);
@@ -232,23 +252,23 @@ export function MessageModerationMenu({
         <DropdownMenuTrigger asChild>
           <Button
             ref={triggerRef}
-            variant={showText ? "outline" : "ghost"}
+            variant={showText ? "secondary" : "ghost"}
             size="sm"
+            aria-label={showText ? undefined : `Moderate ${username}`}
             className={cn(
-              "my-0 transition-opacity",
-              showText ? "bg-red-600/20 border-red-500/50 text-red-300 hover:bg-red-600/30 hover:border-red-400/70 flex items-center gap-1.5 px-2 py-1 text-xs font-medium" :
-              "p-0 text-white/40 hover:text-white/80 hover:bg-white/10 opacity-0 group-hover:opacity-100",
-              size === "sm" && (showText ? "h-auto" : "h-3 w-3"),
-              size === "md" && (showText ? "h-auto" : "h-5 w-5 p-0.5"),
-              size === "lg" && (showText ? "h-auto" : "h-6 w-6 p-1")
+              showText
+                ? "h-9 gap-1.5 border-red-500/30 bg-red-500/10 px-3 text-red-300 hover:border-red-500/40 hover:bg-red-500/20 hover:text-red-200"
+                : [
+                    "p-0 text-foreground/70 hover:text-foreground data-[state=open]:bg-white/[0.08] data-[state=open]:opacity-100 focus-visible:opacity-100",
+                    // Hover-only on a mouse, always visible on touch
+                    "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100",
+                    size === "sm" && "h-6 w-6",
+                    size === "md" && "h-7 w-7",
+                    size === "lg" && "h-8 w-8",
+                  ],
             )}
           >
-            <MoreVertical className={cn(
-              "my-0",
-              size === "sm" && "w-3 h-3",
-              size === "md" && "w-4 h-4",
-              size === "lg" && "w-5 h-5"
-            )} />
+            <MoreVertical />
             {showText && <span>{text}</span>}
           </Button>
         </DropdownMenuTrigger>
@@ -256,86 +276,83 @@ export function MessageModerationMenu({
         <DropdownMenuContent
           align="end"
           side="top"
-          className="z-[300] font-body font-medium min-w-48 text-sm rounded-2xl bg-gray-950/90 backdrop-blur-sm p-1"
+          className="z-[300] min-w-48"
         >
-          {/* Message Actions - only show if messageId is provided */}
+          {/* Message actions: only when a message is given */}
           {messageId !== "profile-moderation" && (
             <>
               <DropdownMenuItem
                 onClick={() => handleShowDialog("delete")}
-                className="text-red-400 focus:text-red-300 focus:bg-red-500/10 text-xs"
+                className="gap-2 text-red-300 focus:bg-red-500/10 focus:text-red-200"
               >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Message
+                <Trash2 className="size-4" />
+                Delete message
               </DropdownMenuItem>
               <DropdownMenuSeparator />
             </>
           )}
 
-          {/* User Actions */}
           <DropdownMenuItem
             onClick={() => handleShowDialog("mute")}
-            className="text-orange-400 focus:text-orange-300 focus:bg-orange-500/10 text-xs"
+            className="gap-2"
           >
-            <VolumeX className="w-4 h-4 mr-2" />
-            Mute User
+            <VolumeX className="size-4" />
+            Mute user
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => handleShowDialog("ban")}
-            className="text-red-500 focus:text-red-400 focus:bg-red-500/10 text-xs"
+            className="gap-2 text-red-300 focus:bg-red-500/10 focus:text-red-200"
           >
-            <Ban className="w-4 h-4 mr-2" />
-            Ban User
+            <Ban className="size-4" />
+            Ban user
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
 
-          {/* Quick Actions */}
           <DropdownMenuItem
             onClick={() => void handleUnmuteUser()}
             disabled={isUnmuting}
-            className="text-green-400 focus:text-green-300 focus:bg-green-500/10 text-xs disabled:opacity-50"
+            className="gap-2 text-emerald-300 focus:bg-emerald-500/10 focus:text-emerald-200"
           >
-            <Volume2 className="w-4 h-4 mr-2" />
-            {isUnmuting ? "Unmuting..." : "Unmute User"}
+            <Volume2 className="size-4" />
+            {isUnmuting ? "Unmuting..." : "Unmute user"}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() => void handleUnbanUser()}
             disabled={isUnbanning}
-            className="text-green-400 focus:text-green-300 focus:bg-green-500/10 text-xs disabled:opacity-50"
+            className="gap-2 text-emerald-300 focus:bg-emerald-500/10 focus:text-emerald-200"
           >
-            <Shield className="w-4 h-4 mr-2" />
-            {isUnbanning ? "Unbanning..." : "Unban User"}
+            <Shield className="size-4" />
+            {isUnbanning ? "Unbanning..." : "Unban user"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      {/* Moderation Dialog */}
+      {/* Moderation dialog */}
       <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
-        <DialogContent className="sm:max-w-md bg-gray-950/80 backdrop-blur-sm border-white/20">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {dialogType === "mute"
-                ? "Mute User"
+                ? "Mute user"
                 : dialogType === "ban"
-                ? "Ban User"
-                : "Delete Message"}
+                  ? "Ban user"
+                  : "Delete message"}
             </DialogTitle>
             <DialogDescription>
               {dialogType === "mute"
-                ? `Are you sure you want to mute ${username}? They will not be able to send messages in the global chat.`
+                ? `${username} won't be able to send messages in global chat.`
                 : dialogType === "ban"
-                ? `Are you sure you want to ban ${username}? They will not be able to access the global chat.`
-                : `Are you sure you want to delete this message from ${username}? This action cannot be undone.`}
+                  ? `${username} won't be able to open global chat.`
+                  : `This removes the message from ${username} for everyone. You can't undo it.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            {/* Duration Selection for Mute/Ban */}
             {(dialogType === "mute" || dialogType === "ban") && (
               <div>
                 <Label className="text-sm font-medium">Duration</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {[
                     { label: "1 hour", value: 1000 * 60 * 60 },
                     { label: "6 hours", value: 1000 * 60 * 60 * 6 },
@@ -346,12 +363,15 @@ export function MessageModerationMenu({
                   ].map((option) => (
                     <button
                       key={option.label}
+                      type="button"
+                      aria-pressed={duration === option.value}
                       onClick={() => setDuration(option.value)}
-                      className={`px-3 py-2 rounded-lg text-sm border transition-colors ${
+                      className={cn(
+                        "h-10 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:scale-[0.98]",
                         duration === option.value
-                          ? "border-blue-500 bg-blue-500/20 text-blue-300"
-                          : "border-white/20 bg-white/5 text-white/80 hover:border-white/40"
-                      }`}
+                          ? "border-gold-500/50 bg-gold-500/10 text-gold-200"
+                          : "border-border bg-white/[0.04] text-foreground hover:border-border-strong hover:bg-white/[0.08]",
+                      )}
                     >
                       {option.label}
                     </button>
@@ -360,52 +380,44 @@ export function MessageModerationMenu({
               </div>
             )}
 
-            {/* Reason Input */}
             <div>
               <Label htmlFor="reason" className="text-sm font-medium">
-                Reason (Optional)
+                Reason (optional)
               </Label>
               <Textarea
                 id="reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Provide a reason for this moderation action..."
-                className="mt-2 bg-white/5 border-white/20 text-white placeholder:text-white/40 min-h-20 resize-none"
+                placeholder="Why are you doing this?"
+                className="mt-2 min-h-20 resize-none"
                 maxLength={200}
               />
-              <div className="text-white/40 text-xs mt-1">
-                {reason.length}/200 characters
+              <div className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
+                {reason.length}/200
               </div>
             </div>
           </div>
 
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="secondary"
               onClick={() => handleDialogClose(false)}
               disabled={isSubmitting}
-              className="bg-white/5 border-white/20 text-white hover:bg-white/10 disabled:opacity-50"
             >
               Cancel
             </Button>
             <Button
+              variant={dialogType === "mute" ? "default" : "destructive"}
               onClick={() => void handleDialogConfirm()}
               disabled={isSubmitting}
-              className={
-                dialogType === "delete"
-                  ? "bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                  : dialogType === "ban"
-                  ? "bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                  : "bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
-              }
             >
               {isSubmitting
-                ? "Processing..."
+                ? "Working..."
                 : dialogType === "delete"
-                ? "Delete Message"
-                : dialogType === "ban"
-                ? "Ban User"
-                : "Mute User"}
+                  ? "Delete message"
+                  : dialogType === "ban"
+                    ? "Ban user"
+                    : "Mute user"}
             </Button>
           </DialogFooter>
         </DialogContent>

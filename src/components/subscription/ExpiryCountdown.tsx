@@ -1,17 +1,24 @@
-
-
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { Clock } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { pluralDays } from "./plan-copy";
 
 interface ExpiryCountdownProps {
   className?: string;
 }
 
 export function ExpiryCountdown({ className = "" }: ExpiryCountdownProps) {
-  const { data: subscription } = useConvexQuery(api.subscriptions.getCurrentSubscription, {});
+  const { data: subscription } = useConvexQuery(
+    api.subscriptions.getCurrentSubscription,
+    {},
+  );
 
-  if (!subscription || !subscription.expiresAt || subscription.tier === "free") {
+  if (
+    !subscription ||
+    !subscription.expiresAt ||
+    subscription.tier === "free"
+  ) {
     return null;
   }
 
@@ -21,22 +28,22 @@ export function ExpiryCountdown({ className = "" }: ExpiryCountdownProps) {
     return null;
   }
 
-  const getColorClass = () => {
-    if (daysUntilExpiry <= 1) return "text-red-400";
-    if (daysUntilExpiry <= 3) return "text-amber-400";
-    if (daysUntilExpiry <= 7) return "text-yellow-400";
-    return "text-white/60";
-  };
+  const tone =
+    daysUntilExpiry <= 1
+      ? "text-red-400"
+      : daysUntilExpiry <= 7
+        ? "text-gold-300"
+        : "text-foreground";
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
-      <Clock className={`w-4 h-4 ${getColorClass()}`} />
-      <span className={`text-sm font-light ${getColorClass()}`}>
+    <div className={cn("flex items-center gap-2 text-sm", tone, className)}>
+      <Clock className="size-4" />
+      <span>
         {daysUntilExpiry === 0
           ? "Expires today"
           : daysUntilExpiry === 1
-          ? "Expires tomorrow"
-          : `${daysUntilExpiry} days remaining`}
+            ? "Expires tomorrow"
+            : `${pluralDays(daysUntilExpiry)} left`}
       </span>
     </div>
   );

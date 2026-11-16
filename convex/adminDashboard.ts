@@ -109,12 +109,8 @@ export const getGamesToday = query({
     // Get finished games from last 24 hours
     const recentGames = await ctx.db
       .query("games")
-      .withIndex("by_status_finished")
-      .filter((q: any) =>
-        q.and(
-          q.eq(q.field("status"), "finished"),
-          q.gte(q.field("finishedAt"), twentyFourHoursAgo),
-        ),
+      .withIndex("by_status_finished", (q) =>
+        q.eq("status", "finished").gte("finishedAt", twentyFourHoursAgo),
       )
       .collect();
 

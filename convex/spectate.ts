@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation, query, QueryCtx } from "./_generated/server";
+import { mutation, internalMutation, query, QueryCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
 
@@ -130,8 +130,18 @@ export const getSpectatableGames = query({
     const gamesWithLobbyInfo = await Promise.all(
       games.map(async (game) => {
         const lobby = await ctx.db.get("lobbies", game.lobbyId);
+        // Only what the spectate list shows. The full row carries both
+        // boards (about 5 KB) and this query re-runs on every move of every
+        // live game, for every open spectate tab.
         return {
-          ...game,
+          _id: game._id,
+          _creationTime: game._creationTime,
+          lobbyName: game.lobbyName,
+          status: game.status,
+          player1Username: game.player1Username,
+          player2Username: game.player2Username,
+          gameMode: game.gameMode,
+          moveCount: game.moveCount,
           gameId: game._id, // Explicitly include gameId for easy access
           allowSpectators: lobby?.allowSpectators ?? true,
           maxSpectators: lobby?.maxSpectators,
@@ -279,7 +289,7 @@ export const getGameSpectators = query({
 });
 
 // Clean up spectator chat for finished games - New optimized function
-export const cleanupSpectatorChat = mutation({
+export const cleanupSpectatorChat = internalMutation({
   args: {
     gameId: v.id("games"),
   },

@@ -1,13 +1,38 @@
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { motion } from "framer-motion";
-import { SettingsHeader } from "./01.settings-header";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
+import { stagger } from "@/lib/motion";
 import { AvatarSection } from "./02.avatar-section";
 import { UsernameSection } from "./03.username-section";
 import { PasswordSection } from "./04.password-section";
 import { EmailSection } from "./05.email-section";
 import { CustomizationSection } from "./07.customization-section";
 import { PushDevicesSection } from "./08.push-devices-section";
+
+function SettingsSkeleton() {
+  return (
+    <div aria-busy="true" aria-label="Loading settings">
+      <PageHeader
+        title="Settings"
+        description="Your profile, sign in details and look."
+      />
+      <div className="space-y-4 sm:space-y-6">
+        {[260, 190, 150].map((h, i) => (
+          <div
+            key={i}
+            className="rounded-lg border border-border bg-card p-5 sm:p-6"
+          >
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="mt-2 h-4 w-72 max-w-full" />
+            <Skeleton className="mt-6 w-full" style={{ height: h - 90 }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function SettingsList() {
   const {
@@ -21,80 +46,63 @@ export function SettingsList() {
 
   if (profileError) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-red-400 text-center font-mono text-sm border border-red-500/20 bg-red-500/5 p-8 rounded-sm"
-        >
-          <div className="text-red-500 font-bold mb-2 uppercase tracking-wider">
-            System Error
-          </div>
-          <p>Unable to load profile data: {profileError.message}</p>
-        </motion.div>
+      <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-6 text-foreground">
+        <h1 className="font-display text-2xl font-semibold">
+          Settings did not load
+        </h1>
+        <p className="mt-2 text-sm text-foreground/80">
+          Check your connection and reload the page.
+        </p>
       </div>
     );
   }
 
   if (isLoadingProfile || !profile || isLoadingSettings) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
-          <div className="text-xs font-mono text-zinc-500 uppercase tracking-widest animate-pulse">
-            Initializing...
-          </div>
-        </div>
-      </div>
-    );
+    return <SettingsSkeleton />;
   }
 
-  // If account is anonymous, only show the convert account section
+  // Guests only get the form that turns the guest account into a real one.
   if (userSettings?.isAnonymous) {
     return (
-      <div className="space-y-8">
-        <SettingsHeader />
-        <div className="max-w-2xl mx-auto">
+      <>
+        <PageHeader title="Settings" />
+        <motion.div
+          variants={stagger()}
+          initial="hidden"
+          animate="show"
+          className="space-y-4 sm:space-y-6"
+        >
           <EmailSection currentEmail={userSettings?.email} />
-        </div>
-      </div>
+        </motion.div>
+      </>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <SettingsHeader />
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-12 max-w-7xl mx-auto">
-        {/* Left Column: Identity & Access */}
-        <div className="lg:col-span-7 space-y-8">
-          <AvatarSection
-            username={profile.username}
-            currentAvatarUrl={profile.avatarUrl}
-            rank={profile.rank}
-            tier={profile.tier as "free" | "pro" | "pro_plus"}
-            isDonor={profile.isDonor}
-          />
-          <UsernameSection currentUsername={profile.username} />
-          <PushDevicesSection />
-        </div>
-
-        {/* Right Column: Security & Preferences */}
-        <div className="lg:col-span-5 space-y-8">
-          <CustomizationSection />
-          <div className="space-y-8">
-            <div className="flex items-center gap-3">
-              <div className="h-px bg-white/10 flex-1" />
-              <span className="text-xs font-mono uppercase tracking-widest text-zinc-600">
-                Security Protocols
-              </span>
-              <div className="h-px bg-white/10 flex-1" />
-            </div>
-            <PasswordSection />
-            <EmailSection currentEmail={userSettings?.email} />
-          </div>
-        </div>
-      </div>
-    </div>
+    <>
+      <PageHeader
+        title="Settings"
+        description="Your profile, sign in details and look."
+      />
+      <motion.div
+        variants={stagger(0.05)}
+        initial="hidden"
+        animate="show"
+        className="space-y-4 sm:space-y-6"
+      >
+        <AvatarSection
+          username={profile.username}
+          currentAvatarUrl={profile.avatarUrl}
+          rank={profile.rank}
+          tier={profile.tier as "free" | "pro" | "pro_plus"}
+          isDonor={profile.isDonor}
+        />
+        <UsernameSection currentUsername={profile.username} />
+        <EmailSection currentEmail={userSettings?.email} />
+        <PasswordSection />
+        <CustomizationSection />
+        <PushDevicesSection />
+      </motion.div>
+    </>
   );
 }

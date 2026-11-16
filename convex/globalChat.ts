@@ -414,8 +414,7 @@ export const getMessages = query({
     // Use optimized timestamp index with better pagination
     const messages = await ctx.db
       .query("globalChat")
-      .withIndex("by_timestamp")
-      .filter((q) => q.lt(q.field("timestamp"), beforeTimestamp))
+      .withIndex("by_timestamp", (q) => q.lt("timestamp", beforeTimestamp))
       .order("desc")
       .take(limit);
 
@@ -435,7 +434,7 @@ export const getMessages = query({
     if (userIds.length === 0) {
       // All messages are system messages
       return {
-        messages: messages.map(message => ({
+        messages: messages.map(({ ipAddress: _ip, messageHash: _hash, ...message }) => ({
           ...message,
           usernameColor: undefined,
           adminRole: undefined,
@@ -495,8 +494,29 @@ export const getMessages = query({
       }
     });
 
+    // Resolve @mentions to usernames here, so the client doesn't have to
+    // download every profile to know which @words are real players. Most
+    // mentioned players also sent a message in this page, so this is usually
+    // zero or a few extra reads.
+    const missingMentionIds = Array.from(
+      new Set(messages.flatMap((m) => m.mentions ?? [])),
+    ).filter((id) => !profilesMap.has(id));
+    const mentionProfiles = await Promise.all(
+      missingMentionIds.map((id) =>
+        ctx.db
+          .query("profiles")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .unique(),
+      ),
+    );
+    const usernameById = new Map<string, string>();
+    for (const profile of [...profilesMap.values(), ...mentionProfiles]) {
+      if (profile) usernameById.set(profile.userId, profile.username.toLowerCase());
+    }
+
     // Enhance messages with batched user data
-    const enhancedMessages = messages.map(message => {
+    // ipAddress and messageHash are for spam checks only; never send them to players.
+    const enhancedMessages = messages.map(({ ipAddress: _ip, messageHash: _hash, ...message }) => {
       const profile = message.userId ? profilesMap.get(message.userId) : undefined;
       const sub = message.userId ? subscriptionsMap.get(message.userId) : undefined;
       const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
@@ -507,6 +527,10 @@ export const getMessages = query({
         adminRole: profile?.adminRole,
         tier: isActive ? (sub?.tier || "free") : "free",
         isDonor: profile?.isDonor || false,
+        avatarUrl: profile?.avatarUrl,
+        mentionedUsernames: (message.mentions ?? [])
+          .map((id) => usernameById.get(id))
+          .filter((name): name is string => name !== undefined),
       };
     });
 
@@ -906,8 +930,7 @@ export const cleanupOldMessages = internalMutation({
     // Get old messages
     const oldMessages = await ctx.db
       .query("globalChat")
-      .withIndex("by_timestamp")
-      .filter((q) => q.lt(q.field("timestamp"), threeDaysAgo))
+      .withIndex("by_timestamp", (q) => q.lt("timestamp", threeDaysAgo))
       .take(100); // Process in batches
 
     if (oldMessages.length === 0) return 0;
@@ -1696,8 +1719,7 @@ export const cleanupExpiredModeration = internalMutation({
     // Find expired bans
     const expiredBans = await ctx.db
       .query("userModeration")
-      .withIndex("by_expires_at")
-      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
       .filter((q) => q.eq(q.field("isActive"), true))
       .filter((q) => q.eq(q.field("action"), "ban"))
       .take(50);
@@ -1705,8 +1727,7 @@ export const cleanupExpiredModeration = internalMutation({
     // Find expired mutes
     const expiredMutes = await ctx.db
       .query("userModeration")
-      .withIndex("by_expires_at")
-      .filter((q) => q.lt(q.field("expiresAt"), now))
+      .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
       .filter((q) => q.eq(q.field("isActive"), true))
       .filter((q) => q.eq(q.field("action"), "mute"))
       .take(50);
