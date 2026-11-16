@@ -187,7 +187,7 @@ export function relaunchEmail(a: {
 }): RenderedEmail {
   return renderEmail({
     subject: "Generals Online is back",
-    preheader: "Your account, rank and match history are still here.",
+    preheader: "Season 3 starts fresh. Your old record is saved on your profile.",
     hero: {
       src: `${SITE_URL}/email/relaunch-hero.jpg`,
       alt: "Painting of a general raising his fist over an army crossing an open field",
@@ -196,12 +196,12 @@ export function relaunchEmail(a: {
       { kind: "heading", text: "Generals Online", accent: "is back." },
       {
         kind: "paragraph",
-        text: `Hi ${a.username}, the servers are back up. Your account, rank and match history are where you left them.`,
+        text: `Hi ${a.username}, the servers are back up and Season 3 starts fresh for every player. Your record from before is saved on your profile.`,
       },
       {
         kind: "stats",
         items: [
-          { label: "Your rank", value: a.rank },
+          { label: "Final rank", value: a.rank },
           { label: "Games", value: a.gamesPlayed.toLocaleString("en-US") },
           { label: "Wins", value: a.wins.toLocaleString("en-US") },
         ],

@@ -12,6 +12,7 @@ import { BattleStats } from "./03.battle-stats";
 import { RecentGames } from "./04.recent-games";
 import { PerformanceInsights } from "./05.performance-insights";
 import { RankRoad } from "./06.rank-road";
+import { PastSeasons } from "./07.past-seasons";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import { EmptyState } from "../../components/ui/empty-state";
@@ -281,6 +282,15 @@ export function ProfilePage() {
               <PerformanceInsights profileStats={profileStats} />
             </motion.section>
           </div>
+
+          {profileStats.pastSeasons.length > 0 && (
+            <motion.div variants={fadeUp}>
+              <PastSeasons
+                seasons={profileStats.pastSeasons}
+                isOwnProfile={!isViewingOther}
+              />
+            </motion.div>
+          )}
         </motion.div>
       </div>
     </>,

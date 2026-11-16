@@ -10,8 +10,8 @@ const SEASON = {
   intro: "Season 3 starts now. Thanks for coming back.",
   points: [
     {
-      title: "Your progress carried over",
-      body: "If you played before, your rank, ELO, wins and match history are where you left them.",
+      title: "Everyone starts fresh",
+      body: "Rank, rating and wins start over for every player. Your record from before is saved on your profile.",
     },
     {
       title: "Same account, same sign-in",

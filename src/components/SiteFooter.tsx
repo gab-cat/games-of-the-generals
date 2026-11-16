@@ -7,14 +7,14 @@ import { cn } from "@/lib/utils";
 import packageJson from "../../package.json";
 
 /*
- * The site footer, a title card for the game: "Generals" at poster size, cut
- * by the bottom of the page, with the Season 3 clash (ChevronClash) charging
+ * The site footer, a title card for the game: "Generals" at poster size,
+ * standing on the bottom of the page, with the Season 3 clash (ChevronClash) charging
  * through the letters when the footer comes into view.
  *
  * - "full": signed-out pages. Brand, credit, link columns, version.
  * - "minimal": signed-in pages, where the header, tab bar and account menu
  *   already carry the main navigation. One row of the links that live nowhere
- *   else, over the top half of the word.
+ *   else, over a smaller word.
  */
 
 export const SOURCE_URL = "https://github.com/gab-cat/games-of-the-generals";
@@ -76,7 +76,7 @@ function FooterLinkItem({ link }: { link: FooterLink }) {
 }
 
 /**
- * "Generals", sized to the footer's width and cut by the page edge. The clash
+ * "Generals", sized to the footer's width and standing on the page edge. The clash
  * mounts only once the word is on screen, so its charge plays when seen.
  */
 function ClashWordmark({ compact = false }: { compact?: boolean }) {
@@ -85,13 +85,18 @@ function ClashWordmark({ compact = false }: { compact?: boolean }) {
   const word =
     "absolute inset-x-0 top-0 whitespace-nowrap text-center font-display font-bold leading-none tracking-[-0.055em]";
   return (
-    // Font size in cqw (the footer's width) and height in em, so the page edge
-    // cuts the letters at the same place on every screen.
+    // Font size in cqw (the footer's width) and height in em, so the word sits
+    // on the page edge the same way on every screen.
     <div ref={ref} aria-hidden="true" className="select-none [container-type:inline-size]">
       <div
         className={cn(
-          "relative isolate overflow-hidden",
-          compact ? "h-[0.5em] text-[20cqw] sm:text-[11cqw]" : "h-[0.74em] text-[20cqw]",
+          // Lighten against the page: the black around the letters drops out,
+          // so the band is exactly the page colour and only the word shows.
+          "relative isolate overflow-hidden mix-blend-lighten",
+          // 0.86em puts the baseline on the bottom edge, so the whole word
+          // stands on the page edge instead of being sliced through.
+          "h-[0.86em]",
+          compact ? "text-[20cqw] sm:text-[11cqw]" : "text-[20cqw]",
         )}
       >
         {/* Dark army colours, so letters the chevrons don't cover still read blue and red */}
@@ -99,8 +104,8 @@ function ClashWordmark({ compact = false }: { compact?: boolean }) {
         {inView && (
           <ChevronClash className="absolute inset-0" fadeTo="transparent" delay={0.05} />
         )}
-        {/* Page colour everywhere but the letters, so the clash shows only through them */}
-        <div className="absolute inset-0 bg-background mix-blend-multiply">
+        {/* Black everywhere but the letters, so the clash shows only through them */}
+        <div className="absolute inset-0 bg-black mix-blend-multiply">
           <span className={cn(word, "text-white")}>Generals</span>
         </div>
         {/* A hairline outline, so the word reads before the clash arrives */}
@@ -125,7 +130,7 @@ export function SiteFooter({ variant }: { variant: "full" | "minimal" }) {
 
   if (variant === "minimal") {
     return (
-      <footer className="relative z-10 mt-auto overflow-hidden">
+      <footer className="relative z-10 mt-auto overflow-hidden bg-background">
         <div className="mx-auto max-w-7xl">
           {/* lg:pr-48 keeps the links clear of the floating Global chat button */}
           <div className="flex flex-col items-center gap-3 px-4 py-4 sm:flex-row sm:justify-between sm:px-6 lg:pr-48">
@@ -153,7 +158,7 @@ export function SiteFooter({ variant }: { variant: "full" | "minimal" }) {
   return (
     <footer
       ref={footerRef}
-      className="relative z-10 mt-auto overflow-hidden border-t border-border"
+      className="relative z-10 mt-auto overflow-hidden border-t border-border bg-background"
     >
       <div className="mx-auto max-w-7xl">
         <div className="px-4 pt-10 sm:px-6 sm:pt-12">

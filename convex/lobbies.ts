@@ -261,28 +261,16 @@ export const getUserActiveLobby = query({
         .first();
     }
 
-    // If not found as host, check if user is a player in any lobby - get most recent
-    // OPTIMIZED: Use status index first, then filter by playerId in memory (better than full scan)
+    // Not a host: the lobby this player joined, most recent first.
     if (!lobby) {
-      const [waitingLobbies, playingLobbies] = await Promise.all([
-        ctx.db
+      for (const status of ["waiting", "playing"] as const) {
+        lobby = await ctx.db
           .query("lobbies")
-          .withIndex("by_status", (q) => q.eq("status", "waiting"))
+          .withIndex("by_player_status", (q) => q.eq("playerId", userId).eq("status", status))
           .order("desc")
-          .take(100), // Reasonable limit
-        ctx.db
-          .query("lobbies")
-          .withIndex("by_status", (q) => q.eq("status", "playing"))
-          .order("desc")
-          .take(100), // Reasonable limit
-      ]);
-
-      // Find the most recent lobby where user is a player
-      const allActiveLobbies = [...waitingLobbies, ...playingLobbies]
-        .filter((l) => l.playerId === userId)
-        .sort((a, b) => b.createdAt - a.createdAt);
-
-      lobby = allActiveLobbies[0] || null;
+          .first();
+        if (lobby) break;
+      }
     }
 
     return lobby;
@@ -587,130 +575,3 @@ export const deleteInactiveLobbies = internalMutation({
   },
 });
 
-// Constants for abandonment detection
-const LOBBY_INACTIVITY_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes - player considered inactive
-
-// Heartbeat mutation - called by clients every 30 seconds while in lobby
-export const heartbeatLobby = mutation({
-  args: {
-    lobbyId: v.id("lobbies"),
-  },
-  handler: async (ctx, { lobbyId }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return { success: false };
-
-    const lobby = await ctx.db.get(lobbyId);
-    if (!lobby || lobby.status !== "waiting") return { success: false };
-
-    const now = Date.now();
-
-    if (lobby.hostId === userId) {
-      await ctx.db.patch(lobbyId, { hostLastActiveAt: now });
-    } else if (lobby.playerId === userId) {
-      await ctx.db.patch(lobbyId, { playerLastActiveAt: now });
-    }
-
-    return { success: true };
-  },
-});
-
-// Check if a specific lobby has been abandoned - called by clients or scheduled
-export const checkLobbyAbandonment = mutation({
-  args: {
-    lobbyId: v.id("lobbies"),
-  },
-  handler: async (ctx, { lobbyId }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return { abandoned: false, reason: null };
-
-    const lobby = await ctx.db.get(lobbyId);
-    if (!lobby) return { abandoned: true, reason: "lobby_deleted" };
-    if (lobby.status !== "waiting") return { abandoned: false, reason: null };
-
-    const now = Date.now();
-    const hostLastActive = lobby.hostLastActiveAt || lobby.createdAt;
-    const playerLastActive =
-      lobby.playerLastActiveAt || (lobby.playerId ? lobby.createdAt : null);
-
-    const hostInactive = now - hostLastActive > LOBBY_INACTIVITY_THRESHOLD_MS;
-    const playerInactive =
-      lobby.playerId && playerLastActive
-        ? now - playerLastActive > LOBBY_INACTIVITY_THRESHOLD_MS
-        : false;
-
-    // Determine abandonment state
-    if (hostInactive && lobby.hostId !== userId) {
-      // Host has abandoned - clean up the lobby
-      // Clear lobbyId from both profiles
-      const hostProfile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", lobby.hostId))
-        .unique();
-
-      if (hostProfile) {
-        await ctx.db.patch(hostProfile._id, { lobbyId: undefined });
-      }
-
-      if (lobby.playerId) {
-        const playerProfile = await ctx.db
-          .query("profiles")
-          .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
-          .unique();
-
-        if (playerProfile) {
-          await ctx.db.patch(playerProfile._id, { lobbyId: undefined });
-        }
-      }
-
-      await ctx.db.delete(lobbyId);
-      return { abandoned: true, reason: "host_abandoned" };
-    }
-
-    if (playerInactive && lobby.playerId && lobby.playerId !== userId) {
-      // Player has abandoned - remove them from lobby
-      const playerProfile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", lobby.playerId!))
-        .unique();
-
-      if (playerProfile) {
-        await ctx.db.patch(playerProfile._id, { lobbyId: undefined });
-      }
-
-      await ctx.db.patch(lobbyId, {
-        playerId: undefined,
-        playerUsername: undefined,
-        playerLastActiveAt: undefined,
-      });
-
-      return { abandoned: true, reason: "player_abandoned" };
-    }
-
-    return { abandoned: false, reason: null };
-  },
-});
-
-// Query to get lobby activity status (for UI indicators)
-export const getLobbyActivityStatus = query({
-  args: {
-    lobbyId: v.id("lobbies"),
-  },
-  handler: async (ctx, { lobbyId }) => {
-    const lobby = await ctx.db.get(lobbyId);
-    if (!lobby) return null;
-
-    const now = Date.now();
-    const hostLastActive = lobby.hostLastActiveAt || lobby.createdAt;
-    const playerLastActive = lobby.playerLastActiveAt;
-
-    return {
-      hostOnline: now - hostLastActive < LOBBY_INACTIVITY_THRESHOLD_MS,
-      playerOnline:
-        lobby.playerId && playerLastActive
-          ? now - playerLastActive < LOBBY_INACTIVITY_THRESHOLD_MS
-          : null,
-      hostLastActiveAt: hostLastActive,
-      playerLastActiveAt: playerLastActive,
-    };
-  },
-});

@@ -31,7 +31,7 @@ const item = {
 type Row = { label: string; value: string | number; tone?: string };
 
 /** Numbers set like a printed record: big figures on thin rules, no cards. */
-function RecordGrid({
+export function RecordGrid({
   rows,
   size,
   className,

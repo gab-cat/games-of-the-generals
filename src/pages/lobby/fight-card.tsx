@@ -161,14 +161,18 @@ export function QuickMatchHero({
       {/* Where the tips meet */}
       <motion.div
         aria-hidden="true"
-        className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-gradient-to-b from-transparent via-gold-200 to-transparent"
+        // Centring goes through framer's x: an animated transform replaces
+        // Tailwind's translate classes, which pushed this off the middle.
+        className="pointer-events-none absolute left-1/2 top-0 h-full w-[2px] bg-gradient-to-b from-transparent via-gold-200 to-transparent"
+        style={{ x: "-50%" }}
         initial={{ opacity: 0, scaleY: 0 }}
         animate={{ opacity: [0, 1, 0.35], scaleY: [0, 1, 1] }}
         transition={{ duration: 0.7, delay: 0.85, times: [0, 0.25, 1] }}
       />
       <motion.div
         aria-hidden="true"
-        className="absolute left-1/2 top-[12%] -translate-x-1/2 text-3xl font-bold text-gold-400 sm:top-[14%] sm:text-5xl"
+        className="absolute left-1/2 top-[12%] text-3xl font-bold leading-none text-gold-400 sm:top-[14%] sm:text-5xl"
+        style={{ x: "-50%" }}
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 1, duration: 0.3, ease: EASE }}

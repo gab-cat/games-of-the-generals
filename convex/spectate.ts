@@ -311,13 +311,3 @@ export const cleanupSpectatorChat = internalMutation({
   },
 });
 
-// Get spectator count for a game - Optimized lightweight query
-export const getSpectatorCount = query({
-  args: {
-    gameId: v.id("games"),
-  },
-  handler: async (ctx, args) => {
-    const game = await ctx.db.get("games", args.gameId);
-    return game ? game.spectators.length : 0;
-  },
-});

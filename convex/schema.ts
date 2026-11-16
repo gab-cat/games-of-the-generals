@@ -59,14 +59,33 @@ const applicationTables = {
     .index("by_wins", ["wins"])
     .index("by_username", ["username"])
     .index("by_games_wins", ["gamesPlayed", "wins"]) // Compound index for better leaderboard queries
-    .index("by_active_players", ["gamesPlayed", "username"]) // For finding active players
     .index("by_admin_role", ["adminRole"]) // For finding admin/moderator users
     .index("by_username_games", ["username", "gamesPlayed"]) // For efficient username search
-    .index("by_last_seen", ["lastSeenAt"]) // For online status queries
     .index("by_elo", ["elo"]) // For ELO-based leaderboard queries
     .searchIndex("search_username", {
       searchField: "username",
     }),
+
+  // A player's final record for a finished season, written by seasonReset before
+  // profiles are zeroed. `season` is the last season the record covers (2 means
+  // everything before Season 3). `place` is the ELO standing among recorded players.
+  seasonRecords: defineTable({
+    userId: v.id("users"),
+    season: v.number(),
+    username: v.string(),
+    elo: v.number(),
+    rank: v.string(),
+    wins: v.number(),
+    losses: v.number(),
+    gamesPlayed: v.number(),
+    bestWinStreak: v.number(),
+    capturedFlags: v.number(),
+    totalPlayTime: v.number(),
+    place: v.number(),
+    recordedAt: v.number(),
+  })
+    .index("by_user_season", ["userId", "season"])
+    .index("by_season_place", ["season", "place"]),
 
   // User achievements
   achievements: defineTable({
@@ -107,6 +126,7 @@ const applicationTables = {
     .index("by_host", ["hostId"])
     .index("by_code", ["lobbyCode"])
     .index("by_host_status", ["hostId", "status"])
+    .index("by_player_status", ["playerId", "status"])
     .index("by_status_created", ["status", "createdAt"]) // For sorting waiting lobbies by creation time
     .index("by_waiting_public", ["status", "isPrivate", "createdAt"]), // Optimized for public lobby list
 
@@ -201,11 +221,13 @@ const applicationTables = {
       moves: v.string(),
     })),
     movesArchivedAt: v.optional(v.number()),
+    // Starting setup in the replay codec's form (lib/replayCodec.ts), written
+    // when both players lock in. Replaces `initialSetupBoard` for new games.
+    // Hidden information: never sent to clients.
+    setupCode: v.optional(v.string()),
   })
     .index("by_lobby", ["lobbyId"])
     .index("by_status", ["status"])
-    .index("by_player1", ["player1Id"])
-    .index("by_player2", ["player2Id"])
     .index("by_status_finished", ["status", "finishedAt"])
     .index("by_player1_finished", ["player1Id", "status", "finishedAt"]) // Player history optimization
     .index("by_player2_finished", ["player2Id", "status", "finishedAt"]) // Player history optimization
@@ -306,7 +328,6 @@ const applicationTables = {
     editedAt: v.optional(v.number()),
     deliveredAt: v.optional(v.number()),
   })
-    .index("by_recipient", ["recipientId"])
     .index("by_sender", ["senderId"])
     .index("by_timestamp", ["timestamp"])
     .index("by_recipient_read", ["recipientId", "readAt"])
@@ -426,7 +447,6 @@ const applicationTables = {
   })
     .index("by_session_id", ["sessionId"])
     .index("by_player", ["playerId"])
-    .index("by_player_status", ["playerId", "status"])
     .index("by_created_at", ["createdAt"]),
 
   // Global Chat Messages
@@ -543,8 +563,7 @@ const applicationTables = {
     .index("by_user", ["userId"])
     .index("by_user_timestamp", ["userId", "timestamp"])
     .index("by_timestamp", ["timestamp"])
-    .index("by_status", ["status"])
-    .index("by_user_status", ["userId", "status"]),
+    .index("by_status", ["status"]),
 
   // Message Moderation Actions (deletions, warnings, etc.)
   messageModeration: defineTable({
@@ -592,7 +611,6 @@ const applicationTables = {
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
-    .index("by_user_status", ["userId", "status"])
     .index("by_status_created", ["status", "createdAt"])
     .index("by_user_created", ["userId", "createdAt"]),
 

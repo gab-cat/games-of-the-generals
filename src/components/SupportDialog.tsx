@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Send, X, Loader2, Paperclip } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,13 @@ import { motion, AnimatePresence } from "framer-motion";
 interface SupportDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  /** Prefill for dialogs opened from a specific place, like the lobby's tournament invite. */
+  initialCategory?: string;
+  initialSubject?: string;
+  detailsPlaceholder?: string;
+  description?: string;
+  /** Called after the ticket is created. */
+  onSent?: () => void;
 }
 
 const categoryOptions = [
@@ -52,7 +59,15 @@ const categoryOptions = [
   { value: "other", label: "Other", description: "Anything else" },
 ];
 
-export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
+export function SupportDialog({
+  isOpen,
+  onClose,
+  initialCategory,
+  initialSubject,
+  detailsPlaceholder,
+  description: intro,
+  onSent,
+}: SupportDialogProps) {
   const [category, setCategory] = useState<string>("");
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
@@ -62,6 +77,13 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
     null,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Apply the prefill each time the dialog opens; closing clears the form.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (initialCategory) setCategory(initialCategory);
+    if (initialSubject) setSubject(initialSubject);
+  }, [isOpen, initialCategory, initialSubject]);
 
   const generateUploadUrlMutation = useConvexMutationWithQuery(
     api.fileUpload.generateUploadUrl,
@@ -223,6 +245,7 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
       });
 
       toast.success("Ticket sent. We will reply in the ticket.");
+      onSent?.();
       handleClose();
     } catch (error) {
       console.error("Error submitting support ticket:", error);
@@ -244,7 +267,7 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
         <DialogHeader>
           <DialogTitle>New ticket</DialogTitle>
           <DialogDescription>
-            Tell us what happened. We reply in the ticket.
+            {intro ?? "Tell us what happened. We reply in the ticket."}
           </DialogDescription>
         </DialogHeader>
 
@@ -290,7 +313,9 @@ export function SupportDialog({ isOpen, onClose }: SupportDialogProps) {
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What happened, and what did you expect?"
+              placeholder={
+                detailsPlaceholder ?? "What happened, and what did you expect?"
+              }
               className="min-h-[140px] resize-none"
               maxLength={2000}
               disabled={isSubmitting}

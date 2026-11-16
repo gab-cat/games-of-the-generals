@@ -76,8 +76,10 @@ export function ChevronClash({
       <Half side="right" delay={delay} />
       {/* Spark where the tips meet */}
       <motion.div
-        className="absolute left-1/2 top-1/2 h-[140%] w-[3px] -translate-x-1/2 -translate-y-1/2 bg-gold-200"
-        style={{ filter: "blur(1px)", boxShadow: "0 0 40px 10px rgba(243,210,138,0.6)" }}
+        // Centred through framer's x/y; the scaleY animation would replace
+        // Tailwind's translate classes.
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[140%] w-[3px] bg-gold-200"
+        style={{ x: "-50%", y: "-50%", filter: "blur(1px)", boxShadow: "0 0 40px 10px rgba(243,210,138,0.6)" }}
         initial={{ opacity: 0, scaleY: 0 }}
         animate={{ opacity: [0, 1, 0], scaleY: [0, 1, 1] }}
         transition={{ duration: 0.7, delay: delay + 0.85, times: [0, 0.2, 1] }}

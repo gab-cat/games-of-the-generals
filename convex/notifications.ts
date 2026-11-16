@@ -1,4 +1,4 @@
-import { query, internalMutation } from "./_generated/server";
+import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 
@@ -146,69 +146,9 @@ export const sendNotification = internalMutation({
 /**
  * Get a user's notification conversation
  */
-export const getNotificationConversation = query({
-  args: {
-    userId: v.id("users"),
-  },
-  returns: v.union(
-    v.object({
-      _id: v.id("conversations"),
-      participant1Id: v.id("users"),
-      participant1Username: v.string(),
-      participant2Id: v.id("users"),
-      participant2Username: v.string(),
-      lastMessageId: v.optional(v.id("messages")),
-      lastMessageAt: v.number(),
-      participant1LastRead: v.optional(v.number()),
-      participant2LastRead: v.optional(v.number()),
-      participant1TypingAt: v.optional(v.number()),
-      participant2TypingAt: v.optional(v.number()),
-      participant1UnreadCount: v.number(),
-      participant2UnreadCount: v.number(),
-      createdAt: v.number(),
-      isSystemNotification: v.optional(v.boolean()),
-    }),
-    v.null()
-  ),
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("conversations")
-      .withIndex("by_participants", (q) =>
-        q.eq("participant1Id", args.userId).eq("participant2Id", args.userId),
-      )
-      .filter((q) => q.eq(q.field("isSystemNotification"), true))
-      .first();
-  },
-});
-
 /**
  * Get recent notifications for a user (for potential future use)
  */
-export const getRecentNotifications = query({
-  args: {
-    userId: v.id("users"),
-    limit: v.optional(v.number()),
-  },
-  returns: v.array(v.object({
-    _id: v.id("notifications"),
-    type: v.string(),
-    ticketId: v.optional(v.id("supportTickets")),
-    action: v.string(),
-    message: v.string(),
-    ticketLink: v.optional(v.string()),
-    createdAt: v.number(),
-    expiresAt: v.number(),
-  })),
-  handler: async (ctx, args) => {
-    const limit = args.limit || 10;
-    return await ctx.db
-      .query("notifications")
-      .withIndex("by_user_created", (q) => q.eq("userId", args.userId))
-      .order("desc")
-      .take(limit);
-  },
-});
-
 /**
  * Delete expired notifications (internal cleanup function)
  */

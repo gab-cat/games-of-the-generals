@@ -66,8 +66,9 @@ function sameMoves(
 function packGame(game: Doc<"games">, moves: Doc<"moves">[]) {
   const playable = moves.filter((m) => m.moveType !== "setup");
   try {
+    // New games carry the packed `setupCode`; older ones the full board.
     const original = game.initialSetupBoard as BoardCell[][] | undefined;
-    const setup = original ? encodeSetup(original) : undefined;
+    const setup = game.setupCode ?? (original ? encodeSetup(original) : undefined);
     const decodedSetup = setup ? decodeSetup(setup) : undefined;
     if (original && decodedSetup && !sameSetup(original, decodedSetup)) return null;
     const encoded = encodeMoves(playable);
@@ -132,7 +133,9 @@ export const archiveFinishedGames = internalMutation({
       stats.moveRowsDeleted += moves.length;
       stats.bytesBefore +=
         JSON.stringify(moves).length +
-        JSON.stringify(game.initialSetupBoard ?? null).length;
+        JSON.stringify(game.initialSetupBoard ?? null).length +
+        (game.setupCode?.length ?? 0) +
+        JSON.stringify(game.eliminatedPieces ?? null).length;
       stats.bytesAfter += JSON.stringify(replay).length;
 
       if (!args.dryRun) {
@@ -140,6 +143,9 @@ export const archiveFinishedGames = internalMutation({
           replay,
           movesArchivedAt: now,
           initialSetupBoard: undefined,
+          setupCode: undefined,
+          // Only the live game screen shows it; the replay rebuilds captures.
+          eliminatedPieces: undefined,
         });
         for (const move of moves) {
           await ctx.db.delete(move._id);
@@ -229,7 +235,9 @@ export async function loadReplay(ctx: QueryCtx, game: Doc<"games">) {
     .withIndex("by_game_timestamp", (q) => q.eq("gameId", game._id))
     .take(limit);
   return {
-    initialBoard: (game.initialSetupBoard as BoardCell[][] | undefined) ?? null,
+    initialBoard:
+      (game.initialSetupBoard as BoardCell[][] | undefined) ??
+      (game.setupCode ? decodeSetup(game.setupCode) : null),
     moves: rows
       .filter((m) => m.moveType === "move" || m.moveType === "challenge")
       .map((m) => ({
