@@ -193,6 +193,14 @@ const applicationTables = {
       turn: v.number(), // moveCount value when elimination occurred
       battleOutcome: v.union(v.literal("attacker"), v.literal("defender"), v.literal("tie")), // Who won the battle
     }))), // Track eliminated pieces for performance optimization
+    // Packed replay, written by gameArchive.archiveFinishedGames about an hour
+    // after the game ends. Its move rows are deleted then. Format: lib/replayCodec.ts
+    replay: v.optional(v.object({
+      v: v.literal(1),
+      setup: v.optional(v.string()),
+      moves: v.string(),
+    })),
+    movesArchivedAt: v.optional(v.number()),
   })
     .index("by_lobby", ["lobbyId"])
     .index("by_status", ["status"])
@@ -204,7 +212,8 @@ const applicationTables = {
     .index("by_player1_status", ["player1Id", "status"]) // BANDWIDTH OPTIMIZED: For efficient active game lookup
     .index("by_player2_status", ["player2Id", "status"]) // BANDWIDTH OPTIMIZED: For efficient active game lookup
     .index("by_status_setup_time", ["status", "setupTimeStarted"]) // For finding stale setup games
-    .index("by_status_game_time", ["status", "gameTimeStarted"]), // For finding stale playing games
+    .index("by_status_game_time", ["status", "gameTimeStarted"]) // For finding stale playing games
+    .index("by_status_archived", ["status", "movesArchivedAt", "finishedAt"]), // Finished games waiting to be packed
 
   // Game moves history
   moves: defineTable({
@@ -227,10 +236,8 @@ const applicationTables = {
     })),
     timestamp: v.number(),
   })
-    .index("by_game", ["gameId"])
-    .index("by_timestamp", ["timestamp"])
-    .index("by_game_timestamp", ["gameId", "timestamp"]) // Compound index for ordered game moves
-    .index("by_game_type", ["gameId", "moveType"]), // Index for filtering by move type
+    // Live games only: rows are packed into games.replay and deleted after the game ends.
+    .index("by_game_timestamp", ["gameId", "timestamp"]),
 
   // Spectator chat messages
   spectatorChat: defineTable({

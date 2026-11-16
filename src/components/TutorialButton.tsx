@@ -1,113 +1,42 @@
-import { useState, useEffect } from "react";
-import { HelpCircle, BookOpen } from "lucide-react";
+import { CircleHelp } from "lucide-react";
 import { Button } from "./ui/button";
-import { TutorialModal } from "./TutorialModal";
-import { useMutation } from "convex/react";
-import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
-import { api } from "../../convex/_generated/api";
-import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface TutorialButtonProps {
+  /** Opens the one tutorial dialog owned by Layout. */
+  onOpen: () => void;
   variant?: "icon" | "text";
-  size?: "sm" | "md" | "lg";
   className?: string;
 }
 
-export function TutorialButton({ 
-  variant = "icon", 
-  size = "md", 
-  className 
+/**
+ * Opens "How to play". Layout owns the single TutorialModal and decides when
+ * to show it on first sign-in, so this button never opens it by itself.
+ */
+export function TutorialButton({
+  onOpen,
+  variant = "icon",
+  className,
 }: TutorialButtonProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Tutorial status doesn't change frequently, cache it for longer
-  const { data: tutorialStatus } = useConvexQueryWithOptions(
-    api.profiles.checkTutorialStatus,
-    {},
-    {
-      staleTime: 300000, // 5 minutes - tutorial status doesn't change often
-      gcTime: 600000, // 10 minutes cache
-    }
-  );
-  const markTutorialCompleted = useMutation(api.profiles.markTutorialCompleted);
-
-  // Automatically show tutorial if not completed
-  useEffect(() => {
-    if (tutorialStatus && !tutorialStatus.tutorialCompletedAt) {
-      setIsModalOpen(true);
-    }
-  }, [tutorialStatus]);
-
-  const handleOpenTutorial = () => {
-    setIsModalOpen(true);
-  };
-
-  const handleCloseTutorial = () => {
-    setIsModalOpen(false);
-  };
-
-  const handleCompleteTutorial = () => {
-    markTutorialCompleted()
-      .then(() => {
-        toast.success("Tutorial completed! Welcome to the battle, General!");
-      })
-      .catch((error) => {
-        console.error("Failed to mark tutorial as completed:", error);
-        // Don't show error toast as it's not critical
-      });
-    setIsModalOpen(false);
-  };
-
-  const buttonSizeClass = {
-    sm: "h-8 w-8",
-    md: "h-10 w-10", 
-    lg: "h-12 w-12"
-  }[size];
-
-  const iconSizeClass = {
-    sm: "h-4 w-4",
-    md: "h-5 w-5",
-    lg: "h-6 w-6"
-  }[size];
-
   if (variant === "icon") {
     return (
-      <>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={handleOpenTutorial}
-          className={`${buttonSizeClass} bg-white/10 border-white/20 text-white/90 hover:bg-white/20 hover:text-white rounded-full p-0 aspect-square flex-shrink-0 ${className}`}
-          title="View Tutorial"
-        >
-          <HelpCircle className={iconSizeClass} />
-        </Button>
-        
-        <TutorialModal
-          isOpen={isModalOpen}
-          onClose={handleCloseTutorial}
-          onComplete={handleCompleteTutorial}
-        />
-      </>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={onOpen}
+        aria-label="How to play"
+        title="How to play"
+        className={cn("h-9 w-9", className)}
+      >
+        <CircleHelp className="!size-[18px]" />
+      </Button>
     );
   }
 
   return (
-    <>
-      <Button
-        variant="outline"
-        onClick={handleOpenTutorial}
-        className={`bg-white/10 border-white/20 text-white/90 hover:bg-white/20 hover:text-white ${className}`}
-      >
-        <BookOpen className="h-4 w-4 mr-2" />
-        Tutorial
-      </Button>
-      
-      <TutorialModal
-        isOpen={isModalOpen}
-        onClose={handleCloseTutorial}
-        onComplete={handleCompleteTutorial}
-      />
-    </>
+    <Button variant="secondary" onClick={onOpen} className={className}>
+      <CircleHelp />
+      How to play
+    </Button>
   );
 }

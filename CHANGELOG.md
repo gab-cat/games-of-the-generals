@@ -60,6 +60,57 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ---
 
+## [Unreleased] - Season 3
+
+### 🎨 A cleaner look for Season 3
+
+**Every screen, refreshed**
+
+- One calm dark theme with a single gold accent, plain sentence-case labels and flat panels across every page
+- Clearer lobby: Quick match up front, simple lobby cards, and empty states that tell you what to do next
+- Cleaner board: clearer pieces and clocks, edge-to-edge on phones, and a calmer result screen with replay and review
+- Readable leaderboard, profile, achievements and match history, with no sideways scrolling on phones
+- New "How to play" guide with real pieces and a tap-to-try board
+- New phone tab bar for Lobbies, Vs AI, Leaderboard, News and Chat
+- New sign-in page and Season 3 welcome, built on the red and blue chevrons from the original 1981 box
+- One typeface across the game: Poppins
+- New footer: a giant "Generals" with the red and blue chevrons charging through the letters. Once you're signed in it shrinks to one row of links
+
+**Pages with their own look**
+
+- The lobby is a fight card: you on the blue side, your next opponent on the red, and every open lobby is a bout with an empty seat waiting for you
+- Vs AI: pick Recruit, Veteran or Commander from their portraits
+- Game over is a title card: "Victory" or "Defeat" in your army's colour, with how the game ended
+- The leaderboard puts the top three on a podium and groups everyone else by rank, with a bar showing how far you are from the next one
+- Your profile shows your rank insignia, all seven ranks on the road to General, and your record
+- News reads like a front page, with the newest story on top and older ones in columns
+- Achievements are ribbons on a rack, and locked ones show how close you are
+- New paintings for each page, and a new loading screen where the two armies meet
+
+**Global chat, easier to follow**
+
+- Messages from the same player in a row sit under one name, picture and time, so more of the conversation fits on screen
+- Day dividers ("Today", "Yesterday") and clock times instead of "1h" on every line
+- Reading older messages no longer yanks you to the bottom; a "2 new messages" button takes you back when you're ready
+- "Show older messages" loads earlier chat
+- Messages that mention you are highlighted
+- Players without a picture get one of the built-in avatars, so they no longer all look the same
+
+### 🐛 Fixes
+
+- The tutorial no longer reopens on every page after you close it, and never covers the username screen
+- Leaving the setup screen now warns you that it can cost you the game
+- Draws no longer show a "You lost" message
+- The leaderboard rank popup only shows when you actually reach a new best place
+- The "Save your guest account" card no longer covers the board, and the upgrade card no longer shows to guests
+- Failed chat and message sends now keep your text and let you retry
+- On phones, the "Save your guest account" card no longer covers the chat box
+- Mentions now work for every player, not only the first thousand who signed up
+- The footer no longer jumps up and down between short and long pages
+- Two combat achievements (Eliminator and Destroyer) were missing from the achievements page
+
+---
+
 ## [1.8.0] - 2025-11-XX
 
 ### 🔊 Immersive Audio Experience

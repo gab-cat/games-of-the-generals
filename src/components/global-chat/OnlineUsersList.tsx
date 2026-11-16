@@ -2,12 +2,13 @@
 
 import { motion } from "framer-motion";
 import { useNavigate } from "@tanstack/react-router";
-import { Crown, Shield, Star, Zap, Target, X, GamepadIcon } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "../UserAvatar";
 import { UserNameWithBadge } from "../UserNameWithBadge";
 import { Button } from "../ui/button";
-import { useAutoAnimate } from "../../lib/useAutoAnimate";
+import { Skeleton } from "../ui/skeleton";
+import { fadeUp, stagger } from "../../lib/motion";
 import { Id } from "../../../convex/_generated/dataModel";
 
 interface OnlineUser {
@@ -29,170 +30,150 @@ interface OnlineUser {
 interface OnlineUsersListProps {
   users: OnlineUser[] | undefined;
   onClose: () => void;
+  /** Fill the parent instead of floating as its own panel (phones). */
+  embedded?: boolean;
 }
 
-const rankIcons = {
-  "Private": Shield,
-  "Sergeant": Shield,
-  "2nd Lieutenant": Star,
-  "1st Lieutenant": Star,
-  "Captain": Star,
-  "Major": Zap,
-  "Lieutenant Colonel": Zap,
-  "Colonel": Target,
-  "1 Star General": Crown,
-  "2 Star General": Crown,
-  "3 Star General": Crown,
-  "4 Star General": Crown,
-  "5 Star General": Crown,
-};
+function getActivity(user: OnlineUser): { text: string; dot: string } {
+  if (user.gameId) return { text: "In a game", dot: "bg-red-400" };
+  if (user.lobbyId) return { text: "In a lobby", dot: "bg-gold-400" };
+  if (user.aiGameId) return { text: "Playing the AI", dot: "bg-gold-400" };
+  return { text: "Online", dot: "bg-emerald-400" };
+}
 
-const rankColors = {
-  "Private": "text-gray-400",
-  "Sergeant": "text-green-400",
-  "2nd Lieutenant": "text-blue-400",
-  "1st Lieutenant": "text-blue-500",
-  "Captain": "text-purple-400",
-  "Major": "text-purple-500",
-  "Lieutenant Colonel": "text-orange-400",
-  "Colonel": "text-orange-500",
-  "1 Star General": "text-yellow-400",
-  "2 Star General": "text-yellow-500",
-  "3 Star General": "text-red-400",
-  "4 Star General": "text-red-500",
-  "5 Star General": "text-red-600",
-};
-
-export function OnlineUsersList({ users, onClose }: OnlineUsersListProps) {
-  const usersListRef = useAutoAnimate();
+export function OnlineUsersList({
+  users,
+  onClose,
+  embedded = false,
+}: OnlineUsersListProps) {
   const navigate = useNavigate();
 
   const handleUserClick = (username: string) => {
     void navigate({ to: "/profile", search: { u: username } });
   };
 
-  const getActivityIcon = (user: OnlineUser) => {
-    if (user.aiGameId) {
-      // AI games - yellow
-      return <GamepadIcon className="w-5 h-5 text-yellow-400" />;
-    }
-    if (user.gameId) {
-      // Regular multiplayer games - red
-      return <GamepadIcon className="w-5 h-5 text-red-400" />;
-    }
-    if (user.lobbyId) {
-      // In lobby - green
-      return <Target className="w-3 h-3 text-green-400" />;
-    }
-    // Generally online - green dot
-    return <div className="w-3 h-3 bg-green-400 rounded-full" />;
-  };
-
-  const getActivityText = (user: OnlineUser) => {
-    if (user.gameId) {
-      return (<span className="text-red-400/80">In Game</span>);
-    }
-    if (user.lobbyId) {
-      return (<span className="text-green-400/80">In Lobby</span>);
-    }
-    if (user.aiGameId) {
-      return (<span className="text-yellow-400/80">In AI Game</span>);
-    }
-    return ""; // Empty string for online status
-  };
-
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="w-64 bg-gray-950/80 backdrop-blur-sm border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 8 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      className={cn(
+        "flex flex-col overflow-hidden bg-card",
+        embedded
+          ? "h-full"
+          : "h-full w-64 rounded-lg border border-border-strong shadow-lg",
+      )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b border-white/10 bg-gray-950/20">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-          <span className="text-white/90 font-medium text-sm">Online Players</span>
-          <span className="text-white/60 text-xs">({users?.length})</span>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-6 w-6 p-0 text-white/60 hover:text-white hover:bg-white/10"
-        >
-          <X className="w-4 h-4" />
-        </Button>
-      </div>
-
-      {/* Users List */}
-      <div className="max-h-96 overflow-y-auto">
-        {users?.length === 0 ? (
-          <div className="p-4 text-center text-white/60 text-sm">
-            No players online
-          </div>
-        ) : (
-          <div ref={usersListRef} className="p-2 space-y-1">
-            {users?.map((user) => {
-              const RankIcon = rankIcons[user.rank as keyof typeof rankIcons] || Shield;
-              const rankColor = rankColors[user.rank as keyof typeof rankColors] || "text-gray-400";
-
-              return (
-                <motion.div
-                  key={user.userId}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-3 p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group"
-                  onClick={() => handleUserClick(user.username!)}
-                >
-                  {/* Avatar */}
-                  <UserAvatar
-                    username={user.username!}
-                    avatarUrl={user.avatarUrl}
-                    rank={user.rank}
-                    size="xs"
-                    frame={user.avatarFrame}
-                    className="flex-shrink-0"
-                  />
-
-                  {/* User Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1 justify-between">
-                      <div className="flex gap-1 flex-col">
-                        <div className="text-left flex items-center gap-1 min-w-0">
-                          <UserNameWithBadge
-                            username={user.username!}
-                            tier={user.tier}
-                            isDonor={user.isDonor}
-                            usernameColor={user.usernameColor}
-                            size="sm"
-                            showBadges={true}
-                            className="max-w-[120px]"
-                          />
-                          <RankIcon className={cn("w-3 h-3 flex-shrink-0 opacity-70", rankColor)} />
-                        </div>
-                        <div className="text-white/50 text-[0.65rem] truncate  -mt-1 font-light">
-                          {getActivityText(user)}
-                        </div>
-                      </div>
-                      {/* Activity indicator dot */}
-                      <div className="flex-shrink-0">
-                        {getActivityIcon(user)}
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
+      <div
+        className={cn(
+          "flex h-12 shrink-0 items-center gap-2 border-b border-border",
+          embedded ? "pl-1.5 pr-4" : "justify-between pl-4 pr-2",
+        )}
+      >
+        {embedded && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Back to chat"
+            className="h-9 w-9"
+          >
+            <ArrowLeft />
+          </Button>
+        )}
+        <h3 className="text-sm font-semibold text-foreground">
+          Online now
+          {users && (
+            <span className="ml-2 text-xs font-normal tabular-nums text-foreground/70">
+              {users.length}
+            </span>
+          )}
+        </h3>
+        {!embedded && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            aria-label="Close online players"
+            className="h-9 w-9"
+          >
+            <X />
+          </Button>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-3 border-t border-white/10 bg-gray-950/20">
-        <div className="text-center text-white/50 text-xs">
-          Click on a player to view their profile
-        </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+        {users === undefined ? (
+          <div className="space-y-1" aria-hidden="true">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex h-12 items-center gap-3 px-2">
+                <Skeleton className="size-7 shrink-0 rounded-full" />
+                <div className="flex-1 space-y-1.5">
+                  <Skeleton className="h-3 w-24" />
+                  <Skeleton className="h-2.5 w-16" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : users.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-foreground/80">
+            No one else is online right now.
+          </p>
+        ) : (
+          <motion.ul
+            variants={stagger(0.02)}
+            initial="hidden"
+            animate="show"
+            className="space-y-0.5"
+          >
+            {users.map((user) => {
+              const activity = getActivity(user);
+              return (
+                <motion.li key={user.userId} variants={fadeUp}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      user.username && handleUserClick(user.username)
+                    }
+                    className="flex min-h-12 w-full items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:bg-white/[0.1]"
+                  >
+                    <UserAvatar
+                      username={user.username ?? ""}
+                      avatarUrl={user.avatarUrl}
+                      rank={user.rank}
+                      size="xs"
+                      frame={user.avatarFrame}
+                      className="shrink-0"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <UserNameWithBadge
+                        username={user.username ?? "Player"}
+                        tier={user.tier}
+                        isDonor={user.isDonor}
+                        usernameColor={user.usernameColor}
+                        size="md"
+                      />
+                      <p className="flex items-center gap-1.5 truncate text-xs text-foreground/75">
+                        <span
+                          className={cn(
+                            "size-1.5 shrink-0 rounded-full",
+                            activity.dot,
+                          )}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">
+                          {user.rank ? `${user.rank} · ` : ""}
+                          {activity.text}
+                        </span>
+                      </p>
+                    </div>
+                  </button>
+                </motion.li>
+              );
+            })}
+          </motion.ul>
+        )}
       </div>
     </motion.div>
   );

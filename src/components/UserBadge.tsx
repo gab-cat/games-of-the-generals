@@ -1,6 +1,5 @@
 import React from "react";
-import { Crown, Star, Heart } from "lucide-react";
-import { motion } from "framer-motion";
+import { Crown, Shield, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -18,80 +17,66 @@ interface UserBadgeProps {
   showText?: boolean;
 }
 
+const CONFIG = {
+  pro: {
+    icon: Shield,
+    label: "Pro",
+    tooltip: "Pro subscriber",
+    tone: "border-border-strong bg-white/[0.06] text-foreground",
+  },
+  pro_plus: {
+    icon: Crown,
+    label: "Pro+",
+    tooltip: "Pro+ subscriber",
+    tone: "border-gold-500/30 bg-gold-500/10 text-gold-300",
+  },
+  donor: {
+    icon: Heart,
+    label: "Donor",
+    tooltip: "Donor",
+    tone: "border-red-500/30 bg-red-500/10 text-red-300",
+  },
+} as const;
+
+const SIZE_CLASSES = {
+  xs: "h-4 px-1 text-[10px]",
+  sm: "h-[18px] px-1 text-[11px]",
+  md: "h-5 px-1.5 text-xs",
+} as const;
+
+const ICON_CLASSES = {
+  xs: "size-2.5",
+  sm: "size-3",
+  md: "size-3.5",
+} as const;
+
 export const UserBadge: React.FC<UserBadgeProps> = ({
   type,
   size = "sm",
   className,
   showText = false,
 }) => {
-  const config = {
-    pro: {
-      icon: Crown,
-      label: "PRO",
-      gradient: "from-blue-500/20 via-indigo-500/20 to-purple-500/20",
-      border: "border-blue-400/30",
-      text: "text-blue-300",
-      iconColor: "text-blue-400",
-      tooltip: "Pro Subscriber",
-    },
-    pro_plus: {
-      icon: Star,
-      label: "PRO+",
-      gradient: "from-amber-500/20 via-orange-500/20 to-yellow-500/20",
-      border: "border-amber-400/30",
-      text: "text-amber-300",
-      iconColor: "text-amber-400",
-      tooltip: "Pro+ Subscriber",
-    },
-    donor: {
-      icon: Heart,
-      label: "DONOR",
-      gradient: "from-pink-500/20 via-rose-500/20 to-pink-500/20",
-      border: "border-pink-400/30",
-      text: "text-pink-300",
-      iconColor: "text-pink-400",
-      tooltip: "Donor",
-    },
-  }[type];
-
-  const sizeClasses = {
-    xs: "px-0.5 py-0 h-3.5 text-[8px]",
-    sm: "px-1 py-0.5 h-4 text-[9px]",
-    md: "px-1.5 py-0.5 h-5 text-xs",
-  }[size];
-
+  const config = CONFIG[type];
   const Icon = config.icon;
 
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            whileHover={{ scale: 1.05 }}
+          <span
             className={cn(
-              "inline-flex items-center gap-0.5 rounded border backdrop-blur-md shadow-sm",
-              config.gradient,
-              config.border,
-              sizeClasses,
-              className
+              "inline-flex shrink-0 items-center gap-1 rounded border font-medium leading-none",
+              config.tone,
+              SIZE_CLASSES[size],
+              className,
             )}
+            aria-label={config.tooltip}
           >
-            <Icon className={cn("flex-shrink-0", 
-              size === "xs" ? "w-2.5 h-2.5" : size === "sm" ? "w-3 h-3" : "w-3.5 h-3.5",
-              config.iconColor
-            )} />
-            {showText && (
-              <span className={cn("font-bold tracking-wider", config.text)}>
-                {config.label}
-              </span>
-            )}
-          </motion.div>
+            <Icon className={cn("shrink-0", ICON_CLASSES[size])} />
+            {showText && <span>{config.label}</span>}
+          </span>
         </TooltipTrigger>
-        <TooltipContent className="bg-black/80 backdrop-blur-xl border-white/10 text-white text-[10px] py-1 px-2">
-          {config.tooltip}
-        </TooltipContent>
+        <TooltipContent>{config.tooltip}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

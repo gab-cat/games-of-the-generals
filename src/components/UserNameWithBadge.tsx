@@ -53,7 +53,7 @@ export const UserNameWithBadge: React.FC<UserNameWithBadgeProps> = ({
           "font-medium truncate transition-opacity",
           textSize,
           onClick && "cursor-pointer hover:opacity-80 active:opacity-70",
-          !usernameColor && "text-white",
+          !usernameColor && "text-foreground",
         )}
         style={usernameColor ? { color: usernameColor } : undefined}
       >

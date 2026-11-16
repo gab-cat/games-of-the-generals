@@ -2,12 +2,11 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { X } from "lucide-react";
 import { useMutation } from "convex/react";
 import { useConvexQueryWithOptions } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { AtSign, MessageCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useAutoAnimate } from "../../lib/useAutoAnimate";
+import { Button } from "../ui/button";
 
 interface Mention {
   _id: string;
@@ -20,10 +19,11 @@ interface Mention {
 }
 
 export function MentionNotification() {
-  const mentionsRef = useAutoAnimate();
   const [visibleMentions, setVisibleMentions] = useState<Mention[]>([]);
-  const [dismissedMentions, setDismissedMentions] = useState<Set<string>>(new Set());
-  const prevMentionsRef = useRef<string>('');
+  const [dismissedMentions, setDismissedMentions] = useState<Set<string>>(
+    new Set(),
+  );
+  const prevMentionsRef = useRef<string>("");
 
   const markMentionsAsRead = useMutation(api.globalChat.markMentionsAsRead);
 
@@ -31,7 +31,8 @@ export function MentionNotification() {
   const playMentionSound = useCallback(() => {
     try {
       // Create a simple beep sound using Web Audio API
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = new (window.AudioContext ||
+        (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
 
@@ -42,7 +43,10 @@ export function MentionNotification() {
       oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.1);
 
       gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      gainNode.gain.exponentialRampToValueAtTime(
+        0.01,
+        audioContext.currentTime + 0.3,
+      );
 
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.3);
@@ -57,12 +61,15 @@ export function MentionNotification() {
     {
       staleTime: 30000, // 30 seconds - recent mentions need moderate freshness
       gcTime: 300000, // 5 minutes cache
-    }
+    },
   );
 
   useEffect(() => {
     // Create a stable identifier for the mentions array
-    const mentionsKey = recentMentions.map((m: { _id: any; }) => m._id).sort().join(',');
+    const mentionsKey = recentMentions
+      .map((m: { _id: any }) => m._id)
+      .sort()
+      .join(",");
 
     // Only update if mentions have actually changed
     if (mentionsKey !== prevMentionsRef.current) {
@@ -70,15 +77,18 @@ export function MentionNotification() {
 
       // Show new mentions that haven't been dismissed
       const newMentions = recentMentions.filter(
-        (        mention: { _id: string; isRead: any; }) => !dismissedMentions.has(mention._id) && !mention.isRead
+        (mention: { _id: string; isRead: any }) =>
+          !dismissedMentions.has(mention._id) && !mention.isRead,
       );
 
-      setVisibleMentions(prev => {
+      setVisibleMentions((prev) => {
         // Combine existing mentions with new ones, avoiding duplicates
         // Also filter out mentions that are already exiting to prevent them from reappearing
-        const existingIds = new Set(prev.map(m => m._id));
-        const activeMentions = prev.filter(m => !m.isExiting);
-        const uniqueNewMentions = newMentions.filter((m: { _id: string; }) => !existingIds.has(m._id));
+        const existingIds = new Set(prev.map((m) => m._id));
+        const activeMentions = prev.filter((m) => !m.isExiting);
+        const uniqueNewMentions = newMentions.filter(
+          (m: { _id: string }) => !existingIds.has(m._id),
+        );
 
         // Play sound notification for new mentions
         if (uniqueNewMentions.length > 0) {
@@ -104,32 +114,36 @@ export function MentionNotification() {
     if (visibleMentions.length === 0) return;
 
     const timers = visibleMentions
-      .filter(mention => !mention.isExiting)
-      .map(mention => {
+      .filter((mention) => !mention.isExiting)
+      .map((mention) => {
         return setTimeout(() => {
-          setVisibleMentions(prev =>
-            prev.map(m => m._id === mention._id ? { ...m, isExiting: true } : m)
+          setVisibleMentions((prev) =>
+            prev.map((m) =>
+              m._id === mention._id ? { ...m, isExiting: true } : m,
+            ),
           );
           // Remove after animation completes
           setTimeout(() => {
-            setVisibleMentions(prev => prev.filter(m => m._id !== mention._id));
+            setVisibleMentions((prev) =>
+              prev.filter((m) => m._id !== mention._id),
+            );
           }, 350);
         }, 5000); // 5 seconds
       });
 
     return () => {
-      timers.forEach(timer => clearTimeout(timer));
+      timers.forEach((timer) => clearTimeout(timer));
     };
   }, [visibleMentions]);
 
   const dismissMention = useCallback((mentionId: string) => {
-    setDismissedMentions(prev => new Set([...prev, mentionId]));
-    setVisibleMentions(prev =>
-      prev.map(m => m._id === mentionId ? { ...m, isExiting: true } : m)
+    setDismissedMentions((prev) => new Set([...prev, mentionId]));
+    setVisibleMentions((prev) =>
+      prev.map((m) => (m._id === mentionId ? { ...m, isExiting: true } : m)),
     );
     // Remove after animation completes
     setTimeout(() => {
-      setVisibleMentions(prev => prev.filter(m => m._id !== mentionId));
+      setVisibleMentions((prev) => prev.filter((m) => m._id !== mentionId));
     }, 350); // Slightly longer than animation duration
   }, []);
 
@@ -138,67 +152,53 @@ export function MentionNotification() {
   }
 
   return (
-    <div ref={mentionsRef} className="fixed top-4 right-4 z-50 space-y-2">
+    <div
+      role="status"
+      aria-live="polite"
+      className="pointer-events-none fixed right-4 top-[4.5rem] z-[60] w-[calc(100vw-2rem)] max-w-sm space-y-2 sm:top-20"
+    >
       <AnimatePresence>
         {visibleMentions
-          .filter(mention => !mention.isExiting)
+          .filter((mention) => !mention.isExiting)
           .map((mention, index) => (
-          <motion.div
-            key={mention._id}
-            initial={{ opacity: 0, x: 300, scale: 0.8 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 300, scale: 0.8 }}
-            transition={{
-              opacity: { duration: 0.3 },
-              x: { duration: 0.3 },
-              scale: { duration: 0.3 },
-              delay: index * 0.1
-            }}
-            className={cn(
-              "bg-gray-950/80 backdrop-blur-sm border border-white/10 rounded-2xl shadow-2xl",
-              "p-4 min-w-80 max-w-sm cursor-pointer hover:bg-gray-900/80 transition-colors"
-            )}
-            onClick={() => dismissMention(mention._id)}
-          >
-            <div className="flex items-start gap-3">
-              {/* Mention Icon */}
-              <div className="flex-shrink-0">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-                  <AtSign className="w-5 h-5 text-blue-400" />
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <MessageCircle className="w-4 h-4 text-blue-400" />
-                  <span className="text-white/90 text-xs font-medium">
-                    New Mention
-                  </span>
-                </div>
-
-                <p className="text-white/80 text-xs mb-2">
-                  <span className="font-medium text-blue-300">
+            <motion.div
+              key={mention._id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{
+                duration: 0.22,
+                ease: [0.16, 1, 0.3, 1],
+                delay: index * 0.05,
+              }}
+              className="pointer-events-auto flex items-start gap-2 rounded-lg border border-border-strong bg-card p-3 shadow-lg"
+            >
+              <button
+                type="button"
+                onClick={() => dismissMention(mention._id)}
+                className="min-w-0 flex-1 rounded-md p-1 text-left transition-colors hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+              >
+                <p className="text-sm text-foreground">
+                  <span className="font-semibold">
                     {mention.mentionerUsername}
                   </span>{" "}
-                  mentioned you in chat
+                  mentioned you in global chat
                 </p>
-
-                <div className="bg-white/10 rounded-lg p-1 mb-3">
-                  <p className="text-white/70 text-xs line-clamp-2">
-                    {mention.mentionText}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-end">
-                  <span className="text-white/50 text-xs">
-                    {new Date(mention.timestamp).toLocaleTimeString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        ))}
+                <p className="mt-1 line-clamp-2 break-words text-sm text-foreground/80">
+                  {mention.mentionText}
+                </p>
+              </button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => dismissMention(mention._id)}
+                aria-label="Dismiss"
+                className="h-9 w-9 shrink-0"
+              >
+                <X />
+              </Button>
+            </motion.div>
+          ))}
       </AnimatePresence>
     </div>
   );

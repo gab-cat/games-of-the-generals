@@ -1,5 +1,5 @@
 export { GlobalChatPanel } from "./GlobalChatPanel";
-export { ChatMessage } from "./ChatMessage";
+export { ChatMessageGroup } from "./ChatMessage";
 export { OnlineUsersList } from "./OnlineUsersList";
 export { ChatRulesModal } from "./ChatRulesModal";
 export { ChatSettingsModal } from "./ChatSettingsModal";

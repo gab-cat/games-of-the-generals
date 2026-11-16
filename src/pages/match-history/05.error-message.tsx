@@ -1,19 +1,20 @@
-import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
 
-interface ErrorMessageProps {
-  error: Error;
-}
-
-export function ErrorMessage({ error }: ErrorMessageProps) {
+export function ErrorMessage(_props: { error?: Error }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="text-center py-8 sm:py-12 px-4"
-    >
-      <div className="text-red-400 text-sm sm:text-base">
-        Error loading match history: {error.message}
-      </div>
-    </motion.div>
+    <div>
+      <PageHeader title="Match history" />
+      <EmptyState
+        title="Match history didn't load"
+        body="Check your connection and try again."
+        action={
+          <Button variant="secondary" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
+        }
+      />
+    </div>
   );
 }

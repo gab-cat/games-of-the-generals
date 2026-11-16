@@ -6,17 +6,12 @@ export function CountdownTestPage() {
   const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
-      <h1 className="text-2xl font-bold text-white mb-8">
-        Countdown Modal Test
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 p-4">
+      <h1 className="font-display text-3xl font-semibold text-foreground">
+        Countdown preview
       </h1>
 
-      <Button
-        onClick={() => setIsOpen(true)}
-        className="bg-amber-500 hover:bg-amber-600 text-black font-bold"
-      >
-        Open Countdown Modal
-      </Button>
+      <Button onClick={() => setIsOpen(true)}>Open countdown</Button>
 
       <GameStartCountdownModal
         isOpen={isOpen}

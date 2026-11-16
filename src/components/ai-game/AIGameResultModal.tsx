@@ -1,27 +1,20 @@
 import React from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "../ui/dialog";
-import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
-import {
-  Trophy,
-  Target,
-  Shield,
-  Zap,
-  RotateCcw,
-  Skull,
-  Swords,
-  Brain,
-  ExternalLink,
-} from "lucide-react";
-import { motion } from "framer-motion";
-import { useSound } from "../../lib/SoundProvider";
+import { Loader2 } from "lucide-react";
 import ConfettiBoom from "react-confetti-boom";
+import { useReducedMotion } from "framer-motion";
+import { Dialog, DialogContent } from "../ui/dialog";
+import { Button } from "../ui/button";
+import { useSound } from "../../lib/SoundProvider";
+import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
+import { api } from "../../../convex/_generated/api";
+import { Insignia } from "../season/art";
+import {
+  RESULT_DIALOG_CLASS,
+  focusPrimaryAction,
+  ResultTitleCard,
+  endSticker,
+  type ResultOutcome,
+} from "../season/ResultTitleCard";
 
 interface AIGameResultModalProps {
   isOpen: boolean;
@@ -35,6 +28,39 @@ interface AIGameResultModalProps {
   onReturnToLobby: () => void;
 }
 
+const opponentInfo = {
+  easy: { label: "Recruit", rank: "Private", portrait: "recruit" },
+  medium: { label: "Veteran", rank: "Captain", portrait: "veteran" },
+  hard: { label: "Commander", rank: "General", portrait: "commander" },
+} as const;
+
+const behaviorLabel = {
+  aggressive: "Aggressive",
+  defensive: "Defensive",
+  passive: "Passive",
+  balanced: "Balanced",
+} as const;
+
+function reasonSentence(outcome: ResultOutcome, reason: string | null, moves: number) {
+  if (outcome === "draw") return "Neither side could win.";
+  const won = outcome === "win";
+  const onMove = moves > 0 ? ` on move ${moves}` : "";
+  switch (reason) {
+    case "flag_captured":
+      return won ? `You captured the AI's flag${onMove}.` : `The AI captured your flag${onMove}.`;
+    case "flag_reached_base":
+      return won ? "Your flag reached the far row." : "The AI's flag reached your back row.";
+    case "elimination":
+      return won ? "The AI has no pieces that can move." : "You have no pieces that can move.";
+    case "timeout":
+      return won ? "The AI ran out of time." : "You ran out of time.";
+    case "surrender":
+      return won ? "The AI gave up." : "You gave up.";
+    default:
+      return won ? "You beat the AI." : "The AI won this one.";
+  }
+}
+
 export function AIGameResultModal({
   isOpen,
   onClose,
@@ -46,223 +72,117 @@ export function AIGameResultModal({
   onPlayAgain,
   onReturnToLobby,
 }: AIGameResultModalProps) {
-  const isVictory = winner === "player1";
-  const isDefeat = winner === "player2";
+  const outcome: ResultOutcome =
+    winner === "player1" ? "win" : winner === "player2" ? "loss" : "draw";
   const { playSFX } = useSound();
+  const reduceMotion = useReducedMotion();
+  const [pending, setPending] = React.useState<"again" | "leave" | null>(null);
 
-  const getResultIcon = () => {
-    if (isVictory) return <Trophy className="h-10 w-10 text-emerald-500" />;
-    if (isDefeat) return <Skull className="h-10 w-10 text-red-500" />;
-    return <Trophy className="h-10 w-10 text-gray-400" />;
-  };
-
-  const getResultTitle = () => {
-    if (isVictory) return "VICTORY";
-    if (isDefeat) return "DEFEAT";
-    return "DRAW";
-  };
-
-  const getMissionStatus = () => {
-    if (isVictory) return "MISSION ACCOMPLISHED";
-    if (isDefeat) return "MISSION FAILED";
-    return "MISSION ENDED";
-  };
-
-  const getReasonDescription = () => {
-    if (!winner) return "STALEMATE DETECTED";
-    if (!gameEndReason) return "OPERATION ENDED";
-
-    switch (gameEndReason) {
-      case "flag_captured":
-        return isVictory ? "ENEMY FLAG CAPTURED" : "FLAG CAPTURED";
-      case "flag_reached_base":
-        return isVictory ? "INFILTRATION SUCCESSFUL" : "BASE INFILTRATED";
-      case "elimination":
-        return isVictory ? "HOSTILES ELIMINATED" : "FORCES ELIMINATED";
-      case "timeout":
-        return isVictory ? "ENEMY TIME EXCEEDED" : "TIME LIMIT EXCEEDED";
-      case "surrender":
-        return isVictory ? "OPPONENT SURRENDERED" : "MISSION ABORTED";
-      default:
-        return gameEndReason.replace(/_/g, " ").toUpperCase();
-    }
-  };
-
-  const getResultColor = () => {
-    if (isVictory) return "text-emerald-500";
-    if (isDefeat) return "text-red-500";
-    return "text-white";
-  };
+  // Same cached query the AI page already holds, so this costs nothing extra.
+  const { data: profile } = useConvexQueryWithOptions(
+    api.profiles.getCurrentProfile,
+    {},
+    { staleTime: 120000, gcTime: 600000 },
+  );
 
   // Play victory/lose SFX when modal opens
   React.useEffect(() => {
-    if (isOpen && winner) {
-      if (isVictory) {
-        playSFX("player-victory");
-      } else if (isDefeat) {
-        playSFX("player-lose");
-      }
+    if (isOpen && outcome !== "draw") {
+      playSFX(outcome === "win" ? "player-victory" : "player-lose");
     }
-  }, [isOpen, winner, isVictory, isDefeat, playSFX]);
+  }, [isOpen, outcome, playSFX]);
+
+  // The board closes the modal when an action starts, so reset the pending
+  // state whenever it closes or reopens.
+  React.useEffect(() => {
+    if (!isOpen) setPending(null);
+  }, [isOpen]);
+
+  const ai = opponentInfo[difficulty];
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl w-full bg-zinc-950 backdrop-blur-xl border border-white/10 p-0 overflow-hidden shadow-2xl text-white sm:max-w-2xl rounded-sm">
-        <DialogHeader className="sr-only">
-          <DialogTitle>Game Result</DialogTitle>
-          <DialogDescription>
-            Match analysis against AI Opponent
-          </DialogDescription>
-        </DialogHeader>
-
-        {isVictory && (
+      <DialogContent className={RESULT_DIALOG_CLASS} onOpenAutoFocus={focusPrimaryAction}>
+        {outcome === "win" && !reduceMotion && (
           <ConfettiBoom
             mode="boom"
-            particleCount={80}
-            colors={["#10B981", "#34D399", "#059669", "#6EE7B7"]}
+            particleCount={60}
+            colors={["#e0b85c", "#d9a441", "#f3d58f", "#3b82f6"]}
             shapeSize={10}
             launchSpeed={1.2}
             opacityDeltaMultiplier={2.5}
           />
         )}
 
-        <div className="relative flex flex-col items-center">
-          {/* Top Security Header */}
-          <div className="w-full flex items-center justify-between px-6 py-3 border-b border-white/10 bg-black/40">
-            <div className="flex items-center gap-2">
-              <Shield className="w-4 h-4 text-white/40" />
-              <span className="text-xs font-mono text-white/40 tracking-[0.2em]">
-                COMBAT_SIMULATION_REPORT
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant="outline"
-                className="text-[10px] h-5 border-white/10 bg-white/5 text-white/60 font-mono rounded-sm"
-              >
-                AI_SIMULATION
-              </Badge>
-            </div>
-          </div>
-
-          <div className="w-full p-4 md:p-10 flex flex-col items-center relative overflow-hidden overflow-y-auto max-h-[80vh]">
-            {/* Background Effects */}
-            <div className="absolute inset-0 pointer-events-none opacity-10 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:30px_30px]" />
-
-            {/* Result Icon */}
-            <motion.div
-              initial={{ scale: 0, rotate: 180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-              className={`w-12 h-12 md:w-20 md:h-20 mb-3 md:mb-6 rounded-xl md:rounded-2xl border-2 flex items-center justify-center relative ${
-                isVictory
-                  ? "border-emerald-500/50 bg-emerald-500/10"
-                  : isDefeat
-                    ? "border-red-500/50 bg-red-500/10"
-                    : "border-white/10 bg-white/5"
-              }`}
-            >
-              {getResultIcon()}
-            </motion.div>
-
-            {/* Status Text */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-center mb-8"
-            >
-              <h1
-                className={`text-3xl md:text-5xl font-black tracking-tighter mb-1 ${getResultColor()}`}
-              >
-                {getResultTitle()}
-              </h1>
-              <div className="flex items-center justify-center gap-2 md:gap-3">
-                <div
-                  className={`h-[1px] w-6 md:w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
-                />
-                <p className="text-[10px] md:text-xs font-mono tracking-[0.1em] md:tracking-[0.2em] text-white/60 uppercase">
-                  {getMissionStatus()}
-                </p>
-                <div
-                  className={`h-[1px] w-6 md:w-8 ${isVictory ? "bg-emerald-500" : isDefeat ? "bg-red-500" : "bg-white/20"}`}
-                />
-              </div>
-              <p className="mt-2 text-white/40 font-mono text-[9px] md:text-[10px] uppercase tracking-widest px-4">
-                [{getReasonDescription()}]
-              </p>
-            </motion.div>
-
-            {/* Stats Grid */}
-            <motion.div
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="w-full grid grid-cols-2 md:grid-cols-4 gap-px bg-white/5 border border-white/10 rounded-sm overflow-hidden mb-8"
-            >
-              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
-                <Zap className="w-3 h-3 md:w-4 md:h-4 text-blue-400 mb-1 md:mb-2 opacity-70" />
-                <div className="text-sm md:text-lg font-mono font-bold text-white">
-                  {moveCount}
-                </div>
-                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
-                  Moves
-                </div>
-              </div>
-              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
-                <Target className="w-3 h-3 md:w-4 md:h-4 text-amber-400 mb-1 md:mb-2 opacity-70" />
-                <div className="text-sm md:text-lg font-mono font-bold text-white">
-                  N/A
-                </div>
-                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
-                  Score
-                </div>
-              </div>
-              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
-                <Swords className="w-3 h-3 md:w-4 md:h-4 text-red-400 mb-1 md:mb-2 opacity-70" />
-                <div className="text-sm md:text-lg font-mono font-bold text-white uppercase">
-                  {difficulty}
-                </div>
-                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
-                  Diff
-                </div>
-              </div>
-              <div className="bg-black/40 p-2 md:p-3 flex flex-col items-center justify-center text-center">
-                <Brain className="w-3 h-3 md:w-4 md:h-4 text-purple-400 mb-1 md:mb-2 opacity-70" />
-                <div className="text-sm md:text-lg font-mono font-bold text-white uppercase truncate max-w-full px-1">
-                  {behavior}
-                </div>
-                <div className="text-[8px] md:text-[9px] uppercase tracking-widest text-white/40">
-                  Logic
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Action Buttons */}
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="flex flex-col sm:flex-row gap-3 w-full justify-center"
-            >
-              <Button
-                onClick={onPlayAgain}
-                className="h-10 bg-white text-black hover:bg-white/90 font-bold font-mono text-xs tracking-wider flex-1 max-w-xs rounded-sm"
-              >
-                <RotateCcw className="w-3 h-3 mr-2" />
-                REINITIATE_SIM
-              </Button>
-              <Button
-                onClick={onReturnToLobby}
-                variant="outline"
-                className="h-10 border-white/10 hover:bg-white/5 text-white bg-transparent font-mono text-xs tracking-wider flex-1 max-w-xs rounded-sm"
-              >
-                <ExternalLink className="w-3 h-3 mr-2" />
-                RETURN_TO_LOBBY
-              </Button>
-            </motion.div>
-          </div>
-        </div>
+        {isOpen && (
+          <ResultTitleCard
+            outcome={outcome}
+            myArmy="blue"
+            sticker={endSticker(outcome, gameEndReason, "ai")}
+            reasonText={reasonSentence(outcome, gameEndReason, moveCount)}
+            stats={[
+              { label: "Moves", value: moveCount },
+              {
+                label: "Opponent",
+                value: (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Insignia rank={ai.rank} className="h-4 text-gold-400" />
+                    {ai.label}
+                  </span>
+                ),
+              },
+              { label: "Style", value: behaviorLabel[behavior] },
+            ]}
+            me={{
+              name: profile?.username ?? "You",
+              avatarUrl: profile?.avatarUrl,
+              caption: "You",
+            }}
+            opponent={{
+              name: ai.label,
+              portrait: ai.portrait,
+              caption: `${behaviorLabel[behavior]} AI`,
+            }}
+            actions={
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={pending !== null}
+                  onClick={() => {
+                    setPending("leave");
+                    onReturnToLobby();
+                  }}
+                >
+                  {pending === "leave" ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Leaving
+                    </>
+                  ) : (
+                    "Back to menu"
+                  )}
+                </Button>
+                <Button
+                  data-primary-action
+                  disabled={pending !== null}
+                  onClick={() => {
+                    setPending("again");
+                    onPlayAgain();
+                  }}
+                >
+                  {pending === "again" ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Starting
+                    </>
+                  ) : (
+                    "Play again"
+                  )}
+                </Button>
+              </>
+            }
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

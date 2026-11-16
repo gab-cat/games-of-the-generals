@@ -328,28 +328,6 @@ export const createOrUpdateSubscription = mutation({
   },
 });
 
-// Extend subscription when payment succeeds (public mutation)
-export const extendSubscription = mutation({
-  args: {
-    paymongoPaymentId: v.string(),
-    months: v.number(),
-  },
-  returns: v.object({
-    success: v.boolean(),
-    newExpiresAt: v.number(),
-  }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ success: boolean; newExpiresAt: number }> => {
-    const result = (await ctx.runMutation(
-      internal.subscriptions.extendSubscriptionInternal,
-      args,
-    )) as { success: boolean; newExpiresAt: number };
-    return result;
-  },
-});
-
 // Internal mutation to extend subscription (used by webhook)
 export const extendSubscriptionInternal = internalMutation({
   args: {

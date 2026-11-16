@@ -1,9 +1,9 @@
-
 import { useEffect, useMemo, useState } from "react";
+import { FixedDigits } from "@/components/ui/fixed-digits";
 import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
-import { Link } from "@tanstack/react-router";
-import { motion } from "framer-motion";
+import { Link, useLocation } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "./ui/button";
 import { UserPlus, X } from "lucide-react";
 
@@ -12,6 +12,9 @@ export function ConvertAnonymousPopup() {
   const { data: loggedInUser } = useConvexQuery(api.auth.loggedInUser);
   const [show, setShow] = useState(false);
   const [msLeft, setMsLeft] = useState<number | null>(null);
+  // Never cover a board: stay out of live games, spectating, replays and the AI game.
+  const { pathname } = useLocation();
+  const onBoardScreen = /^\/(game|spectate|replay|ai-game)(\/|$)/.test(pathname);
 
   // Respect dismissal until next midnight UTC (persisted in localStorage)
   useEffect(() => {
@@ -22,7 +25,10 @@ export function ConvertAnonymousPopup() {
     }
 
     const storageKey = `anonPopupDismissedUntil:${loggedInUser?._id ?? "anon"}`;
-    const stored = typeof window !== "undefined" ? window.localStorage.getItem(storageKey) : null;
+    const stored =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(storageKey)
+        : null;
     const until = stored ? parseInt(stored, 10) : 0;
     const now = Date.now();
     if (until && now < until) {
@@ -41,12 +47,17 @@ export function ConvertAnonymousPopup() {
     if (!show) return;
     const computeMsLeft = () => {
       const now = new Date();
-      const nextMidnightUtc = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate() + 1,
-        0, 0, 0, 0
-      ));
+      const nextMidnightUtc = new Date(
+        Date.UTC(
+          now.getUTCFullYear(),
+          now.getUTCMonth(),
+          now.getUTCDate() + 1,
+          0,
+          0,
+          0,
+          0,
+        ),
+      );
       return nextMidnightUtc.getTime() - now.getTime();
     };
 
@@ -67,15 +78,23 @@ export function ConvertAnonymousPopup() {
 
   const handleDismiss = () => {
     const now = new Date();
-    const nextMidnightUtc = new Date(Date.UTC(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate() + 1,
-      0, 0, 0, 0
-    ));
+    const nextMidnightUtc = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
     const storageKey = `anonPopupDismissedUntil:${loggedInUser?._id ?? "anon"}`;
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(storageKey, String(nextMidnightUtc.getTime()));
+      window.localStorage.setItem(
+        storageKey,
+        String(nextMidnightUtc.getTime()),
+      );
     }
     setShow(false);
   };
@@ -84,56 +103,75 @@ export function ConvertAnonymousPopup() {
 
   if (!userSettings?.isAnonymous) return null;
 
+  // Sits above the phone tab bar (h-16 plus the safe area) and never over the
+  // header. On large screens it moves to the bottom-left corner.
+  const position =
+    "fixed inset-x-3 bottom-[calc(4rem+env(safe-area-inset-bottom)+0.75rem)] z-50 lg:inset-x-auto lg:bottom-6 lg:left-6";
+
   return (
-    <>
-      {show && (
+    <AnimatePresence initial={false}>
+      {show && !onBoardScreen && (
         <motion.div
-          initial={{ x: -100, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: -100, opacity: 0 }}
-          className="fixed z-50 sm:bottom-6 sm:left-6 sm:right-auto sm:top-auto left-3 right-3 top-20"
+          key="convert-card"
+          role="region"
+          aria-label="Save your guest account"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          className={`${position} lg:w-[340px]`}
         >
-          <div className="relative bg-gray-950/40 border border-white/10 backdrop-blur-sm border-gray-600 rounded-2xl shadow-lg p-3 sm:p-4 flex items-start gap-3 w-auto sm:w-[360px]">
+          <div className="relative rounded-lg border border-border-strong bg-card p-3 pr-12 sm:p-4 sm:pr-12">
             <button
+              type="button"
               onClick={handleDismiss}
-              aria-label="Dismiss"
-              className="absolute top-2 right-2 text-white/80 hover:text-white"
+              aria-label="Dismiss until tomorrow"
+              className="absolute right-1.5 top-1.5 inline-flex h-9 w-9 items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
             >
-              <X className="w-4 h-4" />
+              <X className="h-4 w-4" />
             </button>
-            <UserPlus className="w-6 h-6 text-white mt-0.5 flex-shrink-0" />
-            <div className="flex-1 space-y-1">
-              <div className="text-white font-semibold text-xs sm:text-sm">Complete your account</div>
-              <div className="text-blue-100 text-[11px] sm:text-xs">Set an email and password to save your progress and play on any device.</div>
-              <div className="text-amber-200/90 text-[10px] sm:text-[11px] mt-1">
-                Warning: Guest accounts are deleted daily at 00:00 (UTC). Time left: {countdown}
-              </div>
+            <p className="text-sm font-semibold text-foreground">
+              Save your guest account
+            </p>
+            <p className="mt-1 text-[13px] text-foreground/85">
+              Guest accounts are deleted every day at 00:00 UTC. Add an email
+              and password to keep your progress and play on any device.
+            </p>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <p className="text-xs text-foreground/80">
+                Time left{" "}
+                <FixedDigits className="text-gold-300">{countdown}</FixedDigits>
+              </p>
+              <Button asChild size="sm">
+                <Link to="/settings" search={{ convert: "1" }}>
+                  Save account
+                </Link>
+              </Button>
             </div>
-            <Button
-              className="ml-2 px-3 py-2 sm:px-4"
-              asChild
-              variant="gradient"
-            >
-              <Link to="/settings" search={{ convert: "1" }}>
-                Convert
-              </Link>
-            </Button>
           </div>
         </motion.div>
       )}
 
       {shouldShowReopen && (
-        <div className="fixed z-40 sm:bottom-6 sm:left-6 right-3 top-20 sm:top-auto sm:right-auto">
+        <motion.div
+          key="convert-reopen"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.75rem)] left-3 z-40 lg:bottom-6 lg:left-6"
+        >
           <Button
+            type="button"
+            variant="secondary"
             onClick={() => setShow(true)}
-            variant="gradient"
-            className="px-3 sm:px-4"
+            className="bg-card"
           >
-            <UserPlus className="w-4 h-4 mr-2" />
-            <span className="text-sm">Convert</span>
+            <UserPlus />
+            Save account
           </Button>
-        </div>
+        </motion.div>
       )}
-    </>
+    </AnimatePresence>
   );
 }

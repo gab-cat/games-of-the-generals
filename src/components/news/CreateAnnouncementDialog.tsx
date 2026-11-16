@@ -13,7 +13,7 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
 import { Checkbox } from "../ui/checkbox";
-import { Loader2, Save, X } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 
@@ -37,7 +37,7 @@ interface CreateAnnouncementDialogProps {
 export function CreateAnnouncementDialog({
   isOpen,
   onClose,
-  editAnnouncement
+  editAnnouncement,
 }: CreateAnnouncementDialogProps) {
   const [title, setTitle] = useState(editAnnouncement?.title || "");
   const [content, setContent] = useState(editAnnouncement?.content || "");
@@ -53,7 +53,7 @@ export function CreateAnnouncementDialog({
     e.preventDefault();
 
     if (!title.trim() || !content.trim()) {
-      toast.error("Please fill in all required fields");
+      toast.error("Add a title and a body first.");
       return;
     }
 
@@ -67,14 +67,14 @@ export function CreateAnnouncementDialog({
           content: content.trim(),
           isPinned,
         });
-        toast.success("Announcement updated successfully!");
+        toast.success("Post updated");
       } else {
         await createAnnouncement({
           title: title.trim(),
           content: content.trim(),
           isPinned,
         });
-        toast.success("Announcement created successfully!");
+        toast.success("Post published");
       }
 
       // Reset form and close dialog
@@ -84,7 +84,11 @@ export function CreateAnnouncementDialog({
       onClose();
     } catch (error) {
       console.error("Error saving announcement:", error);
-      toast.error(isEditing ? "Failed to update announcement" : "Failed to create announcement");
+      toast.error(
+        isEditing
+          ? "Could not save the post. Try again."
+          : "Could not publish the post. Try again.",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -101,95 +105,74 @@ export function CreateAnnouncementDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">
-            {isEditing ? "Edit Announcement" : "Create Announcement"}
-          </DialogTitle>
-          <DialogDescription className="text-slate-400">
+          <DialogTitle>{isEditing ? "Edit post" : "New post"}</DialogTitle>
+          <DialogDescription>
             {isEditing
-              ? "Update the announcement details below."
-              : "Create a new announcement. Content supports Markdown formatting."
-            }
+              ? "Changes show up for everyone right away."
+              : "The post is visible to all players as soon as you publish it."}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2">
-            <Label htmlFor="title" className="text-white">
-              Title *
-            </Label>
+            <Label htmlFor="title">Title</Label>
             <Input
               id="title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter announcement title"
-              className="bg-slate-800 border-slate-600 text-white placeholder-slate-400"
               disabled={isSubmitting}
               required
             />
           </div>
 
-          {/* Content */}
           <div className="space-y-2">
-            <Label htmlFor="content" className="text-white">
-              Content *
-            </Label>
+            <Label htmlFor="content">Body</Label>
             <Textarea
               id="content"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Enter announcement content (Markdown supported)"
-              className="bg-slate-800 border-slate-600 text-white placeholder-slate-400 min-h-[200px] font-mono text-sm"
+              className="min-h-[220px]"
               disabled={isSubmitting}
               required
             />
-            <div className="text-xs text-slate-400">
-              Supports Markdown: **bold**, *italic*, [links](url), `code`, etc.
-            </div>
+            <p className="text-xs text-foreground/80">
+              Markdown works: **bold**, *italic*, [link](url), lists and
+              headings.
+            </p>
           </div>
 
-          {/* Pinned Checkbox */}
-          <div className="flex items-center space-x-2">
+          <div className="flex min-h-10 items-center gap-3">
             <Checkbox
               id="pinned"
               checked={isPinned}
               onCheckedChange={(checked) => setIsPinned(checked === true)}
               disabled={isSubmitting}
-              className="border-slate-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
             />
-            <Label htmlFor="pinned" className="text-white text-sm">
-              Pin this announcement (appears at the top)
+            <Label htmlFor="pinned" className="cursor-pointer">
+              Pin to the top of the news page
             </Label>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+          <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row sm:justify-end">
             <Button
               type="button"
               variant="ghost"
               onClick={handleClose}
               disabled={isSubmitting}
-              className="text-slate-400 hover:text-white hover:bg-slate-800"
             >
-              <X className="w-4 h-4 mr-2" />
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isSubmitting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="animate-spin" /> : null}
               {isSubmitting
-                ? (isEditing ? "Updating..." : "Creating...")
-                : (isEditing ? "Update Announcement" : "Create Announcement")
-              }
+                ? isEditing
+                  ? "Saving"
+                  : "Publishing"
+                : isEditing
+                  ? "Save changes"
+                  : "Publish"}
             </Button>
           </div>
         </form>

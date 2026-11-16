@@ -19,13 +19,10 @@ export const ensureNotificationConversation = internalMutation({
     // Check if user already has a notification conversation
     const existingConversation = await ctx.db
       .query("conversations")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("participant1Id"), args.userId),
-          q.eq(q.field("participant2Id"), args.userId), // Same user ID for system conversation
-          q.eq(q.field("isSystemNotification"), true)
-        )
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", args.userId).eq("participant2Id", args.userId),
       )
+      .filter((q) => q.eq(q.field("isSystemNotification"), true))
       .first();
 
     if (existingConversation) {
@@ -176,13 +173,10 @@ export const getNotificationConversation = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("conversations")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("participant1Id"), args.userId),
-          q.eq(q.field("participant2Id"), args.userId),
-          q.eq(q.field("isSystemNotification"), true)
-        )
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", args.userId).eq("participant2Id", args.userId),
       )
+      .filter((q) => q.eq(q.field("isSystemNotification"), true))
       .first();
   },
 });
@@ -231,8 +225,7 @@ export const deleteExpiredNotifications = internalMutation({
     while (hasMore) {
       const expiredNotifications = await ctx.db
         .query("notifications")
-        .withIndex("by_expires_at")
-        .filter((q) => q.lt(q.field("expiresAt"), now))
+        .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
         .take(BATCH_SIZE);
 
       if (expiredNotifications.length === 0) {
@@ -270,13 +263,10 @@ export const resetNotificationCounter = internalMutation({
     // Find the notification conversation for this user
     const notificationConversation = await ctx.db
       .query("conversations")
-      .filter((q) =>
-        q.and(
-          q.eq(q.field("participant1Id"), args.userId),
-          q.eq(q.field("participant2Id"), args.userId), // Same user ID for system conversation
-          q.eq(q.field("isSystemNotification"), true)
-        )
+      .withIndex("by_participants", (q) =>
+        q.eq("participant1Id", args.userId).eq("participant2Id", args.userId),
       )
+      .filter((q) => q.eq(q.field("isSystemNotification"), true))
       .first();
 
     if (!notificationConversation) {

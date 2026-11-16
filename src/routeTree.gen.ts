@@ -24,7 +24,6 @@ import { Route as MatchHistoryRouteImport } from './routes/match-history'
 import { Route as MaintenanceRouteImport } from './routes/maintenance'
 import { Route as LeaderboardRouteImport } from './routes/leaderboard'
 import { Route as GameRouteImport } from './routes/game'
-import { Route as EmailPreviewRouteImport } from './routes/email-preview'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AnnouncementsRouteImport } from './routes/announcements'
 import { Route as AiGameRouteImport } from './routes/ai-game'
@@ -37,6 +36,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTicketsRouteImport } from './routes/admin/tickets'
 import { Route as AdminSubscriptionsRouteImport } from './routes/admin/subscriptions'
+import { Route as AdminEmailsRouteImport } from './routes/admin/emails'
 
 const TestCountdownRoute = TestCountdownRouteImport.update({
   id: '/test-countdown',
@@ -113,11 +113,6 @@ const GameRoute = GameRouteImport.update({
   path: '/game',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EmailPreviewRoute = EmailPreviewRouteImport.update({
-  id: '/email-preview',
-  path: '/email-preview',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -178,6 +173,11 @@ const AdminSubscriptionsRoute = AdminSubscriptionsRouteImport.update({
   path: '/subscriptions',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEmailsRoute = AdminEmailsRouteImport.update({
+  id: '/emails',
+  path: '/emails',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -188,7 +188,6 @@ export interface FileRoutesByFullPath {
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
-  '/email-preview': typeof EmailPreviewRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/maintenance': typeof MaintenanceRoute
@@ -204,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
   '/test-countdown': typeof TestCountdownRoute
+  '/admin/emails': typeof AdminEmailsRoute
   '/admin/subscriptions': typeof AdminSubscriptionsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -217,7 +217,6 @@ export interface FileRoutesByTo {
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
-  '/email-preview': typeof EmailPreviewRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/maintenance': typeof MaintenanceRoute
@@ -233,6 +232,7 @@ export interface FileRoutesByTo {
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
   '/test-countdown': typeof TestCountdownRoute
+  '/admin/emails': typeof AdminEmailsRoute
   '/admin/subscriptions': typeof AdminSubscriptionsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -248,7 +248,6 @@ export interface FileRoutesById {
   '/ai-game': typeof AiGameRoute
   '/announcements': typeof AnnouncementsRoute
   '/auth': typeof AuthRoute
-  '/email-preview': typeof EmailPreviewRoute
   '/game': typeof GameRoute
   '/leaderboard': typeof LeaderboardRoute
   '/maintenance': typeof MaintenanceRoute
@@ -264,6 +263,7 @@ export interface FileRoutesById {
   '/support-resolve': typeof SupportResolveRoute
   '/terms': typeof TermsRoute
   '/test-countdown': typeof TestCountdownRoute
+  '/admin/emails': typeof AdminEmailsRoute
   '/admin/subscriptions': typeof AdminSubscriptionsRoute
   '/admin/tickets': typeof AdminTicketsRoute
   '/admin/users': typeof AdminUsersRoute
@@ -280,7 +280,6 @@ export interface FileRouteTypes {
     | '/ai-game'
     | '/announcements'
     | '/auth'
-    | '/email-preview'
     | '/game'
     | '/leaderboard'
     | '/maintenance'
@@ -296,6 +295,7 @@ export interface FileRouteTypes {
     | '/support-resolve'
     | '/terms'
     | '/test-countdown'
+    | '/admin/emails'
     | '/admin/subscriptions'
     | '/admin/tickets'
     | '/admin/users'
@@ -309,7 +309,6 @@ export interface FileRouteTypes {
     | '/ai-game'
     | '/announcements'
     | '/auth'
-    | '/email-preview'
     | '/game'
     | '/leaderboard'
     | '/maintenance'
@@ -325,6 +324,7 @@ export interface FileRouteTypes {
     | '/support-resolve'
     | '/terms'
     | '/test-countdown'
+    | '/admin/emails'
     | '/admin/subscriptions'
     | '/admin/tickets'
     | '/admin/users'
@@ -339,7 +339,6 @@ export interface FileRouteTypes {
     | '/ai-game'
     | '/announcements'
     | '/auth'
-    | '/email-preview'
     | '/game'
     | '/leaderboard'
     | '/maintenance'
@@ -355,6 +354,7 @@ export interface FileRouteTypes {
     | '/support-resolve'
     | '/terms'
     | '/test-countdown'
+    | '/admin/emails'
     | '/admin/subscriptions'
     | '/admin/tickets'
     | '/admin/users'
@@ -370,7 +370,6 @@ export interface RootRouteChildren {
   AiGameRoute: typeof AiGameRoute
   AnnouncementsRoute: typeof AnnouncementsRoute
   AuthRoute: typeof AuthRoute
-  EmailPreviewRoute: typeof EmailPreviewRoute
   GameRoute: typeof GameRoute
   LeaderboardRoute: typeof LeaderboardRoute
   MaintenanceRoute: typeof MaintenanceRoute
@@ -495,13 +494,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/email-preview': {
-      id: '/email-preview'
-      path: '/email-preview'
-      fullPath: '/email-preview'
-      preLoaderRoute: typeof EmailPreviewRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -586,10 +578,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminSubscriptionsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/emails': {
+      id: '/admin/emails'
+      path: '/emails'
+      fullPath: '/admin/emails'
+      preLoaderRoute: typeof AdminEmailsRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminEmailsRoute: typeof AdminEmailsRoute
   AdminSubscriptionsRoute: typeof AdminSubscriptionsRoute
   AdminTicketsRoute: typeof AdminTicketsRoute
   AdminUsersRoute: typeof AdminUsersRoute
@@ -597,6 +597,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminEmailsRoute: AdminEmailsRoute,
   AdminSubscriptionsRoute: AdminSubscriptionsRoute,
   AdminTicketsRoute: AdminTicketsRoute,
   AdminUsersRoute: AdminUsersRoute,
@@ -614,7 +615,6 @@ const rootRouteChildren: RootRouteChildren = {
   AiGameRoute: AiGameRoute,
   AnnouncementsRoute: AnnouncementsRoute,
   AuthRoute: AuthRoute,
-  EmailPreviewRoute: EmailPreviewRoute,
   GameRoute: GameRoute,
   LeaderboardRoute: LeaderboardRoute,
   MaintenanceRoute: MaintenanceRoute,

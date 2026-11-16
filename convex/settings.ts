@@ -132,7 +132,7 @@ export const requestEmailChange = action({
     }
     
     try {
-      verificationCode = await ctx.runAction(internal.ResendEmailChangeVerification.sendEmailChangeVerification, {
+      verificationCode = await ctx.runAction(internal.emailChangeVerification.sendEmailChangeVerification, {
         currentEmail: user.email,
         newEmail: args.newEmail,
       });

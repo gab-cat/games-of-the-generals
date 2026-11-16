@@ -3,15 +3,11 @@ import { motion } from "framer-motion";
 import {
   Send,
   Copy,
-  ExternalLink,
   Users,
-  CheckCheck,
-  Check,
-  AlertCircle,
+  Eye,
   ArrowLeft,
-  GamepadIcon,
-  Target,
-  Bell,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { useConvex, useMutation } from "convex/react";
@@ -20,14 +16,10 @@ import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
+import { Skeleton } from "../ui/skeleton";
 import { UserAvatar } from "../UserAvatar";
 import { UserNameWithBadge } from "../UserNameWithBadge";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
+import { BrandMark } from "../BrandMark";
 import { cn } from "../../lib/utils";
 import { toast } from "sonner";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
@@ -84,7 +76,16 @@ interface LobbyInviteMessageProps {
   onNavigateToLobby?: (lobbyId: string) => void;
   copyLobbyCode: (code: string) => void;
   currentUserId?: string;
-  onJoinLobby?: (lobbyId: string) => void;
+  onJoinLobby?: (lobbyId: string) => Promise<void> | void;
+}
+
+function StatusDot({ className }: { className: string }) {
+  return (
+    <span
+      className={cn("size-2 shrink-0 rounded-full", className)}
+      aria-hidden="true"
+    />
+  );
 }
 
 function LobbyInviteMessage({
@@ -94,6 +95,7 @@ function LobbyInviteMessage({
   currentUserId,
   onJoinLobby,
 }: LobbyInviteMessageProps) {
+  const [isJoining, setIsJoining] = useState(false);
   const { data: lobbyInfo } = useConvexQuery(
     api.lobbies.getLobby,
     message.lobbyId ? { lobbyId: message.lobbyId as Id<"lobbies"> } : "skip",
@@ -101,110 +103,109 @@ function LobbyInviteMessage({
 
   const isOwnMessage = message.senderId === currentUserId;
 
+  const handleJoin = async () => {
+    if (!onJoinLobby || !message.lobbyId || isJoining) return;
+    setIsJoining(true);
+    try {
+      await onJoinLobby(message.lobbyId);
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  const copyButton = message.lobbyCode ? (
+    <Button
+      size="sm"
+      variant="secondary"
+      onClick={() => copyLobbyCode(message.lobbyCode!)}
+    >
+      <Copy />
+      Copy code
+    </Button>
+  ) : null;
+
   return (
-    <div className="space-y-3 font-mono">
-      {/* Header with icon and lobby name */}
-      <div className="flex items-center justify-between border-b border-white/5 pb-2">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-blue-400">
-          <Users className="w-3 h-3" />
-          <span>LOBBY_INVITE_PROTOCOL</span>
-        </div>
-        {message.lobbyName && (
-          <span className="text-[10px] text-zinc-500 font-mono bg-zinc-950/50 px-2 py-0.5 rounded border border-white/5">
-            {message.lobbyName}
-          </span>
+    <div className="w-full min-w-[220px] space-y-3">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+          <Users className="size-4 shrink-0" />
+          Lobby invite
+        </p>
+        {(message.lobbyName ?? lobbyInfo?.name) && (
+          <p className="mt-0.5 truncate text-sm text-foreground/80">
+            {message.lobbyName ?? lobbyInfo?.name}
+          </p>
         )}
       </div>
 
-      {/* Status indicator */}
       {lobbyInfo ? (
-        <div className="flex items-center justify-between">
-          {lobbyInfo.status === "waiting" ? (
-            <div className="text-[10px] text-green-400 flex items-center gap-2 uppercase tracking-wide">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              STATUS: OPEN ({lobbyInfo.playerId ? "2/2" : "1/2"})
-            </div>
-          ) : lobbyInfo.status === "playing" ? (
-            <div className="text-[10px] text-amber-400 flex items-center gap-2 uppercase tracking-wide">
-              <div className="w-2 h-2 bg-amber-400 rounded-sm animate-pulse"></div>
-              STATUS: ENGAGED
-            </div>
-          ) : (
-            <div className="text-[10px] text-red-400 flex items-center gap-2 uppercase tracking-wide">
-              <div className="w-2 h-2 bg-red-400 rounded-sm"></div>
-              STATUS: TERMINATED
-            </div>
-          )}
-
-          {/* Action buttons - compact */}
-          <div className="flex ml-2 gap-1">
-            {message.lobbyCode && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => copyLobbyCode(message.lobbyCode!)}
-                className="h-6 px-2 text-[10px] font-mono uppercase bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
-              >
-                <Copy className="w-3 h-3 mr-1" />
-                Code
-              </Button>
+        <>
+          <p className="flex items-center gap-2 text-sm text-foreground/90">
+            {lobbyInfo.status === "waiting" ? (
+              <>
+                <StatusDot className="bg-emerald-400" />
+                Open, {lobbyInfo.playerId ? "2" : "1"} of 2 players
+              </>
+            ) : lobbyInfo.status === "playing" ? (
+              <>
+                <StatusDot className="bg-gold-400" />
+                Game in progress
+              </>
+            ) : (
+              <>
+                <StatusDot className="bg-foreground/40" />
+                Game over
+              </>
             )}
+          </p>
+
+          <div className="flex flex-wrap gap-2">
             {!isOwnMessage &&
               message.lobbyId &&
-              lobbyInfo?.status === "waiting" &&
+              lobbyInfo.status === "waiting" &&
               onJoinLobby && (
                 <Button
                   size="sm"
-                  onClick={() => onJoinLobby(message.lobbyId!)}
-                  className="h-6 px-3 text-[10px] font-bold font-mono uppercase bg-green-600/20 text-green-400 border border-green-500/50 hover:bg-green-600/40 hover:text-green-300"
+                  onClick={() => void handleJoin()}
+                  disabled={isJoining}
                 >
-                  Confirm Join
+                  {isJoining ? (
+                    <>
+                      <Loader2 className="animate-spin" />
+                      Joining
+                    </>
+                  ) : (
+                    "Join lobby"
+                  )}
                 </Button>
               )}
             {!isOwnMessage &&
               message.lobbyId &&
               onNavigateToLobby &&
-              (lobbyInfo?.status === "playing" ||
-                lobbyInfo?.status === "finished") && (
+              lobbyInfo.status === "playing" && (
                 <Button
                   size="sm"
+                  variant="secondary"
                   onClick={() => onNavigateToLobby(message.lobbyId!)}
-                  className="h-6 px-3 text-[10px] font-bold font-mono uppercase bg-purple-600/20 text-purple-400 border border-purple-500/50 hover:bg-purple-600/40 hover:text-purple-300"
-                  disabled={lobbyInfo.status === "finished"}
                 >
-                  Observe
+                  <Eye />
+                  Spectate
                 </Button>
               )}
+            {copyButton}
           </div>
-        </div>
+        </>
       ) : message.lobbyId ? (
-        <div className="text-[10px] text-red-400/80 flex items-center gap-2 uppercase font-mono">
-          <AlertCircle className="w-3 h-3" />
-          UPLINK_EXPIRED // TARGET_LOST
-        </div>
+        <p className="flex items-center gap-2 text-sm text-foreground/80">
+          <StatusDot className="bg-foreground/40" />
+          This invite has expired.
+        </p>
       ) : (
-        message.lobbyCode && (
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => copyLobbyCode(message.lobbyCode!)}
-              className="h-6 px-2 text-[10px] font-mono uppercase bg-zinc-900/50 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700"
-            >
-              <Copy className="w-3 h-3 mr-1" />
-              Code
-            </Button>
-          </div>
-        )
+        copyButton && <div className="flex">{copyButton}</div>
       )}
     </div>
   );
 }
-
-type ConversationMode = "message" | "notification";
 
 export function ConversationView({
   otherUserId,
@@ -224,7 +225,7 @@ export function ConversationView({
   const newestTimestampRef = useRef<number>(0);
 
   // Online users presence data
-  const { onlineUsers } = useOnlineUsers();
+  const { onlineUsers } = useOnlineUsers(true);
 
   // Chat protection hook
   const {
@@ -265,43 +266,39 @@ export function ConversationView({
     setShowSpamModal: (show: boolean) => void;
   };
 
-  // Helper: status indicator node and status text for header
+  // Helper: status dot and status text for the header
   const getHeaderStatus = (username?: string) => {
-    if (!username)
-      return {
-        indicator: null as React.ReactNode,
-        text: null as string | null,
-      };
+    const none = {
+      indicator: null as React.ReactNode,
+      text: null as string | null,
+    };
+    if (!username) return none;
     const user = onlineUsers?.find(
       (u: { username: string }) => u.username === username,
     );
-    if (!user)
-      return {
-        indicator: null as React.ReactNode,
-        text: null as string | null,
-      };
+    if (!user) return none;
 
     if (user.gameId) {
       return {
-        indicator: <GamepadIcon className="w-3 h-3 text-red-400" />,
-        text: "In Game",
+        indicator: <StatusDot className="size-2.5 bg-red-400" />,
+        text: "In a game",
       };
     }
     if (user.lobbyId) {
       return {
-        indicator: <Target className="w-3 h-3 text-green-400" />,
-        text: "In Lobby",
+        indicator: <StatusDot className="size-2.5 bg-gold-400" />,
+        text: "In a lobby",
       };
     }
     if (user.aiGameId) {
       return {
-        indicator: <GamepadIcon className="w-3 h-3 text-yellow-400" />,
-        text: "In AI Game",
+        indicator: <StatusDot className="size-2.5 bg-gold-400" />,
+        text: "Playing the AI",
       };
     }
     // Generally online
     return {
-      indicator: <div className="w-3 h-3 bg-green-400 rounded-full" />,
+      indicator: <StatusDot className="size-2.5 bg-emerald-400" />,
       text: null,
     };
   };
@@ -351,15 +348,6 @@ export function ConversationView({
 
   // Check if this is a system notification conversation (both participants are the same user)
   const isNotificationConversation = otherUserId === currentUserProfile?.userId;
-  console.log("🔧 Is notification conversation:", isNotificationConversation);
-  console.log("🔧 Other user ID:", otherUserId);
-  console.log("🔧 Current user profile ID:", currentUserProfile?._id);
-
-  // Determine conversation mode
-  const conversationMode: ConversationMode = isNotificationConversation
-    ? "notification"
-    : "message";
-  console.log("🔧 Conversation mode:", conversationMode);
 
   // Typing status of the other user
   const { data: typingStatus } = useConvexQuery(api.messages.getTypingStatus, {
@@ -644,8 +632,8 @@ export function ConversationView({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       void handleSendMessage();
     }
@@ -694,17 +682,17 @@ export function ConversationView({
   const copyLobbyCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
-      toast.success("Lobby code copied!");
+      toast.success("Lobby code copied.");
     } catch (error) {
       console.error("Failed to copy code:", error);
-      toast.error("Failed to copy code");
+      toast.error("Couldn't copy the code. Copy it by hand.");
     }
   };
 
   const handleJoinLobby = async (lobbyId: string) => {
     try {
       await joinLobby({ lobbyId: lobbyId as Id<"lobbies"> });
-      toast.success("Joined lobby! Waiting for host to start the game...");
+      toast.success("You joined the lobby. Waiting for the host to start.");
 
       // Navigate to lobby page after joining
       if (onNavigateToLobby) {
@@ -712,7 +700,7 @@ export function ConversationView({
       }
     } catch (error) {
       console.error("Failed to join lobby:", error);
-      toast.error("Failed to join lobby");
+      toast.error("Couldn't join the lobby. It may be full or closed.");
     }
   };
 
@@ -730,19 +718,6 @@ export function ConversationView({
       });
     }
     return date.toLocaleDateString([], { month: "short", day: "numeric" });
-  };
-
-  const formatFullTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString([], {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
   };
 
   // Helper function to determine message clustering
@@ -806,7 +781,6 @@ export function ConversationView({
     } else {
       dateText = date.toLocaleDateString([], {
         weekday: "long",
-        year: "numeric",
         month: "long",
         day: "numeric",
       });
@@ -818,13 +792,55 @@ export function ConversationView({
     });
 
     return (
-      <div className="flex items-center justify-center my-6">
-        <div className="flex-1 h-px bg-white/20"></div>
-        <div className="px-3 py-1 mx-4 text-xs text-white/60">
-          {dateText} at {timeText}
-        </div>
-        <div className="flex-1 h-px bg-white/20"></div>
+      <div className="my-5 flex items-center gap-3">
+        <div className="h-px flex-1 bg-border" />
+        <p className="text-xs text-foreground/70">
+          {dateText}, {timeText}
+        </p>
+        <div className="h-px flex-1 bg-border" />
       </div>
+    );
+  };
+
+  const renderNotificationText = (content: string) => {
+    const ticketLinkMatch = content.match(/Ticket:\s*(https?:\/\/[^\s]+)/);
+    if (!ticketLinkMatch) return content;
+
+    const [fullMatch, url] = ticketLinkMatch;
+    const beforeLink = content.substring(0, content.indexOf(fullMatch));
+    const afterLink = content.substring(
+      content.indexOf(fullMatch) + fullMatch.length,
+    );
+
+    const handleTicketLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Extract ticket ID from URL (format: /support/TICKET_ID)
+      const urlParts = url.split("/support/");
+      if (urlParts.length > 1) {
+        const ticketId = urlParts[1];
+        onNavigateToTicket?.(ticketId);
+        void navigate({ to: "/support", search: { ticketId } });
+      }
+    };
+
+    return (
+      <>
+        {beforeLink}
+        <span className="my-2 flex items-center justify-between gap-3 rounded-md border border-border bg-white/[0.04] px-3 py-2">
+          <span className="text-sm text-foreground">Support ticket</span>
+          <a
+            href={url}
+            onClick={handleTicketLinkClick}
+            className="inline-flex items-center gap-1 rounded text-sm font-medium text-gold-300 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+          >
+            Open
+            <ExternalLink className="size-3.5" />
+          </a>
+        </span>
+        {afterLink}
+      </>
     );
   };
 
@@ -834,71 +850,34 @@ export function ConversationView({
     messagePosition: "single" | "first" | "middle" | "last",
     isOptimistic = false,
   ) => {
-    const showAvatar =
-      !isOwn && (messagePosition === "single" || messagePosition === "last"); // Show avatar at the bottom for incoming
-    const showTimestamp =
+    const isLastOfGroup =
       messagePosition === "single" || messagePosition === "last";
-
-    // Adjust spacing based on message position
-    const marginBottom =
-      messagePosition === "last" || messagePosition === "single"
-        ? "mb-6"
-        : "mb-0.5";
-
-    // Angular tactical corners
-    const getBorderRadius = () => {
-      const baseRadius = "rounded-sm"; // Default sharp corners
-
-      if (isOwn) {
-        // Own messages (Right side)
-        switch (messagePosition) {
-          case "single":
-            return "rounded-lg rounded-tr-none";
-          case "first":
-            return "rounded-lg rounded-tr-none rounded-br-none";
-          case "middle":
-            return "rounded-lg rounded-r-none";
-          case "last":
-            return "rounded-lg rounded-br-none rounded-tr-none";
-          default:
-            return baseRadius;
-        }
-      } else {
-        // Other messages (Left side)
-        switch (messagePosition) {
-          case "single":
-            return "rounded-lg rounded-tl-none";
-          case "first":
-            return "rounded-lg rounded-tl-none rounded-bl-none";
-          case "middle":
-            return "rounded-lg rounded-l-none";
-          case "last":
-            return "rounded-lg rounded-bl-none rounded-tl-none";
-          default:
-            return baseRadius;
-        }
-      }
-    };
+    const showAvatar = !isOwn && isLastOfGroup;
+    const isCard = message.messageType !== "text";
+    const failed =
+      isOptimistic && "status" in message && message.status === "failed";
+    const sending =
+      isOptimistic && "status" in message && message.status === "sending";
+    const timestamp =
+      "isOptimistic" in message ? message._creationTime : message.timestamp;
 
     return (
       <motion.div
         key={message._id}
-        initial={{ opacity: 0, y: 5 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.15 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
         className={cn(
-          "flex gap-3 items-end group",
-          marginBottom,
+          "flex items-end gap-2",
+          isLastOfGroup || failed ? "mb-3" : "mb-0.5",
           isOwn ? "justify-end" : "justify-start",
         )}
       >
         {!isOwn && (
-          <div className="w-8 flex flex-col justify-end self-end shrink-0">
-            {showAvatar ? (
-              isNotificationConversation ? (
-                <div className="w-8 h-8 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
-                  <Bell className="w-4 h-4 text-blue-400" />
-                </div>
+          <div className="flex w-8 shrink-0 items-end">
+            {showAvatar &&
+              (isNotificationConversation ? (
+                <BrandMark className="size-7" />
               ) : (
                 <UserAvatar
                   username={
@@ -908,206 +887,128 @@ export function ConversationView({
                   rank={otherUserProfile?.rank}
                   size="sm"
                   frame={otherUserProfile?.avatarFrame}
-                  className="mb-1"
                 />
-              )
-            ) : (
-              <div className="w-8 h-8"></div>
-            )}
-          </div>
-        )}
-
-        {/* Timestamp and status for own messages (left side of bubble) */}
-        {isOwn && showTimestamp && (
-          <div className="flex gap-1.5 items-center mb-1 mr-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            {!isOptimistic && (
-              <div className="flex items-center">
-                {message.readAt ? (
-                  <CheckCheck className="w-3 h-3 text-amber-500" />
-                ) : message.deliveredAt ? (
-                  <Check className="w-3 h-3 text-zinc-600" />
-                ) : (
-                  <div className="w-2 h-2 rounded-full border border-zinc-600" />
-                )}
-              </div>
-            )}
-            <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">
-              {formatTime(
-                "isOptimistic" in message
-                  ? message._creationTime
-                  : message.timestamp,
-              )}
-            </div>
-            {isOptimistic && "status" in message && (
-              <div className="flex items-center">
-                {message.status === "sending" ? (
-                  <div className="w-2 h-2 border border-amber-500/50 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <span className="text-[9px] text-red-500 font-mono uppercase">
-                    ERR
-                  </span>
-                )}
-              </div>
-            )}
+              ))}
           </div>
         )}
 
         <div
           className={cn(
-            "max-w-[75%] relative",
+            "flex min-w-0 max-w-[80%] flex-col",
             isOwn ? "items-end" : "items-start",
           )}
         >
-          {/* Message bubble */}
           <div
             className={cn(
-              "px-4 py-3 shadow-sm relative backdrop-blur-sm border transition-all duration-200",
-              getBorderRadius(),
+              "min-w-0 rounded-lg border px-3 py-2 transition-opacity",
               isOwn
-                ? "bg-amber-500/10 border-amber-500/20 text-amber-100/90 shadow-[0_0_15px_-5px_rgba(245,158,11,0.1)]"
-                : isNotificationConversation
-                  ? "bg-blue-900/10 border-blue-500/20 text-blue-100/90"
-                  : "bg-zinc-900/80 border-white/5 text-zinc-300 hover:border-zinc-700",
-              message.messageType !== "text" &&
-                !isOwn &&
-                "bg-transparent border-transparent px-0 py-0 shadow-none hover:border-transparent",
-              message.messageType !== "text" &&
-                isOwn &&
-                "bg-transparent border-transparent px-0 py-0 shadow-none hover:border-transparent",
-              isOptimistic &&
-                "opacity-70 border-dashed border-amber-500/30 bg-transparent",
+                ? "border-gold-500/25 bg-gold-500/10 text-foreground"
+                : "border-border bg-white/[0.06] text-foreground",
+              isOwn && isLastOfGroup && "rounded-br-sm",
+              !isOwn && isLastOfGroup && "rounded-bl-sm",
+              isCard && "w-full border-border bg-white/[0.04] p-3",
+              sending && "opacity-70",
+              failed && "border-red-500/40 bg-red-500/10",
             )}
           >
             {message.messageType === "lobby_invite" ? (
-              <div
-                className={cn(
-                  "p-3 rounded border w-full min-w-[260px]",
-                  isOwn
-                    ? "bg-amber-950/30 border-amber-500/20"
-                    : "bg-zinc-900/50 border-white/10",
-                )}
-              >
-                <LobbyInviteMessage
-                  message={message}
-                  onNavigateToLobby={onNavigateToLobby}
-                  copyLobbyCode={(code) => void copyLobbyCode(code)}
-                  currentUserId={currentUserProfile?.userId}
-                  onJoinLobby={(lobbyId) => void handleJoinLobby(lobbyId)}
-                />
-              </div>
+              <LobbyInviteMessage
+                message={message}
+                onNavigateToLobby={onNavigateToLobby}
+                copyLobbyCode={(code) => void copyLobbyCode(code)}
+                currentUserId={currentUserProfile?.userId}
+                onJoinLobby={handleJoinLobby}
+              />
             ) : message.messageType === "game_invite" ? (
-              <div
-                className={cn(
-                  "p-3 rounded border min-w-[240px]",
-                  isOwn
-                    ? "bg-amber-950/30 border-amber-500/20"
-                    : "bg-zinc-900/50 border-white/10",
-                )}
-              >
-                <div className="space-y-2 font-mono">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-400">
-                      <ExternalLink className="w-3 h-3" />
-                      <span>GAME_SPECTATE_LINK</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-end pt-1">
-                    {message.gameId && onNavigateToGame && (
-                      <Button
-                        size="sm"
-                        onClick={() => onNavigateToGame(message.gameId!)}
-                        className="h-6 px-3 text-[10px] font-bold font-mono uppercase bg-purple-600/20 text-purple-400 border border-purple-500/50 hover:bg-purple-600/40 hover:text-purple-300"
-                      >
-                        Initialize Uplink
-                      </Button>
-                    )}
-                  </div>
+              <div className="w-full min-w-[220px] space-y-3">
+                <div>
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <Eye className="size-4 shrink-0" />
+                    Game invite
+                  </p>
+                  <p className="mt-0.5 text-sm text-foreground/80">
+                    Watch this game live.
+                  </p>
                 </div>
+                {message.gameId && onNavigateToGame && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => onNavigateToGame(message.gameId!)}
+                  >
+                    <Eye />
+                    Spectate
+                  </Button>
+                )}
               </div>
             ) : (
-              <div
-                className={cn(
-                  "text-sm whitespace-pre-wrap break-words leading-relaxed",
-                  !isOwn && !isNotificationConversation && "font-sans",
-                  isOwn && "font-sans",
-                )}
-              >
+              <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                 {isNotificationConversation
-                  ? (() => {
-                      // Parse notification content for clickable ticket links
-                      const ticketLinkMatch = message.content.match(
-                        /Ticket:\s*(https?:\/\/[^\s]+)/,
-                      );
-                      if (ticketLinkMatch) {
-                        const [fullMatch, url] = ticketLinkMatch;
-                        const beforeLink = message.content.substring(
-                          0,
-                          message.content.indexOf(fullMatch),
-                        );
-                        const afterLink = message.content.substring(
-                          message.content.indexOf(fullMatch) + fullMatch.length,
-                        );
-
-                        const handleTicketLinkClick = (
-                          e: React.MouseEvent<HTMLAnchorElement>,
-                        ) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          // Extract ticket ID from URL (format: /support/TICKET_ID)
-                          const urlParts = url.split("/support/");
-                          if (urlParts.length > 1) {
-                            const ticketId = urlParts[1];
-                            // Call the callback if provided
-                            if (onNavigateToTicket) {
-                              onNavigateToTicket(ticketId);
-                            }
-                            // Navigate to support page with ticket ID as query parameter
-                            void navigate({
-                              to: "/support",
-                              search: { ticketId },
-                            });
-                          }
-                        };
-
-                        return (
-                          <div className="font-mono text-xs">
-                            {beforeLink}
-                            <div className="my-2 p-2 bg-blue-500/10 border border-blue-500/30 rounded flex items-center justify-between">
-                              <span className="text-blue-200">
-                                SUPPORT_TICKET_REF
-                              </span>
-                              <a
-                                href={url}
-                                onClick={handleTicketLinkClick}
-                                className="text-blue-400 hover:text-blue-300 uppercase font-bold text-[10px] flex items-center gap-1"
-                              >
-                                ACCESS
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            </div>
-                            {afterLink}
-                          </div>
-                        );
-                      }
-                      return (
-                        <span className="font-mono text-xs text-blue-200/80">
-                          {message.content}
-                        </span>
-                      );
-                    })()
+                  ? renderNotificationText(message.content)
                   : message.content}
               </div>
             )}
           </div>
 
-          {/* Timestamp for other user messages (right side, outside bubble) */}
-          {!isOwn && showTimestamp && (
-            <div className="absolute -right-12 bottom-0 text-[9px] font-mono text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity">
-              {formatTime(
-                "isOptimistic" in message
-                  ? message._creationTime
-                  : message.timestamp,
+          {(isLastOfGroup || failed) && (
+            <div
+              className={cn(
+                "mt-1 flex items-center gap-2 text-xs text-muted-foreground",
+                isOwn ? "justify-end" : "justify-start",
+              )}
+            >
+              {failed ? (
+                <>
+                  <span className="text-red-300">Not sent</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2 text-red-200 hover:text-red-100"
+                    onClick={() =>
+                      void retryFailedMessage(message._id, message.content)
+                    }
+                  >
+                    Retry
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2"
+                    onClick={() =>
+                      setOptimisticMessages((prev) =>
+                        prev.filter((m) => m._id !== message._id),
+                      )
+                    }
+                  >
+                    Remove
+                  </Button>
+                </>
+              ) : sending ? (
+                <span className="flex items-center gap-1.5">
+                  <Loader2 className="size-3 animate-spin" />
+                  Sending
+                </span>
+              ) : (
+                <>
+                  <span className="tabular-nums">
+                    {formatTime(timestamp)}
+                  </span>
+                  {isOwn && !isNotificationConversation && (
+                    <span
+                      className={cn(
+                        message.readAt
+                          ? "text-gold-300"
+                          : "text-muted-foreground",
+                      )}
+                    >
+                      {message.readAt
+                        ? "Read"
+                        : message.deliveredAt
+                          ? "Delivered"
+                          : "Sent"}
+                    </span>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -1126,31 +1027,44 @@ export function ConversationView({
 
   if (!otherUserProfile) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+      <div className="flex h-full flex-col" aria-hidden="true">
+        <div className="flex items-center gap-3 border-b border-border p-4 pr-14">
+          <Skeleton className="size-10 rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-28" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        </div>
       </div>
     );
   }
 
+  const headerStatus = !isNotificationConversation
+    ? getHeaderStatus(otherUserProfile.username)
+    : null;
+  const winsLabel = `${otherUserProfile.wins} ${otherUserProfile.wins === 1 ? "win" : "wins"}`;
+  const lossesLabel = `${otherUserProfile.losses} ${otherUserProfile.losses === 1 ? "loss" : "losses"}`;
+
   return (
-    <TooltipProvider>
-      <div className="h-full flex flex-col bg-zinc-950 text-zinc-300">
-        {/* Chat Header */}
-        <div className="flex items-center gap-3 p-4 border-b border-white/5 bg-zinc-900/50 backdrop-blur-md">
+    <>
+      <div className="flex h-full flex-col bg-card">
+        {/* Header */}
+        <div className="flex shrink-0 items-center gap-2 border-b border-border py-3 pl-2 pr-14">
           {onBack && (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={onBack}
-              className="p-2 h-8 w-8 text-zinc-500 hover:text-white hover:bg-white/10 rounded-sm"
+              aria-label="Back to messages"
+              className="h-10 w-10 shrink-0"
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft />
             </Button>
           )}
-          <div className="relative">
+          <div className="relative shrink-0">
             {isNotificationConversation ? (
-              <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.2)]">
-                <Bell className="w-5 h-5 text-blue-400" />
+              <div className="flex size-10 items-center justify-center">
+                <BrandMark className="size-8" />
               </div>
             ) : (
               <UserAvatar
@@ -1161,37 +1075,21 @@ export function ConversationView({
                 rank={otherUserProfile?.rank}
               />
             )}
-            {!isNotificationConversation &&
-              (() => {
-                const { indicator } = getHeaderStatus(
-                  otherUserProfile?.username,
-                );
-                return indicator ? (
-                  <div className="absolute -bottom-1 -right-1 bg-zinc-950 rounded-full p-0.5 border border-zinc-900">
-                    {indicator}
-                  </div>
-                ) : null;
-              })()}
+            {headerStatus?.indicator && (
+              <div className="absolute -bottom-1 -right-1 rounded-full bg-card p-0.5">
+                {headerStatus.indicator}
+              </div>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             {isNotificationConversation ? (
-              <h3 className="text-sm font-display font-bold uppercase tracking-wide text-white">
-                Command_Notifications
+              <h3 className="text-base font-semibold text-foreground">
+                Notifications
               </h3>
             ) : (
-              <UserNameWithBadge
-                username={otherUserProfile?.username || "Unknown"}
-                tier={
-                  otherUserProfile?.tier as
-                    | "free"
-                    | "pro"
-                    | "pro_plus"
-                    | undefined
-                }
-                isDonor={otherUserProfile?.isDonor}
-                usernameColor={otherUserProfile?.usernameColor}
-                size="md"
-                className="cursor-pointer hover:opacity-80 font-display tracking-wide"
+              <button
+                type="button"
+                className="block max-w-full rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
                 onClick={() => {
                   if (otherUserProfile?.username) {
                     void navigate({
@@ -1200,122 +1098,101 @@ export function ConversationView({
                     });
                   }
                 }}
-              />
+              >
+                <UserNameWithBadge
+                  username={otherUserProfile?.username || "Unknown"}
+                  tier={
+                    otherUserProfile?.tier as
+                      | "free"
+                      | "pro"
+                      | "pro_plus"
+                      | undefined
+                  }
+                  isDonor={otherUserProfile?.isDonor}
+                  usernameColor={otherUserProfile?.usernameColor}
+                  size="lg"
+                />
+              </button>
             )}
             {isNotificationConversation ? (
-              <p className="text-[10px] font-mono text-blue-400/80 uppercase tracking-wider">
-                System Uplink Active
+              <p className="text-xs text-foreground/75">
+                Updates about your account and support tickets
               </p>
+            ) : headerStatus?.text ? (
+              <p className="text-xs text-foreground/85">{headerStatus.text}</p>
             ) : (
-              (() => {
-                const status = getHeaderStatus(otherUserProfile?.username);
-                if (status.text) {
-                  // Colorize status text only: In Lobby (green), In Game (red), In AI Game (yellow)
-                  const colorClass =
-                    status.text === "In Lobby"
-                      ? "text-green-400"
-                      : status.text === "In Game"
-                        ? "text-red-400"
-                        : "text-amber-400"; // In AI Game
-                  return (
-                    <div
-                      className={`text-[10px] font-mono uppercase tracking-wider ${colorClass} flex items-center gap-2`}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-sm bg-current animate-pulse"></span>
-                      {status.text}
-                    </div>
-                  );
-                }
-                // Generally online: show bio/wins like before
-                return (
-                  <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate">
-                    {otherUserProfile.bio
-                      ? otherUserProfile.bio.length > 50
-                        ? `${otherUserProfile.bio.substring(0, 50)}...`
-                        : otherUserProfile.bio
-                      : `${otherUserProfile.rank && `${otherUserProfile.rank} • `}${otherUserProfile.wins}W ${otherUserProfile.losses}L`}
-                  </p>
-                );
-              })()
+              <p className="truncate text-xs text-foreground/75">
+                {otherUserProfile.bio
+                  ? otherUserProfile.bio.length > 50
+                    ? `${otherUserProfile.bio.substring(0, 50)}...`
+                    : otherUserProfile.bio
+                  : [otherUserProfile.rank, `${winsLabel}, ${lossesLabel}`]
+                      .filter(Boolean)
+                      .join(" · ")}
+              </p>
             )}
           </div>
         </div>
 
         {/* Retention notice */}
-        <div className="px-4 py-2 border-b border-white/5 bg-amber-500/5">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-amber-500/60 cursor-help uppercase tracking-wider justify-center">
-                <AlertCircle className="w-3 h-3 text-amber-500/60" />
-                <span>AUTO_PURGE_PROTOCOL: T-MINUS 7 DAYS</span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="backdrop-blur-xl z-[320] pointer-events-auto py-3 px-4 bg-zinc-950 border border-white/10 text-zinc-300 rounded-sm max-w-sm text-xs space-y-3 shadow-2xl">
-              <div className="space-y-2 font-mono">
-                <p className="font-bold text-amber-500 uppercase tracking-wider border-b border-amber-500/20 pb-1">
-                  Retention Policy Protocol
-                </p>
-                <div className="space-y-1 text-zinc-400 text-[10px]">
-                  <p>• DATA_EXPIRATION: 168 HOURS (7 DAYS)</p>
-                  <p>• SCOPE: ALL TRANSMISSION TYPES</p>
-                  <p>• STATUS: IRREVERSIBLE DELETION</p>
-                  <p>• PURPOSE: OPTIMIZE DATABASE INTEGRITY</p>
-                </div>
-              </div>
-            </TooltipContent>
-          </Tooltip>
-        </div>
+        <p className="shrink-0 border-b border-border px-4 py-2 text-center text-xs text-foreground/70">
+          Messages are deleted after 7 days.
+        </p>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto no-scrollbar p-4 space-y-4">
+        <div
+          role="log"
+          aria-label="Messages"
+          className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+        >
           {messagesLoading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex gap-2 animate-pulse">
-                  <div className="w-8 h-8 rounded bg-white/5 border border-white/5" />
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-white/5 rounded-sm w-3/4" />
-                    <div className="h-4 bg-white/5 rounded-sm w-1/2" />
-                  </div>
+            <div className="space-y-4" aria-hidden="true">
+              {[
+                ["w-2/3", false],
+                ["w-1/2", false],
+                ["w-3/5", true],
+                ["w-2/5", true],
+                ["w-3/4", false],
+              ].map(([w, own], i) => (
+                <div
+                  key={i}
+                  className={cn("flex", own ? "justify-end" : "justify-start")}
+                >
+                  <Skeleton className={cn("h-10", w as string)} />
                 </div>
               ))}
             </div>
           ) : messages.length === 0 ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-center opacity-50">
-                <div className="w-16 h-16 rounded bg-zinc-900 border border-white/5 flex items-center justify-center mx-auto mb-4 grayscale">
-                  {isNotificationConversation ? (
-                    <Bell className="w-8 h-8 text-zinc-500" />
-                  ) : (
-                    <AlertCircle className="w-8 h-8 text-zinc-500" />
-                  )}
-                </div>
-                <p className="text-zinc-500 font-display uppercase tracking-widest text-sm mb-2">
-                  {isNotificationConversation
-                    ? "NO_ALERTS"
-                    : "NO_TRANSMISSIONS"}
-                </p>
-                <p className="text-[10px] font-mono text-zinc-700 uppercase tracking-wider">
-                  {isNotificationConversation
-                    ? "SYSTEM_STATUS_NORMAL"
-                    : `LINK_ESTABLISHED: ${otherUserProfile?.username}`}
-                </p>
-              </div>
+            <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+              <p className="text-base font-medium text-foreground">
+                {isNotificationConversation
+                  ? "No notifications yet"
+                  : "No messages yet"}
+              </p>
+              <p className="mt-1 max-w-xs text-sm text-foreground/75">
+                {isNotificationConversation
+                  ? "Account and support updates show up here."
+                  : `Say hi to ${otherUserProfile?.username}.`}
+              </p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div>
               {hasMoreOlder && (
-                <div className="flex justify-center mb-6">
+                <div className="mb-4 flex justify-center">
                   <Button
                     size="sm"
-                    variant="ghost"
+                    variant="secondary"
                     onClick={() => void loadOlderMessages()}
                     disabled={isFetchingOlder}
-                    className="h-6 px-4 text-[10px] font-mono uppercase tracking-widest text-zinc-500 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10"
                   >
-                    {isFetchingOlder
-                      ? "ACCESSING_ARCHIVES..."
-                      : "LOAD_ARCHIVED_DATA"}
+                    {isFetchingOlder ? (
+                      <>
+                        <Loader2 className="animate-spin" />
+                        Loading
+                      </>
+                    ) : (
+                      "Load earlier messages"
+                    )}
                   </Button>
                 </div>
               )}
@@ -1367,23 +1244,24 @@ export function ConversationView({
                 );
               })}
               {typingStatus?.isTyping && (
-                <div className="flex gap-3 items-end mb-4 justify-start">
-                  <div className="w-8 flex flex-col justify-end self-end shrink-0">
+                <div
+                  className="mb-3 flex items-end gap-2"
+                  role="status"
+                  aria-label={`${otherUserProfile.username} is typing`}
+                >
+                  <div className="flex w-8 shrink-0 items-end">
                     <UserAvatar
                       username={otherUserProfile.username}
                       avatarUrl={otherUserProfile.avatarUrl}
                       rank={otherUserProfile.rank}
                       size="sm"
-                      className="mb-1"
                     />
                   </div>
-                  <div className="max-w-[70%] items-start">
-                    <div className="px-3 py-2 shadow-sm relative rounded-lg rounded-bl-none bg-zinc-900/50 border border-white/5 text-zinc-400">
-                      <div className="flex items-center gap-1">
-                        <span className="w-1 h-1 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.2s]"></span>
-                        <span className="w-1 h-1 bg-zinc-500 rounded-full animate-bounce [animation-delay:-0.1s]"></span>
-                        <span className="w-1 h-1 bg-zinc-500 rounded-full animate-bounce"></span>
-                      </div>
+                  <div className="rounded-lg rounded-bl-sm border border-border bg-white/[0.06] px-3 py-3">
+                    <div className="flex items-center gap-1">
+                      <span className="size-1.5 animate-bounce rounded-full bg-foreground/60 [animation-delay:-0.2s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-foreground/60 [animation-delay:-0.1s]" />
+                      <span className="size-1.5 animate-bounce rounded-full bg-foreground/60" />
                     </div>
                   </div>
                 </div>
@@ -1393,28 +1271,32 @@ export function ConversationView({
           )}
         </div>
 
-        {/* Message Input - Hidden for notification conversations */}
+        {/* Message input: not shown in the notifications thread */}
         {!isNotificationConversation && (
-          <div className="p-4 border-t border-white/5 bg-zinc-900/50 backdrop-blur-md">
-            <div className="flex gap-2">
+          <div className="shrink-0 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="flex items-center gap-2">
               <Input
                 ref={inputRef}
-                placeholder={`Transmitting to ${otherUserProfile?.username}...`}
+                placeholder={`Message ${otherUserProfile?.username}`}
+                aria-label={`Message ${otherUserProfile?.username}`}
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
                   signalTyping();
                 }}
-                onKeyPress={handleKeyPress}
-                className="flex-1 bg-zinc-950 border-zinc-800 text-white placeholder:text-zinc-600 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 font-mono text-sm h-10 transition-all font-medium rounded-sm"
+                onKeyDown={handleKeyDown}
+                enterKeyHint="send"
+                autoComplete="off"
+                className="flex-1"
               />
               <Button
                 onClick={() => void handleSendMessage()}
                 disabled={!newMessage.trim() || isLoading}
-                size="sm"
-                className="bg-amber-600 hover:bg-amber-500 text-white border border-amber-500/50 rounded-sm w-10 h-10 p-0 flex items-center justify-center disabled:opacity-50 disabled:bg-zinc-800 disabled:border-zinc-700"
+                size="icon"
+                aria-label="Send message"
+                className="shrink-0"
               >
-                <Send className="w-4 h-4" />
+                {isLoading ? <Loader2 className="animate-spin" /> : <Send />}
               </Button>
             </div>
           </div>
@@ -1433,6 +1315,6 @@ export function ConversationView({
         spamType={spamType}
         message={spamMessage}
       />
-    </TooltipProvider>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import { internalMutation } from "./_generated/server";
+import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { Presence } from "@convex-dev/presence";
 import { Doc } from "./_generated/dataModel";
@@ -292,11 +293,13 @@ export const deleteAllPresenceRooms = internalMutation({
     // Get all active games from the last 24 hours (these have presence rooms)
     const twentyFourHoursAgo = Date.now() - (24 * 60 * 60 * 1000);
     // OPTIMIZED: Added limit to prevent excessive scanning
+    // Index range on finishedAt: the old createdAt filter scanned every finished game daily.
     const activeGames = await ctx.db
       .query("games")
-      .withIndex("by_status", (q) => q.eq("status", "finished"))
-      .filter((q) => q.gte(q.field("createdAt"), twentyFourHoursAgo))
-      .take(500); // Reasonable limit for presence cleanup
+      .withIndex("by_status_finished", (q) =>
+        q.eq("status", "finished").gte("finishedAt", twentyFourHoursAgo),
+      )
+      .take(500);
 
     // Collect all room IDs that should have presence data
     const roomIds = new Set<string>();
@@ -475,5 +478,44 @@ export const cleanupPresenceTable = internalMutation({
       remainingRecords,
       rescheduled
     };
+  },
+});
+
+// Internal: Delete expired Convex Auth sessions and refresh tokens.
+// Sessions last at most 30 days (DEFAULT_SESSION_TOTAL_DURATION_MS in
+// @convex-dev/auth), so rows created before that are always expired. Refresh
+// tokens rotate on every refresh and the old ones were never removed: prod had
+// 55k token rows for 12k sessions.
+const AUTH_MAX_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+const AUTH_BATCH = 1000;
+
+export const cleanupExpiredAuth = internalMutation({
+  args: { table: v.optional(v.union(v.literal("authRefreshTokens"), v.literal("authSessions"))) },
+  handler: async (ctx, args) => {
+    const table = args.table ?? "authRefreshTokens";
+    const now = Date.now();
+    const rows = await ctx.db
+      .query(table)
+      .withIndex("by_creation_time", (q) =>
+        q.lt("_creationTime", now - AUTH_MAX_SESSION_MS),
+      )
+      .take(AUTH_BATCH);
+
+    let deleted = 0;
+    for (const row of rows) {
+      if (row.expirationTime < now) {
+        await ctx.db.delete(row._id);
+        deleted++;
+      }
+    }
+
+    if (rows.length === AUTH_BATCH && deleted > 0) {
+      await ctx.scheduler.runAfter(1000, internal.maintenance.cleanupExpiredAuth, { table });
+    } else if (table === "authRefreshTokens") {
+      // Tokens first, then the sessions they point to.
+      await ctx.scheduler.runAfter(1000, internal.maintenance.cleanupExpiredAuth, { table: "authSessions" });
+    }
+    console.log(`[auth cleanup] ${table}: deleted ${deleted} of ${rows.length} scanned`);
+    return { table, deleted, scanned: rows.length };
   },
 });

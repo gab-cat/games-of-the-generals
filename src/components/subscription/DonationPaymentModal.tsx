@@ -10,10 +10,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useConvexAction } from "@convex-dev/react-query";
 import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
-import { Heart, Loader2, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface DonationPaymentModalProps {
@@ -46,7 +47,7 @@ export function DonationPaymentModal({
       selectedAmount || (customAmount ? parseFloat(customAmount) : null);
 
     if (!amount || amount <= 0) {
-      toast.error("Invalid funding amount.");
+      toast.error("Choose or enter an amount first.");
       return;
     }
 
@@ -61,131 +62,123 @@ export function DonationPaymentModal({
         window.location.href = result.checkoutUrl;
         onSuccess?.();
       } else {
-        toast.error("Failed to establish secure payment channel.");
+        toast.error("The payment page did not open. Try again.");
         setIsProcessing(false);
       }
     } catch (error) {
       console.error("Donation error:", error);
-      toast.error("Transaction failed. System busy.");
+      toast.error("Could not start the donation. Try again in a moment.");
       setIsProcessing(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-zinc-950 border border-pink-500/20 backdrop-blur-xl">
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-xl font-display font-medium text-white flex items-center gap-2">
-            <Heart className="w-5 h-5 text-pink-500" />
-            Funding Transfer
-          </DialogTitle>
-          <DialogDescription className="text-zinc-500 font-mono text-xs">
-            Voluntary contribution to maintain operational status.
+          <DialogTitle>Donate</DialogTitle>
+          <DialogDescription>
+            Donations pay for servers and development. Give ₱50 or more to get a
+            donor badge, a custom name colour and a profile frame.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4 space-y-4">
-          {/* Amount Selection Grid */}
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">
-              Select Amount (PHP)
-            </label>
-            <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-4">
+          <fieldset>
+            <legend className="mb-2 text-[13px] font-medium text-foreground">
+              Amount in pesos
+            </legend>
+            <div className="grid grid-cols-3 gap-2" role="radiogroup">
               {donationAmounts.map((amount) => {
                 const isSelected = selectedAmount === amount;
                 return (
                   <button
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
                     key={amount}
                     onClick={() => {
                       setSelectedAmount(amount);
                       setCustomAmount("");
                     }}
                     className={cn(
-                      "relative flex flex-col items-center justify-center py-3 px-1 rounded-md border transition-all duration-200 group",
+                      "flex h-12 items-center justify-center rounded-md border text-sm font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:scale-[0.98]",
                       isSelected
-                        ? "border-pink-500 bg-pink-500/10 text-white shadow-[0_0_15px_rgba(236,72,153,0.3)]"
-                        : "border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-300",
+                        ? "border-gold-500/60 bg-gold-500/10 text-foreground"
+                        : "border-border bg-white/[0.04] text-foreground hover:border-border-strong hover:bg-white/[0.08]",
                     )}
                   >
-                    <span className="text-sm font-bold font-mono">
-                      ₱{amount}
-                    </span>
+                    ₱{amount}
                   </button>
                 );
               })}
-
-              {/* Custom Amount Input integration in grid if space permits or separate */}
             </div>
-          </div>
+          </fieldset>
 
-          {/* Custom Amount */}
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <span className="text-zinc-500 font-mono text-xs">₱</span>
+          <div className="space-y-1.5">
+            <label
+              htmlFor="donation-custom"
+              className="block text-[13px] font-medium text-foreground"
+            >
+              Or enter another amount
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-foreground/70">
+                ₱
+              </span>
+              <Input
+                id="donation-custom"
+                type="number"
+                inputMode="decimal"
+                min={1}
+                placeholder="0"
+                value={customAmount}
+                onChange={(e) => {
+                  setCustomAmount(e.target.value);
+                  setSelectedAmount(null);
+                }}
+                className="pl-7 tabular-nums"
+                aria-invalid={isBelowThreshold}
+                aria-describedby={
+                  isBelowThreshold ? "donation-warning" : undefined
+                }
+              />
             </div>
-            <input
-              type="number"
-              placeholder="CUSTOM_AMOUNT"
-              value={customAmount}
-              onChange={(e) => {
-                setCustomAmount(e.target.value);
-                setSelectedAmount(null);
-              }}
-              className={cn(
-                "w-full pl-8 pr-4 py-3 bg-zinc-900/50 border rounded-md text-white text-sm font-mono placeholder:text-zinc-600 outline-none transition-all",
-                customAmount
-                  ? "border-pink-500/50 focus:border-pink-500"
-                  : "border-zinc-800 focus:border-zinc-700",
-              )}
-            />
-          </div>
-
-          {/* Impact Note */}
-          <div className="space-y-2">
-            <div className="p-3 bg-pink-500/5 border border-pink-500/10 rounded-lg flex items-start gap-2">
-              <Sparkles className="w-4 h-4 text-pink-500/70 mt-0.5 flex-shrink-0" />
-              <p className="text-[10px] text-pink-200/60 font-mono leading-relaxed">
-                Contributions directly support server costs and development.
-                Receive <span className="text-pink-400">Donor Status</span> and
-                exclusive cosmetic protocols.
-              </p>
-            </div>
-
             {isBelowThreshold && (
-              <div className="p-2 border border-yellow-500/20 bg-yellow-500/5 rounded flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
-                <Loader2 className="w-3 h-3 text-yellow-500/70 mt-0.5 flex-shrink-0 animate-pulse" />
-                <p className="text-[9px] text-yellow-200/50 font-mono leading-tight">
-                  <span className="text-yellow-500/80">WARNING:</span>{" "}
-                  CONTRIBUTIONS BELOW ₱50 DO NOT ACTIVATE DONOR STATUS.
-                </p>
-              </div>
+              <p
+                id="donation-warning"
+                role="status"
+                className="text-xs text-gold-300"
+              >
+                Under ₱50 does not give you the donor badge. You can still
+                donate this amount.
+              </p>
             )}
           </div>
+
+          <p className="text-xs text-foreground/70">
+            You pay on the PayMongo checkout page.
+          </p>
         </div>
 
-        <DialogFooter className="flex gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            className="text-zinc-500 font-mono hover:text-white"
-          >
-            CANCEL
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
           </Button>
           <Button
             onClick={handleDonate}
             disabled={(!selectedAmount && !customAmount) || isProcessing}
-            className="bg-pink-600 hover:bg-pink-500 text-white font-mono uppercase tracking-wider min-w-[140px]"
+            className="sm:min-w-[160px]"
           >
             {isProcessing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                PROCESSING
+                <Loader2 className="animate-spin" />
+                Opening payment page
               </>
+            ) : currentAmount > 0 ? (
+              `Donate ₱${currentAmount.toLocaleString()}`
             ) : (
-              <>
-                <Heart className="w-4 h-4 mr-2" />
-                CONTRIBUTE
-              </>
+              "Donate"
             )}
           </Button>
         </DialogFooter>

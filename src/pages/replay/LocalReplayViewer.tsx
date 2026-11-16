@@ -2,6 +2,9 @@ import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Upload, FileJson, AlertCircle, ArrowLeft } from "lucide-react";
 import { Button } from "../../components/ui/button";
+import { PageHeader } from "../../components/ui/page-header";
+import { riseIn } from "../../lib/motion";
+import { cn } from "../../lib/utils";
 import { useNavigate } from "@tanstack/react-router";
 
 // Type for the replay data we expect to receive
@@ -53,7 +56,7 @@ export function LocalReplayViewer({ onReplayLoaded }: LocalReplayViewerProps) {
       setFileName(file.name);
 
       if (!file.name.endsWith(".json")) {
-        setError("Invalid file type. Please upload a JSON file.");
+        setError("That is not a replay file. Choose a .json file.");
         return;
       }
 
@@ -62,17 +65,13 @@ export function LocalReplayViewer({ onReplayLoaded }: LocalReplayViewerProps) {
         const data = JSON.parse(text);
 
         if (!validateReplayData(data)) {
-          setError(
-            "Invalid replay file format. File is missing required fields.",
-          );
+          setError("This file is not a replay from Games of the Generals.");
           return;
         }
 
         onReplayLoaded(data);
       } catch {
-        setError(
-          "Failed to parse JSON file. Please check that the file is valid.",
-        );
+        setError("This file could not be read. Download the replay again.");
       }
     },
     [onReplayLoaded],
@@ -115,113 +114,70 @@ export function LocalReplayViewer({ onReplayLoaded }: LocalReplayViewerProps) {
   };
 
   return (
-    <div className="min-h-[60vh] flex flex-col items-center justify-center p-4 sm:p-8">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-xl mb-8 text-center"
-      >
-        <div className="flex items-center justify-center gap-3 text-blue-400/60 font-mono text-xs tracking-[0.2em] uppercase mb-4">
-          <Upload className="w-4 h-4" />
-          <span>Local Replay Loader</span>
-        </div>
-        <h1 className="text-3xl md:text-4xl font-display font-medium text-white tracking-tight mb-2">
-          Import <span className="text-white/20">Replay</span>
-        </h1>
-        <p className="text-white/50 text-sm font-mono">
-          Upload a previously downloaded replay file to view the match
-        </p>
-      </motion.div>
+    <div>
+      <PageHeader
+        title="Load a replay"
+        description="Choose a replay file you downloaded from Match history."
+        actions={
+          <Button variant="secondary" onClick={handleBack}>
+            <ArrowLeft />
+            Match history
+          </Button>
+        }
+      />
 
-      {/* Drop Zone */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-        className="w-full max-w-xl"
-      >
-        <div
+      <motion.div {...riseIn} className="max-w-xl">
+        <label
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          className={`
-            relative p-12 rounded-sm border-2 border-dashed transition-all duration-300 cursor-pointer
-            ${
-              isDragActive
-                ? "border-blue-500 bg-blue-500/10"
-                : error
-                  ? "border-red-500/50 bg-red-500/5"
-                  : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
-            }
-          `}
+          className={cn(
+            "relative flex cursor-pointer flex-col items-center rounded-lg border border-dashed px-6 py-12 text-center transition-colors",
+            "focus-within:ring-2 focus-within:ring-ring/70 focus-within:ring-offset-2 focus-within:ring-offset-background",
+            isDragActive
+              ? "border-gold-500/60 bg-gold-500/10"
+              : error
+                ? "border-red-500/50 bg-red-500/5"
+                : "border-border-strong bg-card hover:bg-white/[0.04]",
+          )}
         >
-          {/* Corner decorations */}
-          <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-white/20" />
-          <div className="absolute top-0 right-0 w-3 h-3 border-t border-r border-white/20" />
-          <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l border-white/20" />
-          <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-white/20" />
-
           <input
             type="file"
-            accept=".json"
+            accept=".json,application/json"
             onChange={handleFileSelect}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            className="sr-only"
           />
 
-          <div className="flex flex-col items-center text-center">
-            <div
-              className={`
-                w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors
-                ${isDragActive ? "bg-blue-500/20" : "bg-white/5"}
-              `}
-            >
-              <FileJson
-                className={`w-8 h-8 ${isDragActive ? "text-blue-400" : "text-white/40"}`}
-              />
-            </div>
+          <p className="text-base font-medium text-foreground">
+            {isDragActive
+              ? "Drop the file to open it"
+              : "Drop a replay file here"}
+          </p>
+          <p className="mt-1 text-sm text-foreground/80">
+            Replay files end in .json.
+          </p>
+          <span className="mt-5 inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+            <Upload className="size-4" />
+            Choose file
+          </span>
 
-            <p className="text-white/80 font-medium mb-2">
-              {isDragActive
-                ? "Drop your replay file here"
-                : "Drag & drop your replay file"}
+          {fileName && !error && (
+            <p className="mt-4 flex items-center gap-2 break-all text-sm text-foreground">
+              <FileJson className="size-4 shrink-0" />
+              {fileName}
             </p>
-            <p className="text-white/40 text-sm font-mono mb-4">
-              or click to browse
-            </p>
+          )}
+        </label>
 
-            {fileName && !error && (
-              <div className="flex items-center gap-2 text-sm text-blue-400 font-mono bg-blue-500/10 px-3 py-1.5 rounded border border-blue-500/20">
-                <FileJson className="w-4 h-4" />
-                {fileName}
-              </div>
-            )}
-
-            {error && (
-              <div className="flex items-center gap-2 text-sm text-red-400 font-mono bg-red-500/10 px-3 py-1.5 rounded border border-red-500/20">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Back button */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="mt-6"
-      >
-        <Button
-          variant="ghost"
-          onClick={handleBack}
-          className="text-white/40 hover:text-white hover:bg-white/5 font-mono text-xs uppercase tracking-wider"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Match History
-        </Button>
+        {error && (
+          <p
+            role="alert"
+            className="mt-3 flex items-start gap-2 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-foreground"
+          >
+            <AlertCircle className="mt-0.5 size-4 shrink-0 text-red-400" />
+            {error}
+          </p>
+        )}
       </motion.div>
     </div>
   );

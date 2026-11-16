@@ -2,17 +2,23 @@
 
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
 
 interface GracePeriodWarningProps {
   className?: string;
 }
 
-export function GracePeriodWarning({ className = "" }: GracePeriodWarningProps) {
+export function GracePeriodWarning({
+  className = "",
+}: GracePeriodWarningProps) {
   const navigate = useNavigate();
-  const { data: subscription } = useConvexQuery(api.subscriptions.getCurrentSubscription, {});
+  const { data: subscription } = useConvexQuery(
+    api.subscriptions.getCurrentSubscription,
+    {},
+  );
 
   if (!subscription || subscription.status !== "grace_period") {
     return null;
@@ -27,39 +33,40 @@ export function GracePeriodWarning({ className = "" }: GracePeriodWarningProps) 
   const deltaMs = gracePeriodEndsAt - Date.now();
   const hoursRemaining = Math.max(0, Math.ceil(deltaMs / (1000 * 60 * 60)));
 
-  const getWarningMessage = () => {
-    if (deltaMs <= 0) {
-      return "Your subscription and grace period have expired. Please renew now to restore access to premium features.";
-    }
-    if (deltaMs < 1000 * 60 * 60) {
-      return "Your subscription has expired, and you have less than 1 hour remaining in your grace period. Renew now to avoid losing access to premium features.";
-    }
-    return `Your subscription has expired but you're still in the 2-day grace period. You have approximately ${hoursRemaining} hour${hoursRemaining !== 1 ? "s" : ""} remaining before premium features are locked.`;
-  };
+  const message =
+    deltaMs <= 0
+      ? "Your plan and its grace period have ended. Renew to get your Pro features back."
+      : deltaMs < 1000 * 60 * 60
+        ? "Your plan has expired and the grace period ends in less than an hour. Renew to keep your Pro features."
+        : `Your plan has expired. Pro features lock in about ${hoursRemaining} ${hoursRemaining === 1 ? "hour" : "hours"}.`;
 
   return (
     <div
-      className={`bg-amber-500/20 border border-amber-500/30 rounded-lg p-4 ${className}`}
+      role="status"
+      className={cn(
+        "rounded-lg border border-red-500/30 bg-red-500/10 p-4",
+        className,
+      )}
     >
       <div className="flex items-start gap-3">
-        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <AlertTriangle className="mt-0.5 size-4 shrink-0 text-red-400" />
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <Clock className="w-4 h-4 text-amber-400" />
-            <span className="font-medium text-amber-300">
-              {deltaMs <= 0 ? "Grace Period Expired" : "Grace Period Active"}
-            </span>
-          </div>
-          <p className="text-sm font-light text-amber-300/80 mb-3">
-            {getWarningMessage()}
+          <p className="text-sm font-semibold text-foreground">
+            {deltaMs <= 0 ? "Grace period ended" : "Grace period"}
           </p>
+          <p className="mt-1 text-sm text-foreground/80">{message}</p>
           <Button
-            variant="outline"
+            variant="secondary"
             size="sm"
-            onClick={() => navigate({ to: "/subscription", search: { subscription: undefined} })}
-            className="font-light border-amber-500/50 text-amber-300 hover:bg-amber-500/20"
+            className="mt-3"
+            onClick={() =>
+              navigate({
+                to: "/subscription",
+                search: { subscription: undefined },
+              })
+            }
           >
-            Renew Now
+            Renew
           </Button>
         </div>
       </div>

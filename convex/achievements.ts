@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
@@ -247,37 +247,8 @@ export const getAllAchievements = query({
 });
 
 // Unlock an achievement
-export const unlockAchievement = mutation({
-  args: {
-    achievementId: v.string(),
-    progress: v.optional(v.number()),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    // Check if already unlocked
-    const existing = await ctx.db
-      .query("achievements")
-      .withIndex("by_user_achievement", (q) => 
-        q.eq("userId", userId).eq("achievementId", args.achievementId)
-      )
-      .unique();
-
-    if (existing) return existing._id;
-
-    // Unlock the achievement
-    return await ctx.db.insert("achievements", {
-      userId,
-      achievementId: args.achievementId,
-      unlockedAt: Date.now(),
-      progress: args.progress,
-    });
-  },
-});
-
 // Check and unlock achievements based on profile stats
-export const checkAchievements = mutation({
+export const checkAchievements = internalMutation({
   args: {
     profileId: v.id("profiles"),
   },
@@ -404,7 +375,7 @@ export const checkAchievements = mutation({
 });
 
 // Check special game-specific achievements
-export const checkGameSpecificAchievements = mutation({
+export const checkGameSpecificAchievements = internalMutation({
   args: {
     gameId: v.id("games"),
     winnerId: v.id("users"),
@@ -441,8 +412,8 @@ export const checkGameSpecificAchievements = mutation({
     // OPTIMIZED: Added limit to prevent excessive document scanning
     const moves = await ctx.db
       .query("moves")
-      .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-      .take(500); // Reasonable limit - games rarely exceed 500 moves
+      .withIndex("by_game_timestamp", (q) => q.eq("gameId", args.gameId))
+      .take(1000);
 
     // Check for Perfectionist achievement (win without losing any pieces)
     let winnerLostPieces = false;

@@ -8,6 +8,7 @@ import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { lazy, Suspense, useState, useCallback, useEffect } from "react";
 import { ConvertAnonymousPopup } from "../components/ConvertAnonymousPopup";
 import { Toaster } from "sonner";
+import { MotionConfig } from "framer-motion";
 import { useConvexQuery } from "../lib/convex-query-hooks";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -23,10 +24,24 @@ const Layout = lazy(() =>
 
 function OfflineRoot() {
   return (
-    <div className="min-h-screen">
-      <MaintenancePage />
-      <Toaster theme="dark" className="rounded-2xl" />
-    </div>
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen">
+        <MaintenancePage />
+        <Toaster
+          theme="dark"
+          position="top-center"
+          toastOptions={{
+            classNames: {
+              toast:
+                "!rounded-lg !border !border-border-strong !bg-card !text-foreground !shadow-none !font-body",
+              description: "!text-foreground/80",
+              actionButton: "!bg-primary !text-primary-foreground !rounded-md",
+              cancelButton: "!bg-white/[0.06] !text-foreground !rounded-md",
+            },
+          }}
+        />
+      </div>
+    </MotionConfig>
   );
 }
 
@@ -63,25 +78,39 @@ function OnlineRoot() {
   }, [location.pathname, navigate, isAdminRoute, isMaintenancePage]);
 
   return (
-    <div className="min-h-screen">
-      <Suspense fallback={<LoadingSpinner fullScreen={true} />}>
-        <SoundProvider>
-          {isAdminRoute || isMaintenancePage ? (
-            <Outlet />
-          ) : (
-            <Layout
-              user={profile ? { username: profile.username } : undefined}
-              onOpenMessagingWithLobby={onOpenMessagingWithLobby}
-            >
+    <MotionConfig reducedMotion="user">
+      <div className="min-h-screen">
+        <Suspense fallback={<LoadingSpinner fullScreen={true} />}>
+          <SoundProvider>
+            {isAdminRoute || isMaintenancePage ? (
               <Outlet />
-            </Layout>
-          )}
-        </SoundProvider>
-      </Suspense>
-      <ConvertAnonymousPopup />
-      <Toaster theme="dark" className="rounded-2xl" />
-      {import.meta.env.DEV && <TanStackRouterDevtools />}
-    </div>
+            ) : (
+              <Layout
+                user={profile ? { username: profile.username } : undefined}
+                onOpenMessagingWithLobby={onOpenMessagingWithLobby}
+              >
+                <Outlet />
+              </Layout>
+            )}
+          </SoundProvider>
+        </Suspense>
+        <ConvertAnonymousPopup />
+        <Toaster
+          theme="dark"
+          position="top-center"
+          toastOptions={{
+            classNames: {
+              toast:
+                "!rounded-lg !border !border-border-strong !bg-card !text-foreground !shadow-none !font-body",
+              description: "!text-foreground/80",
+              actionButton: "!bg-primary !text-primary-foreground !rounded-md",
+              cancelButton: "!bg-white/[0.06] !text-foreground !rounded-md",
+            },
+          }}
+        />
+        {import.meta.env.DEV && <TanStackRouterDevtools />}
+      </div>
+    </MotionConfig>
   );
 }
 

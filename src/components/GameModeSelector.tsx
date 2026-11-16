@@ -1,6 +1,4 @@
 import { Clock, Zap, Eye } from "lucide-react";
-import { Card, CardContent } from "./ui/card";
-import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
 export type GameMode = "classic" | "blitz" | "reveal";
@@ -8,48 +6,31 @@ export type GameMode = "classic" | "blitz" | "reveal";
 interface GameModeOption {
   value: GameMode;
   label: string;
+  /** What the mode changes, in one plain sentence. */
   description: string;
-  twist: string; // The unique feature/highlight of this mode
   icon: React.ReactNode;
-  color: string;
-  bgColor: string;
-  borderColor: string;
-  hoverBg: string;
 }
 
 const gameModes: GameModeOption[] = [
   {
     value: "classic",
     label: "Classic",
-    description: "Standard rules with 15 minutes per player",
-    twist: "Traditional gameplay with strategic time management",
+    description:
+      "Standard rules with 15 minutes per player. Time to think each move.",
     icon: <Clock className="h-4 w-4" />,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/20",
-    borderColor: "border-blue-500/30",
-    hoverBg: "hover:bg-blue-500/30",
   },
   {
     value: "blitz",
     label: "Blitz",
-    description: "Fast-paced action with 6 minutes per player",
-    twist: "Quick decisions under time pressure - perfect for rapid matches",
+    description: "6 minutes per player. Quick decisions under time pressure.",
     icon: <Zap className="h-4 w-4" />,
-    color: "text-orange-400",
-    bgColor: "bg-orange-500/20",
-    borderColor: "border-orange-500/30",
-    hoverBg: "hover:bg-orange-500/30",
   },
   {
     value: "reveal",
     label: "Reveal",
-    description: "Winner's rank is revealed after each attack",
-    twist: "Winner's piece rank is revealed after each challenge - adds strategic depth",
+    description:
+      "The winner's rank is shown after every attack, so each fight gives something away.",
     icon: <Eye className="h-4 w-4" />,
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/20",
-    borderColor: "border-purple-500/30",
-    hoverBg: "hover:bg-purple-500/30",
   },
 ];
 
@@ -59,68 +40,56 @@ interface GameModeSelectorProps {
   disabled?: boolean;
 }
 
-export const GameModeSelector = ({ value, onChange, disabled }: GameModeSelectorProps) => {
-  const selectedMode = gameModes.find(mode => mode.value === value) || gameModes[0];
+export const GameModeSelector = ({
+  value,
+  onChange,
+  disabled,
+}: GameModeSelectorProps) => {
+  const selectedMode =
+    gameModes.find((mode) => mode.value === value) || gameModes[0];
 
   return (
-    <div className="space-y-3">
-      <label className="text-sm font-medium text-white/90">Game Mode</label>
-      
-      {/* Mode Selection Buttons */}
-      <div className="grid grid-cols-3 gap-2">
+    <div className="space-y-2">
+      <span
+        id="game-mode-label"
+        className="text-sm font-medium text-foreground"
+      >
+        Game mode
+      </span>
+
+      <div
+        role="radiogroup"
+        aria-labelledby="game-mode-label"
+        className="grid grid-cols-3 gap-2"
+      >
         {gameModes.map((mode) => {
           const isSelected = value === mode.value;
           return (
-            <Button
+            <button
               key={mode.value}
               type="button"
-              variant="outline"
-              onClick={() => !disabled && onChange(mode.value)}
+              role="radio"
+              aria-checked={isSelected}
+              onClick={() => onChange(mode.value)}
               disabled={disabled}
               className={cn(
-                "flex items-center justify-center gap-2 h-10 transition-all duration-200",
-                "border backdrop-blur-sm",
+                "flex h-10 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-[background-color,border-color,color,transform] duration-150 active:scale-[0.98]",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:pointer-events-none disabled:opacity-50",
                 isSelected
-                  ? `${mode.bgColor} ${mode.borderColor} border-2 ${mode.color} font-semibold shadow-md`
-                  : "bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:border-white/20",
-                disabled && "opacity-50 cursor-not-allowed"
+                  ? "border-gold-500/40 bg-gold-500/10 text-gold-300"
+                  : "border-border bg-white/[0.04] text-foreground hover:border-border-strong hover:bg-white/[0.08]",
               )}
             >
               {mode.icon}
-              <span className="text-sm">{mode.label}</span>
-            </Button>
+              {mode.label}
+            </button>
           );
         })}
       </div>
 
-      {/* Details Card */}
-      <Card className={cn(
-        "transition-all duration-200",
-        selectedMode.bgColor,
-        selectedMode.borderColor
-      )}>
-        <CardContent className="p-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className={selectedMode.color}>
-                {selectedMode.icon}
-              </div>
-              <h3 className={cn("font-semibold text-sm", selectedMode.color)}>
-                {selectedMode.label} Mode
-              </h3>
-            </div>
-            <p className="text-xs text-white/70 leading-relaxed">
-              {selectedMode.description}
-            </p>
-            <div className="pt-2 border-t border-white/10">
-              <p className="text-xs font-medium text-white/90">
-                <span className={selectedMode.color}>✨ Twist:</span> {selectedMode.twist}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <p className="text-[13px] text-foreground/80" aria-live="polite">
+        {selectedMode.description}
+      </p>
     </div>
   );
 };
-

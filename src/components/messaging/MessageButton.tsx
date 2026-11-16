@@ -1,7 +1,6 @@
 import { MessageCircle } from "lucide-react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "../ui/button";
-import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 
 interface MessageButtonProps {
@@ -11,64 +10,43 @@ interface MessageButtonProps {
   className?: string;
 }
 
-export function MessageButton({ unreadCount, isActive, onClick, className }: MessageButtonProps) {
+export function MessageButton({
+  unreadCount,
+  isActive,
+  onClick,
+  className,
+}: MessageButtonProps) {
+  const label =
+    unreadCount > 0 ? `Messages, ${unreadCount} unread` : "Messages";
+
   return (
-    <motion.div
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      className={cn("relative", className)}
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onClick}
+      aria-label={label}
+      aria-pressed={isActive}
+      title="Messages"
+      className={cn(
+        "relative h-9 w-9",
+        isActive && "bg-white/[0.08]",
+        className,
+      )}
     >
-      <Button
-        variant={isActive ? "default" : "ghost"}
-        size="sm"
-        onClick={onClick}
-        className={cn(
-          "relative rounded-full w-9 h-9 p-0 flex items-center justify-center transition-all duration-200",
-          isActive 
-            ? "bg-gray-400/50 hover:bg-gray-100 text-white shadow-lg" 
-            : "bg-white/5 hover:bg-white/10 text-white/90 border border-white/10"
-        )}
-      >
-        <MessageCircle className="w-5 h-5" />
-        
-        {/* Subtle pulsing ring for unread messages */}
-        {unreadCount > 0 && !isActive && (
-          <motion.div
-            className="absolute inset-0 rounded-full border border-blue-400/30"
-            animate={{
-              scale: [1, 1.1, 1],
-              opacity: [0.3, 0.1, 0.3],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-          />
-        )}
-        
-        {/* Unread count badge */}
+      <MessageCircle className="!size-[18px]" />
+      <AnimatePresence>
         {unreadCount > 0 && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0 }}
-            transition={{
-              type: "spring", 
-              stiffness: 300, 
-              damping: 25
-            }}
-            className="absolute -top-1 -right-1"
+          <motion.span
+            initial={{ scale: 0.6, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.6, opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold tabular-nums text-primary-foreground ring-2 ring-background"
           >
-            <Badge 
-              variant="destructive" 
-              className="min-w-[18px] h-[18px] text-xs flex items-center justify-center p-0 bg-red-500 hover:bg-red-500 shadow-lg border border-white/20"
-            >
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </Badge>
-          </motion.div>
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </motion.span>
         )}
-      </Button>
-    </motion.div>
+      </AnimatePresence>
+    </Button>
   );
 }

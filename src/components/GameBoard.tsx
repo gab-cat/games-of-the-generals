@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react";
+import { FixedDigits } from "@/components/ui/fixed-digits";
 import { useConvexMutationWithQuery } from "../lib/convex-query-hooks";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
@@ -7,34 +8,27 @@ import { Doc, Id } from "../../convex/_generated/dataModel";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Shuffle,
-  RefreshCw,
   ArrowRightLeft,
-  Info,
-  CheckCircle,
-  Users,
-  Sword,
-  Target,
-  Square,
+  Check,
   Flag,
   Eye,
   Copy,
-  Crown,
-  Swords,
   ArrowLeft,
   ArrowRight,
   ArrowUp,
   ArrowDown,
-  AlertCircle,
-  AlertTriangle,
   ChevronUp,
   ChevronDown,
-  X,
   Clock,
   Zap,
+  Loader2,
+  Eraser,
+  TriangleAlert,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { Card } from "./ui/card";
+import { Skeleton } from "./ui/skeleton";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -55,6 +49,7 @@ import { getPieceDisplay } from "../lib/piece-display";
 import { SetupPresets } from "./setup-presets/SetupPresets";
 import { useSound } from "../lib/SoundProvider";
 import { UserNameWithBadge } from "./UserNameWithBadge";
+import { fadeUp, riseIn, stagger } from "../lib/motion";
 import usePresence from "@convex-dev/presence/react";
 
 interface GameBoardProps {
@@ -106,33 +101,44 @@ const getTimeLimitSeconds = (
   }
 };
 
-// Get game mode badge info
+// Game mode label and icon for the status strip
 const getGameModeBadge = (gameMode?: "classic" | "blitz" | "reveal") => {
-  const mode = gameMode || "classic";
-  switch (mode) {
+  switch (gameMode || "classic") {
     case "blitz":
-      return {
-        label: "Blitz",
-        icon: <Zap className="h-3 w-3" />,
-        className:
-          "bg-orange-500/10 text-orange-400 border-orange-500/20 font-mono tracking-wider",
-      };
+      return { label: "Blitz", icon: <Zap className="h-3 w-3" /> };
     case "reveal":
-      return {
-        label: "Reveal",
-        icon: <Eye className="h-3 w-3" />,
-        className:
-          "bg-purple-500/10 text-purple-400 border-purple-500/20 font-mono tracking-wider",
-      };
-    case "classic":
+      return { label: "Reveal", icon: <Eye className="h-3 w-3" /> };
     default:
-      return {
-        label: "Classic",
-        icon: <Clock className="h-3 w-3" />,
-        className:
-          "bg-amber-500/10 text-amber-400 border-amber-500/20 font-mono tracking-wider",
-      };
+      return { label: "Classic", icon: <Clock className="h-3 w-3" /> };
   }
+};
+
+// Every piece with its short name and rank, used by the legend and the setup tray
+const PIECES_INFO = [
+  { piece: "5 Star General", short: "5 Star", rank: "1 (highest)" },
+  { piece: "4 Star General", short: "4 Star", rank: "2" },
+  { piece: "3 Star General", short: "3 Star", rank: "3" },
+  { piece: "2 Star General", short: "2 Star", rank: "4" },
+  { piece: "1 Star General", short: "1 Star", rank: "5" },
+  { piece: "Colonel", short: "Colonel", rank: "6" },
+  { piece: "Lieutenant Colonel", short: "Lt Col", rank: "7" },
+  { piece: "Major", short: "Major", rank: "8" },
+  { piece: "Captain", short: "Captain", rank: "9" },
+  { piece: "1st Lieutenant", short: "1st Lt", rank: "10" },
+  { piece: "2nd Lieutenant", short: "2nd Lt", rank: "11" },
+  { piece: "Sergeant", short: "Sergeant", rank: "12" },
+  { piece: "Private", short: "Private", rank: "13" },
+  { piece: "Spy", short: "Spy", rank: "Special" },
+  { piece: "Flag", short: "Flag", rank: "Goal" },
+];
+const SHORT_NAMES: Record<string, string> = Object.fromEntries(
+  PIECES_INFO.map((p) => [p.piece, p.short]),
+);
+
+// "14:52" -> 892
+const secondsFromClock = (clock: string) => {
+  const [m, s] = clock.split(":").map(Number);
+  return (m || 0) * 60 + (s || 0);
 };
 
 // Create empty board factory function
@@ -153,7 +159,23 @@ const flipBoardForDisplay = (board: any[][], shouldFlip: boolean) => {
   return [...board].reverse();
 };
 
-// Memoized board square component for better performance
+// Piece colours: player 1 is blue, player 2 is red, on both screens.
+const PLAYER_TONE = {
+  player1: {
+    text: "text-blue-300",
+    tile: "bg-blue-500/[0.13] border-blue-400/30",
+    bar: "border-l-blue-400",
+    ring: "border-blue-400/60",
+  },
+  player2: {
+    text: "text-red-300",
+    tile: "bg-red-500/[0.13] border-red-400/30",
+    bar: "border-l-red-400",
+    ring: "border-red-400/60",
+  },
+} as const;
+
+// One board square. Memoized: the board has 72 of them.
 const BoardSquare = memo(
   ({
     row,
@@ -182,74 +204,60 @@ const BoardSquare = memo(
     ArrowComponent: any;
     onClick: (row: number, col: number) => void;
   }) => {
+    const tone = cell
+      ? PLAYER_TONE[cell.player === "player1" ? "player1" : "player2"]
+      : null;
+    const label = !cell
+      ? "Empty square"
+      : cell.piece === "Hidden"
+        ? "Opponent piece, hidden"
+        : cell.piece;
+
     return (
-      <motion.div
-        key={`${row}-${col}`}
-        whileHover={isCurrentPlayer ? { scale: 1.0 } : {}}
-        whileTap={isCurrentPlayer ? { scale: 1 } : {}}
-        animate={
-          isPendingMove
-            ? {
-                scale: [1, 1.02, 1],
-                opacity: [0.75, 0.9, 0.75],
-              }
-            : {}
-        }
-        transition={
-          isPendingMove
-            ? {
-                duration: 1,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }
-            : {}
-        }
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={isSelected}
         onClick={() => onClick(row, col)}
-        className={`
-        aspect-square border flex items-center justify-center cursor-pointer rounded-sm sm:rounded-sm transition-all relative min-h-[38px] sm:min-h-0
-        bg-zinc-900 border-white/5 hover:bg-white/5 hover:border-white/10 p-0.5 sm:p-1
-        ${isSelected ? "ring-1 ring-amber-500 bg-amber-500/10 !border-amber-500/50" : ""}
-        ${isValidMove ? "ring-1 ring-emerald-500 bg-emerald-500/10 !border-emerald-500/50" : ""}
-        ${highlightType === "last-move" ? "ring-1 ring-yellow-500 !border-yellow-500/50 bg-yellow-500/10" : ""}
-        ${isPendingMove ? "ring-1 ring-orange-500 bg-orange-500/20 border-orange-500 opacity-75" : ""}
-        ${isCurrentPlayer ? "hover:bg-white/10" : ""}
-      `}
+        className={`relative flex aspect-square items-center justify-center border text-foreground transition-colors duration-150 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/80 sm:rounded-md ${
+          tone ? tone.tile : "border-white/[0.07] bg-white/[0.025]"
+        } ${isCurrentPlayer ? "cursor-pointer [@media(hover:hover)]:hover:bg-white/[0.08]" : "cursor-default"} ${
+          highlightType === "last-move" && !isSelected
+            ? "!border-gold-500/50 !bg-gold-500/[0.12]"
+            : ""
+        } ${isValidMove ? "!border-emerald-400/60 !bg-emerald-500/[0.12]" : ""} ${
+          isSelected
+            ? "z-10 ring-2 ring-inset ring-gold-400 !bg-gold-500/20"
+            : ""
+        } ${isPendingMove ? "opacity-70" : ""}`}
       >
         {isPendingFromPosition && (
-          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-              className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full"
-            />
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-gold-400" />
           </div>
         )}
 
         {isLastMoveFrom && ArrowComponent && !isPendingFromPosition && (
-          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-            <div className="rounded-full p-1">
-              <ArrowComponent className="h-6 w-6 text-yellow-500" />
-            </div>
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <ArrowComponent className="h-6 w-6 text-gold-400" />
           </div>
         )}
 
-        {cell && (
+        {cell && tone && (
           <div className="text-center">
-            <div
-              className={`${cell.player === "player1" ? "text-blue-400" : "text-red-400"}`}
-            >
+            <div className={tone.text}>
               {cell.piece === "Hidden" ? (
                 getPieceDisplay(cell.piece, { isOpponent: true, size: "small" })
               ) : (
                 <>
-                  {/* Mobile: No labels, small size */}
+                  {/* Phone: icon only */}
                   <div className="block sm:hidden">
                     {getPieceDisplay(cell.piece, {
                       showLabel: false,
                       size: "small",
                     })}
                   </div>
-                  {/* Desktop: With labels, medium size */}
+                  {/* Desktop: icon and name */}
                   <div className="hidden sm:block">
                     {getPieceDisplay(cell.piece, {
                       showLabel: true,
@@ -260,7 +268,7 @@ const BoardSquare = memo(
               )}
             </div>
             {cell.revealed && cell.piece !== "Hidden" && (
-              <div className="text-[10px] sm:text-xs font-bold mt-0.5 sm:mt-1 text-muted-foreground leading-tight">
+              <div className="mt-0.5 text-[10px] font-bold leading-tight text-foreground/70 sm:text-xs">
                 {cell.piece
                   .split(" ")
                   .map((word: string) => word[0])
@@ -269,12 +277,192 @@ const BoardSquare = memo(
             )}
           </div>
         )}
-      </motion.div>
+      </button>
     );
   },
 );
 
 BoardSquare.displayName = "BoardSquare";
+
+type Presence = { online: boolean } | null | undefined;
+
+// One player's bar above or below the board: who, their clock, whose turn.
+function PlayerBar({
+  side,
+  username,
+  profile,
+  presence,
+  forfeitRemaining,
+  time,
+  isTurn,
+  isWinner,
+  isYou,
+  formatTime,
+}: {
+  side: "player1" | "player2";
+  username: string;
+  profile?: {
+    username?: string;
+    avatarUrl?: string;
+    rank?: string;
+    avatarFrame?: string;
+    tier?: "free" | "pro" | "pro_plus";
+    isDonor?: boolean;
+    usernameColor?: string;
+  } | null;
+  presence: Presence;
+  forfeitRemaining: number | null;
+  time: string;
+  isTurn: boolean;
+  isWinner: boolean;
+  isYou: boolean;
+  formatTime: (s: number) => string;
+}) {
+  const tone = PLAYER_TONE[side];
+  const seconds = secondsFromClock(time);
+  const lowTime = isTurn && seconds <= 60;
+  return (
+    <div
+      data-testid={isYou ? "player-bar-you" : "player-bar-opponent"}
+      data-turn={isTurn}
+      className={`flex items-center gap-3 rounded-lg border border-l-[3px] px-3 py-2 transition-colors duration-200 ${tone.bar} ${
+        isTurn
+          ? "border-y-gold-500/40 border-r-gold-500/40 bg-gold-500/[0.07]"
+          : "border-y-border border-r-border bg-card"
+      }`}
+    >
+      <UserAvatar
+        username={profile?.username || username}
+        avatarUrl={profile?.avatarUrl}
+        rank={profile?.rank}
+        size="sm"
+        frame={profile?.avatarFrame}
+        noRing
+        className={`border-2 ${isWinner ? "border-gold-400" : tone.ring}`}
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <UserNameWithBadge
+            username={username}
+            tier={profile?.tier}
+            isDonor={profile?.isDonor}
+            usernameColor={profile?.usernameColor}
+            size="md"
+            className="max-w-[160px] sm:max-w-[240px]"
+          />
+          {isYou && (
+            <span className="shrink-0 text-xs text-foreground/70">You</span>
+          )}
+          {presence?.online && (
+            <span
+              className="h-2 w-2 shrink-0 rounded-full bg-emerald-400"
+              title="Online"
+              role="img"
+              aria-label="Online"
+            />
+          )}
+          {presence && !presence.online && (
+            <span
+              className="flex shrink-0 items-center gap-1 rounded border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-xs text-red-300"
+              title={
+                forfeitRemaining !== null
+                  ? `Forfeits in ${formatTime(forfeitRemaining)}`
+                  : "Disconnected"
+              }
+            >
+              <TriangleAlert className="h-3 w-3" />
+              {forfeitRemaining !== null ? (
+                <FixedDigits>{formatTime(forfeitRemaining)}</FixedDigits>
+              ) : (
+                "Offline"
+              )}
+            </span>
+          )}
+        </div>
+        {isWinner && <p className="text-xs text-gold-300">Winner</p>}
+      </div>
+      <span
+        className={`text-xl font-semibold tabular-nums ${
+          lowTime
+            ? "text-red-400"
+            : isTurn
+              ? "text-foreground"
+              : "text-foreground/75"
+        }`}
+        aria-label={`Time left ${time}`}
+      >
+        <FixedDigits>{time}</FixedDigits>
+      </span>
+    </div>
+  );
+}
+
+// Piece ranks. Collapsed by default.
+function PieceLegend() {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex min-h-[48px] w-full items-center justify-between gap-3 rounded-lg px-4 text-left transition-colors hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+      >
+        <span className="text-base font-semibold text-foreground">
+          Piece ranks
+        </span>
+        {open ? (
+          <ChevronUp className="h-4 w-4" />
+        ) : (
+          <ChevronDown className="h-4 w-4" />
+        )}
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="max-h-96 overflow-y-auto border-t border-border px-4 pb-4 pt-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-[13px] text-foreground/70">
+                    <th className="w-14 py-2 font-medium">Piece</th>
+                    <th className="py-2 font-medium">Name</th>
+                    <th className="py-2 text-right font-medium">Rank</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PIECES_INFO.map(({ piece, rank }) => (
+                    <tr key={piece} className="border-b border-border/60">
+                      <td className="py-1.5">
+                        <div className="flex w-10 justify-center text-foreground">
+                          {getPieceDisplay(piece, { size: "small" })}
+                        </div>
+                      </td>
+                      <td className="py-1.5 text-foreground">{piece}</td>
+                      <td className="py-1.5 text-right text-foreground/80">
+                        {rank}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <ul className="mt-3 space-y-1 text-[13px] text-foreground/80">
+                <li>A higher rank removes a lower rank.</li>
+                <li>The Spy removes any officer, but loses to a Private.</li>
+                <li>Capture your opponent's Flag to win.</li>
+              </ul>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
 
 const GameBoard = memo(function GameBoard({
   gameId,
@@ -300,8 +488,6 @@ const GameBoard = memo(function GameBoard({
     stableUsername,
     PRESENCE_INTERVAL,
   );
-  console.log(presenceState);
-
   const { playBGM, playSFX } = useSound();
 
   // Helper function to get online status for a player
@@ -313,12 +499,16 @@ const GameBoard = memo(function GameBoard({
     [presenceState],
   );
 
-  const matchResult = useQuery(api.games.getMatchResult, { gameId });
+  // Subscribing during play re-ran this on every move only to return null.
+  const matchResult = useQuery(
+    api.games.getMatchResult,
+    game?.status === "finished" ? { gameId } : "skip",
+  );
 
   const { mutate: setupPieces, isPending: isSettingUpPieces } =
     useConvexMutationWithQuery(api.games.setupPieces, {
       onSuccess: () => {
-        toast.success("Pieces setup complete!");
+        toast.success("Pieces placed. Waiting for your opponent.");
       },
       onError: () => {
         toast.error("Failed to setup pieces");
@@ -340,11 +530,11 @@ const GameBoard = memo(function GameBoard({
           const isCurrentPlayerWinner =
             result.challengeResult.winner === "attacker";
           if (isCurrentPlayerWinner) {
-            toast.success("Victory! Your piece wins the battle!");
+            toast.success("Your piece won the battle.");
           } else if (result.challengeResult.winner === "defender") {
-            toast.error("Defeat! Your piece was eliminated!");
+            toast.error("Your piece was captured.");
           } else {
-            toast.info("Both pieces eliminated in battle!");
+            toast.info("Both pieces were removed.");
           }
         }
       },
@@ -370,7 +560,7 @@ const GameBoard = memo(function GameBoard({
     api.games.timeoutGame,
     {
       onSuccess: () => {
-        toast.error("Time expired! You lose the game.");
+        toast.error("Your time ran out. You lost the game.");
       },
     },
   );
@@ -444,7 +634,7 @@ const GameBoard = memo(function GameBoard({
       );
       reportOpponentReconnect({ gameId })
         .then(() => {
-          toast.success(`Opponent reconnected!`, { duration: 3000 });
+          toast.success(`Your opponent is back.`, { duration: 3000 });
         })
         .catch(console.error);
     }
@@ -496,7 +686,6 @@ const GameBoard = memo(function GameBoard({
     toCol: number;
   } | null>(null);
   const [currentTime, setCurrentTime] = useState(Date.now());
-  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
   const [showSurrenderDialog, setShowSurrenderDialog] = useState(false);
 
   const [_, setBoardRect] = useState<DOMRect | null>(null);
@@ -651,9 +840,9 @@ const GameBoard = memo(function GameBoard({
 
     if (canHandlePlayer1Timeout) {
       if (isPlayer1) {
-        toast.error("Your time expired! You lose the game.");
+        toast.error("Your time ran out. You lost the game.");
       } else {
-        toast.info("Opponent's time expired! You win the game.");
+        toast.success("Your opponent ran out of time. You won.");
       }
       timeoutGame({ gameId });
     }
@@ -673,9 +862,9 @@ const GameBoard = memo(function GameBoard({
 
     if (canHandlePlayer2Timeout) {
       if (isPlayer2) {
-        toast.error("Your time expired! You lose the game.");
+        toast.error("Your time ran out. You lost the game.");
       } else {
-        toast.info("Opponent's time expired! You win the game.");
+        toast.success("Your opponent ran out of time. You won.");
       }
       timeoutGame({ gameId });
     }
@@ -779,7 +968,7 @@ const GameBoard = memo(function GameBoard({
     setAvailablePieces([]);
     setSelectedPiece(null);
     setIsSwapMode(true);
-    toast.success("Pieces randomized!");
+    toast.success("Pieces placed at random.");
   }, [validRows]);
 
   const clearSetup = useCallback(() => {
@@ -788,7 +977,7 @@ const GameBoard = memo(function GameBoard({
     setSelectedPiece(null);
     setSelectedSetupSquare(null);
     setIsSwapMode(false);
-    toast.success("Setup cleared!");
+    toast.success("Board cleared.");
   }, []);
 
   const loadPresetSetup = useCallback(
@@ -806,7 +995,7 @@ const GameBoard = memo(function GameBoard({
       setSelectedPiece(null);
       setSelectedSetupSquare(null);
       setIsSwapMode(true);
-      toast.success("Preset loaded successfully!");
+      toast.success("Preset loaded.");
     },
     [],
   );
@@ -937,15 +1126,7 @@ const GameBoard = memo(function GameBoard({
   // Game result toast notification - separated for better performance
   useEffect(() => {
     if (game?.status === "finished" && !hasAcknowledgedResult) {
-      const isCurrentUserWinner =
-        game.winner === (isPlayer1 ? "player1" : "player2");
-
-      if (isCurrentUserWinner) {
-        toast.success("Victory! You won the game!");
-      } else {
-        toast.error("Defeat! You lost the game.");
-      }
-
+      // The result modal says who won (including draws), so no toast here.
       if (!gameFinished) {
         setShowResultModal(true);
         setGameFinished(true);
@@ -1176,7 +1357,7 @@ const GameBoard = memo(function GameBoard({
   );
 
   const handleSetupTimeout = useCallback(() => {
-    toast.error("Setup time expired! Pieces will be placed randomly.");
+    toast.error("Setup time ran out. Your pieces were placed at random.");
     randomizeSetup();
     setTimeout(() => {
       void handleFinishSetup();
@@ -1218,7 +1399,8 @@ const GameBoard = memo(function GameBoard({
           selectedSquare &&
           Math.abs(selectedSquare.row - logicalRowIndex) +
             Math.abs(selectedSquare.col - colIndex) ===
-            1;
+            1 &&
+          cell?.player !== (isPlayer1 ? "player1" : "player2");
         const highlightType = isSquareHighlighted(logicalRowIndex, colIndex);
         const isPendingMove =
           pendingMove &&
@@ -1275,6 +1457,7 @@ const GameBoard = memo(function GameBoard({
     game?.lastMoveFrom,
     game?.lastMoveTo,
     isCurrentPlayer,
+    isPlayer1,
     isSquareHighlighted,
     getArrowDirection,
     handleGameSquareClick,
@@ -1288,20 +1471,24 @@ const GameBoard = memo(function GameBoard({
   // }
 
   if (isLoadingGame) {
+    // Same shape as the live game: status, two player bars, the board.
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="flex flex-col items-center gap-4"
-        >
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="rounded-full h-12 w-12 border-4 border-amber-400 border-t-transparent"
-          />
-          <p className="text-white/70 text-lg">Loading game...</p>
-        </motion.div>
+      <div
+        className="mx-auto w-full max-w-[600px] space-y-2 sm:space-y-3"
+        aria-busy="true"
+      >
+        <Skeleton className="h-9 w-32" />
+        <Skeleton className="h-[58px] w-full rounded-lg" />
+        <div className="-mx-4 grid grid-cols-9 border-y border-border bg-card sm:mx-0 sm:gap-1 sm:rounded-lg sm:border sm:p-2">
+          {Array.from({ length: BOARD_ROWS * BOARD_COLS }).map((_, i) => (
+            <Skeleton
+              key={i}
+              className="aspect-square rounded-none sm:rounded-md"
+            />
+          ))}
+        </div>
+        <Skeleton className="h-[58px] w-full rounded-lg" />
+        <span className="sr-only">Loading game</span>
       </div>
     );
   }
@@ -1310,177 +1497,115 @@ const GameBoard = memo(function GameBoard({
   if (!game) {
     return (
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex justify-center items-center min-h-[60vh] p-4"
+        {...riseIn}
+        className="mx-auto flex min-h-[50vh] w-full max-w-md items-center px-0"
       >
-        <Card className="w-full max-w-md bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 rounded-sm">
-          <CardContent className="text-center p-8">
-            <motion.div
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-              className="mx-auto mb-6"
-            >
-              <div className="w-16 h-16 bg-red-500/20 backdrop-blur-sm border mx-auto border-red-500/30 rounded-xl flex items-center justify-center">
-                <AlertCircle className="h-8 w-8 text-red-400" />
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="space-y-4"
-            >
-              <h3 className="text-xl font-semibold text-white/90">
-                Game Not Found
-              </h3>
-              <p className="text-white/60 leading-relaxed">
-                This game doesn't exist or you're not authorized to view it. The
-                game may have been deleted or you might not be a participant.
-              </p>
-
-              <div className="pt-4">
-                <Button
-                  onClick={onBackToLobby}
-                  className="bg-white text-black hover:bg-white/90 font-mono tracking-wider font-bold rounded-sm w-full"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  RETURN_TO_LOBBY
-                </Button>
-              </div>
-            </motion.div>
-          </CardContent>
+        <Card className="w-full p-6 text-center sm:p-8">
+          <h1 className="font-display text-2xl font-semibold text-foreground">
+            Game not found
+          </h1>
+          <p className="mt-2 text-sm text-foreground/80">
+            This game doesn't exist, or you're not one of its players.
+          </p>
+          <Button onClick={onBackToLobby} className="mt-6 w-full" size="lg">
+            <ArrowLeft />
+            Back to lobbies
+          </Button>
         </Card>
       </motion.div>
     );
   }
 
+  const myKey = isPlayer2 ? "player2" : "player1";
+  const myTone = PLAYER_TONE[myKey];
+  const opponentName = isPlayer1 ? game.player2Username : game.player1Username;
+  const copyGameId = () => {
+    void navigator.clipboard.writeText(gameId);
+    toast.success("Game ID copied");
+  };
+
   if (game.status === "setup") {
     const needsSetup =
       (isPlayer1 && !game.player1Setup) || (isPlayer2 && !game.player2Setup);
+    const setupTimeUsed = game.setupTimeStarted
+      ? Math.floor((Date.now() - game.setupTimeStarted) / 1000)
+      : 0;
 
     if (!needsSetup) {
+      const myProfile = isPlayer1 ? player1Profile : player2Profile;
+      const theirProfile = isPlayer1 ? player2Profile : player1Profile;
       return (
         <>
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="min-h-[60vh] flex items-center justify-center px-4"
+            {...riseIn}
+            className="mx-auto w-full max-w-md py-4 sm:py-10"
           >
-            <div className="w-full max-w-lg relative">
-              {/* Tactical Border */}
-              <div className="absolute -inset-0.5 bg-gradient-to-r from-amber-500/20 via-orange-500/20 to-amber-500/20 rounded-sm opacity-50 blur-sm" />
+            <Card className="p-5 sm:p-6">
+              <h1 className="font-display text-2xl font-semibold text-foreground">
+                Waiting for your opponent
+              </h1>
+              <p className="mt-2 text-sm text-foreground/80">
+                Your pieces are placed. The game starts when {opponentName}{" "}
+                finishes setup. If they run out of time, you win.
+              </p>
 
-              <div className="relative bg-zinc-950 backdrop-blur-xl border border-white/10 rounded-sm overflow-hidden shadow-2xl">
-                {/* Header Bar */}
-                <div className="flex items-center justify-between px-4 py-2 bg-black/40 border-b border-white/10">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                    <span className="text-xs font-mono text-amber-500/80 tracking-wider">
-                      STATUS: PENDING_OPPONENT
-                    </span>
-                  </div>
-                  <div className="text-xs font-mono text-white/30">
-                    ID: {gameId}
-                  </div>
-                </div>
+              <ul className="mt-5 divide-y divide-border border-y border-border">
+                <li className="flex items-center gap-3 py-3">
+                  <UserAvatar
+                    username={profile.username}
+                    avatarUrl={myProfile?.avatarUrl}
+                    size="sm"
+                    noRing
+                    className={`border-2 ${myTone.ring}`}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                    {profile.username}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm text-emerald-400">
+                    <Check className="h-4 w-4" />
+                    Ready
+                  </span>
+                </li>
+                <li className="flex items-center gap-3 py-3">
+                  <UserAvatar
+                    username={opponentName}
+                    avatarUrl={theirProfile?.avatarUrl}
+                    size="sm"
+                    noRing
+                    className={`border-2 ${PLAYER_TONE[isPlayer1 ? "player2" : "player1"].ring}`}
+                  />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                    {opponentName}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm text-foreground/80">
+                    <span className="h-2 w-2 animate-pulse rounded-full bg-gold-400" />
+                    Setting up
+                  </span>
+                </li>
+              </ul>
 
-                <div className="p-8 flex flex-col items-center text-center relative overflow-hidden">
-                  {/* Background Grid */}
-                  <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:20px_20px]" />
-
-                  {/* Radar Animation */}
-                  <div className="relative w-32 h-32 mb-8 flex items-center justify-center">
-                    <div className="absolute inset-0 border border-amber-500/30 rounded-full" />
-                    <div className="absolute inset-2 border border-amber-500/20 rounded-full border-dashed animate-spin-slow" />
-                    <div className="absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_0_340deg,rgba(245,158,11,0.5)_360deg)] animate-spin-linear opacity-20" />
-                    <Users className="w-12 h-12 text-amber-400 relative z-10" />
-
-                    {/* Pinging dots */}
-                    <motion.div
-                      className="absolute w-2 h-2 bg-white rounded-full opacity-0"
-                      animate={{ scale: [1, 2], opacity: [1, 0] }}
-                      transition={{
-                        duration: 1.5,
-                        repeat: Infinity,
-                        delay: 0.5,
-                      }}
-                    />
-                  </div>
-
-                  <h3 className="text-2xl font-bold text-white mb-2 tracking-tight">
-                    Establish Uplink
-                  </h3>
-                  <p className="text-white/60 mb-8 max-w-sm">
-                    Your forces are deployed. Maintaining encrypted channel
-                    while waiting for opponent response.
-                  </p>
-
-                  {/* Status Cards */}
-                  <div className="grid grid-cols-2 gap-4 w-full mb-8">
-                    <div className="bg-zinc-900/60 border border-white/10 rounded-sm p-3 flex flex-col items-center">
-                      <div className="text-xs font-mono text-emerald-400 mb-1 flex items-center gap-1 tracking-wider">
-                        <CheckCircle className="w-3 h-3" /> READY
-                      </div>
-                      <div className="text-sm font-bold text-white/90">
-                        YOUR_ARMY
-                      </div>
-                    </div>
-                    <div className="bg-zinc-900/60 border border-white/10 rounded-sm p-3 flex flex-col items-center">
-                      <div className="text-xs font-mono text-amber-400 mb-1 flex items-center gap-1 tracking-wider">
-                        <Clock className="w-3 h-3 animate-pulse" /> WAITING
-                      </div>
-                      <div className="text-sm font-bold text-white/90">
-                        OPPONENT
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Action Bar */}
-                  <div className="w-full bg-black/40 rounded-sm p-4 border border-white/10 flex items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <Timer
-                        duration={300} // 5 minutes for setup
-                        onTimeout={() => {}} // No-op for the waiting player, server handles it
-                        label="OPPONENT TIMEOUT"
-                        variant="setup"
-                        isActive={true}
-                        timeUsed={
-                          game.setupTimeStarted
-                            ? Math.floor(
-                                (Date.now() - game.setupTimeStarted) / 1000,
-                              )
-                            : 0
-                        }
-                        turnStartTime={game.setupTimeStarted}
-                      />
-                    </div>
-                    <div className="h-8 w-[1px] bg-white/10" />
-                    <Button
-                      onClick={() => {
-                        void navigator.clipboard.writeText(gameId);
-                        toast.success("Uplink Code copied!");
-                      }}
-                      size="sm"
-                      variant="ghost"
-                      className="text-xs font-mono text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
-                    >
-                      <Copy className="h-3 w-3 mr-2" />
-                      COPY_ID
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Footer Progress */}
-                <motion.div
-                  className="h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent w-full opacity-50"
-                  animate={{ x: ["-100%", "100%"] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              <div className="mt-5">
+                <Timer
+                  duration={300} // 5 minutes for setup
+                  onTimeout={() => {}} // No-op for the waiting player, server handles it
+                  label="Their setup time"
+                  variant="setup"
+                  isActive={true}
+                  timeUsed={setupTimeUsed}
+                  turnStartTime={game.setupTimeStarted}
                 />
               </div>
-            </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={copyGameId}>
+                  <Copy />
+                  Copy game ID
+                </Button>
+                <Button variant="ghost" onClick={onBackToLobby}>
+                  Back to lobbies
+                </Button>
+              </div>
+            </Card>
           </motion.div>
 
           {/* Achievement Notifications */}
@@ -1489,461 +1614,277 @@ const GameBoard = memo(function GameBoard({
       );
     }
 
+    // Group the remaining pieces by name so six Privates are one tile with a count.
+    const pieceGroups: { piece: string; count: number }[] = [];
+    for (const piece of availablePieces) {
+      const group = pieceGroups.find((g) => g.piece === piece);
+      if (group) group.count += 1;
+      else pieceGroups.push({ piece, count: 1 });
+    }
+    const placedAll = availablePieces.length === 0;
+
     return (
       <>
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
-        >
-          {/* Setup Header */}
-          <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 rounded-sm">
-            <CardHeader className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <motion.div
-                  initial={{ x: -20, opacity: 0 }}
-                  animate={{ x: 0, opacity: 1 }}
-                  className="flex items-center gap-3 sm:gap-4"
+        <motion.div {...riseIn} className="space-y-4 sm:space-y-6">
+          {/* Header */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0">
+              <h1 className="font-display text-2xl font-semibold leading-tight text-foreground sm:text-4xl">
+                Set up your army
+              </h1>
+              <p className="mt-1 text-sm text-foreground/80 sm:text-base">
+                Place all 21 pieces in your three rows. Your opponent can't see
+                them.
+              </p>
+            </div>
+            <div className="flex items-stretch gap-2 sm:w-auto">
+              <div className="min-w-0 flex-1 sm:w-56 sm:flex-none">
+                <Timer
+                  duration={300} // 5 minutes for setup
+                  onTimeout={handleSetupTimeout}
+                  label="Setup time"
+                  variant="setup"
+                  isActive={needsSetup}
+                  timeUsed={setupTimeUsed}
+                  turnStartTime={game.setupTimeStarted}
+                />
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="secondary" className="h-auto">
+                    <ArrowLeft />
+                    <span className="hidden sm:inline">Back to lobbies</span>
+                    <span className="sm:hidden">Back</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Leave setup?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Your game stays open and the setup timer keeps running. If
+                      it runs out before you finish, you lose the game.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Stay and set up</AlertDialogCancel>
+                    <AlertDialogAction onClick={onBackToLobby}>
+                      Back to lobbies
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)] lg:items-start">
+            {/* Board */}
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Button
+                  onClick={randomizeSetup}
+                  variant="secondary"
+                  data-testid="setup-randomize"
                 >
-                  <motion.div
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: 0.1, type: "spring" }}
-                    className="w-10 h-10 sm:w-12 sm:h-12 bg-zinc-900 border border-white/10 rounded-sm flex items-center justify-center shadow-lg flex-shrink-0"
-                  >
-                    <Sword className="h-5 w-5 sm:h-6 sm:w-6 text-white/60" />
-                  </motion.div>
-                  <div className="min-w-0 flex-1">
-                    <CardTitle className="text-xl sm:text-2xl flex items-center gap-2 text-white/90">
-                      Army Setup
-                    </CardTitle>
-                    <div className="flex items-center gap-2 mt-1 mb-1 flex-wrap">
-                      <span className="text-xs text-white/50">Game ID:</span>
-                      <code className="bg-black/40 border border-white/10 px-2 py-1 rounded-sm text-xs font-mono text-white/70 break-all tracking-wider">
-                        {gameId}
-                      </code>
-                      <Button
-                        onClick={() => {
-                          void navigator.clipboard.writeText(gameId);
-                          toast.success("Game ID copied to clipboard!");
-                        }}
-                        size="sm"
-                        variant="ghost"
-                        className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10 flex-shrink-0"
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <p className="text-white/60 mt-1 text-sm sm:text-base">
-                      Strategically position your pieces for battle
-                    </p>
-                  </div>
-                </motion.div>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <Timer
-                    duration={300} // 5 minutes for setup
-                    onTimeout={handleSetupTimeout}
-                    label="Setup Time"
-                    variant="setup"
-                    isActive={needsSetup}
-                    timeUsed={
-                      game.setupTimeStarted
-                        ? Math.floor(
-                            (Date.now() - game.setupTimeStarted) / 1000,
-                          )
-                        : 0
+                  <Shuffle />
+                  Randomize
+                </Button>
+                <Button onClick={clearSetup} variant="secondary">
+                  <Eraser />
+                  Clear
+                </Button>
+                {/* Hide the swap toggle once swapping is the only thing left to do */}
+                {(availablePieces.length > 0 ||
+                  (availablePieces.length === 0 && !isSwapMode)) && (
+                  <Button
+                    onClick={() => setIsSwapMode(!isSwapMode)}
+                    variant="secondary"
+                    aria-pressed={isSwapMode}
+                    className={
+                      isSwapMode
+                        ? "border-gold-500/50 bg-gold-500/15 text-gold-200 hover:bg-gold-500/20"
+                        : ""
                     }
-                    turnStartTime={game.setupTimeStarted}
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={onBackToLobby}
-                    className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20 w-full sm:w-auto"
                   >
-                    Back to Lobby
+                    <ArrowRightLeft />
+                    {isSwapMode ? "Swapping" : "Swap"}
                   </Button>
-                </div>
+                )}
               </div>
-            </CardHeader>
-          </Card>
+              <p className="mb-2 text-sm text-foreground/80" aria-live="polite">
+                {placedAll
+                  ? "Tap one piece, then another, to swap them."
+                  : isSwapMode
+                    ? "Swap is on. Tap a piece on the board, then another."
+                    : "Pick a piece below, then tap a gold square."}
+              </p>
 
-          {/* Controls */}
-          <Card className="bg-zinc-900/60 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20 rounded-sm">
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <Button
-                    onClick={randomizeSetup}
-                    className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-white rounded-sm text-sm"
-                  >
-                    <Shuffle className="h-4 w-4" />
-                    <span className="hidden sm:inline">Randomize</span>
-                    <span className="sm:hidden">Random</span>
-                  </Button>
-                  <Button
-                    onClick={clearSetup}
-                    variant="outline"
-                    className="flex items-center gap-2 bg-transparent border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm rounded-sm"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Clear
-                  </Button>
-                  {/* Show swap mode button always, but hide "Exit Swap Mode" when no pieces left */}
-                  {(availablePieces.length > 0 ||
-                    (availablePieces.length === 0 && !isSwapMode)) && (
-                    <Button
-                      onClick={() => setIsSwapMode(!isSwapMode)}
-                      variant={isSwapMode ? "default" : "outline"}
-                      className={`flex items-center gap-2 text-sm rounded-sm ${isSwapMode ? "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30" : "bg-transparent border-white/10 text-white/60 hover:text-white hover:bg-white/5"}`}
-                    >
-                      <ArrowRightLeft className="h-4 w-4" />
-                      <span className="hidden sm:inline">
-                        {isSwapMode ? "Exit Swap Mode" : "Swap Mode"}
-                      </span>
-                      <span className="sm:hidden">Swap</span>
-                    </Button>
-                  )}
-                </div>
+              <div
+                data-testid="setup-board"
+                className="-mx-4 grid grid-cols-9 border-y border-border bg-card sm:mx-0 sm:gap-1 sm:rounded-lg sm:border sm:p-2"
+              >
+                {displaySetupBoard.map((row, displayRowIndex) =>
+                  row.map((cell, colIndex) => {
+                    const isValidArea =
+                      validDisplayRows.includes(displayRowIndex);
+                    // Convert selected square logical coordinates to display coordinates for comparison
+                    const selectedDisplayRow = selectedSetupSquare
+                      ? flipRowForDisplay(
+                          selectedSetupSquare.row,
+                          shouldFlipBoard,
+                        )
+                      : -1;
+                    const isSelected =
+                      selectedDisplayRow === displayRowIndex &&
+                      selectedSetupSquare?.col === colIndex;
 
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-xs sm:text-xs font-mono tracking-wider px-3 py-1 rounded-sm"
-                  >
-                    {availablePieces.length === 0
-                      ? "All pieces placed - Swap Mode"
-                      : isSwapMode
-                        ? "Swap Mode Active"
-                        : `${availablePieces.length} pieces remaining`}
-                  </Badge>
-                </div>
+                    return (
+                      <button
+                        type="button"
+                        key={`${displayRowIndex}-${colIndex}`}
+                        aria-label={
+                          cell
+                            ? cell
+                            : isValidArea
+                              ? "Empty square in your area"
+                              : "Opponent's area"
+                        }
+                        aria-pressed={isSelected}
+                        onClick={() =>
+                          handleDisplaySetupSquareClick(
+                            displayRowIndex,
+                            colIndex,
+                          )
+                        }
+                        className={`relative flex aspect-square items-center justify-center border text-foreground transition-colors duration-150 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/80 sm:rounded-md ${
+                          !isValidArea
+                            ? "cursor-default border-white/[0.05] bg-transparent"
+                            : cell
+                              ? `${myTone.tile} cursor-pointer`
+                              : "cursor-pointer border-gold-500/30 bg-gold-500/[0.07] [@media(hover:hover)]:hover:bg-gold-500/[0.15]"
+                        } ${isSelected ? "z-10 ring-2 ring-inset ring-gold-400 !bg-gold-500/20" : ""}`}
+                      >
+                        {cell && (
+                          <div className={myTone.text}>
+                            <div className="block sm:hidden">
+                              {getPieceDisplay(cell, {
+                                showLabel: false,
+                                size: "small",
+                              })}
+                            </div>
+                            <div className="hidden sm:block">
+                              {getPieceDisplay(cell, {
+                                showLabel: true,
+                                size: "medium",
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  }),
+                )}
               </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-            {/* Game Board */}
-            <div className="lg:col-span-2">
-              <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-                <CardHeader className="p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                    <Target className="h-5 w-5 text-blue-400" />
-                    Battle Grid
-                  </CardTitle>
-                  <p className="text-xs sm:text-sm text-white/60">
-                    {isSwapMode
-                      ? "Click on pieces to swap their positions"
-                      : "Click empty spaces to place selected pieces"}
-                  </p>
-                </CardHeader>
-                <CardContent className="p-2 sm:p-6">
-                  <motion.div
-                    initial={{ scale: 1, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="grid grid-cols-9 gap-0.5 sm:gap-2 max-w-lg mx-auto"
-                  >
-                    {displaySetupBoard.map((row, displayRowIndex) =>
-                      row.map((cell, colIndex) => {
-                        // Check if this display row is in the valid area for the current player
-                        const isValidArea =
-                          validDisplayRows.includes(displayRowIndex);
-                        const isOccupied = !!cell;
-                        // Convert selected square logical coordinates to display coordinates for comparison
-                        const selectedDisplayRow = selectedSetupSquare
-                          ? flipRowForDisplay(
-                              selectedSetupSquare.row,
-                              shouldFlipBoard,
-                            )
-                          : -1;
-                        const isSelected =
-                          selectedDisplayRow === displayRowIndex &&
-                          selectedSetupSquare?.col === colIndex;
-
-                        return (
-                          <motion.div
-                            key={`${displayRowIndex}-${colIndex}`}
-                            whileHover={isValidArea ? { scale: 1.05 } : {}}
-                            whileTap={isValidArea ? { scale: 0.95 } : {}}
-                            onClick={() =>
-                              handleDisplaySetupSquareClick(
-                                displayRowIndex,
-                                colIndex,
-                              )
-                            }
-                            className={`
-                            aspect-square border-2 flex items-center justify-center cursor-pointer rounded-sm sm:rounded-lg transition-all text-xs sm:text-sm min-h-[38px] sm:min-h-0 p-0.5 sm:p-1
-                            ${
-                              isValidArea
-                                ? "border-primary/50 bg-primary/10 hover:bg-primary/20"
-                                : "border-muted bg-muted/20"
-                            }
-                            ${isOccupied ? "bg-accent border-accent-foreground/50" : ""}
-                            ${isSelected ? "ring-1 ring-yellow-500 bg-yellow-500/20" : ""}
-                            ${selectedPiece && isValidArea && !isOccupied ? "hover:bg-primary/30" : ""}
-                          `}
-                          >
-                            {cell && (
-                              <div className="text-foreground" title={cell}>
-                                {/* Mobile: No labels, small size */}
-                                <div className="block sm:hidden">
-                                  {getPieceDisplay(cell, {
-                                    showLabel: false,
-                                    size: "small",
-                                  })}
-                                </div>
-                                {/* Desktop: With labels, medium size */}
-                                <div className="hidden sm:block">
-                                  {getPieceDisplay(cell, {
-                                    showLabel: true,
-                                    size: "medium",
-                                  })}
-                                </div>
-                              </div>
-                            )}
-                          </motion.div>
-                        );
-                      }),
-                    )}
-                  </motion.div>
-                </CardContent>
-              </Card>
             </div>
 
-            {/* Available Pieces & Controls */}
-            <div className="space-y-4 sm:space-y-6">
-              {/* Setup Presets - moved to top */}
+            {/* Tray, finish, presets, legend */}
+            <div className="min-w-0 space-y-4">
+              <Card className="p-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h2 className="text-base font-semibold text-foreground">
+                    Pieces to place
+                  </h2>
+                  <span className="text-sm text-foreground/80">
+                    <span className="tabular-nums">
+                      {availablePieces.length}
+                    </span>{" "}
+                    left
+                  </span>
+                </div>
+
+                {placedAll ? (
+                  <p className="mt-2 text-sm text-foreground/80">
+                    All pieces are placed. Check your setup, then finish.
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm text-foreground/80">
+                      Placing:{" "}
+                      <span className="font-medium text-foreground">
+                        {selectedPiece ?? "none selected"}
+                      </span>
+                    </p>
+                    <motion.div
+                      variants={stagger(0.02)}
+                      initial="hidden"
+                      animate="show"
+                      className="mt-3 grid grid-cols-5 gap-2 lg:grid-cols-4"
+                    >
+                      {pieceGroups.map(({ piece, count }) => (
+                        <motion.button
+                          type="button"
+                          variants={fadeUp}
+                          key={piece}
+                          onClick={() => setSelectedPiece(piece)}
+                          aria-pressed={selectedPiece === piece}
+                          aria-label={`${piece}, ${count} left`}
+                          className={`relative flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-md border px-1 py-2 text-foreground transition-colors duration-150 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 ${
+                            selectedPiece === piece
+                              ? "border-gold-400 bg-gold-500/15"
+                              : "border-border bg-white/[0.03] [@media(hover:hover)]:hover:bg-white/[0.08]"
+                          }`}
+                        >
+                          <span className={myTone.text}>
+                            {getPieceDisplay(piece, {
+                              showLabel: false,
+                              size: "small",
+                            })}
+                          </span>
+                          <span className="w-full truncate text-center text-[11px] leading-tight text-foreground/90">
+                            {SHORT_NAMES[piece] ?? piece}
+                          </span>
+                          {count > 1 && (
+                            <span className="absolute right-1 top-0.5 text-[11px] tabular-nums text-gold-300">
+                              {count}
+                            </span>
+                          )}
+                        </motion.button>
+                      ))}
+                    </motion.div>
+                  </>
+                )}
+              </Card>
+
+              <Button
+                onClick={() => void handleFinishSetup()}
+                disabled={!placedAll || isSettingUpPieces}
+                className="w-full"
+                size="lg"
+                data-testid="setup-finish"
+              >
+                {isSettingUpPieces ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    Placing your army
+                  </>
+                ) : placedAll ? (
+                  <>
+                    <Check />
+                    Finish setup
+                  </>
+                ) : (
+                  `Place ${availablePieces.length} more ${
+                    availablePieces.length === 1 ? "piece" : "pieces"
+                  }`
+                )}
+              </Button>
+
               <SetupPresets
                 currentSetup={displaySetupBoard}
                 onLoadPreset={loadPresetSetup}
                 shouldFlipBoard={shouldFlipBoard}
               />
 
-              {availablePieces.length > 0 && (
-                <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-                  <CardHeader className="p-4 sm:p-6">
-                    <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                      <Square className="h-5 w-5 text-purple-400" />
-                      Available Pieces ({availablePieces.length})
-                    </CardTitle>
-                    <Badge
-                      variant="outline"
-                      className="w-fit bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs sm:text-sm"
-                    >
-                      Selected: {selectedPiece}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="p-4 sm:p-6">
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.3 }}
-                      className="grid grid-cols-2 gap-2 max-h-80 overflow-y-auto"
-                    >
-                      {availablePieces.map((piece, index) => (
-                        <motion.button
-                          key={`${piece}-${index}`}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={() => setSelectedPiece(piece)}
-                          className={`
-                          p-2 sm:p-3 border-2 rounded-lg text-xs sm:text-sm transition-all flex flex-col items-center justify-center gap-1 min-h-[60px] sm:min-h-[80px]
-                          ${
-                            selectedPiece === piece
-                              ? "border-primary bg-primary/20 ring-1 ring-primary/50"
-                              : "border-border bg-card hover:bg-accent hover:border-accent-foreground/50"
-                          }
-                        `}
-                        >
-                          {/* Mobile: No labels, small size */}
-                          <div className="flex sm:hidden flex-col items-center justify-center gap-1">
-                            <div className="text-foreground flex items-center justify-center">
-                              {getPieceDisplay(piece, {
-                                showLabel: false,
-                                size: "small",
-                              })}
-                            </div>
-                            <div className="text-[10px] text-center font-medium text-muted-foreground truncate w-full leading-tight">
-                              {piece}
-                            </div>
-                          </div>
-                          {/* Desktop: With labels, medium size */}
-                          <div className="hidden sm:flex sm:flex-col sm:items-center sm:justify-center sm:gap-1">
-                            <div className="text-foreground flex items-center justify-center">
-                              {getPieceDisplay(piece, {
-                                showLabel: false,
-                                size: "medium",
-                              })}
-                            </div>
-                            <div className="text-xs text-center font-medium text-muted-foreground truncate w-full">
-                              {piece}
-                            </div>
-                          </div>
-                        </motion.button>
-                      ))}
-                    </motion.div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Collapsible Legend - moved to bottom */}
-              <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-                <CardHeader className="p-4 sm:p-4">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                      <Info className="h-5 w-5 text-orange-400" />
-                      Piece Legend
-                    </CardTitle>
-                    <Button
-                      onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-white/70 hover:text-white"
-                    >
-                      {isLegendExpanded ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                </CardHeader>
-                <AnimatePresence>
-                  {isLegendExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <CardContent className="p-4 sm:p-4 sm:pt-0">
-                        <div className="max-h-60 overflow-y-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-white/20">
-                                <th className="text-left py-1 px-1 font-medium text-white/70">
-                                  Icon
-                                </th>
-                                <th className="text-left py-1 px-1 font-medium text-white/70">
-                                  Piece
-                                </th>
-                                <th className="text-center py-1 px-1 font-medium text-white/70">
-                                  Rank
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {[
-                                {
-                                  piece: "5 Star General",
-                                  rank: "1",
-                                  short: "5★ Gen",
-                                },
-                                {
-                                  piece: "4 Star General",
-                                  rank: "2",
-                                  short: "4★ Gen",
-                                },
-                                {
-                                  piece: "3 Star General",
-                                  rank: "3",
-                                  short: "3★ Gen",
-                                },
-                                {
-                                  piece: "2 Star General",
-                                  rank: "4",
-                                  short: "2★ Gen",
-                                },
-                                {
-                                  piece: "1 Star General",
-                                  rank: "5",
-                                  short: "1★ Gen",
-                                },
-                                { piece: "Colonel", rank: "6", short: "Col" },
-                                {
-                                  piece: "Lieutenant Colonel",
-                                  rank: "7",
-                                  short: "Lt Col",
-                                },
-                                { piece: "Major", rank: "8", short: "Maj" },
-                                { piece: "Captain", rank: "9", short: "Cpt" },
-                                {
-                                  piece: "1st Lieutenant",
-                                  rank: "10",
-                                  short: "1st Lt",
-                                },
-                                {
-                                  piece: "2nd Lieutenant",
-                                  rank: "11",
-                                  short: "2nd Lt",
-                                },
-                                { piece: "Sergeant", rank: "12", short: "Sgt" },
-                                { piece: "Private", rank: "13", short: "Pvt" },
-                                { piece: "Spy", rank: "★", short: "Spy" },
-                                { piece: "Flag", rank: "🏁", short: "Flag" },
-                              ].map(({ piece, rank, short }) => (
-                                <tr
-                                  key={piece}
-                                  className="border-b border-border/50 hover:bg-muted/30"
-                                >
-                                  <td className="py-1 px-1">
-                                    <div className="flex justify-center">
-                                      {getPieceDisplay(piece, {
-                                        size: "small",
-                                      })}
-                                    </div>
-                                  </td>
-                                  <td className="py-1 px-1 font-medium">
-                                    {short}
-                                  </td>
-                                  <td className="py-1 px-1 text-muted-foreground text-center">
-                                    {rank}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </CardContent>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </Card>
-
-              {availablePieces.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <Button
-                    onClick={() => void handleFinishSetup()}
-                    disabled={isSettingUpPieces}
-                    className="w-full py-3 sm:py-4 text-sm text-black rounded-full disabled:opacity-50"
-                    size="lg"
-                  >
-                    {isSettingUpPieces ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{
-                            duration: 1,
-                            repeat: Infinity,
-                            ease: "linear",
-                          }}
-                          className="w-4 h-4 sm:w-5 sm:h-5 mr-2 border-2 border-black border-t-transparent rounded-full"
-                        />
-                        Setting up pieces...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                        Finish Setup & Enter Battle
-                      </>
-                    )}
-                  </Button>
-                </motion.div>
-              )}
+              <PieceLegend />
             </div>
           </div>
         </motion.div>
@@ -1954,666 +1895,207 @@ const GameBoard = memo(function GameBoard({
     );
   }
 
+  const isPlaying = game.status === "playing";
+  const isFinished = game.status === "finished";
+  const oppKey = myKey === "player1" ? "player2" : "player1";
+  const gameModeBadge = getGameModeBadge(game.gameMode);
+  const barProps = (key: "player1" | "player2") => {
+    const username =
+      key === "player1" ? game.player1Username : game.player2Username;
+    return {
+      side: key,
+      username,
+      profile: key === "player1" ? player1Profile : player2Profile,
+      presence: getPlayerPresence(username) as Presence,
+      forfeitRemaining: getDisconnectForfeitTime(
+        key === "player1"
+          ? game.player1DisconnectedAt
+          : game.player2DisconnectedAt,
+      ),
+      time: getPlayerTime(key === "player1"),
+      isTurn: isPlaying && game.currentTurn === key,
+      isWinner: isFinished && game.winner === key,
+      isYou: key === myKey,
+      formatTime,
+    };
+  };
+  const oppBar = barProps(oppKey);
+  const myBar = barProps(myKey);
+  const isMyTurn = isPlaying && isCurrentPlayer;
+
   return (
     <>
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-4 sm:space-y-6 px-1 sm:px-4 lg:px-0"
+        {...riseIn}
+        className="mx-auto grid max-w-5xl gap-4 sm:gap-6 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)] lg:items-start"
       >
-        {/* Game Header */}
-        <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-          <CardHeader className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              {/* Game ID Section */}
-              <div className="flex items-center gap-2 order-2 sm:order-1">
-                <span className="text-xs text-white/50">Game ID:</span>
-                <code className="bg-white/10 px-2 py-1 rounded text-xs font-mono text-white/70 break-all">
-                  {gameId}
-                </code>
-                <Button
-                  onClick={() => {
-                    void navigator.clipboard.writeText(gameId);
-                    toast.success("Game ID copied to clipboard!");
-                  }}
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 w-6 p-0 text-white/50 hover:text-white/80 hover:bg-white/10 flex-shrink-0"
-                >
-                  <Copy className="h-3 w-3" />
-                </Button>
-              </div>
-
-              {/* Surrender Button */}
-              {game.status === "playing" && (isPlayer1 || isPlayer2) && (
-                <div className="order-1 sm:order-2">
-                  <AlertDialog
-                    open={showSurrenderDialog}
-                    onOpenChange={setShowSurrenderDialog}
-                  >
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        disabled={isSurrendering}
-                        variant="destructive"
-                        size="sm"
-                        className="flex items-center rounded-full gap-2 disabled:opacity-50 w-full sm:w-auto"
-                      >
-                        {isSurrendering ? (
-                          <>
-                            <motion.div
-                              animate={{ rotate: 360 }}
-                              transition={{
-                                duration: 1,
-                                repeat: Infinity,
-                                ease: "linear",
-                              }}
-                              className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                            />
-                            <span className="hidden sm:inline">
-                              Surrendering...
-                            </span>
-                            <span className="sm:hidden">...</span>
-                          </>
-                        ) : (
-                          <>
-                            <Flag className="h-4 w-4" />
-                            <span className="hidden sm:inline">Surrender</span>
-                            <span className="sm:hidden">Give Up</span>
-                          </>
-                        )}
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent className="sm:max-w-[425px] bg-gray-500/10 backdrop-blur-md border border-white/10">
-                      <AlertDialogHeader>
-                        <div className="flex items-center gap-3">
-                          <AlertTriangle className="h-6 w-6 text-amber-400" />
-                          <AlertDialogTitle className="text-white/90">
-                            Confirm Surrender
-                          </AlertDialogTitle>
-                        </div>
-                        <AlertDialogDescription className="text-white/60">
-                          Are you sure you want to surrender? This cannot be
-                          undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel className="bg-white/10 border-white/20 text-white/90 hover:bg-white/20">
-                          <span className="flex items-center gap-2">
-                            <X className="h-4 w-4" />
-                            Cancel
-                          </span>
-                        </AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => void handleSurrender()}
-                          disabled={isSurrendering}
-                          className="bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
-                        >
-                          {isSurrendering ? (
-                            <div className="flex items-center gap-2">
-                              <motion.div
-                                animate={{ rotate: 360 }}
-                                transition={{
-                                  duration: 1,
-                                  repeat: Infinity,
-                                  ease: "linear",
-                                }}
-                                className="w-4 h-4 border-2 border-red-300/30 border-t-red-300 rounded-full"
-                              />
-                              Surrendering...
-                            </div>
-                          ) : (
-                            <>
-                              <Flag className="h-4 w-4 mr-2" />
-                              Surrender
-                            </>
-                          )}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
+        <div className="min-w-0 space-y-2 sm:space-y-3">
+          {/* Status strip */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div
+              data-testid="turn-indicator"
+              data-mine={isMyTurn}
+              role="status"
+              className={`inline-flex max-w-full items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium ${
+                isMyTurn
+                  ? "border-gold-500/40 bg-gold-500/10 text-gold-200"
+                  : "border-border bg-white/[0.03] text-foreground"
+              }`}
+            >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${
+                  isMyTurn ? "bg-gold-400" : "bg-foreground/40"
+                }`}
+              />
+              <span className="truncate">
+                {isFinished
+                  ? "Game over"
+                  : isMyTurn
+                    ? "Your turn"
+                    : `${opponentName}'s turn`}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-[13px] text-foreground/80">
+              <Badge variant="outline">
+                {gameModeBadge.icon}
+                {gameModeBadge.label}
+              </Badge>
+              {isPlaying && (
+                <span>
+                  Turn{" "}
+                  <span className="tabular-nums">
+                    {Math.floor((game.moveCount || 0) / 2 + 1)}
+                  </span>
+                </span>
               )}
             </div>
-
-            {/* VS Design */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-4">
-              <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-                {/* Player 1 */}
-                <div
-                  className={`flex items-center gap-3 p-3 rounded-lg transition-all w-full sm:w-auto ${
-                    game.status === "finished"
-                      ? game.winner === "player1"
-                        ? "bg-yellow-500/20 border border-yellow-500/30 shadow-lg"
-                        : "bg-gray-500/10 border border-gray-500/20"
-                      : game.currentTurn === "player1" &&
-                          game.status === "playing"
-                        ? "bg-amber-500/20 border border-amber-500/30 shadow-lg"
-                        : "bg-transparent"
-                  }`}
-                >
-                  <UserAvatar
-                    username={player1Profile?.username || game.player1Username}
-                    avatarUrl={player1Profile?.avatarUrl}
-                    rank={player1Profile?.rank}
-                    size="md"
-                    frame={player1Profile?.avatarFrame}
-                    className={`border-2 ${
-                      game.status === "finished" && game.winner === "player1"
-                        ? "border-yellow-400"
-                        : "border-amber-500/50"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <UserNameWithBadge
-                        username={game.player1Username}
-                        tier={player1Profile?.tier}
-                        isDonor={player1Profile?.isDonor}
-                        usernameColor={player1Profile?.usernameColor}
-                        size="md"
-                        className="max-w-[120px] sm:max-w-[200px]"
-                      />
-                      {(() => {
-                        const player1Presence = getPlayerPresence(
-                          game.player1Username,
-                        );
-                        const forfeitTimeRemaining = getDisconnectForfeitTime(
-                          game.player1DisconnectedAt,
-                        );
-                        return player1Presence ? (
-                          player1Presence.online ? (
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
-                              title="Online"
-                            />
-                          ) : (
-                            <div
-                              className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded-full border border-orange-400/50 bg-orange-400/10"
-                              title={
-                                forfeitTimeRemaining !== null
-                                  ? `Forfeit in ${formatTime(forfeitTimeRemaining)}`
-                                  : "Disconnected"
-                              }
-                            >
-                              <AlertTriangle className="w-3 h-3 text-orange-400" />
-                              <span
-                                className={`text-xs font-medium font-mono ${
-                                  forfeitTimeRemaining !== null &&
-                                  forfeitTimeRemaining <= 30
-                                    ? "text-red-400"
-                                    : "text-orange-400"
-                                }`}
-                              >
-                                {forfeitTimeRemaining !== null
-                                  ? formatTime(forfeitTimeRemaining)
-                                  : "Disconnected"}
-                              </span>
-                            </div>
-                          )
-                        ) : null;
-                      })()}
-                      {game.status === "finished" &&
-                        game.winner === "player1" && (
-                          <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
-                        )}
-                      {game.currentTurn === "player1" &&
-                        game.status === "playing" && (
-                          <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
-                        )}
-                    </div>
-                    <div
-                      className={`text-xs sm:text-sm font-mono ${
-                        game.status === "finished" && game.winner === "player1"
-                          ? "text-yellow-300"
-                          : "text-blue-300"
-                      }`}
-                    >
-                      {getPlayerTime(true)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="hidden sm:flex">
-                  <Swords className="h-6 w-6 text-white/40" />
-                </div>
-
-                {/* Player 2 */}
-                <div
-                  className={`flex items-center gap-3 p-3 rounded-lg transition-all w-full sm:w-auto ${
-                    game.status === "finished"
-                      ? game.winner === "player2"
-                        ? "bg-yellow-500/20 border border-yellow-500/30 shadow-lg"
-                        : "bg-gray-500/10 border border-gray-500/20"
-                      : game.currentTurn === "player2" &&
-                          game.status === "playing"
-                        ? "bg-red-500/20 border border-red-500/30 shadow-lg"
-                        : "bg-transparent"
-                  }`}
-                >
-                  <UserAvatar
-                    username={player2Profile?.username || game.player2Username}
-                    avatarUrl={player2Profile?.avatarUrl}
-                    rank={player2Profile?.rank}
-                    size="md"
-                    frame={player2Profile?.avatarFrame}
-                    className={`border-2 ${
-                      game.status === "finished" && game.winner === "player2"
-                        ? "border-yellow-400"
-                        : "border-red-500/50"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <UserNameWithBadge
-                        username={game.player2Username}
-                        tier={player2Profile?.tier}
-                        isDonor={player2Profile?.isDonor}
-                        usernameColor={player2Profile?.usernameColor}
-                        size="md"
-                        className="max-w-[120px] sm:max-w-[200px]"
-                      />
-                      {(() => {
-                        const player2Presence = getPlayerPresence(
-                          game.player2Username,
-                        );
-                        const forfeitTimeRemaining = getDisconnectForfeitTime(
-                          game.player2DisconnectedAt,
-                        );
-                        return player2Presence ? (
-                          player2Presence.online ? (
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0 bg-green-400"
-                              title="Online"
-                            />
-                          ) : (
-                            <div
-                              className="flex items-center gap-1 flex-shrink-0 px-2 py-1 rounded-full border border-orange-400/50 bg-orange-400/10"
-                              title={
-                                forfeitTimeRemaining !== null
-                                  ? `Forfeit in ${formatTime(forfeitTimeRemaining)}`
-                                  : "Disconnected"
-                              }
-                            >
-                              <AlertTriangle className="w-3 h-3 text-orange-400" />
-                              <span
-                                className={`text-xs font-medium font-mono ${
-                                  forfeitTimeRemaining !== null &&
-                                  forfeitTimeRemaining <= 30
-                                    ? "text-red-400"
-                                    : "text-orange-400"
-                                }`}
-                              >
-                                {forfeitTimeRemaining !== null
-                                  ? formatTime(forfeitTimeRemaining)
-                                  : "Disconnected"}
-                              </span>
-                            </div>
-                          )
-                        ) : null;
-                      })()}
-                      {game.status === "finished" &&
-                        game.winner === "player2" && (
-                          <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
-                        )}
-                      {game.currentTurn === "player2" &&
-                        game.status === "playing" && (
-                          <Crown className="h-4 w-4 text-yellow-400 flex-shrink-0" />
-                        )}
-                    </div>
-                    <div
-                      className={`text-xs sm:text-sm font-mono ${
-                        game.status === "finished" && game.winner === "player2"
-                          ? "text-yellow-300"
-                          : "text-red-300"
-                      }`}
-                    >
-                      {getPlayerTime(false)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
-                {(() => {
-                  const gameModeBadge = getGameModeBadge(game.gameMode);
-                  return (
-                    <Badge className={gameModeBadge.className}>
-                      {gameModeBadge.icon}
-                      <span className="ml-1">{gameModeBadge.label}</span>
-                    </Badge>
-                  );
-                })()}
-                <Badge
-                  variant={game.status === "playing" ? "default" : "outline"}
-                  className={
-                    game.status === "playing"
-                      ? "bg-green-500/20 text-green-300 border-green-500/30"
-                      : "bg-gray-500/20 text-gray-300 border-gray-500/30"
-                  }
-                >
-                  {game.status === "playing" ? "Playing" : "Finished"}
-                </Badge>
-
-                {game.status === "playing" && (
-                  <div className="text-xs sm:text-sm text-white/60 text-center sm:text-left">
-                    Turn {Math.floor((game.moveCount || 0) / 2 + 1)} •{" "}
-                    {game.currentTurn === "player1"
-                      ? game.player1Username
-                      : game.player2Username}
-                    's turn
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
-          {/* Game Board */}
-          <div className="xl:col-span-3">
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-5 w-5 text-blue-400" />
-                    <span className="text-white/90 text-lg sm:text-xl">
-                      Battle Arena
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      animate={
-                        isCurrentPlayer
-                          ? {
-                              boxShadow: [
-                                "0 0 0 0 rgba(34, 197, 94, 0.7)",
-                                "0 0 0 10px rgba(34, 197, 94, 0)",
-                                "0 0 0 0 rgba(34, 197, 94, 0)",
-                              ],
-                            }
-                          : {}
-                      }
-                      transition={{
-                        duration: 2,
-                        repeat: isCurrentPlayer ? Infinity : 0,
-                        ease: "easeInOut",
-                      }}
-                      className={`px-3 sm:px-4 py-2 rounded-full text-xs sm:text-sm font-bold flex items-center gap-2 border-2 ${
-                        isCurrentPlayer
-                          ? "bg-gradient-to-r from-green-500/30 to-emerald-500/30 text-green-300 border-green-500/50 shadow-lg"
-                          : "bg-muted/50 text-muted-foreground border-muted/50"
-                      }`}
-                    >
-                      {isCurrentPlayer ? (
-                        <>
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{
-                              duration: 2,
-                              repeat: Infinity,
-                              ease: "linear",
-                            }}
-                            className="w-2 h-2 rounded-full bg-green-400"
-                          />
-                          <strong className="hidden sm:inline">
-                            YOUR TURN
-                          </strong>
-                          <strong className="sm:hidden">YOUR TURN</strong>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-2 h-2 rounded-full bg-gray-400" />
-                          <span className="hidden sm:inline">
-                            Opponent's Turn
-                          </span>
-                          <span className="sm:hidden">Waiting</span>
-                        </>
-                      )}
-                    </motion.div>
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-1 sm:p-4 lg:p-6">
-                <motion.div
-                  ref={boardRef}
-                  initial={{ scale: 1, opacity: 0 }}
-                  animate={{
-                    scale: 1,
-                    opacity: 1,
-                  }}
-                  transition={{
-                    delay: 0.1,
-                  }}
-                  className={`grid grid-cols-9 gap-0.5 sm:gap-2 max-w-3xl mx-auto p-1 sm:p-4 rounded-lg transition-all duration-500 relative ring-1 border-2 ${
-                    isCurrentPlayer
-                      ? "ring-primary/70 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/30"
-                      : "ring-muted/30 bg-muted/10 border-muted/30"
-                  } ${isMakingMove ? "pointer-events-none" : ""}`}
-                >
-                  {/* Simple text indicator when making move */}
-                  <AnimatePresence>
-                    {isMakingMove && (
-                      <motion.div
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3, ease: "easeInOut" }}
-                      >
-                        {/* Soft feathered blur backdrop - board-sized circle */}
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.8 }}
-                          transition={{ duration: 0.3, ease: "easeInOut" }}
-                          className="absolute inset-0 backdrop-blur-sm"
-                          style={{
-                            width: "100vw",
-                            height: "100vh",
-                            top: "-50vh",
-                            left: "-50vw",
-                            maskImage:
-                              "radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0) 80%)",
-                            WebkitMaskImage:
-                              "radial-gradient(circle, rgba(0,0,0,1) 0%, rgba(0,0,0,0.8) 20%, rgba(0,0,0,0.4) 40%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0) 80%)",
-                          }}
-                        />
-
-                        <motion.div
-                          initial={{ opacity: 0, y: -10, scale: 0.9 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: -10, scale: 0.9 }}
-                          transition={{ duration: 0.3, ease: "easeInOut" }}
-                          className="relative bg-white/20 backdrop-blur-xl shadow-2xl shadow-white/10 border border-white/20 rounded-full px-3 sm:px-4 py-2 flex items-center gap-2"
-                        >
-                          <motion.div
-                            animate={{ rotate: 360 }}
-                            transition={{
-                              duration: 1,
-                              repeat: Infinity,
-                              ease: "linear",
-                            }}
-                            className="w-3 h-3 sm:w-4 sm:h-4 border-2 border-white border-t-transparent rounded-full"
-                          />
-                          <span className="text-white !bg-transparent text-xs sm:text-sm font-medium">
-                            <span className="hidden sm:inline">
-                              Processing move...
-                            </span>
-                            <span className="sm:hidden">Moving...</span>
-                          </span>
-                        </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {renderBoardSquares}
-                </motion.div>
-              </CardContent>
-            </Card>
           </div>
 
-          {/* Game Info & Legend */}
-          <div className="space-y-4 sm:space-y-6">
-            {/* Eliminated Pieces */}
-            {eliminatedPieces.length > 0 && (
-              <Card
-                className={`bg-black/20 backdrop-blur-xl border shadow-2xl shadow-black/20 ${
-                  isPlayer1 ? "border-blue-500/30" : "border-red-500/30"
-                }`}
-              >
-                <CardHeader className="p-4 sm:p-6 sm:pb-2 pb-2">
-                  <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                    <Sword
-                      className={`h-5 w-5 ${isPlayer1 ? "text-blue-400" : "text-red-400"}`}
-                    />
-                    Eliminated Pieces
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 sm:p-2 sm:pt-2 pt-2">
-                  <div className="max-h-48 sm:max-h-60 overflow-y-auto">
-                    <div className="space-y-2">
-                      {eliminatedPieces.map((eliminated, index) => (
-                        <motion.div
-                          key={`${eliminated.piece}-${eliminated.moveNumber}-${index}`}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className={`flex items-center gap-3 p-2 rounded-lg border ${
-                            isPlayer1
-                              ? "bg-amber-500/10 border border-amber-500/30"
-                              : "bg-red-500/10 border-red-500/30"
-                          }`}
-                        >
-                          <div
-                            className={`flex-shrink-0 ${isPlayer1 ? "text-amber-400" : "text-red-400"}`}
-                          >
-                            {getPieceDisplay(eliminated.piece, {
-                              size: "small",
-                            })}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-xs sm:text-sm font-medium text-white/90 truncate">
-                              {eliminated.piece}
-                            </div>
-                            <div
-                              className={`text-xs ${isPlayer1 ? "text-blue-300/70" : "text-red-300/70"}`}
-                            >
-                              {eliminated.battleOutcome === "attacker" &&
-                                "Attacker won"}
-                              {eliminated.battleOutcome === "defender" &&
-                                "Defender won"}
-                              {eliminated.battleOutcome === "tie" &&
-                                "Tie - both eliminated"}
-                            </div>
-                          </div>
-                          <div className="flex-shrink-0 text-xs sm:text-sm font-semibold text-white/70">
-                            Move {eliminated.moveNumber}
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+          <PlayerBar {...oppBar} />
 
-            {/* Legend */}
-            <Card className="bg-black/20 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/20">
-              <CardHeader className="p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-white/90 text-lg sm:text-xl">
-                    <Info className="h-5 w-5 text-orange-400" />
-                    Piece Legend
-                  </CardTitle>
-                  <Button
-                    onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-                    variant="ghost"
-                    size="sm"
-                    className="text-white/70 hover:text-white"
-                  >
-                    {isLegendExpanded ? (
-                      <ChevronUp className="h-4 w-4" />
+          {/* Board */}
+          <div
+            ref={boardRef}
+            data-testid="game-board"
+            className={`relative -mx-4 grid grid-cols-9 border-y bg-card transition-colors duration-300 sm:mx-0 sm:gap-1 sm:rounded-lg sm:border sm:p-2 ${
+              isMyTurn ? "border-gold-500/50" : "border-border"
+            } ${isMakingMove ? "pointer-events-none" : ""}`}
+          >
+            <AnimatePresence>
+              {isMakingMove && (
+                <motion.div
+                  className="pointer-events-none absolute inset-x-0 top-1/2 z-50 flex -translate-y-1/2 justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="flex items-center gap-2 rounded-md border border-border-strong bg-card px-3 py-1.5 text-sm text-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin text-gold-400" />
+                    Sending move
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {renderBoardSquares}
+          </div>
+
+          <PlayerBar {...myBar} />
+
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <Button variant="ghost" onClick={copyGameId}>
+              <Copy />
+              Copy game ID
+            </Button>
+
+            {isPlaying && (isPlayer1 || isPlayer2) && (
+              <AlertDialog
+                open={showSurrenderDialog}
+                onOpenChange={setShowSurrenderDialog}
+              >
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={isSurrendering}>
+                    {isSurrendering ? (
+                      <>
+                        <Loader2 className="animate-spin" />
+                        Surrendering
+                      </>
                     ) : (
-                      <ChevronDown className="h-4 w-4" />
+                      <>
+                        <Flag />
+                        Surrender
+                      </>
                     )}
                   </Button>
-                </div>
-              </CardHeader>
-              <AnimatePresence>
-                {isLegendExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <CardContent className="p-4 sm:p-6 pt-0">
-                      <div className="max-h-60 sm:max-h-80 overflow-y-auto">
-                        <table className="w-full text-xs sm:text-sm">
-                          <thead>
-                            <tr className="border-b border-border">
-                              <th className="text-left py-1 sm:py-2 px-1 font-medium text-muted-foreground">
-                                Icon
-                              </th>
-                              <th className="text-left py-1 sm:py-2 px-1 font-medium text-muted-foreground">
-                                Piece
-                              </th>
-                              <th className="text-left py-1 sm:py-2 px-1 font-medium text-muted-foreground">
-                                Rank
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {[
-                              { piece: "5 Star General", rank: "1 (Highest)" },
-                              { piece: "4 Star General", rank: "2" },
-                              { piece: "3 Star General", rank: "3" },
-                              { piece: "2 Star General", rank: "4" },
-                              { piece: "1 Star General", rank: "5" },
-                              { piece: "Colonel", rank: "6" },
-                              { piece: "Lieutenant Colonel", rank: "7" },
-                              { piece: "Major", rank: "8" },
-                              { piece: "Captain", rank: "9" },
-                              { piece: "1st Lieutenant", rank: "10" },
-                              { piece: "2nd Lieutenant", rank: "11" },
-                              { piece: "Sergeant", rank: "12" },
-                              { piece: "Private", rank: "13" },
-                              { piece: "Spy", rank: "Special*" },
-                              { piece: "Flag", rank: "Goal" },
-                            ].map(({ piece, rank }) => (
-                              <tr
-                                key={piece}
-                                className="border-b border-border/50 hover:bg-muted/30"
-                              >
-                                <td className="py-1 sm:py-2 px-1">
-                                  <div className="flex justify-center">
-                                    {getPieceDisplay(piece, { size: "medium" })}
-                                  </div>
-                                </td>
-                                <td className="py-1 sm:py-2 px-1 font-medium truncate">
-                                  {piece}
-                                </td>
-                                <td className="py-1 sm:py-2 px-1 text-muted-foreground">
-                                  {rank}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        <div className="mt-3 text-xs text-muted-foreground space-y-1">
-                          <p>
-                            * Spy can eliminate any piece but loses to Private
-                          </p>
-                          <p>• Higher ranks eliminate lower ranks</p>
-                          <p>• Goal: Capture opponent's Flag to win</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </Card>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Surrender this game?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Surrendering counts as a loss and ends the game now. You
+                      can't undo it.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Keep playing</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => void handleSurrender()}
+                      disabled={isSurrendering}
+                      className="border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200"
+                    >
+                      <Flag />
+                      Surrender and lose
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
           </div>
+        </div>
+
+        {/* Lost pieces and ranks */}
+        <div className="min-w-0 space-y-4">
+          {eliminatedPieces.length > 0 && (
+            <Card>
+              <h2 className="px-4 pt-4 text-base font-semibold text-foreground">
+                Your lost pieces
+              </h2>
+              <ul className="max-h-60 overflow-y-auto px-4 pb-2 pt-1">
+                {eliminatedPieces.map((eliminated, index) => (
+                  <li
+                    key={`${eliminated.piece}-${eliminated.moveNumber}-${index}`}
+                    className="flex items-center gap-3 border-b border-border py-2 last:border-b-0"
+                  >
+                    <span className={`flex w-8 justify-center ${myTone.text}`}>
+                      {getPieceDisplay(eliminated.piece, { size: "small" })}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm text-foreground">
+                        {eliminated.piece}
+                      </p>
+                      <p className="text-xs text-foreground/70">
+                        {eliminated.battleOutcome === "attacker" &&
+                          "Attacker won"}
+                        {eliminated.battleOutcome === "defender" &&
+                          "Defender won"}
+                        {eliminated.battleOutcome === "tie" &&
+                          "Tie, both removed"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-xs text-foreground/70">
+                      Move{" "}
+                      <span className="tabular-nums">
+                        {eliminated.moveNumber}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          <PieceLegend />
         </div>
       </motion.div>
 

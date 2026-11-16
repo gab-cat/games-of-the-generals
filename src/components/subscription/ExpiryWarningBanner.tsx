@@ -6,16 +6,24 @@ import { AlertTriangle, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { cn } from "@/lib/utils";
+import { pluralDays } from "./plan-copy";
 
 interface ExpiryWarningBannerProps {
   className?: string;
   dismissible?: boolean;
 }
 
-export function ExpiryWarningBanner({ className = "", dismissible = true }: ExpiryWarningBannerProps) {
+export function ExpiryWarningBanner({
+  className = "",
+  dismissible = true,
+}: ExpiryWarningBannerProps) {
   const [dismissed, setDismissed] = useState(false);
   const navigate = useNavigate();
-  const { data: subscription } = useConvexQuery(api.subscriptions.getCurrentSubscription, {});
+  const { data: subscription } = useConvexQuery(
+    api.subscriptions.getCurrentSubscription,
+    {},
+  );
 
   if (dismissed || !subscription || subscription.tier === "free") {
     return null;
@@ -24,10 +32,10 @@ export function ExpiryWarningBanner({ className = "", dismissible = true }: Expi
   const daysUntilExpiry = subscription.daysUntilExpiry;
   const status = subscription.status;
 
-  // Show banner if:
-  // 1. Subscription is expiring soon (7 days or less)
-  // 2. Subscription is in grace period
-  // 3. Subscription is expired
+  // Show the banner when the plan:
+  // 1. expires in 7 days or less
+  // 2. is in its grace period
+  // 3. has expired
   const shouldShow =
     (daysUntilExpiry !== null && daysUntilExpiry <= 7) ||
     status === "grace_period" ||
@@ -40,51 +48,45 @@ export function ExpiryWarningBanner({ className = "", dismissible = true }: Expi
   const getBannerContent = () => {
     if (status === "expired") {
       return {
-        bgColor: "bg-red-500/20",
-        borderColor: "border-red-500/30",
-        textColor: "text-red-300",
+        tone: "danger" as const,
         icon: AlertTriangle,
-        message: "Your subscription has expired. Renew now to restore access to premium features.",
-        actionText: "Renew Now",
+        message: "Your plan has expired. Renew to get your Pro features back.",
+        actionText: "Renew",
       };
     }
     if (status === "grace_period") {
       return {
-        bgColor: "bg-amber-500/20",
-        borderColor: "border-amber-500/30",
-        textColor: "text-amber-300",
+        tone: "danger" as const,
         icon: Clock,
-        message: "Your subscription has expired but you're in a 2-day grace period. Renew now to continue access.",
-        actionText: "Renew Now",
+        message:
+          "Your plan has expired. You have a 2-day grace period to renew before Pro features lock.",
+        actionText: "Renew",
       };
     }
     if (daysUntilExpiry !== null && daysUntilExpiry <= 1) {
       return {
-        bgColor: "bg-red-500/20",
-        borderColor: "border-red-500/30",
-        textColor: "text-red-300",
+        tone: "danger" as const,
         icon: AlertTriangle,
-        message: "Your subscription expires today. Renew now to avoid losing access.",
-        actionText: "Renew Now",
+        message:
+          daysUntilExpiry === 0
+            ? "Your plan expires today. Renew to keep your Pro features."
+            : "Your plan expires tomorrow. Renew to keep your Pro features.",
+        actionText: "Renew",
       };
     }
     if (daysUntilExpiry !== null && daysUntilExpiry <= 3) {
       return {
-        bgColor: "bg-amber-500/20",
-        borderColor: "border-amber-500/30",
-        textColor: "text-amber-300",
+        tone: "gold" as const,
         icon: Clock,
-        message: `Your subscription expires in ${daysUntilExpiry} day${daysUntilExpiry !== 1 ? "s" : ""}. Renew now to continue access.`,
-        actionText: "Renew Now",
+        message: `Your plan expires in ${pluralDays(daysUntilExpiry)}. Renew to keep your Pro features.`,
+        actionText: "Renew",
       };
     }
     return {
-      bgColor: "bg-yellow-500/20",
-      borderColor: "border-yellow-500/30",
-      textColor: "text-yellow-300",
+      tone: "neutral" as const,
       icon: Clock,
-      message: `Your subscription expires in ${daysUntilExpiry} days. Consider renewing to avoid interruption.`,
-      actionText: "View Subscription",
+      message: `Your plan expires in ${daysUntilExpiry} days.`,
+      actionText: "View plan",
     };
   };
 
@@ -93,30 +95,49 @@ export function ExpiryWarningBanner({ className = "", dismissible = true }: Expi
 
   return (
     <div
-      className={`${content.bgColor} ${content.borderColor} border rounded-lg p-4 flex items-center justify-between gap-4 ${className}`}
+      role="status"
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-lg border p-3 sm:p-4",
+        content.tone === "danger" && "border-red-500/30 bg-red-500/10",
+        content.tone === "gold" && "border-gold-500/30 bg-gold-500/10",
+        content.tone === "neutral" && "border-border bg-card",
+        className,
+      )}
     >
-      <div className="flex items-center gap-3 flex-1">
-        <Icon className={`w-5 h-5 ${content.textColor} flex-shrink-0`} />
-        <p className={`text-sm font-light ${content.textColor} flex-1`}>{content.message}</p>
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <Icon
+          className={cn(
+            "mt-0.5 size-4 shrink-0",
+            content.tone === "danger"
+              ? "text-red-400"
+              : content.tone === "gold"
+                ? "text-gold-300"
+                : "text-foreground",
+          )}
+        />
+        <p className="text-sm text-foreground">{content.message}</p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1">
         <Button
-          variant="outline"
+          variant="secondary"
           size="sm"
-          onClick={() => navigate({ to: "/subscription", search: { subscription: undefined} })}
-          className="font-light"
+          onClick={() =>
+            navigate({
+              to: "/subscription",
+              search: { subscription: undefined },
+            })
+          }
         >
           {content.actionText}
         </Button>
         {dismissible && (
           <Button
             variant="ghost"
-            size="sm"
+            size="icon"
             onClick={() => setDismissed(true)}
-            className="text-white/60 hover:text-white"
-            aria-label="Dismiss banner"
+            aria-label="Dismiss"
           >
-            <X className="w-4 h-4" />
+            <X />
           </Button>
         )}
       </div>

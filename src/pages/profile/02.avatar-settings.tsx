@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { AvatarUpload } from "../settings/AvatarUpload";
-import { Settings } from "lucide-react";
+import { riseIn } from "@/lib/motion";
 
 interface AvatarSettingsProps {
   username: string;
@@ -19,15 +19,10 @@ export function AvatarSettings({
 }: AvatarSettingsProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, height: 0 }}
-      animate={{ opacity: 1, height: "auto" }}
-      exit={{ opacity: 0, height: 0 }}
-      className="rounded-xl border border-white/10 bg-black/30 p-6 mb-6"
+      {...riseIn}
+      className="rounded-lg border border-border bg-card p-5 sm:p-6"
     >
-      <div className="flex items-center gap-3 mb-4">
-        <Settings className="w-5 h-5 text-blue-400" />
-        <h2 className="text-lg font-bold text-white">Avatar Settings</h2>
-      </div>
+      <h2 className="mb-4 text-base font-semibold text-foreground">Avatar</h2>
       <AvatarUpload
         username={username}
         currentAvatarUrl={currentAvatarUrl}

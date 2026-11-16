@@ -118,6 +118,22 @@ crons.cron(
   {}
 );
 
+// Run hourly to pack finished games into games.replay and delete their move rows
+crons.cron(
+  "Archive finished games (hourly)",
+  "40 * * * *",
+  internal.gameArchive.archiveFinishedGames,
+  { continueUntilDone: true }
+);
+
+// Run daily at 00:25 UTC to delete expired auth sessions and refresh tokens
+crons.cron(
+  "Delete expired auth sessions and refresh tokens (daily 00:25 UTC)",
+  "25 0 * * *",
+  internal.maintenance.cleanupExpiredAuth,
+  {}
+);
+
 export default crons;
 
 

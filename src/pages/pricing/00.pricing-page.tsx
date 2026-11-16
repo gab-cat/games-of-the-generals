@@ -3,28 +3,30 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import {
-  Heart,
-  ArrowRight,
-  Sparkles,
-  Crown,
-  Star,
-  CheckCircle2,
-  Shield,
-  Target,
-  Terminal,
-  Activity,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PageHeader, SectionHeader } from "@/components/ui/page-header";
+import { Check, ChevronRight, Minus } from "lucide-react";
 
 import { api } from "../../../convex/_generated/api";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { toast } from "sonner";
-import { useNavigate, getRouteApi } from "@tanstack/react-router";
+import { Link, useNavigate, getRouteApi } from "@tanstack/react-router";
 import { useConvexAuth } from "convex/react";
 import { cn } from "@/lib/utils";
+import { fadeUp, stagger } from "@/lib/motion";
 import { SubscriptionPaymentModal } from "@/components/subscription/SubscriptionPaymentModal";
 import { DonationPaymentModal } from "@/components/subscription/DonationPaymentModal";
+import { plainFeature } from "@/components/subscription/plan-copy";
+import { pricingTiers } from "@/lib/pricing-tiers";
 
 const route = getRouteApi("/pricing");
 
@@ -32,50 +34,54 @@ interface PricingPageProps {
   profile: any;
 }
 
-import { pricingTiers } from "@/lib/pricing-tiers";
+// Short plan summaries. Prices, features and limits come from pricing-tiers.
+const TIER_SUMMARY: Record<string, string> = {
+  Standard: "Full multiplayer and the basic AI.",
+  Pro: "More AI levels, more replays and unlimited loadouts.",
+  "Pro+": "Everything in Pro, plus unlimited matches and the strongest AI.",
+};
 
-const comparisonFeatures = [
+type Cell = string | boolean;
+const comparisonFeatures: {
+  category: string;
+  items: { name: string; standard: Cell; pro: Cell; proPlus: Cell }[];
+}[] = [
   {
-    category: "Operational Capabilities",
+    category: "Play",
     items: [
       {
-        name: "Daily Missions (Matches)",
-        standard: "10/Day",
-        pro: "50/Day",
+        name: "Matches per day",
+        standard: "10",
+        pro: "50",
         proPlus: "Unlimited",
       },
       {
-        name: "AI Difficulty Access",
-        standard: "Basic (MK-1)",
-        pro: "Advanced (MK-2)",
-        proPlus: "Elite (MK-3)",
+        name: "AI level",
+        standard: "Basic",
+        pro: "Advanced",
+        proPlus: "Expert",
       },
+      { name: "Saved replays", standard: "1", pro: "50", proPlus: "100" },
       {
-        name: "Replay Storage Buffer",
-        standard: "1 Game",
-        pro: "50 Games",
-        proPlus: "100 Games",
-      },
-      {
-        name: "Custom Loadout Slots",
-        standard: "2 Slots",
+        name: "Loadout slots",
+        standard: "2",
         pro: "Unlimited",
         proPlus: "Unlimited",
       },
     ],
   },
   {
-    category: "Tactical Intelligence",
+    category: "Analysis",
     items: [
-      { name: "Battle Analytics", standard: false, pro: true, proPlus: true },
+      { name: "Battle analytics", standard: false, pro: true, proPlus: true },
       {
-        name: "Move History Analysis",
+        name: "Move history analysis",
         standard: false,
         pro: true,
         proPlus: true,
       },
       {
-        name: "Meta-Game Insights",
+        name: "Meta-game insights",
         standard: false,
         pro: false,
         proPlus: true,
@@ -83,26 +89,21 @@ const comparisonFeatures = [
     ],
   },
   {
-    category: "Social protocols",
+    category: "Profile and community",
     items: [
       {
-        name: "Custom Avatar Upload",
+        name: "Custom avatar upload",
         standard: false,
         pro: true,
         proPlus: true,
       },
+      { name: "Share loadouts", standard: false, pro: true, proPlus: true },
+      { name: "Priority queue", standard: false, pro: true, proPlus: true },
       {
-        name: "Squad Formation Share",
-        standard: false,
-        pro: true,
-        proPlus: true,
-      },
-      { name: "Priority Queue", standard: false, pro: true, proPlus: true },
-      {
-        name: "Tournament Hosting",
+        name: "Tournament hosting",
         standard: false,
         pro: false,
-        proPlus: "Coming Soon",
+        proPlus: "Coming soon",
       },
     ],
   },
@@ -110,22 +111,49 @@ const comparisonFeatures = [
 
 const faqs = [
   {
-    q: "Can I cancel my subscription anytime?",
-    a: "Of course. You're in total control of your account. You can cancel through your dashboard whenever you like, and you'll keep your features until the end of your billing cycle.",
+    q: "Does my plan renew by itself?",
+    a: "No. You pay for the months you pick and keep your features until the plan expires. When it is close to ending, extend it from the Subscription page.",
   },
   {
     q: "Is my payment information safe?",
-    a: "Absolutely. We use industry-standard encryption through Stripe and PayMongo. We never even see your credit card details, let alone store them.",
+    a: "Payments run on PayMongo's checkout page. We never see or store your card details.",
   },
   {
-    q: "Will I lose my rank if I downgrade?",
-    a: "Not at all. Your match history, rank, and achievements are yours forever. You'll just lose access to the premium features until you decide to upgrade again.",
+    q: "Will I lose my rank if my plan ends?",
+    a: "No. Your match history, rank and achievements stay. You lose the Pro features until you renew.",
   },
   {
-    q: "Can I upgrade my plan later?",
-    a: "Definitely! If you're on Pro and want to go Pro+, you can upgrade instantly. We'll even prorate the cost so you only pay the difference for the remaining time.",
+    q: "Can I switch from Pro to Pro+?",
+    a: "Yes. Pick Pro+ on this page. The new plan starts when the payment goes through and replaces the days left on your current plan.",
   },
 ];
+
+function CompareCell({ value, tone }: { value: Cell; tone?: "gold" }) {
+  if (typeof value === "boolean") {
+    return value ? (
+      <>
+        <Check
+          className={cn(
+            "mx-auto size-4",
+            tone === "gold" ? "text-gold-400" : "text-foreground",
+          )}
+          aria-hidden
+        />
+        <span className="sr-only">Included</span>
+      </>
+    ) : (
+      <>
+        <Minus className="mx-auto size-4 text-foreground/40" aria-hidden />
+        <span className="sr-only">Not included</span>
+      </>
+    );
+  }
+  return (
+    <span className="text-xs tabular-nums text-foreground sm:text-sm">
+      {value}
+    </span>
+  );
+}
 
 export function PricingPage({ profile: _profile }: PricingPageProps) {
   const [donateDialogOpen, setDonateDialogOpen] = useState(false);
@@ -164,8 +192,7 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
     }
     const tierLower = tier.toLowerCase();
     if (tierLower === "standard") {
-      // Formerly Free
-      toast.info("Standard clearance is already active.");
+      toast.info("You are already on the free plan.");
       return;
     }
 
@@ -182,541 +209,311 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
     setDonateDialogOpen(true);
   };
 
+  const currentTier = subscription?.tier || "free";
+  const expiresAt = subscription?.expiresAt;
+  const daysUntilExpiry = expiresAt
+    ? Math.ceil((expiresAt - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  const isCurrent = (name: string) => {
+    const n = name.toLowerCase();
+    return (
+      (n === "standard" && currentTier === "free") ||
+      (n === "pro" && currentTier === "pro") ||
+      (n === "pro+" && currentTier === "pro_plus")
+    );
+  };
+
+  // The one gold button: Pro, or Pro+ when Pro is already the current plan.
+  const primaryName = currentTier === "pro" ? "Pro+" : "Pro";
+
   return (
-    <div className="min-h-screen py-10 px-2 sm:px-6 relative overflow-hidden font-sans text-zinc-300">
-      <div className="relative z-10 max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="mb-16 md:mb-20 space-y-4 text-center">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex justify-center"
-          >
-            <div className="flex items-center gap-3 text-blue-400/60 font-mono text-xs tracking-[0.2em] uppercase bg-blue-500/5 border border-blue-500/10 px-3 py-1 rounded-full">
-              <Terminal className="w-3.5 h-3.5" />
-              <span>Choosing Your Path</span>
-            </div>
-          </motion.div>
+    <div className="w-full">
+      <PageHeader
+        title="Pricing"
+        description="Playing is free. Pro and Pro+ add stronger AI, more saved replays and profile options. Pay for the months you want, with no automatic renewal."
+      />
 
-          <motion.h1
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1 }}
-            className="text-4xl md:text-5xl lg:text-6xl font-display font-medium text-white tracking-tight"
-          >
-            Unlock the Full <span className="text-zinc-600">Experience</span>
-          </motion.h1>
+      {/* Plans */}
+      <motion.div
+        variants={stagger(0.06)}
+        initial="hidden"
+        animate="show"
+        className="mb-12 grid items-stretch gap-4 lg:grid-cols-3 lg:gap-6"
+      >
+        {pricingTiers.map((tier) => {
+          const current = isCurrent(tier.name);
+          const isPaidTier = tier.name !== "Standard";
+          const isPrimary = !current && tier.name === primaryName;
+          const features = tier.features.slice(0, 8);
+          const more = tier.features.length - features.length;
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-zinc-500 text-sm max-w-2xl mx-auto leading-relaxed font-mono"
-          >
-            The core game is always free. Upgrade your account to unlock
-            advanced features, better AI training, and more ways to customize
-            your game.
-          </motion.p>
-        </div>
-
-        {/* Pricing Cards */}
-        <div className="grid lg:grid-cols-3 gap-6 lg:gap-8 mb-20 items-start">
-          {pricingTiers.map((tier, index) => {
-            const isBlue = tier.color === "blue";
-            const isAmber = tier.color === "amber";
-
-            const borderClass = isBlue
-              ? "border-blue-500/30"
-              : isAmber
-                ? "border-amber-500/30"
-                : "border-zinc-800";
-            const bgClass = isBlue
-              ? "bg-blue-500/5"
-              : isAmber
-                ? "bg-amber-500/5"
-                : "bg-zinc-900/40";
-            const textClass = isBlue
-              ? "text-blue-400"
-              : isAmber
-                ? "text-amber-400"
-                : "text-zinc-400";
-
-            return (
-              <motion.div
-                key={tier.name}
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="relative group h-full"
+          return (
+            <motion.div key={tier.name} variants={fadeUp} className="h-full">
+              <Card
+                className={cn(
+                  "flex h-full flex-col",
+                  (current || isPrimary) && "border-gold-500/40",
+                )}
               >
-                <div
-                  className={cn(
-                    "group relative h-full flex flex-col p-6 rounded-sm border backdrop-blur-sm transition-all duration-300",
-                    borderClass,
-                    bgClass,
-                    tier.popular &&
-                      "ring-1 ring-blue-500/20 shadow-[0_0_30px_-10px_rgba(59,130,246,0.2)]",
-                  )}
-                >
-                  {/* Tactical Decor */}
-                  <div className="absolute top-0 right-0 p-3 opacity-30">
-                    {isBlue ? (
-                      <Target className="w-12 h-12 text-blue-500" />
-                    ) : isAmber ? (
-                      <Crown className="w-12 h-12 text-amber-500" />
-                    ) : (
-                      <Shield className="w-12 h-12 text-zinc-500" />
-                    )}
-                  </div>
-
-                  {tier.popular && (
-                    <div className="absolute -top-3 left-6 px-3 py-1 bg-blue-500 text-[#050505] text-[10px] font-bold font-mono uppercase tracking-wider rounded-sm">
-                      Best Value
+                <CardContent className="flex h-full flex-col gap-5 p-5 sm:p-6">
+                  <div>
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="font-display text-2xl font-semibold text-foreground">
+                        {tier.name}
+                      </h2>
+                      {current ? (
+                        <Badge>Your plan</Badge>
+                      ) : tier.popular ? (
+                        <Badge variant="secondary">Most chosen</Badge>
+                      ) : null}
                     </div>
-                  )}
-
-                  {/* Header */}
-                  <div className="mb-6 space-y-2 relative z-10">
-                    <h3
-                      className={cn(
-                        "font-display text-2xl font-bold tracking-wide text-white",
-                      )}
-                    >
-                      {tier.name}
-                    </h3>
-                    <p className="text-xs text-zinc-500 font-mono min-h-[40px]">
-                      {tier.description}
+                    <p className="mt-1 text-sm text-foreground/80">
+                      {TIER_SUMMARY[tier.name] ?? tier.description}
                     </p>
                   </div>
 
-                  {/* Price */}
-                  <div className="mb-8 p-4 bg-[#050505]/50 rounded-sm border border-white/5 relative overflow-hidden group-hover:border-white/10 transition-colors">
-                    <div className="flex items-baseline gap-1">
-                      <span
-                        className={cn(
-                          "text-3xl font-mono font-bold tracking-tight",
-                          textClass,
-                        )}
-                      >
+                  <div>
+                    <p className="text-foreground">
+                      <span className="text-3xl font-semibold tabular-nums">
                         {tier.price}
-                      </span>
-                      <span className="text-zinc-600 font-mono text-xs uppercase">
-                        /{tier.period}
-                      </span>
-                    </div>
-                    {tier.name !== "Standard" && (
-                      <div className="mt-2 text-[10px] text-zinc-500 flex items-center gap-1.5">
-                        <Sparkles className="w-3 h-3 text-zinc-600" />
-                        Multi-month discounts available
-                      </div>
+                      </span>{" "}
+                      {isPaidTier && (
+                        <span className="text-sm text-foreground/80">
+                          a month
+                        </span>
+                      )}
+                    </p>
+                    {isPaidTier && (
+                      <p className="mt-1 text-xs text-foreground/70">
+                        Pay for 3, 6 or 12 months and save up to 25%.
+                      </p>
                     )}
                   </div>
 
-                  {/* Features */}
-                  <div className="flex-1 space-y-6 mb-8">
-                    <div>
-                      <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-3 border-b border-zinc-800 pb-1">
-                        Capabilities
-                      </div>
-                      <ul className="space-y-3">
-                        {tier.features.slice(0, 8).map((feature, i) => (
-                          <li
-                            key={i}
-                            className="flex items-start gap-3 text-xs text-zinc-300"
+                  <div className="space-y-2">
+                    {current && isPaidTier ? (
+                      <>
+                        <Button asChild variant="secondary" className="w-full">
+                          <Link
+                            to="/subscription"
+                            search={{ subscription: undefined }}
                           >
-                            <div
-                              className={cn(
-                                "w-1 h-1 rounded-full mt-1.5",
-                                isBlue
-                                  ? "bg-blue-500"
-                                  : isAmber
-                                    ? "bg-amber-500"
-                                    : "bg-zinc-500",
-                              )}
-                            />
-                            <span className="font-light">{feature}</span>
-                          </li>
-                        ))}
-                        {tier.features.length > 8 && (
-                          <li className="text-[10px] text-zinc-500 pl-4 py-1 italic">
-                            + {tier.features.length - 8} additional protocols
-                          </li>
+                            Manage plan
+                          </Link>
+                        </Button>
+                        {expiresAt && (
+                          <p
+                            className={cn(
+                              "text-center text-xs",
+                              daysUntilExpiry !== null && daysUntilExpiry <= 0
+                                ? "text-red-400"
+                                : "text-foreground/80",
+                            )}
+                          >
+                            {daysUntilExpiry !== null && daysUntilExpiry > 1
+                              ? `Expires in ${daysUntilExpiry} days`
+                              : daysUntilExpiry === 1
+                                ? "Expires tomorrow"
+                                : daysUntilExpiry === 0
+                                  ? "Expires today"
+                                  : "Expired"}
+                          </p>
                         )}
-                      </ul>
-                    </div>
+                      </>
+                    ) : (
+                      <Button
+                        variant={isPrimary ? "default" : "secondary"}
+                        className="w-full"
+                        onClick={() => handleUpgrade(tier.name)}
+                        disabled={current}
+                      >
+                        {current
+                          ? "Current plan"
+                          : isPaidTier
+                            ? `Get ${tier.name}`
+                            : "Free plan"}
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 border-t border-border pt-4">
+                    <ul className="space-y-2">
+                      {features.map((feature) => (
+                        <li
+                          key={feature}
+                          className="flex items-start gap-2 text-sm text-foreground"
+                        >
+                          <Check className="mt-0.5 size-4 shrink-0 text-gold-400" />
+                          {plainFeature(feature)}
+                        </li>
+                      ))}
+                      {more > 0 && (
+                        <li className="pl-6 text-sm text-foreground/80">
+                          and {more} more, see the table below
+                        </li>
+                      )}
+                    </ul>
 
                     {tier.comingSoon && tier.comingSoon.length > 0 && (
-                      <div>
-                        <div className="text-[10px] font-mono uppercase tracking-widest text-amber-500/50 mb-3 border-b border-amber-500/10 pb-1 pt-2">
-                          In Development
+                      <div className="mt-4">
+                        <div className="text-[13px] font-medium text-foreground">
+                          Coming later
                         </div>
-                        <ul className="space-y-3">
-                          {tier.comingSoon.map((feature, i) => (
+                        <ul className="mt-2 space-y-1.5">
+                          {tier.comingSoon.map((feature) => (
                             <li
-                              key={i}
-                              className="flex items-start gap-3 text-xs text-zinc-400/70"
+                              key={feature}
+                              className="flex items-start gap-2 text-sm text-foreground/80"
                             >
-                              <div className="w-1 h-1 rounded-full mt-1.5 bg-amber-500/40" />
-                              <div className="flex flex-col gap-0.5">
-                                <span>{feature}</span>
-                                <span className="text-[9px] text-amber-500/60 font-mono uppercase">
-                                  Pending Deployment
-                                </span>
-                              </div>
+                              <Minus className="mt-0.5 size-4 shrink-0 text-foreground/40" />
+                              {plainFeature(feature)}
                             </li>
                           ))}
                         </ul>
                       </div>
                     )}
                   </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </motion.div>
 
-                  {/* Action Button */}
-                  {(() => {
-                    const currentTier = subscription?.tier || "free";
-                    const tierName = tier.name.toLowerCase();
-                    const isCurrentTier =
-                      (tierName === "standard" && currentTier === "free") ||
-                      (tierName === "pro" && currentTier === "pro") ||
-                      (tierName === "pro+" && currentTier === "pro_plus");
-
-                    const expiresAt = subscription?.expiresAt;
-                    const daysUntilExpiry = expiresAt
-                      ? Math.ceil(
-                          (expiresAt - Date.now()) / (1000 * 60 * 60 * 24),
-                        )
-                      : null;
-
-                    return (
-                      <div className="w-full space-y-3 z-10 relative">
-                        {isCurrentTier && expiresAt && (
-                          <div className="text-[10px] font-mono text-center bg-zinc-900/50 py-1 rounded-sm border border-white/5">
-                            {daysUntilExpiry !== null && daysUntilExpiry > 0 ? (
-                              <span className="text-zinc-400">
-                                LICENSE EXP: {daysUntilExpiry} DAY(S)
-                              </span>
-                            ) : daysUntilExpiry === 0 ? (
-                              <span className="text-amber-500 animate-pulse">
-                                EXPIRING TODAY
-                              </span>
-                            ) : (
-                              <span className="text-red-500">
-                                LICENSE EXPIRED
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        <Button
-                          variant={isCurrentTier ? "outline" : "default"}
-                          className={cn(
-                            "w-full h-10 font-mono text-xs uppercase tracking-wider transition-all duration-300",
-                            isCurrentTier
-                              ? "bg-transparent border-white/10 text-white/40 hover:bg-white/5 cursor-default"
-                              : isBlue
-                                ? "bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] border-0"
-                                : isAmber
-                                  ? "bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_20px_rgba(217,119,6,0.3)] hover:shadow-[0_0_20px_rgba(217,119,6,0.5)] border-0"
-                                  : "bg-white text-black hover:bg-zinc-200",
-                          )}
-                          onClick={() => void handleUpgrade(tier.name)}
-                          disabled={isCurrentTier}
-                        >
-                          {isCurrentTier ? "ACTIVE" : tier.buttonText}
-                        </Button>
-                      </div>
-                    );
-                  })()}
-
-                  {/* Corner Brackets */}
-                  <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors" />
-                  <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors" />
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-
-        {/* Support & Discounts (Moved & Updated) */}
-        <div className="grid md:grid-cols-12 gap-6 mb-24">
-          {/* Discount Module */}
-          <motion.div
-            className="group md:col-span-12 lg:col-span-7 bg-zinc-900/40 border border-green-500/20 rounded-sm p-6 md:p-8 backdrop-blur-md relative overflow-hidden"
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.4 }}
-          >
-            {/* Decorative corners */}
-            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors" />
-            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors" />
-            <div className="absolute top-0 left-0 w-1 h-full bg-green-500/50" />
-            <div className="flex flex-col gap-6 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-500/10 rounded-sm border border-green-500/20">
-                  <Activity className="w-5 h-5 text-green-400" />
-                </div>
-                <div>
-                  <h3 className="font-display text-xl text-white">
-                    Save with Multi-Month Plans
-                  </h3>
-                  <p className="text-xs text-zinc-500 font-mono">
-                    Get up to 25% off when you commit to a longer plan.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { term: "3 Months", discount: "15%", saved: "Save 15%" },
-                  { term: "6 Months", discount: "20%", saved: "Save 20%" },
-                  { term: "12 Months", discount: "25%", saved: "Best Value" },
-                ].map((plan, i) => (
-                  <div
-                    key={i}
-                    className="bg-black/40 border border-white/5 p-3 rounded-sm text-center hover:border-green-500/30 transition-colors"
-                  >
-                    <div className="text-green-400 font-bold text-lg">
-                      {plan.discount}
-                    </div>
-                    <div className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mb-1">
-                      OFF
-                    </div>
-                    <div className="w-full h-px bg-white/5 my-2" />
-                    <div className="text-xs text-white">{plan.term}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Pattern Overlay */}
-            <div className="absolute inset-0 bg-[linear-gradient(45deg,rgba(34,197,94,0.03)_1px,transparent_1px)] bg-[size:10px_10px]" />
-          </motion.div>
-
-          {/* Donation Module */}
-          <motion.div
-            className="group md:col-span-12 lg:col-span-5 bg-zinc-900/40 border border-pink-500/20 rounded-sm p-6 md:p-8 backdrop-blur-md relative overflow-hidden"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            {/* Decorative corners */}
-            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/20 group-hover:border-white/40 transition-colors" />
-            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/20 group-hover:border-white/40 transition-colors" />
-            <div className="absolute top-0 right-0 w-1 h-full bg-pink-500/50" />
-            <div className="flex flex-col gap-6 relative z-10">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-pink-500/10 rounded-sm border border-pink-500/20">
-                  <Heart className="w-5 h-5 text-pink-400" />
-                </div>
-                <div>
-                  <h3 className="font-display text-xl text-white">
-                    Support the Developer
-                  </h3>
-                  <p className="text-xs text-zinc-500 font-mono">
-                    Help us keep the servers running.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <p className="text-sm text-zinc-400 leading-relaxed">
-                  Voluntary contributions maintain server uptime and active
-                  development cycles.
-                </p>
-
-                <div className="space-y-2">
-                  <div className="text-[10px] uppercase font-mono text-zinc-500">
-                    Includes Benefits:
-                  </div>
-                  <ul className="space-y-1">
-                    {[
-                      "Exclusive Donor Badge",
-                      "Custom Username Color",
-                      "Premium Profile Frame",
-                    ].map((benefit, i) => (
-                      <li
-                        key={i}
-                        className="flex items-center gap-2 text-xs text-zinc-300"
-                      >
-                        <Star className="w-3 h-3 text-pink-500" />
-                        {benefit}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <Button
-                  onClick={handleDonateOpen}
-                  className="w-full bg-pink-600 hover:bg-pink-500 text-white font-mono text-xs uppercase tracking-wider shadow-[0_0_20px_rgba(236,72,153,0.3)] hover:shadow-[0_0_20px_rgba(236,72,153,0.5)] mt-2"
+      {/* Discounts and donations */}
+      <div className="mb-12 grid gap-4 lg:grid-cols-12 lg:gap-6">
+        <Card className="lg:col-span-7">
+          <CardContent className="p-5 sm:p-6">
+            <h2 className="text-base font-semibold text-foreground sm:text-lg">
+              Longer plans cost less
+            </h2>
+            <p className="mt-1 text-sm text-foreground/80">
+              The discount applies to the whole payment when you pick the
+              months.
+            </p>
+            <div className="mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+              {[
+                { term: "3 months", discount: "15%" },
+                { term: "6 months", discount: "20%" },
+                { term: "12 months", discount: "25%" },
+              ].map((plan) => (
+                <div
+                  key={plan.term}
+                  className="rounded-md border border-border bg-white/[0.02] p-3 text-center"
                 >
-                  To Donation Page
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Feature Comparison Matrix */}
-        <div className="mb-24">
-          <div className="flex items-center gap-3 mb-8 justify-center">
-            <div className="h-px bg-zinc-800 w-12" />
-            <h2 className="text-xl font-display text-white tracking-wide">
-              Tactical Feature Comparison
-            </h2>
-            <div className="h-px bg-zinc-800 w-12" />
-          </div>
-
-          <div className="bg-zinc-900/40 border border-white/5 rounded-sm overflow-hidden backdrop-blur-sm relative group">
-            {/* Decorative corners */}
-            <div className="absolute top-0 left-0 w-2 h-2 border-t border-l border-white/10 group-hover:border-white/20 transition-colors" />
-            <div className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-white/10 group-hover:border-white/20 transition-colors" />
-            <div className="grid grid-cols-4 bg-black/40 border-b border-white/5 p-4 text-xs font-mono uppercase tracking-wider text-zinc-500">
-              <div>Feature Comparison</div>
-              <div className="text-center font-bold text-zinc-400">
-                Standard
-              </div>
-              <div className="text-center font-bold text-blue-400">Pro</div>
-              <div className="text-center font-bold text-amber-500">Pro+</div>
-            </div>
-
-            {comparisonFeatures.map((section, idx) => (
-              <div key={idx}>
-                <div className="px-4 py-2 bg-zinc-950/50 border-y border-white/5 text-[10px] font-mono uppercase tracking-widest text-zinc-600">
-                  {section.category}
+                  <div className="text-xl font-semibold tabular-nums text-emerald-400">
+                    {plan.discount} off
+                  </div>
+                  <div className="mt-1 text-sm text-foreground">
+                    {plan.term}
+                  </div>
                 </div>
-                {section.items.map((item, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-4 p-4 border-b border-white/5 text-sm hover:bg-white/[0.02] transition-colors items-center"
-                  >
-                    <div className="text-zinc-300 font-light">{item.name}</div>
-
-                    <div className="text-center text-zinc-500">
-                      {typeof item.standard === "boolean" ? (
-                        item.standard ? (
-                          <CheckCircle2 className="w-4 h-4 mx-auto text-zinc-500" />
-                        ) : (
-                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-800 mx-auto" />
-                        )
-                      ) : (
-                        <span className="font-mono text-xs">
-                          {item.standard}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-center">
-                      {typeof item.pro === "boolean" ? (
-                        item.pro ? (
-                          <CheckCircle2 className="w-4 h-4 mx-auto text-blue-500" />
-                        ) : (
-                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-800 mx-auto" />
-                        )
-                      ) : (
-                        <span className="font-mono text-xs text-blue-400">
-                          {item.pro}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="text-center">
-                      {typeof item.proPlus === "boolean" ? (
-                        item.proPlus ? (
-                          <CheckCircle2 className="w-4 h-4 mx-auto text-amber-500" />
-                        ) : (
-                          <div className="w-1.5 h-1.5 rounded-full bg-zinc-800 mx-auto" />
-                        )
-                      ) : (
-                        <span className="font-mono text-xs text-amber-500 tracking-tight">
-                          {item.proPlus}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Upgrade Dialog (Replaced) */}
-        <SubscriptionPaymentModal
-          open={upgradeModalOpen}
-          onOpenChange={setUpgradeModalOpen}
-          mode="upgrade"
-          tier={selectedTier || "pro"}
-          onSuccess={() => {}}
-        />
-
-        {/* Tactical Briefing (FAQs) */}
-        <div className="max-w-3xl mx-auto mb-24">
-          <div className="flex items-center gap-3 mb-8 justify-center">
-            <div className="p-2 bg-blue-500/10 rounded-sm border border-blue-500/20">
-              <Terminal className="w-5 h-5 text-blue-400" />
+              ))}
             </div>
-            <h2 className="text-xl font-display text-white tracking-wide">
-              Got Questions? We Have Answers.
-            </h2>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="space-y-4">
-            {faqs.map((faq, i) => (
-              <div
-                key={i}
-                className="group bg-zinc-900/40 border border-white/5 rounded-sm overflow-hidden hover:border-blue-500/30 transition-all duration-300"
-              >
-                <details className="w-full">
-                  <summary className="flex items-center justify-between p-4 cursor-pointer list-none">
-                    <span className="font-mono text-sm text-zinc-300 group-hover:text-white transition-colors">
-                      <span className="text-blue-500 mr-2">#{i + 1} //</span>
-                      {faq.q}
-                    </span>
-                    <div className="text-blue-500 opacity-50 group-hover:opacity-100 transition-opacity">
-                      <ArrowRight className="w-4 h-4 transform group-open:rotate-90 transition-transform" />
-                    </div>
-                  </summary>
-                  <div className="px-4 pb-4 pl-10">
-                    <p className="text-sm text-zinc-400 font-light leading-relaxed border-l-2 border-blue-500/20 pl-4">
-                      <span className="text-[10px] text-zinc-600 font-mono uppercase block mb-1">
-                        The Details:
-                      </span>
-                      {faq.a}
-                    </p>
-                  </div>
-                </details>
-              </div>
-            ))}
-          </div>
-        </div>
+        <Card id="donate" className="lg:col-span-5">
+          <CardContent className="flex h-full flex-col gap-3 p-5 sm:p-6">
+            <h2 className="text-base font-semibold text-foreground sm:text-lg">
+              Donate
+            </h2>
+            <p className="text-sm text-foreground/80">
+              Donations pay for servers and development. Give ₱50 or more to get
+              a donor badge, a custom name colour and a profile frame.
+            </p>
+            <div className="mt-auto">
+              <Button variant="secondary" onClick={handleDonateOpen}>
+                Donate
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Donation Modal (Unified) */}
+      {/* Comparison */}
+      <section className="mb-12">
+        <SectionHeader title="Compare plans" as="h2" />
+        <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center border-b border-border bg-white/[0.03] px-3 py-3 text-xs font-semibold text-foreground sm:px-4 sm:text-sm">
+            <div>Feature</div>
+            <div className="text-center">Standard</div>
+            <div className="text-center">Pro</div>
+            <div className="text-center">Pro+</div>
+          </div>
+
+          {comparisonFeatures.map((section) => (
+            <div key={section.category}>
+              <div className="border-b border-border bg-white/[0.02] px-3 py-2 text-[13px] font-medium text-foreground sm:px-4">
+                {section.category}
+              </div>
+              {section.items.map((item) => (
+                <div
+                  key={item.name}
+                  className="grid grid-cols-[1.6fr_1fr_1fr_1fr] items-center gap-1 border-b border-border px-3 py-3 text-sm last:border-b-0 hover:bg-white/[0.02] sm:px-4"
+                >
+                  <div className="pr-2 text-foreground">{item.name}</div>
+                  <div className="text-center">
+                    <CompareCell value={item.standard} />
+                  </div>
+                  <div className="text-center">
+                    <CompareCell value={item.pro} />
+                  </div>
+                  <div className="text-center">
+                    <CompareCell value={item.proPlus} tone="gold" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <SubscriptionPaymentModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+        mode="upgrade"
+        tier={selectedTier || "pro"}
+        onSuccess={() => {}}
+      />
+
+      {/* Questions */}
+      <section className="mx-auto mb-12 max-w-3xl">
+        <SectionHeader title="Questions" />
+        <div className="space-y-2">
+          {faqs.map((faq) => (
+            <details
+              key={faq.q}
+              className="group rounded-lg border border-border bg-card transition-colors open:border-border-strong hover:border-border-strong"
+            >
+              <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 [&::-webkit-details-marker]:hidden">
+                {faq.q}
+                <ChevronRight className="size-4 shrink-0 text-foreground/70 transition-transform group-open:rotate-90" />
+              </summary>
+              <p className="px-4 pb-4 text-sm text-foreground/80">{faq.a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
+
       <DonationPaymentModal
         open={donateDialogOpen}
         onOpenChange={setDonateDialogOpen}
       />
 
-      {/* Success Modal for Donation - kept simple or can be integrated into page state */}
       <Dialog open={thankYouModalOpen} onOpenChange={setThankYouModalOpen}>
-        <DialogContent className="bg-zinc-950 border border-green-500/20">
-          <div className="flex flex-col items-center text-center py-6 gap-4">
-            <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center border border-green-500/20">
-              <CheckCircle2 className="w-8 h-8 text-green-500" />
-            </div>
-            <h2 className="text-2xl font-display text-white">
-              You're Awesome!
-            </h2>
-            <p className="text-zinc-400 text-sm max-w-xs">
-              Thank you for supporting the game! Your contribution helps us keep
-              things running and growing. Check your profile for your new
-              rewards!
-            </p>
-            <Button
-              onClick={() => setThankYouModalOpen(false)}
-              className="bg-zinc-800 text-white hover:bg-zinc-700 w-full"
-            >
-              DISMISS
-            </Button>
-          </div>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Thank you</DialogTitle>
+            <DialogDescription>
+              Your payment went through. Your new badge, plan or frame will show
+              on your profile in a moment.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setThankYouModalOpen(false)}>Done</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

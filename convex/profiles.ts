@@ -1,4 +1,4 @@
-import { query, mutation, MutationCtx, QueryCtx } from "./_generated/server";
+import { query, mutation, internalMutation, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
@@ -857,8 +857,8 @@ export const getLeaderboard = query({
   },
 });
 
-// Update profile stats after game
-export const updateProfileStats = mutation({
+// Update profile stats after game. Internal: only game-ending mutations may call it.
+export const updateProfileStats = internalMutation({
   args: {
     userId: v.id("users"),
     won: v.boolean(),

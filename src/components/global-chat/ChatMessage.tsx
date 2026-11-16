@@ -1,268 +1,258 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useNavigate } from "@tanstack/react-router";
-import { useConvexAuth } from "convex/react";
-import { useConvexQueryWithOptions } from "../../lib/convex-query-hooks";
-import { api } from "../../../convex/_generated/api";
-import { Id } from "../../../convex/_generated/dataModel";
-import { Loader2, Shield, ShieldCheck } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { MessageModerationMenu } from "./MessageModerationMenu";
+import { Link } from "@tanstack/react-router";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import {
+  formatClock,
+  formatFull,
+  splitMentions,
+} from "@/lib/chat-grouping";
+import { Id } from "../../../convex/_generated/dataModel";
+import { MessageModerationMenu } from "./MessageModerationMenu";
 import { UserNameWithBadge } from "../UserNameWithBadge";
+import { UserAvatar } from "../UserAvatar";
+import { Badge } from "../ui/badge";
 
-interface ChatMessageProps {
-  message: {
-    _id?: Id<"globalChat">;
-    id?: string;
-    userId?: Id<"users"> | string; // Optional for system messages, allow string for optimistic messages
-    username: string;
-    filteredMessage: string;
-    timestamp: number;
-    mentions?: Id<"users">[];
-    usernameColor?: string;
-    adminRole?: "moderator" | "admin";
-    tier?: "free" | "pro" | "pro_plus";
-    isDonor?: boolean;
-  };
-  currentUserSettings?: {
-    usernameColor?: string;
-  } | null;
+export interface ChatLine {
+  key: string;
+  _id?: Id<"globalChat">;
+  userId?: string;
+  username: string;
+  filteredMessage: string;
+  timestamp: number;
+  usernameColor?: string;
+  adminRole?: "moderator" | "admin";
+  tier?: "free" | "pro" | "pro_plus";
+  isDonor?: boolean;
+  avatarUrl?: string;
+  /** Lowercase usernames the server resolved for this message's @mentions. */
+  mentionedUsernames?: string[];
   isOptimistic?: boolean;
 }
 
-export function ChatMessage({
-  message,
-  isOptimistic = false,
-}: ChatMessageProps) {
-  const navigate = useNavigate();
-  const { isAuthenticated } = useConvexAuth();
+export interface ChatViewer {
+  userId?: string;
+  username?: string;
+  isAdmin: boolean;
+  isBanned: boolean;
+  showTimestamps: boolean;
+}
 
-  // Get current user profile to check for self-mentions - profile data changes infrequently
-  const { data: currentUser } = useConvexQueryWithOptions(
-    api.profiles.getCurrentProfile,
-    {},
-    {
-      staleTime: 120000, // 2 minutes - profile data changes infrequently
-      gcTime: 600000, // 10 minutes cache
-    },
-  );
+interface ChatMessageGroupProps {
+  messages: ChatLine[];
+  viewer: ChatViewer;
+  /** Rise in on mount. Off for the first page so a full panel doesn't ripple. */
+  animate: boolean;
+}
 
-  // Get all usernames for validation - usernames change infrequently
-  const { data: allProfiles = [] } = useConvexQueryWithOptions(
-    api.globalChat.getAllUsernames,
-    {},
-    {
-      staleTime: 300000, // 5 minutes - usernames don't change often
-      gcTime: 600000, // 10 minutes cache
-    },
-  );
-
-  // Check if current user is admin/moderator
-  const { data: isCurrentUserAdmin = false } = useConvexQueryWithOptions(
-    api.globalChat.isUserAdmin,
-    isAuthenticated ? {} : "skip",
-    {
-      staleTime: 300000, // 5 minutes - admin status doesn't change often
-      gcTime: 600000, // 10 minutes cache
-    },
-  );
-
-  // Check if current user is banned
-  const { data: isCurrentUserBanned = false } = useConvexQueryWithOptions(
-    api.globalChat.isUserBanned,
-    isAuthenticated ? {} : "skip",
-    {
-      staleTime: 30000, // 30 seconds - ban status can change
-      gcTime: 60000, // 1 minute cache
-    },
-  );
-
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-
-    if (diff < 60000) {
-      // Less than 1 minute
-      return "now";
-    } else if (diff < 3600000) {
-      // Less than 1 hour
-      return `${Math.floor(diff / 60000)}m`;
-    } else if (diff < 86400000) {
-      // Less than 1 day
-      return `${Math.floor(diff / 3600000)}h`;
-    } else if (diff < 604800000) {
-      // Less than 7 days
-      return `${Math.floor(diff / 86400000)}d`;
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-
-  const handleUsernameClick = () => {
-    if (isAuthenticated && message.userId) {
-      void navigate({ to: "/profile", search: { u: message.username } });
-    }
-  };
-
-  const handleMessageClick = () => {
-    if (isAuthenticated && isCurrentUserBanned) {
-      // For banned users, show a helpful message about contacting admin
-      toast.info(
-        "Use the 'Message Administrator' button in your ban screen to appeal your suspension",
-        {
-          duration: 5000,
-        },
-      );
-    }
-  };
-
-  const renderMessageWithMentions = (text: string) => {
-    const mentionRegex = /(@[\w-]+)/g;
-    const parts = text.split(mentionRegex);
-    const validUsernames = new Set(
-      allProfiles.map((profile: { username: string }) =>
-        profile.username.toLowerCase(),
-      ),
-    );
-
-    return parts.map((part, index) => {
-      if (part.startsWith("@")) {
-        const username = part.slice(1).toLowerCase(); // Remove @ and convert to lowercase
-        const isValidUser = validUsernames.has(username);
-        const isCurrentUser =
-          currentUser && username === currentUser.username.toLowerCase();
-
-        if (!isValidUser) {
-          // Not a valid user, render as plain text
-          return part;
-        }
-
-        return (
-          <span
-            key={index}
-            className={cn(
-              "px-1 py-0.5 rounded text-xs font-medium cursor-pointer hover:opacity-80 transition-opacity",
-              isCurrentUser
-                ? "bg-yellow-500/20 text-yellow-300" // Yellow for self-mentions
-                : "bg-blue-500/20 text-blue-300", // Blue for other mentions
-            )}
-            onClick={() => {
-              // Navigate to the mentioned user's profile
-              void navigate({ to: "/profile", search: { u: part.slice(1) } });
-            }}
-          >
-            {part}
-          </span>
-        );
-      }
-      return part;
-    });
-  };
+/**
+ * One run of messages from one sender: avatar, name and time once, then each
+ * message as its own line. Pure view: everything it shows comes in as props.
+ */
+export function ChatMessageGroup({
+  messages,
+  viewer,
+  animate,
+}: ChatMessageGroupProps) {
+  const head = messages[0];
+  const isOwn =
+    !!head.isOptimistic || (!!viewer.userId && viewer.userId === head.userId);
+  const me = viewer.username?.toLowerCase();
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: isOptimistic ? 0.7 : 1, y: 0 }}
-      className={cn(
-        "group hover:bg-white/5 rounded-lg p-1 -m-1 transition-colors",
-        isOptimistic && "bg-white/5",
-      )}
+      initial={animate ? { opacity: 0, y: 6 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+      className="flex gap-2.5 px-3 pb-1 pt-2.5"
     >
-      <div className="flex items-start">
-        {/* Username */}
-        {/* Username with Badges */}
-        <div className="flex items-start gap-1 flex-shrink-0 min-w-0 max-w-[150px] sm:max-w-[200px]">
-          <UserNameWithBadge
-            username={message.username}
-            tier={message.tier}
-            isDonor={message.isDonor}
-            usernameColor={message.usernameColor}
+      {head.userId && !head.isOptimistic ? (
+        <Link
+          to="/profile"
+          search={{ u: head.username }}
+          aria-label={`${head.username}'s profile`}
+          tabIndex={-1}
+          className="mt-0.5 shrink-0 self-start rounded-full transition-opacity hover:opacity-85"
+        >
+          <UserAvatar
+            username={head.username}
+            avatarUrl={head.avatarUrl}
             size="sm"
-            onClick={!isOptimistic ? handleUsernameClick : undefined}
-            className={cn(isOptimistic && "opacity-70")}
           />
+        </Link>
+      ) : (
+        <UserAvatar
+          username={head.username}
+          avatarUrl={head.avatarUrl}
+          size="sm"
+          className="mt-0.5 shrink-0"
+        />
+      )}
 
-          {/* Admin Badge */}
-          {message.adminRole && (
-            <div
-              className={cn(
-                "flex items-center gap-0.5 px-1 rounded text-[10px] h-4 font-medium flex-shrink-0",
-                message.adminRole === "admin"
-                  ? "bg-red-500/20 text-red-300"
-                  : "bg-blue-500/20 text-blue-300",
-              )}
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          {head.userId && !head.isOptimistic ? (
+            <Link
+              to="/profile"
+              search={{ u: head.username }}
+              className="min-w-0 rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+              title={head.username}
             >
-              {message.adminRole === "admin" ? (
-                <ShieldCheck className="w-2.5 h-2.5" />
-              ) : (
-                <Shield className="w-2.5 h-2.5" />
-              )}
-              <span className="capitalize">
-                {message.adminRole === "admin" ? "Admin" : "Mod"}
-              </span>
-            </div>
+              <UserNameWithBadge
+                username={head.username}
+                tier={head.tier}
+                isDonor={head.isDonor}
+                usernameColor={head.usernameColor}
+                size="md"
+              />
+            </Link>
+          ) : (
+            <UserNameWithBadge
+              username={head.username}
+              tier={head.tier}
+              isDonor={head.isDonor}
+              usernameColor={head.usernameColor}
+              size="md"
+              className="min-w-0"
+            />
+          )}
+
+          {head.adminRole && (
+            <Badge
+              variant={head.adminRole === "admin" ? "default" : "secondary"}
+              className="shrink-0 self-center px-1 py-0 text-[11px] leading-4"
+            >
+              {head.adminRole === "admin" ? "Admin" : "Mod"}
+            </Badge>
+          )}
+
+          {isOwn && (
+            <span className="shrink-0 text-xs text-muted-foreground">You</span>
+          )}
+
+          {viewer.showTimestamps && !head.isOptimistic && (
+            <time
+              dateTime={new Date(head.timestamp).toISOString()}
+              title={formatFull(head.timestamp)}
+              className="shrink-0 text-xs text-muted-foreground"
+            >
+              {formatClock(head.timestamp)}
+            </time>
           )}
         </div>
 
-        {/* Separator */}
-        <span className="text-white/40 text-xs mr-1">:</span>
-
-        {/* Message Content */}
-        <div className="flex min-w-0 items-start w-full">
-          <div className="flex items-start gap-2 w-full">
-            <div
-              className={cn(
-                "text-white/90 text-xs leading-tight break-words flex-1",
-                isOptimistic && "opacity-75",
-                isCurrentUserBanned &&
-                  "cursor-pointer hover:bg-white/10 rounded px-1 py-0.5 transition-colors",
-              )}
-              onClick={isCurrentUserBanned ? handleMessageClick : undefined}
-              title={
-                isCurrentUserBanned
-                  ? "Click to message administrator"
-                  : undefined
-              }
-            >
-              {renderMessageWithMentions(message.filteredMessage)}
-            </div>
-
-            {/* Loading indicator */}
-            {isOptimistic && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex-shrink-0"
-              >
-                <Loader2 className="w-3 h-3 text-white/60 animate-spin" />
-              </motion.div>
-            )}
-
-            {/* Moderation Menu for Admins */}
-            {isCurrentUserAdmin &&
-              !isOptimistic &&
-              message._id &&
-              message.userId && (
-                <MessageModerationMenu
-                  messageId={message._id}
-                  userId={message.userId as Id<"users">}
-                  username={message.username}
-                  isOwnMessage={currentUser?.userId === message.userId}
-                  className="ml-auto"
-                  size="md"
-                />
-              )}
-          </div>
-        </div>
-
-        {/* Timestamp */}
-        <div className="text-white/40 text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          {isOptimistic ? "sending..." : formatTimestamp(message.timestamp)}
+        <div className="mt-0.5 space-y-0.5">
+          {messages.map((msg, i) => (
+            <MessageLine
+              key={msg.key}
+              message={msg}
+              viewer={viewer}
+              me={me}
+              showGutterTime={i > 0}
+            />
+          ))}
         </div>
       </div>
     </motion.div>
+  );
+}
+
+function MessageLine({
+  message,
+  viewer,
+  me,
+  showGutterTime,
+}: {
+  message: ChatLine;
+  viewer: ChatViewer;
+  me: string | undefined;
+  showGutterTime: boolean;
+}) {
+  const parts = splitMentions(message.filteredMessage, message.mentionedUsernames);
+  const mentionsMe =
+    !!me &&
+    message.userId !== viewer.userId &&
+    parts.some((p) => p.mention?.toLowerCase() === me);
+
+  const canModerate =
+    viewer.isAdmin && !message.isOptimistic && message._id && message.userId;
+
+  return (
+    <div
+      className={cn(
+        "group relative -mx-1.5 flex items-start gap-1 rounded-md px-1.5 py-0.5 transition-colors",
+        mentionsMe
+          ? "bg-gold-500/[0.09] before:absolute before:inset-y-1 before:left-0 before:w-0.5 before:rounded-full before:bg-gold-400"
+          : "[@media(hover:hover)]:hover:bg-white/[0.03]",
+        message.isOptimistic && "opacity-60",
+      )}
+    >
+      {/* Time of a follow-up line, in the avatar column on hover */}
+      {showGutterTime && viewer.showTimestamps && !message.isOptimistic && (
+        <time
+          dateTime={new Date(message.timestamp).toISOString()}
+          title={formatFull(message.timestamp)}
+          className="pointer-events-none absolute -left-[2.6rem] top-[0.3rem] hidden w-9 text-right text-[10px] leading-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:hover)]:block"
+        >
+          {formatClock(message.timestamp).replace(/\s?[AP]M$/i, "")}
+        </time>
+      )}
+
+      <p
+        className={cn(
+          "min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-[1.45] text-foreground",
+          viewer.isBanned && "cursor-pointer",
+        )}
+        onClick={
+          viewer.isBanned
+            ? () =>
+                toast.info(
+                  "To appeal your suspension, use the Message administrator button on your ban screen.",
+                  { duration: 5000 },
+                )
+            : undefined
+        }
+      >
+        {parts.map((part, i) =>
+          part.mention ? (
+            <Link
+              key={i}
+              to="/profile"
+              search={{ u: part.mention }}
+              className={cn(
+                "rounded px-0.5 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70",
+                part.mention.toLowerCase() === me
+                  ? "bg-gold-500/20 text-gold-200 hover:bg-gold-500/30"
+                  : "text-gold-300 hover:bg-white/[0.08]",
+              )}
+            >
+              {part.text}
+            </Link>
+          ) : (
+            <span key={i}>{part.text}</span>
+          ),
+        )}
+        {message.isOptimistic && (
+          <span className="ml-2 inline-flex items-center gap-1 align-middle text-xs text-muted-foreground">
+            <Loader2 className="size-3 animate-spin" />
+            Sending
+          </span>
+        )}
+      </p>
+
+      {canModerate && (
+        <MessageModerationMenu
+          messageId={message._id!}
+          userId={message.userId as Id<"users">}
+          username={message.username}
+          isOwnMessage={viewer.userId === message.userId}
+          size="sm"
+          className="-my-0.5 shrink-0"
+        />
+      )}
+    </div>
   );
 }

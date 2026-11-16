@@ -4,28 +4,34 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+// Season 3 buttons: 6px corners, no shadows, a 40px default hit target,
+// gold for the one primary action on a screen. See DESIGN.md.
 const buttonVariants = cva(
-  "inline-flex !transition-all !duration-300 items-center rounded-full justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 backdrop-blur-sm",
+  "inline-flex select-none items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[background-color,border-color,color,transform,opacity] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
+        // The one main action on a screen
         default:
-          "bg-white rounded-full text-black hover:bg-gray-100 text-white shadow-lg hover:shadow-xl",
-        destructive:
-          "bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30 shadow-lg hover:shadow-xl",
-        outline:
-          "border rounded-full border-white/20 bg-white/10 hover:bg-white/20 text-white/90 shadow-lg hover:shadow-xl",
+          "bg-primary text-primary-foreground font-semibold hover:bg-[hsl(var(--primary-hover))]",
+        // Everything else that needs a visible button
         secondary:
-          "bg-transparent rounded-full hover:bg-white/10 text-white/80 border border-white/20 shadow-lg hover:shadow-xl",
-        ghost: "hover:bg-white/10 text-white/90",
-        link: "text-blue-400 underline-offset-4 hover:underline hover:text-blue-300",
-        gradient: "bg-gradient-to-r rounded-full text-white from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
+          "border border-border bg-white/[0.04] text-foreground hover:bg-white/[0.08] hover:border-border-strong",
+        outline:
+          "border border-border-strong bg-transparent text-foreground hover:bg-white/[0.06]",
+        ghost: "text-foreground hover:bg-white/[0.06]",
+        destructive:
+          "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 hover:text-red-200",
+        link: "h-auto px-0 text-gold-300 underline-offset-4 hover:underline active:scale-100",
+        // Kept for old call sites; same as default
+        gradient:
+          "bg-primary text-primary-foreground font-semibold hover:bg-[hsl(var(--primary-hover))]",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 px-3 text-xs",
-        lg: "h-10 px-8",
-        icon: "h-9 w-9",
+        default: "h-10 px-4",
+        sm: "h-9 px-3 text-[13px]",
+        lg: "h-11 px-6",
+        icon: "h-10 w-10",
       },
     },
     defaultVariants: {

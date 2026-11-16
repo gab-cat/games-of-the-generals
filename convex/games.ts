@@ -1,11 +1,12 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { presence } from "./presence";
 import { updateEloRatings, isQuickMatchGame } from "./profiles";
-import { Doc } from "./_generated/dataModel";
+import { Doc, Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
+import { loadReplay } from "./gameArchive";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -215,17 +216,25 @@ export const getGame = query({
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
-    const game = await ctx.db.get("games", args.gameId);
+    if (!userId) return null;
+    const stored = await ctx.db.get("games", args.gameId);
 
-    if (!game) return null;
+    if (!stored) return null;
 
     // Should not allow if not part of the game - return null to hide game existence
     if (
-      userId &&
-      ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)
+      ![stored.player1Id, stored.player2Id, ...stored.spectators].includes(userId)
     ) {
       return null;
     }
+
+    // The initial setup holds every hidden piece, and the packed replay is
+    // only for the replay screen. Neither is sent with the live game.
+    const {
+      initialSetupBoard: _initialSetupBoard,
+      replay: _replay,
+      ...game
+    } = stored;
 
     // If game is finished, reveal all pieces
     if (game.status === "finished") {
@@ -851,7 +860,7 @@ export const makeMove = mutation({
       }
 
       // Clean up spectator chat when game ends
-      await ctx.runMutation(api.spectate.cleanupSpectatorChat, {
+      await ctx.runMutation(internal.spectate.cleanupSpectatorChat, {
         gameId: args.gameId,
       });
 
@@ -868,18 +877,13 @@ export const makeMove = mutation({
       // OPTIMIZED: Use indexed queries instead of collecting all moves
       // Count pieces eliminated and spies revealed from moves in this game
       // OPTIMIZED: Added limit to prevent excessive document scanning
-      const [winnerMoves, loserMoves] = await Promise.all([
-        ctx.db
-          .query("moves")
-          .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-          .filter((q) => q.eq(q.field("playerId"), winnerId))
-          .take(250), // Reasonable limit - games rarely exceed 500 moves
-        ctx.db
-          .query("moves")
-          .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-          .filter((q) => q.eq(q.field("playerId"), loserId))
-          .take(250), // Reasonable limit - games rarely exceed 500 moves
-      ]);
+      // The move just made is inserted above, so it is included here.
+      const gameMoves = await ctx.db
+        .query("moves")
+        .withIndex("by_game_timestamp", (q) => q.eq("gameId", args.gameId))
+        .take(1000);
+      const winnerMoves = gameMoves.filter((m) => m.playerId === winnerId);
+      const loserMoves = gameMoves.filter((m) => m.playerId === loserId);
 
       let winnerPiecesEliminated = 0;
       let winnerSpiesRevealed = 0;
@@ -926,7 +930,7 @@ export const makeMove = mutation({
       }
 
       // Update player stats with detailed information
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: winnerId,
         won: true,
         gameTime: gameDuration,
@@ -935,7 +939,7 @@ export const makeMove = mutation({
         spiesRevealed: winnerSpiesRevealed,
       });
 
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: loserId,
         won: false,
         gameTime: gameDuration,
@@ -972,29 +976,21 @@ export const makeMove = mutation({
       // Check and unlock achievements for both players
 
       if (winnerProfile) {
-        void Promise.all([
-          ctx.runMutation(api.achievements.checkAchievements, {
-            profileId: winnerProfile._id,
-          }),
-          ctx.db.patch(winnerProfile._id, {
-            gameId: undefined,
-          }),
-        ]);
+        await ctx.runMutation(internal.achievements.checkAchievements, {
+          profileId: winnerProfile._id,
+        });
+        await ctx.db.patch(winnerProfile._id, { gameId: undefined });
       }
 
       if (loserProfile) {
-        void Promise.all([
-          ctx.runMutation(api.achievements.checkAchievements, {
-            profileId: loserProfile._id,
-          }),
-          ctx.db.patch(loserProfile._id, {
-            gameId: undefined,
-          }),
-        ]);
+        await ctx.runMutation(internal.achievements.checkAchievements, {
+          profileId: loserProfile._id,
+        });
+        await ctx.db.patch(loserProfile._id, { gameId: undefined });
       }
 
       // Check game-specific achievements (like Perfectionist, Comeback King)
-      await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+      await ctx.runMutation(internal.achievements.checkGameSpecificAchievements, {
         gameId: args.gameId,
         winnerId,
         loserId,
@@ -1012,78 +1008,6 @@ export const makeMove = mutation({
     }
 
     return { success: true, challengeResult, winner: gameWinner };
-  },
-});
-
-// Get game moves with optional filtering - Optimized for performance
-export const getGameMoves = query({
-  args: {
-    gameId: v.id("games"),
-    paginationOpts: v.optional(
-      v.object({
-        numItems: v.number(),
-        cursor: v.optional(v.string()),
-      }),
-    ),
-    moveTypes: v.optional(v.array(v.string())), // Optional filter by move types
-  },
-  handler: async (ctx, args) => {
-    const { paginationOpts } = args;
-    const limit = paginationOpts ? Math.min(paginationOpts.numItems, 100) : 50;
-
-    let queryBuilder = ctx.db
-      .query("moves")
-      .withIndex("by_game_timestamp", (q) => q.eq("gameId", args.gameId))
-      .order("asc");
-
-    // Optimized: Apply move type filter at database level if possible
-    if (args.moveTypes && args.moveTypes.length === 1) {
-      // Use the by_game_type index for single move type filters
-      const moveType = args.moveTypes[0] as "setup" | "move" | "challenge";
-      queryBuilder = ctx.db
-        .query("moves")
-        .withIndex("by_game_type", (q) =>
-          q.eq("gameId", args.gameId).eq("moveType", moveType),
-        )
-        .order("asc");
-    }
-
-    if (paginationOpts && paginationOpts.cursor) {
-      const result = await queryBuilder.paginate({
-        numItems: limit,
-        cursor: paginationOpts.cursor,
-      });
-
-      // Filter by move types if multiple types specified
-      if (args.moveTypes && args.moveTypes.length > 1) {
-        return {
-          ...result,
-          page: result.page.filter((move) =>
-            args.moveTypes!.includes(move.moveType),
-          ),
-        };
-      }
-
-      return result;
-    } else {
-      // Initial load
-      const moves = await queryBuilder.take(limit);
-
-      // Filter by move types if multiple types specified (less common case)
-      const filteredMoves =
-        args.moveTypes && args.moveTypes.length > 1
-          ? moves.filter((move) => args.moveTypes!.includes(move.moveType))
-          : moves;
-
-      return {
-        page: filteredMoves,
-        isDone: filteredMoves.length < limit,
-        continueCursor:
-          filteredMoves.length > 0
-            ? filteredMoves[filteredMoves.length - 1]._id
-            : "",
-      };
-    }
   },
 });
 
@@ -1138,18 +1062,18 @@ export const surrenderGame = mutation({
     await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
     // Clean up spectator chat when game ends
-    await ctx.runMutation(api.spectate.cleanupSpectatorChat, {
+    await ctx.runMutation(internal.spectate.cleanupSpectatorChat, {
       gameId: args.gameId,
     });
 
     // Update player stats with game duration
-    await ctx.runMutation(api.profiles.updateProfileStats, {
+    await ctx.runMutation(internal.profiles.updateProfileStats, {
       userId: winnerId,
       won: true,
       gameTime: gameDuration,
     });
 
-    await ctx.runMutation(api.profiles.updateProfileStats, {
+    await ctx.runMutation(internal.profiles.updateProfileStats, {
       userId: loserId,
       won: false,
       gameTime: gameDuration,
@@ -1181,29 +1105,21 @@ export const surrenderGame = mutation({
     }
 
     if (winnerProfile) {
-      void Promise.all([
-        ctx.runMutation(api.achievements.checkAchievements, {
-          profileId: winnerProfile._id,
-        }),
-        ctx.db.patch(winnerProfile._id, {
-          gameId: undefined,
-        }),
-      ]);
+      await ctx.runMutation(internal.achievements.checkAchievements, {
+        profileId: winnerProfile._id,
+      });
+      await ctx.db.patch(winnerProfile._id, { gameId: undefined });
     }
 
     if (loserProfile) {
-      void Promise.all([
-        ctx.runMutation(api.achievements.checkAchievements, {
-          profileId: loserProfile._id,
-        }),
-        ctx.db.patch(loserProfile._id, {
-          gameId: undefined,
-        }),
-      ]);
+      await ctx.runMutation(internal.achievements.checkAchievements, {
+        profileId: loserProfile._id,
+      });
+      await ctx.db.patch(loserProfile._id, { gameId: undefined });
     }
 
     // Check game-specific achievements for surrender scenario
-    await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+    await ctx.runMutation(internal.achievements.checkGameSpecificAchievements, {
       gameId: args.gameId,
       winnerId,
       loserId,
@@ -1280,13 +1196,13 @@ export const timeoutGame = mutation({
     await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
     // Update player stats with game duration
-    await ctx.runMutation(api.profiles.updateProfileStats, {
+    await ctx.runMutation(internal.profiles.updateProfileStats, {
       userId: winnerId,
       won: true,
       gameTime: gameDuration,
     });
 
-    await ctx.runMutation(api.profiles.updateProfileStats, {
+    await ctx.runMutation(internal.profiles.updateProfileStats, {
       userId: loserId,
       won: false,
       gameTime: gameDuration,
@@ -1318,29 +1234,21 @@ export const timeoutGame = mutation({
     }
 
     if (winnerProfile) {
-      void Promise.all([
-        ctx.runMutation(api.achievements.checkAchievements, {
-          profileId: winnerProfile._id,
-        }),
-        ctx.db.patch(winnerProfile._id, {
-          gameId: undefined,
-        }),
-      ]);
+      await ctx.runMutation(internal.achievements.checkAchievements, {
+        profileId: winnerProfile._id,
+      });
+      await ctx.db.patch(winnerProfile._id, { gameId: undefined });
     }
 
     if (loserProfile) {
-      void Promise.all([
-        ctx.runMutation(api.achievements.checkAchievements, {
-          profileId: loserProfile._id,
-        }),
-        ctx.db.patch(loserProfile._id, {
-          gameId: undefined,
-        }),
-      ]);
+      await ctx.runMutation(internal.achievements.checkAchievements, {
+        profileId: loserProfile._id,
+      });
+      await ctx.db.patch(loserProfile._id, { gameId: undefined });
     }
 
     // Check game-specific achievements for timeout scenario
-    await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+    await ctx.runMutation(internal.achievements.checkGameSpecificAchievements, {
       gameId: args.gameId,
       winnerId,
       loserId,
@@ -1351,7 +1259,8 @@ export const timeoutGame = mutation({
 });
 
 // Handle game forfeit due to disconnection
-export const forfeitGame = mutation({
+// Internal: called by cleanupStaleGames. Players leave through surrenderGame.
+export const forfeitGame = internalMutation({
   args: {
     gameId: v.id("games"),
     reason: v.union(v.literal("disconnection_timeout"), v.literal("manual")),
@@ -1411,7 +1320,7 @@ export const forfeitGame = mutation({
       });
 
       // Update player stats with game duration
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: winnerId,
         won: true,
         gameTime: gameDuration,
@@ -1424,7 +1333,7 @@ export const forfeitGame = mutation({
       });
 
       // Update player stats with game duration
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: loserId,
         won: false,
         gameTime: gameDuration,
@@ -1447,18 +1356,18 @@ export const forfeitGame = mutation({
 
     // Check achievements
     if (winnerProfile) {
-      await ctx.runMutation(api.achievements.checkAchievements, {
+      await ctx.runMutation(internal.achievements.checkAchievements, {
         profileId: winnerProfile._id,
       });
     }
     if (loserProfile) {
-      await ctx.runMutation(api.achievements.checkAchievements, {
+      await ctx.runMutation(internal.achievements.checkAchievements, {
         profileId: loserProfile._id,
       });
     }
 
     // Check game-specific achievements
-    await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+    await ctx.runMutation(internal.achievements.checkGameSpecificAchievements, {
       gameId,
       winnerId,
       loserId,
@@ -1667,7 +1576,7 @@ export const handleDisconnectionForfeit = internalMutation({
       });
 
       // Update profile stats with game duration
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: winnerId,
         won: true,
         gameTime: gameDuration,
@@ -1680,7 +1589,7 @@ export const handleDisconnectionForfeit = internalMutation({
       });
 
       // Update profile stats with game duration
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: loserId,
         won: false,
         gameTime: gameDuration,
@@ -1703,12 +1612,12 @@ export const handleDisconnectionForfeit = internalMutation({
 
     // Check achievements
     if (winnerProfile) {
-      await ctx.runMutation(api.achievements.checkAchievements, {
+      await ctx.runMutation(internal.achievements.checkAchievements, {
         profileId: winnerProfile._id,
       });
     }
     if (loserProfile) {
-      await ctx.runMutation(api.achievements.checkAchievements, {
+      await ctx.runMutation(internal.achievements.checkAchievements, {
         profileId: loserProfile._id,
       });
     }
@@ -1719,38 +1628,35 @@ export const handleDisconnectionForfeit = internalMutation({
 
 // Get current user's active game - Optimized to reduce queries
 
+// The player's game in setup or play, if any. Four indexed point lookups:
+// filtering by_player1/by_player2 on status read every game the player had
+// ever finished whenever they had no active game.
+async function findActiveGame(ctx: QueryCtx, userId: Id<"users">) {
+  const lookups = (["playing", "setup"] as const).flatMap((status) => [
+    ctx.db
+      .query("games")
+      .withIndex("by_player1_status", (q) =>
+        q.eq("player1Id", userId).eq("status", status),
+      )
+      .first(),
+    ctx.db
+      .query("games")
+      .withIndex("by_player2_status", (q) =>
+        q.eq("player2Id", userId).eq("status", status),
+      )
+      .first(),
+  ]);
+  const games = await Promise.all(lookups);
+  return games.find((game) => game !== null) ?? null;
+}
+
 export const getCurrentUserGame = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // Optimized: Use Promise.all to query both player indexes in parallel
-    const [player1Games, player2Games] = await Promise.all([
-      ctx.db
-        .query("games")
-        .withIndex("by_player1", (q) => q.eq("player1Id", userId))
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("status"), "setup"),
-            q.eq(q.field("status"), "playing"),
-          ),
-        )
-        .first(),
-      ctx.db
-        .query("games")
-        .withIndex("by_player2", (q) => q.eq("player2Id", userId))
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("status"), "setup"),
-            q.eq(q.field("status"), "playing"),
-          ),
-        )
-        .first(),
-    ]);
-
-    // Return the most recent active game
-    const activeGame = player1Games || player2Games;
+    const activeGame = await findActiveGame(ctx, userId);
     if (activeGame) return activeGame;
 
     // If no active game, check for recently finished games that need acknowledgment
@@ -1790,32 +1696,7 @@ export const getCurrentUserGameId = query({
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
-    // Query both player indexes in parallel, returning only the _id
-    const [player1Game, player2Game] = await Promise.all([
-      ctx.db
-        .query("games")
-        .withIndex("by_player1", (q) => q.eq("player1Id", userId))
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("status"), "setup"),
-            q.eq(q.field("status"), "playing"),
-          ),
-        )
-        .first(),
-      ctx.db
-        .query("games")
-        .withIndex("by_player2", (q) => q.eq("player2Id", userId))
-        .filter((q) =>
-          q.or(
-            q.eq(q.field("status"), "setup"),
-            q.eq(q.field("status"), "playing"),
-          ),
-        )
-        .first(),
-    ]);
-
-    // Return just the game ID, not the full document
-    const activeGame = player1Game || player2Game;
+    const activeGame = await findActiveGame(ctx, userId);
     if (activeGame) return activeGame._id;
 
     // Check for recently finished games needing acknowledgment
@@ -1911,18 +1792,18 @@ export const checkOpponentTimeout = mutation({
       await presence.removeRoomUser(ctx, args.gameId as string, game.player2Id);
 
       // Clean up spectator chat when game ends
-      await ctx.runMutation(api.spectate.cleanupSpectatorChat, {
+      await ctx.runMutation(internal.spectate.cleanupSpectatorChat, {
         gameId: args.gameId,
       });
 
       // Update player stats
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: winnerId,
         won: true,
         gameTime: gameDuration,
       });
 
-      await ctx.runMutation(api.profiles.updateProfileStats, {
+      await ctx.runMutation(internal.profiles.updateProfileStats, {
         userId: loserId,
         won: false,
         gameTime: gameDuration,
@@ -1954,29 +1835,21 @@ export const checkOpponentTimeout = mutation({
       }
 
       if (winnerProfile) {
-        void Promise.all([
-          ctx.runMutation(api.achievements.checkAchievements, {
-            profileId: winnerProfile._id,
-          }),
-          ctx.db.patch(winnerProfile._id, {
-            gameId: undefined,
-          }),
-        ]);
+        await ctx.runMutation(internal.achievements.checkAchievements, {
+          profileId: winnerProfile._id,
+        });
+        await ctx.db.patch(winnerProfile._id, { gameId: undefined });
       }
 
       if (loserProfile) {
-        void Promise.all([
-          ctx.runMutation(api.achievements.checkAchievements, {
-            profileId: loserProfile._id,
-          }),
-          ctx.db.patch(loserProfile._id, {
-            gameId: undefined,
-          }),
-        ]);
+        await ctx.runMutation(internal.achievements.checkAchievements, {
+          profileId: loserProfile._id,
+        });
+        await ctx.db.patch(loserProfile._id, { gameId: undefined });
       }
 
       // Check game-specific achievements for timeout scenario
-      await ctx.runMutation(api.achievements.checkGameSpecificAchievements, {
+      await ctx.runMutation(internal.achievements.checkGameSpecificAchievements, {
         gameId: args.gameId,
         winnerId,
         loserId,
@@ -2036,13 +1909,8 @@ export const getMatchResult = query({
     } else {
       // Only query moves if we need to determine the exact reason (expensive fallback)
       if (!game.gameEndReason) {
-        const moves = await ctx.db
-          .query("moves")
-          .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-          .order("desc")
-          .take(1);
-
-        const lastMove = moves[0];
+        const { moves } = await loadReplay(ctx, game);
+        const lastMove = moves[moves.length - 1];
         if (lastMove?.challengeResult?.defender === "Flag") {
           reason = "flag_captured";
         } else {
@@ -2247,50 +2115,30 @@ export const getGameReplay = query({
       throw new Error("Can only replay finished games");
     }
 
-    // Limit moves if specified (useful for very long games)
-    const moveLimit = args.moveLimit || 1000; // Default limit of 1000 moves
+    const replay = await loadReplay(ctx, game);
+    const moves =
+      args.moveLimit !== undefined
+        ? replay.moves.slice(0, args.moveLimit)
+        : replay.moves;
 
-    // Get moves in chronological order with limit
-    const allMoves = await ctx.db
-      .query("moves")
-      .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
-      .order("asc")
-      .take(moveLimit);
-
-    // Filter out setup moves and keep only game moves
-    const gameMoves = allMoves.filter(
-      (move) => move.moveType === "move" || move.moveType === "challenge",
-    );
-
-    // Use the saved initial setup board, or reconstruct from current board if not available
-    let initialBoard = game.initialSetupBoard;
-
-    if (!initialBoard) {
-      // Fallback for games created before we saved initial setup
-      // Try to reconstruct initial positions from final board and moves
-      initialBoard = game.board.map((row) =>
+    // Games from before the initial setup was saved fall back to the final
+    // board with every piece hidden.
+    const initialBoard =
+      replay.initialBoard ??
+      game.board.map((row) =>
         row.map((cell) => (cell ? { ...cell, revealed: false } : null)),
       );
 
-      // If we have moves, try to reverse them to get initial positions
-      // This is a best-effort reconstruction for legacy games
-      if (gameMoves.length > 0) {
-        // For now, just use the final board with pieces hidden
-        // A more sophisticated approach could reverse-engineer the moves
-        console.warn(
-          "Game missing initial setup board, using fallback reconstruction",
-        );
-      }
-    }
-
     return {
-      game,
-      moves: gameMoves,
+      // The replay screen only reads the start time; the full game row
+      // (two boards) is not sent.
+      game: { _id: game._id, _creationTime: game._creationTime },
+      moves,
       initialBoard,
       player1Username: game.player1Username,
       player2Username: game.player2Username,
-      moveCount: gameMoves.length,
-      isTruncated: allMoves.length >= moveLimit, // Indicate if moves were truncated
+      moveCount: moves.length,
+      isTruncated: replay.isTruncated || moves.length < replay.moves.length,
     };
   },
 });
@@ -2409,7 +2257,7 @@ export const cleanupStaleGames = internalMutation({
       try {
         // Use existing forfeitGame mutation to handle playing games
         // The current turn player loses (took too long on their turn)
-        await ctx.runMutation(api.games.forfeitGame, {
+        await ctx.runMutation(internal.games.forfeitGame, {
           gameId: game._id,
           reason: "disconnection_timeout",
         });

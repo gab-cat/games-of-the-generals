@@ -1,349 +1,283 @@
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "@tanstack/react-router";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "../../components/ui/tabs";
-import { Trophy, Award, Flame, Star, Zap, Target } from "lucide-react";
-import { AchievementsHeader } from "./01.achievements-header";
-import { AchievementCard } from "./02.achievement-card";
-import { useAutoAnimate } from "../../lib/useAutoAnimate";
+import { Button } from "../../components/ui/button";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Skeleton } from "../../components/ui/skeleton";
+import { Grain } from "@/components/season/art";
+import {
+  AchievementsHeader,
+  AchievementsHeaderSkeleton,
+} from "./01.achievements-header";
+import {
+  Ribbon,
+  RibbonDetail,
+  RibbonTile,
+  type Achievement,
+  type RibbonProgress,
+} from "./02.achievement-card";
+import { percentOf, progressFor, type ProfileStats } from "./progress";
 
-export function AchievementsPage() {
-  const categoryGridRef = useAutoAnimate();
-  const unlockedGridRef = useAutoAnimate();
-  const recentUnlocksRef = useAutoAnimate();
-  const {
-    data: achievements,
-    isPending: isLoadingAchievements,
-    error: achievementsError,
-  } = useConvexQuery(api.achievements.getAllAchievements);
+const CATEGORIES = [
+  { value: "milestone", label: "Milestones" },
+  { value: "rank", label: "Ranks" },
+  { value: "streak", label: "Streaks" },
+  { value: "combat", label: "Combat" },
+  { value: "special", label: "Special" },
+] as const;
+const KNOWN = new Set<string>(CATEGORIES.map((c) => c.value));
 
-  if (isLoadingAchievements) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="relative"
-        >
-          <div className="animate-spin rounded-full h-12 w-12 border-2 border-yellow-500/20 border-t-yellow-500" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-4 w-4 bg-yellow-500/20 rounded-full animate-pulse" />
+const GRID = "grid grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-3 xl:grid-cols-4";
+
+const listMotion = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.03, delayChildren: 0.15 } },
+};
+
+function ribbonProgress(a: Achievement, stats: ProfileStats | null): RibbonProgress {
+  if (a.unlocked) return { count: null, percent: 100 };
+  const count = progressFor(a.id, stats);
+  if (count) return { count, percent: percentOf(count) };
+  const server = typeof a.progress === "number" ? Math.round(a.progress) : 0;
+  return { count: null, percent: Math.max(0, Math.min(100, server)) };
+}
+
+function AchievementsSkeleton() {
+  return (
+    <div className="space-y-8" role="status" aria-label="Loading achievements">
+      <AchievementsHeaderSkeleton />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="space-y-8">
+          <Skeleton className="h-[156px] w-full rounded-lg sm:h-[196px]" />
+          <Skeleton className="h-10 w-full max-w-xl" />
+          <div className={GRID}>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-10 w-full rounded-[3px]" />
+                <Skeleton className="h-4 w-2/3" />
+              </div>
+            ))}
           </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (achievementsError) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
-        >
-          <div className="text-red-400/90 font-mono text-lg tracking-wide uppercase">
-            System Error: Failed to load data
-          </div>
-          <div className="text-white/40 text-sm">
-            Please try refreshing the page
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (!achievements) {
-    return (
-      <div className="flex justify-center items-center min-h-[60vh]">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center space-y-4"
-        >
-          <div className="text-white/40 text-lg font-mono">
-            No achievement data found
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
-  const unlockedAchievements = achievements.filter((a) => a.unlocked);
-  const lockedAchievements = achievements.filter((a) => !a.unlocked);
-
-  const categoryGroups = {
-    milestone: achievements.filter((a) => a.category === "milestone"),
-    rank: achievements.filter((a) => a.category === "rank"),
-    streak: achievements.filter((a) => a.category === "streak"),
-    special: achievements.filter((a) => a.category === "special"),
-  };
-
-  const formatDate = (timestamp?: number) => {
-    if (!timestamp) return "";
-    return new Date(timestamp).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-    });
-  };
-
-  const CategorySection = ({
-    title,
-    achievements,
-    icon: Icon,
-  }: {
-    title: string;
-    achievements: any[];
-    icon: any;
-  }) => (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3 border-b border-white/5 pb-4">
-        <div className="p-2 rounded bg-white/5 border border-white/5">
-          <Icon className="w-5 h-5 text-yellow-500" />
         </div>
-        <h3 className="text-xl font-display tracking-tight text-white">
-          {title}
-        </h3>
-        <div className="ml-auto text-xs font-mono text-white/30 uppercase tracking-widest">
-          {achievements.filter((a) => a.unlocked).length} /{" "}
-          {achievements.length} UNLOCKED
-        </div>
-      </div>
-      <div
-        ref={categoryGridRef}
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-      >
-        {achievements.map((achievement) => (
-          <AchievementCard key={achievement.id} achievement={achievement} />
-        ))}
+        <Skeleton className="hidden h-[200px] rounded-lg lg:block" />
       </div>
     </div>
   );
+}
+
+export function AchievementsPage() {
+  const navigate = useNavigate();
+  const {
+    data: achievements,
+    isPending,
+    error,
+  } = useConvexQuery(api.achievements.getAllAchievements);
+  const { data: profile } = useConvexQuery(api.profiles.getCurrentProfile);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const list = (achievements ?? []) as Achievement[];
+  const progress = useMemo(() => {
+    const stats: ProfileStats | null = profile ?? null;
+    const map = new Map<string, RibbonProgress>();
+    for (const a of (achievements ?? []) as Achievement[]) {
+      map.set(a.id, ribbonProgress(a, stats));
+    }
+    return map;
+  }, [achievements, profile]);
+
+  if (isPending) return <AchievementsSkeleton />;
+
+  if (error || !achievements) {
+    return (
+      <div className="space-y-8">
+        <h1 className="font-display text-3xl font-semibold text-foreground sm:text-4xl">
+          Achievements
+        </h1>
+        <EmptyState
+          title="Achievements didn't load"
+          body="Check your connection and try again."
+          action={
+            <Button
+              variant="secondary"
+              onClick={() => window.location.reload()}
+            >
+              Try again
+            </Button>
+          }
+        />
+      </div>
+    );
+  }
+
+  const progressOf = (a: Achievement) =>
+    progress.get(a.id) ?? { count: null, percent: 0 };
+
+  // Newest first on the rack, as a uniform wears its latest award on top.
+  const unlocked = list
+    .filter((a) => a.unlocked)
+    .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0));
+  const locked = list
+    .filter((a) => !a.unlocked)
+    .sort((a, b) => progressOf(b).percent - progressOf(a).percent);
+  const byCategory = (c: string) => list.filter((a) => a.category === c);
+  const other = list.filter((a) => !KNOWN.has(a.category));
+
+  // Until something is picked: the latest ribbon earned, else the closest one.
+  const selected =
+    list.find((a) => a.id === selectedId) ?? unlocked[0] ?? locked[0] ?? null;
+
+  const tile = (a: Achievement) => (
+    <RibbonTile
+      key={a.id}
+      achievement={a}
+      progress={progressOf(a)}
+      selected={selected?.id === a.id}
+      onSelect={() => setSelectedId(a.id)}
+    />
+  );
+
+  const grid = (items: Achievement[]) => (
+    <motion.div
+      variants={listMotion}
+      initial="hidden"
+      animate="show"
+      className={GRID}
+    >
+      {items.map(tile)}
+    </motion.div>
+  );
+
+  const group = (label: string, items: Achievement[]) =>
+    items.length === 0 ? null : (
+      <section key={label} className="space-y-3">
+        <h2 className="text-base font-semibold text-foreground sm:text-lg">
+          {label}{" "}
+          <span className="font-normal text-foreground/70">
+            {items.filter((a) => a.unlocked).length} of {items.length}
+          </span>
+        </h2>
+        {grid(items)}
+      </section>
+    );
 
   return (
-    <div className="min-h-screen py-8 px-2 sm:px-6 relative overflow-hidden">
-      {/* Global decorative background */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(0,0,0,0)_0%,#000000_100%)]" />
-      </div>
+    <div className="space-y-8">
+      <AchievementsHeader
+        unlockedCount={unlocked.length}
+        totalCount={list.length}
+      />
 
-      <div className="relative z-10 max-w-7xl mx-auto space-y-12">
-        <AchievementsHeader
-          unlockedCount={unlockedAchievements.length}
-          lockedCount={lockedAchievements.length}
-          totalCount={achievements.length}
-        />
-
-        {/* Achievement Tabs */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.1 }}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-x-6 lg:gap-y-8">
+        {/* The rack: earned ribbons only, newest on top, on uniform cloth */}
+        <section
+          aria-label="Your ribbon rack"
+          className="relative overflow-hidden rounded-lg border border-border bg-[#14201a] px-4 py-10 sm:px-8 sm:py-14 lg:col-start-1"
         >
-          <Tabs defaultValue="all" className="space-y-8">
-            <div className="overflow-x-auto pb-2 scrollbar-hide">
-              <TabsList className="bg-zinc-900/50 border border-white/10 p-1 flex w-full min-w-max rounded-lg backdrop-blur-md">
-                <TabsTrigger
-                  value="all"
-                  className="flex-1 px-6 text-xs sm:text-xs font-mono uppercase tracking-wider data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/40 ring-0"
-                >
-                  All Modules
-                </TabsTrigger>
-                <div className="w-px h-4 bg-white/5 mx-1" />
-                <TabsTrigger
-                  value="unlocked"
-                  className="flex-1 px-6 text-xs sm:text-xs font-mono uppercase tracking-wider data-[state=active]:bg-emerald-500/20 data-[state=active]:text-emerald-400 text-white/40 ring-0 data-[state=active]:border-emerald-500/30 data-[state=active]:border"
-                >
-                  Acquired
-                </TabsTrigger>
-                <div className="w-px h-4 bg-white/5 mx-1" />
-                <TabsTrigger
-                  value="milestone"
-                  className="flex-1 px-6 text-xs sm:text-xs font-mono uppercase tracking-wider data-[state=active]:bg-yellow-500/20 data-[state=active]:text-yellow-400 text-white/40 ring-0 data-[state=active]:border-yellow-500/30 data-[state=active]:border"
-                >
-                  Milestones
-                </TabsTrigger>
-                <div className="w-px h-4 bg-white/5 mx-1" />
-                <TabsTrigger
-                  value="rank"
-                  className="flex-1 px-6 text-xs sm:text-xs font-mono uppercase tracking-wider data-[state=active]:bg-purple-500/20 data-[state=active]:text-purple-400 text-white/40 ring-0 data-[state=active]:border-purple-500/30 data-[state=active]:border"
-                >
-                  Rank
-                </TabsTrigger>
-                <div className="w-px h-4 bg-white/5 mx-1" />
-                <TabsTrigger
-                  value="streak"
-                  className="flex-1 px-6 text-xs sm:text-xs font-mono uppercase tracking-wider data-[state=active]:bg-orange-500/20 data-[state=active]:text-orange-400 text-white/40 ring-0 data-[state=active]:border-orange-500/30 data-[state=active]:border"
-                >
-                  Streaks
-                </TabsTrigger>
-                <div className="w-px h-4 bg-white/5 mx-1" />
-                <TabsTrigger
-                  value="special"
-                  className="flex-1 px-6 text-xs sm:text-xs font-mono uppercase tracking-wider data-[state=active]:bg-red-500/20 data-[state=active]:text-red-400 text-white/40 ring-0 data-[state=active]:border-red-500/30 data-[state=active]:border"
-                >
-                  Special Ops
-                </TabsTrigger>
-              </TabsList>
+          <Grain opacity={0.28} />
+          {unlocked.length === 0 ? (
+            <div className="relative mx-auto flex h-24 max-w-[330px] flex-col items-center justify-center gap-3 rounded-[3px] border border-dashed border-foreground/40 px-4 text-center text-sm text-foreground sm:h-28">
+              Your first ribbon goes here.
+              <Button size="sm" onClick={() => void navigate({ to: "/" })}>
+                Find a game
+              </Button>
             </div>
-
-            <TabsContent
-              value="all"
-              className="space-y-16 animate-in fade-in zoom-in-95 duration-500"
+          ) : (
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={{
+                hidden: {},
+                show: { transition: { staggerChildren: 0.06, delayChildren: 0.2 } },
+              }}
+              className="relative mx-auto flex max-w-[330px] flex-wrap-reverse justify-center gap-[3px] sm:max-w-[620px]"
             >
-              <CategorySection
-                title="Milestone Protocols"
-                achievements={categoryGroups.milestone}
-                icon={Target}
-              />
-              <CategorySection
-                title="Rank Designations"
-                achievements={categoryGroups.rank}
-                icon={Award}
-              />
-              <CategorySection
-                title="Streak Records"
-                achievements={categoryGroups.streak}
-                icon={Flame}
-              />
-              <CategorySection
-                title="Special Operations"
-                achievements={categoryGroups.special}
-                icon={Star}
-              />
-            </TabsContent>
+              {/* Reversed so the newest ribbon lands in the top row */}
+              {[...unlocked].reverse().map((a) => (
+                <Ribbon
+                  key={a.id}
+                  achievement={a}
+                  progress={progressOf(a)}
+                  selected={selected?.id === a.id}
+                  onSelect={() => setSelectedId(a.id)}
+                  className="h-[26px] w-[78px] sm:h-11 sm:w-[150px]"
+                />
+              ))}
+            </motion.div>
+          )}
+        </section>
 
-            <TabsContent
-              value="unlocked"
-              className="animate-in fade-in zoom-in-95 duration-500"
-            >
-              {unlockedAchievements.length > 0 ? (
-                <div
-                  ref={unlockedGridRef}
-                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
-                >
-                  {unlockedAchievements
-                    .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0))
-                    .map((achievement) => (
-                      <AchievementCard
-                        key={achievement.id}
-                        achievement={achievement}
-                      />
-                    ))}
-                </div>
-              ) : (
-                <div className="text-center py-24 border border-dashed border-white/10 rounded-lg bg-white/5">
-                  <div className="inline-flex items-center justify-center p-4 rounded-full bg-white/5 mb-4">
-                    <Trophy className="w-8 h-8 opacity-20" />
-                  </div>
-                  <h3 className="text-xl font-display tracking-wide mb-2">
-                    No Acquisitions Yet
-                  </h3>
-                  <p className="text-white/40 font-mono text-sm">
-                    Complete objectives to unlock awards.
-                  </p>
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent
-              value="milestone"
-              className="animate-in fade-in zoom-in-95 duration-500"
-            >
-              <CategorySection
-                title="Milestone Protocols"
-                achievements={categoryGroups.milestone}
-                icon={Target}
-              />
-            </TabsContent>
-
-            <TabsContent
-              value="rank"
-              className="animate-in fade-in zoom-in-95 duration-500"
-            >
-              <CategorySection
-                title="Rank Designations"
-                achievements={categoryGroups.rank}
-                icon={Award}
-              />
-            </TabsContent>
-
-            <TabsContent
-              value="streak"
-              className="animate-in fade-in zoom-in-95 duration-500"
-            >
-              <CategorySection
-                title="Streak Records"
-                achievements={categoryGroups.streak}
-                icon={Flame}
-              />
-            </TabsContent>
-
-            <TabsContent
-              value="special"
-              className="animate-in fade-in zoom-in-95 duration-500"
-            >
-              <CategorySection
-                title="Special Operations"
-                achievements={categoryGroups.special}
-                icon={Star}
-              />
-            </TabsContent>
-          </Tabs>
-        </motion.div>
-
-        {/* Recent Unlocks (Compact Feed) */}
-        {unlockedAchievements.length > 0 && (
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="border-t border-white/10 pt-12"
+        {/* Detail: right of everything on desktop, under the rack on phone */}
+        {selected && (
+          <aside
+            aria-live="polite"
+            className="row-start-2 h-fit rounded-lg border border-border bg-card p-5 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-2 lg:row-start-1"
           >
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Zap className="w-4 h-4" />
-              </div>
-              <h2 className="text-lg font-display tracking-wide text-white">
-                Recent Activity Log
-              </h2>
-            </div>
-
-            <div
-              ref={recentUnlocksRef}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-            >
-              {unlockedAchievements
-                .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0))
-                .slice(0, 3)
-                .map((achievement) => (
-                  <div
-                    key={achievement.id}
-                    className="flex items-center gap-4 p-4 bg-zinc-900/50 border border-white/5 rounded-lg hover:border-white/10 transition-colors"
-                  >
-                    <div className="text-xl opacity-80">{achievement.icon}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-mono text-xs text-yellow-500/80 truncate mb-0.5">
-                        {achievement.name}
-                      </div>
-                      <div className="text-[10px] text-white/40 truncate">
-                        {achievement.description}
-                      </div>
-                    </div>
-                    <div className="text-[10px] text-white/20 font-mono whitespace-nowrap">
-                      {formatDate(achievement.unlockedAt)}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </motion.div>
+            <RibbonDetail
+              achievement={selected}
+              progress={progressOf(selected)}
+            />
+          </aside>
         )}
+
+        <Tabs defaultValue="all" className="min-w-0 space-y-6 lg:col-start-1">
+          <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+            <TabsList className="inline-flex min-w-max">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="unlocked">Unlocked</TabsTrigger>
+              <TabsTrigger value="locked">Locked</TabsTrigger>
+              {CATEGORIES.map((c) =>
+                byCategory(c.value).length > 0 ? (
+                  <TabsTrigger key={c.value} value={c.value}>
+                    {c.label}
+                  </TabsTrigger>
+                ) : null,
+              )}
+            </TabsList>
+          </div>
+
+          <TabsContent value="all" className="mt-0 space-y-8">
+            {CATEGORIES.map((c) => group(c.label, byCategory(c.value)))}
+            {group("Other", other)}
+          </TabsContent>
+
+          <TabsContent value="unlocked" className="mt-0">
+            {unlocked.length > 0 ? (
+              grid(unlocked)
+            ) : (
+              <EmptyState
+                title="Nothing unlocked yet"
+                body="Win your first game to earn one."
+                action={
+                  <Button onClick={() => void navigate({ to: "/" })}>
+                    Find a game
+                  </Button>
+                }
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="locked" className="mt-0">
+            {locked.length > 0 ? (
+              grid(locked)
+            ) : (
+              <EmptyState title="Everything is unlocked" />
+            )}
+          </TabsContent>
+
+          {CATEGORIES.map((c) => (
+            <TabsContent key={c.value} value={c.value} className="mt-0">
+              {grid(byCategory(c.value))}
+            </TabsContent>
+          ))}
+        </Tabs>
       </div>
     </div>
   );

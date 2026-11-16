@@ -7,29 +7,36 @@ import { api } from "../../../convex/_generated/api";
 import { toast } from "sonner";
 import { Id } from "../../../convex/_generated/dataModel";
 import { LobbyCard } from "./LobbyCard";
+import { friendlyError } from "./friendly-error";
+import { LobbyHeader } from "./01.lobby-header";
+import { LobbyTabs, type LobbyTab } from "./02.lobby-tabs";
+import {
+  BoutSkeleton,
+  EmptyBout,
+  ListErrorBoundary,
+  type Opponent,
+} from "./fight-card";
 import { motion } from "framer-motion";
+import { stagger } from "../../lib/motion";
 import {
   Plus,
-  Users,
-  Sword,
-  Lock,
+  Check,
   Copy,
-  ChevronDown,
   Key,
   Shuffle,
-  Clock,
   Zap,
-  X,
-  AlertTriangle,
+  ChevronDown,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../../components/ui/button";
-import { Card, CardContent } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
+import { Checkbox } from "../../components/ui/checkbox";
 import { Input } from "../../components/ui/input";
+import { Label } from "../../components/ui/label";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -41,7 +48,6 @@ import {
 } from "../../components/GameModeSelector";
 import generateName from "@scaleway/random-name";
 import { useQuery } from "convex-helpers/react/cache";
-import { useAutoAnimate } from "../../lib/useAutoAnimate";
 import { useNavigate } from "@tanstack/react-router";
 
 interface Profile {
@@ -52,23 +58,34 @@ interface Profile {
   losses: number;
   gamesPlayed: number;
   rank: string;
+  elo?: number;
+  avatarUrl?: string;
+  avatarFrame?: string;
 }
 
 interface LobbyListTabProps {
   profile: Profile;
+  activeTab: LobbyTab;
+  onTabChange: (tab: LobbyTab) => void;
+  /** The live games list, shown under the Watch tab. */
+  watch: React.ReactNode;
   onGameStart?: (gameId: string) => void;
   startGameMutation: any;
   onOpenMessaging?: (lobbyId?: Id<"lobbies">) => void;
 }
 
+const LOBBIES_PER_PAGE = 10;
+
 export function LobbyListTab({
   profile,
+  activeTab,
+  onTabChange,
+  watch,
   onGameStart: _onGameStart,
   startGameMutation,
   onOpenMessaging,
 }: LobbyListTabProps) {
   const navigate = useNavigate();
-  const listRef = useAutoAnimate();
   const [showCreateLobby, setShowCreateLobby] = useState(false);
   const [showJoinByCode, setShowJoinByCode] = useState(false);
   const [lobbyName, setLobbyName] = useState("");
@@ -77,8 +94,8 @@ export function LobbyListTab({
   const [maxSpectators, setMaxSpectators] = useState("");
   const [gameMode, setGameMode] = useState<GameMode>("classic");
   const [joinCode, setJoinCode] = useState("");
-  const [lobbiesCursor, setLobbiesCursor] = useState<string | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   // Subscription queries
   const { data: privateLobbyLimit } = useConvexQuery(
@@ -105,15 +122,6 @@ export function LobbyListTab({
   const [queueTimeRemaining, setQueueTimeRemaining] = useState<number | null>(
     null,
   );
-
-  const LOBBIES_PER_PAGE = 10;
-
-  const lobbiesQuery = useQuery(api.lobbies.getLobbies, {
-    paginationOpts: {
-      numItems: LOBBIES_PER_PAGE,
-      cursor: lobbiesCursor || undefined,
-    },
-  });
 
   const activeLobby = useQuery(api.lobbies.getUserActiveLobby);
   const currentGame = useQuery(api.games.getCurrentUserGame);
@@ -168,11 +176,11 @@ export function LobbyListTab({
             { lobbyId: activeLobby._id },
             {
               onSuccess: (gameId: string) => {
-                toast.success("Battle has begun!");
+                toast.success("The game is starting");
                 _onGameStart?.(gameId);
               },
               onError: () => {
-                toast.error("Failed to start game");
+                toast.error("Couldn't start the game. Try again.");
                 setGameStartData((prev) => ({ ...prev, isOpen: false }));
               },
             },
@@ -264,41 +272,39 @@ export function LobbyListTab({
 
         if (isPrivate && newLobby) {
           toast.success(
-            "Private lobby created! Share the code with your opponent.",
+            "Private lobby created. Share the code with your opponent.",
           );
         } else {
-          toast.success("Lobby created!");
+          toast.success("Lobby created. Waiting for an opponent.");
         }
       },
-      onError: () => {
-        toast.error("Failed to create lobby");
+      onError: (error) => {
+        toast.error(
+          friendlyError(error, "Couldn't create the lobby. Try again."),
+        );
       },
     },
   );
 
   const joinLobbyMutation = useConvexMutationWithQuery(api.lobbies.joinLobby, {
-    onError: () => {
-      toast.error("Failed to join lobby");
+    onError: (error) => {
+      toast.error(friendlyError(error, "Couldn't join that lobby. Try again."));
     },
   });
 
+  // Errors for this one show inside the dialog, next to the code.
   const joinLobbyByCodeMutation = useConvexMutationWithQuery(
     api.lobbies.joinLobbyByCode,
-    {
-      onError: () => {
-        toast.error("Failed to join lobby");
-      },
-    },
   );
 
   const leaveLobbyMutation = useConvexMutationWithQuery(
     api.lobbies.leaveLobby,
     {
       onSuccess: () => {
-        toast.success("Left lobby");
+        toast.success("You left the lobby");
       },
       onError: () => {
-        toast.error("Failed to leave lobby");
+        toast.error("Couldn't leave the lobby. Try again.");
       },
     },
   );
@@ -309,14 +315,14 @@ export function LobbyListTab({
     {
       onSuccess: (result) => {
         if (result.success) {
-          toast.success("Joined matchmaking queue!");
+          toast.success("Looking for an opponent");
         } else {
-          toast.info("Already in queue");
+          toast.info("You are already in the queue");
         }
       },
       onError: (error) => {
         toast.error(
-          error instanceof Error ? error.message : "Failed to join queue",
+          friendlyError(error, "Couldn't start a quick match. Try again."),
         );
       },
     },
@@ -328,10 +334,10 @@ export function LobbyListTab({
       onSuccess: () => {
         setIsInQueue(false);
         setQueueTimeRemaining(null);
-        toast.success("Left matchmaking queue");
+        toast.success("Quick match cancelled");
       },
       onError: () => {
-        toast.error("Failed to leave queue");
+        toast.error("Couldn't cancel. Try again.");
       },
     },
   );
@@ -361,8 +367,6 @@ export function LobbyListTab({
     };
   }, [isInQueue, queueTimeRemaining, leaveQueueMutation, queueStatus]);
 
-  const lobbies = lobbiesQuery?.page || [];
-
   const handleCreateLobby = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -387,15 +391,14 @@ export function LobbyListTab({
   };
 
   const handleJoinLobby = async (lobbyId: Id<"lobbies">) => {
+    // The mutation hook already shows the error toast.
     try {
       await new Promise<void>((resolve, reject) => {
         joinLobbyMutation.mutate(
           { lobbyId },
           {
             onSuccess: () => {
-              toast.success(
-                "Joined lobby! Waiting for host to start the game...",
-              );
+              toast.success("Joined. Waiting for the host to start the game.");
               resolve();
             },
             onError: reject,
@@ -403,13 +406,14 @@ export function LobbyListTab({
         );
       });
     } catch {
-      toast.error("Failed to join lobby");
+      // Handled by the hook's onError.
     }
   };
 
   const handleJoinByCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinCode.trim()) return;
+    if (joinCode.trim().length < 6) return;
+    setJoinError(null);
 
     try {
       await new Promise<Id<"lobbies">>((resolve, reject) => {
@@ -419,23 +423,587 @@ export function LobbyListTab({
             onSuccess: (result: any) => {
               setJoinCode("");
               setShowJoinByCode(false);
-              toast.success(
-                "Joined private lobby! Waiting for host to start the game...",
-              );
+              toast.success("Joined. Waiting for the host to start the game.");
               resolve(result as Id<"lobbies">);
             },
             onError: reject,
           },
         );
       });
-    } catch {
-      toast.error("Failed to join lobby");
+    } catch (error) {
+      setJoinError(
+        friendlyError(
+          error,
+          "Couldn't join with that code. Check it and try again.",
+        ),
+      );
     }
   };
 
   const handleLeaveLobby = async (lobbyId: Id<"lobbies">) => {
     leaveLobbyMutation.mutate({ lobbyId });
   };
+
+  const handleInviteToLobby = (lobbyId: Id<"lobbies">) => {
+    onOpenMessaging?.(lobbyId);
+  };
+
+  const copyLobbyCode = (code: string) => {
+    void navigator.clipboard.writeText(code);
+    toast.success("Lobby code copied");
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 1500);
+  };
+
+  const planName = (tier?: string) =>
+    tier === "pro" ? "Pro" : tier === "pro_plus" ? "Pro+" : "Free";
+
+  const countdownActive = gameStartData.isOpen;
+  const lobbyIsFull = !!activeLobby?.playerId;
+  const iAmHost = activeLobby?.hostId === profile.userId;
+
+  let lobbyStatus: {
+    text: string;
+    tone: "gold" | "win" | "plain";
+    busy?: boolean;
+  } | null = null;
+  if (activeLobby) {
+    if (lobbyIsFull && countdownActive) {
+      lobbyStatus = { text: "Starting the game", tone: "gold", busy: true };
+    } else if (lobbyIsFull && iAmHost) {
+      lobbyStatus = { text: "Opponent joined", tone: "win" };
+    } else if (lobbyIsFull) {
+      lobbyStatus = { text: "Waiting for the host to start", tone: "gold" };
+    } else {
+      lobbyStatus = { text: "Waiting for an opponent", tone: "plain" };
+    }
+  }
+
+  // Who stands in the red corner of the title card
+  let opponent: Opponent = { kind: "anyone", elo: profile.elo ?? 1500 };
+  if (activeLobby) {
+    const other = iAmHost
+      ? activeLobby.playerUsername
+      : activeLobby.hostUsername;
+    opponent =
+      lobbyIsFull && other
+        ? {
+            kind: "joined",
+            username: other,
+            status: lobbyStatus?.text ?? "Opponent joined",
+          }
+        : { kind: "waiting", lobbyName: activeLobby.name };
+  } else if (isInQueue) {
+    opponent = {
+      kind: "searching",
+      secondsLeft: queueTimeRemaining
+        ? Math.ceil(queueTimeRemaining / 1000)
+        : null,
+    };
+  }
+
+  const privateLimitReached =
+    !!privateLobbyLimit && !privateLobbyLimit.canCreate;
+  const privateLeft =
+    privateLobbyLimit && privateLobbyLimit.canCreate
+      ? privateLobbyLimit.limit === Infinity
+        ? "No daily limit on private lobbies."
+        : `${privateLobbyLimit.limit - privateLobbyLimit.today} private ${
+            privateLobbyLimit.limit - privateLobbyLimit.today === 1
+              ? "lobby"
+              : "lobbies"
+          } left today.`
+      : null;
+
+  return (
+    <div className="space-y-6 sm:space-y-8">
+      {/* You against whoever's next */}
+      <section className="space-y-3">
+        <LobbyHeader profile={profile} opponent={opponent} />
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {/* Quick match: the one gold action */}
+          {!activeLobby && !isInQueue && (
+            <>
+              <Button
+                className="h-12 w-full text-base sm:h-14 sm:w-auto sm:px-12 sm:text-lg"
+                onClick={() => joinQueueMutation.mutate({})}
+                disabled={joinQueueMutation.isPending}
+              >
+                {joinQueueMutation.isPending ? (
+                  <Loader2 className="animate-spin" />
+                ) : (
+                  <Zap />
+                )}
+                {joinQueueMutation.isPending
+                  ? "Joining the queue"
+                  : "Quick match"}
+              </Button>
+              <p className="hidden text-sm text-foreground/85 sm:block sm:px-3">
+                Ranked. Finds someone near your rating.
+              </p>
+            </>
+          )}
+
+          {isInQueue && (
+            <>
+              <Button
+                variant="secondary"
+                className="h-12 w-full text-base sm:h-14 sm:w-auto sm:px-10"
+                onClick={() => leaveQueueMutation.mutate({})}
+                disabled={leaveQueueMutation.isPending}
+              >
+                {leaveQueueMutation.isPending && (
+                  <Loader2 className="animate-spin" />
+                )}
+                {leaveQueueMutation.isPending
+                  ? "Cancelling"
+                  : "Cancel quick match"}
+              </Button>
+              <p className="hidden text-sm text-foreground/85 sm:block sm:px-3">
+                You can still join a lobby while you wait.
+              </p>
+            </>
+          )}
+
+          <div className="grid grid-cols-2 gap-2 sm:ml-auto sm:flex">
+            {/* Join with a code */}
+            <Dialog
+              open={showJoinByCode}
+              onOpenChange={(open) => {
+                setShowJoinByCode(open);
+                if (open) setJoinError(null);
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button
+                  variant="secondary"
+                  className={activeLobby ? "col-span-2" : undefined}
+                >
+                  <Key />
+                  Join with code
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader>
+                  <DialogTitle>Join with a code</DialogTitle>
+                  <DialogDescription>
+                    Enter the 6-character code from the host of a private lobby.
+                  </DialogDescription>
+                </DialogHeader>
+                <form
+                  onSubmit={(e) => void handleJoinByCode(e)}
+                  className="space-y-4"
+                >
+                  <div className="space-y-1.5">
+                    <Label htmlFor="join-code">Lobby code</Label>
+                    <Input
+                      id="join-code"
+                      value={joinCode}
+                      onChange={(e) => {
+                        setJoinCode(
+                          e.target.value.toUpperCase().replace(/\s/g, ""),
+                        );
+                        setJoinError(null);
+                      }}
+                      placeholder="ABC123"
+                      maxLength={6}
+                      required
+                      autoFocus
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      spellCheck={false}
+                      disabled={
+                        joinLobbyByCodeMutation.isPending ||
+                        startGameMutation.isPending
+                      }
+                      aria-invalid={joinError ? true : undefined}
+                      className="h-14 text-center text-2xl tabular-nums"
+                    />
+                    {joinError && (
+                      <p role="alert" className="text-sm text-red-300">
+                        {joinError}
+                      </p>
+                    )}
+                  </div>
+
+                  <DialogFooter>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setShowJoinByCode(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={
+                        joinCode.trim().length < 6 ||
+                        joinLobbyByCodeMutation.isPending ||
+                        startGameMutation.isPending
+                      }
+                    >
+                      {(joinLobbyByCodeMutation.isPending ||
+                        startGameMutation.isPending) && (
+                        <Loader2 className="animate-spin" />
+                      )}
+                      {joinLobbyByCodeMutation.isPending ||
+                      startGameMutation.isPending
+                        ? "Joining"
+                        : "Join lobby"}
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Create a lobby */}
+            {!activeLobby && (
+              <Dialog open={showCreateLobby} onOpenChange={setShowCreateLobby}>
+                <DialogTrigger asChild>
+                  <Button variant="secondary">
+                    <Plus />
+                    Create lobby
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[440px]">
+                  <DialogHeader>
+                    <DialogTitle>Create a lobby</DialogTitle>
+                    <DialogDescription>
+                      Pick a name and a mode, then wait for an opponent. Lobbies
+                      with no activity close after 30 minutes.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form
+                    onSubmit={(e) => void handleCreateLobby(e)}
+                    className="space-y-5"
+                  >
+                    <div className="space-y-1.5">
+                      <Label htmlFor="lobby-name">Lobby name</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="lobby-name"
+                          value={lobbyName}
+                          onChange={(e) => setLobbyName(e.target.value)}
+                          placeholder="Random if blank"
+                          disabled={createLobbyMutation.isPending}
+                          autoComplete="off"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          onClick={generateRandomName}
+                          disabled={createLobbyMutation.isPending}
+                          aria-label="Suggest a random name"
+                          title="Suggest a random name"
+                          className="shrink-0"
+                        >
+                          <Shuffle />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 border-t border-border pt-4">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="private-lobby"
+                          checked={isPrivate}
+                          onCheckedChange={(checked) =>
+                            setIsPrivate(checked === true)
+                          }
+                          disabled={
+                            createLobbyMutation.isPending || privateLimitReached
+                          }
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0">
+                          <Label
+                            htmlFor="private-lobby"
+                            className="cursor-pointer"
+                          >
+                            Private lobby
+                          </Label>
+                          <p className="mt-1 text-[13px] text-foreground/80">
+                            Players need a code to join.
+                            {isPrivate && privateLeft ? ` ${privateLeft}` : ""}
+                          </p>
+                        </div>
+                      </div>
+
+                      {privateLobbyLimit && privateLimitReached && (
+                        <div
+                          role="alert"
+                          className="rounded-md border border-gold-500/30 bg-gold-500/[0.06] p-3 text-sm text-foreground"
+                        >
+                          <p className="font-medium">
+                            {privateLobbyLimit.reason === "subscription_expired"
+                              ? "Your subscription has expired"
+                              : "Daily limit reached"}
+                          </p>
+                          <p className="mt-1 text-foreground/85">
+                            {privateLobbyLimit.reason === "subscription_expired"
+                              ? "Renew it to create private lobbies again."
+                              : `The ${planName(privateLobbyLimit.tier)} plan allows ${privateLobbyLimit.limit} private ${privateLobbyLimit.limit === 1 ? "lobby" : "lobbies"} a day.`}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() =>
+                              navigate({
+                                to:
+                                  privateLobbyLimit.reason ===
+                                  "subscription_expired"
+                                    ? "/subscription"
+                                    : "/pricing",
+                                search: {
+                                  subscription: undefined,
+                                  donation: undefined,
+                                },
+                              })
+                            }
+                          >
+                            {privateLobbyLimit.reason === "subscription_expired"
+                              ? "Renew subscription"
+                              : "See plans"}
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="allow-spectators"
+                          checked={allowSpectators}
+                          onCheckedChange={(checked) =>
+                            setAllowSpectators(checked === true)
+                          }
+                          disabled={createLobbyMutation.isPending}
+                          className="mt-0.5"
+                        />
+                        <div className="min-w-0">
+                          <Label
+                            htmlFor="allow-spectators"
+                            className="cursor-pointer"
+                          >
+                            Allow spectators
+                          </Label>
+                          <p className="mt-1 text-[13px] text-foreground/80">
+                            Others can watch the game live.
+                          </p>
+                        </div>
+                      </div>
+
+                      {allowSpectators && (
+                        <div className="space-y-1.5 pl-7">
+                          <Label
+                            htmlFor="max-spectators"
+                            className="text-[13px] font-normal"
+                          >
+                            Spectator limit
+                          </Label>
+                          <Input
+                            id="max-spectators"
+                            value={maxSpectators}
+                            onChange={(e) => setMaxSpectators(e.target.value)}
+                            placeholder="No limit"
+                            type="number"
+                            inputMode="numeric"
+                            min="1"
+                            disabled={createLobbyMutation.isPending}
+                            className="tabular-nums"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border pt-4">
+                      <GameModeSelector
+                        value={gameMode}
+                        onChange={setGameMode}
+                        disabled={createLobbyMutation.isPending}
+                      />
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setShowCreateLobby(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={createLobbyMutation.isPending}
+                      >
+                        {createLobbyMutation.isPending && (
+                          <Loader2 className="animate-spin" />
+                        )}
+                        {createLobbyMutation.isPending
+                          ? "Creating"
+                          : "Create lobby"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* The lobby the player is already in */}
+      {activeLobby && (
+        <motion.section
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28 }}
+          aria-label="Your lobby"
+          className="flex flex-col gap-4 rounded-lg border border-gold-500/30 bg-gold-500/[0.06] p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+        >
+          <div className="min-w-0 space-y-1.5">
+            <p className="text-xs text-foreground/80">Your lobby</p>
+            <h3 className="truncate font-display text-xl font-semibold text-foreground">
+              {activeLobby.name}
+            </h3>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground/85">
+              <span>{activeLobby.isPrivate ? "Private" : "Public"}</span>
+              <span className="tabular-nums">
+                {activeLobby.playerId ? "2/2" : "1/2"} players
+              </span>
+              {activeLobby.isPrivate && activeLobby.lobbyCode && (
+                <span className="inline-flex items-center gap-1">
+                  Code
+                  <code className="rounded border border-border bg-background/60 px-2 py-0.5 text-sm tabular-nums text-gold-300">
+                    {activeLobby.lobbyCode}
+                  </code>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-9 w-9"
+                    aria-label="Copy lobby code"
+                    onClick={() =>
+                      activeLobby.lobbyCode &&
+                      copyLobbyCode(activeLobby.lobbyCode)
+                    }
+                  >
+                    {codeCopied ? <Check /> : <Copy />}
+                  </Button>
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {lobbyStatus && (
+              <p
+                role="status"
+                className={`inline-flex items-center gap-2 text-sm ${
+                  lobbyStatus.tone === "win"
+                    ? "text-emerald-400"
+                    : lobbyStatus.tone === "gold"
+                      ? "text-gold-300"
+                      : "text-foreground/85"
+                }`}
+              >
+                {lobbyStatus.busy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      lobbyStatus.tone === "win"
+                        ? "bg-emerald-400"
+                        : lobbyStatus.tone === "gold"
+                          ? "bg-gold-400"
+                          : "bg-foreground/50"
+                    }`}
+                  />
+                )}
+                {lobbyStatus.text}
+              </p>
+            )}
+            <Button
+              variant="destructive"
+              onClick={() => void handleLeaveLobby(activeLobby._id)}
+              disabled={leaveLobbyMutation.isPending}
+            >
+              {leaveLobbyMutation.isPending && (
+                <Loader2 className="animate-spin" />
+              )}
+              {leaveLobbyMutation.isPending ? "Leaving" : "Leave lobby"}
+            </Button>
+          </div>
+        </motion.section>
+      )}
+
+      <LobbyTabs
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+        lobbies={
+          <ListErrorBoundary message="Couldn't load the open lobbies.">
+            <OpenLobbies
+              currentUserId={profile.userId}
+              canCreate={!activeLobby}
+              onCreate={() => setShowCreateLobby(true)}
+              onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
+              onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
+              onInvite={handleInviteToLobby}
+              isJoining={
+                joinLobbyMutation.isPending || startGameMutation.isPending
+              }
+              isLeaving={leaveLobbyMutation.isPending}
+            />
+          </ListErrorBoundary>
+        }
+        watch={watch}
+      />
+
+      {/* Game Start Countdown Modal */}
+      <GameStartCountdownModal
+        isOpen={gameStartData.isOpen}
+        onComplete={handleCountdownComplete}
+        player1Username={gameStartData.player1Username}
+        player2Username={gameStartData.player2Username}
+        currentUsername={gameStartData.currentUsername}
+      />
+    </div>
+  );
+}
+
+/** The open lobbies as bouts, with paging. Its own component so a failed load
+ * is caught by the error boundary around it. */
+function OpenLobbies({
+  currentUserId,
+  canCreate,
+  onCreate,
+  onJoin,
+  onLeave,
+  onInvite,
+  isJoining,
+  isLeaving,
+}: {
+  currentUserId: Id<"users">;
+  canCreate: boolean;
+  onCreate: () => void;
+  onJoin: (lobbyId: Id<"lobbies">) => void;
+  onLeave: (lobbyId: Id<"lobbies">) => void;
+  onInvite: (lobbyId: Id<"lobbies">) => void;
+  isJoining: boolean;
+  isLeaving: boolean;
+}) {
+  const [lobbiesCursor, setLobbiesCursor] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  const lobbiesQuery = useQuery(api.lobbies.getLobbies, {
+    paginationOpts: {
+      numItems: LOBBIES_PER_PAGE,
+      cursor: lobbiesCursor || undefined,
+    },
+  });
+  const lobbies = lobbiesQuery?.page || [];
 
   const loadMoreLobbies = () => {
     if (lobbiesQuery?.continueCursor) {
@@ -446,628 +1014,72 @@ export function LobbyListTab({
     }
   };
 
-  const handleInviteToLobby = (lobbyId: Id<"lobbies">) => {
-    onOpenMessaging?.(lobbyId);
-  };
+  if (lobbiesQuery === undefined) {
+    // Same shape as a bout, so nothing jumps when data arrives
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2].map((i) => (
+          <BoutSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
 
-  const copyLobbyCode = (code: string) => {
-    void navigator.clipboard.writeText(code);
-    toast.success("Lobby code copied to clipboard!");
-  };
+  if (lobbies.length === 0) {
+    return (
+      <EmptyBout
+        title="No one's waiting"
+        body="Create a lobby and you're the first bout on the card, or start a quick match."
+        action={
+          canCreate ? (
+            <Button variant="secondary" onClick={onCreate}>
+              <Plus />
+              Create lobby
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Active Lobby Display */}
-      {activeLobby && (
-        <Card className="bg-zinc-900/40 backdrop-blur-md border border-white/10 shadow-lg relative overflow-hidden group">
-          <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50" />
-          <CardContent className="p-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/20 rounded-sm flex items-center justify-center relative">
-                  <div className="absolute inset-0 bg-amber-500/5 blur-[2px]" />
-                  {activeLobby.isPrivate ? (
-                    <Lock className="h-5 w-5 text-blue-400 relative z-10" />
-                  ) : (
-                    <Users className="h-5 w-5 text-blue-400 relative z-10" />
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-amber-400 font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded-sm border border-amber-500/20">
-                      Active Mission
-                    </span>
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                      {activeLobby.isPrivate
-                        ? "Private Channel"
-                        : "Public Channel"}
-                    </span>
-                  </div>
-                  <h4 className="font-display text-lg text-white tracking-wide">
-                    {activeLobby.name}
-                  </h4>
-                  {activeLobby.isPrivate && activeLobby.lobbyCode && (
-                    <div className="flex items-center gap-2 mt-1.5">
-                      <span className="text-xs text-zinc-400 font-mono">
-                        SECURE CODE:
-                      </span>
-                      <code className="bg-black/40 px-2 py-0.5 rounded-sm text-xs font-mono text-amber-300 border border-white/10 tracking-wider">
-                        {activeLobby.lobbyCode}
-                      </code>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-5 w-5 p-0 text-zinc-400 hover:text-white hover:bg-white/5"
-                        onClick={() =>
-                          activeLobby.lobbyCode &&
-                          copyLobbyCode(activeLobby.lobbyCode)
-                        }
-                      >
-                        <Copy className="h-3 w-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-                <Badge
-                  variant="outline"
-                  className="bg-zinc-900/50 text-zinc-300 border-white/10 font-mono h-8 px-3"
-                >
-                  <Users className="w-3 h-3 mr-2 text-zinc-500" />
-                  {activeLobby.playerId ? "2/2" : "1/2"} OPERATIVES
-                </Badge>
+    <div className="space-y-2 pb-6">
+      <motion.div
+        variants={stagger(0.06)}
+        initial="hidden"
+        animate="show"
+        className="space-y-2"
+      >
+        {lobbies.map((lobby) => (
+          <LobbyCard
+            key={lobby._id}
+            lobby={lobby}
+            currentUserId={currentUserId}
+            onJoin={onJoin}
+            onLeave={onLeave}
+            onInviteToLobby={onInvite}
+            isJoining={isJoining}
+            isLeaving={isLeaving}
+          />
+        ))}
+      </motion.div>
 
-                {/* Game Starting Indicator - show when countdown is active */}
-                {activeLobby.hostId === profile.userId &&
-                  activeLobby.playerId &&
-                  gameStartData.isOpen && (
-                    <div className="bg-amber-500/10 text-amber-300 border border-amber-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
-                      <div className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
-                      Launch Sequence Initiated...
-                    </div>
-                  )}
-
-                {/* Ready indicator for non-host when countdown is active */}
-                {activeLobby.hostId !== profile.userId &&
-                  activeLobby.playerId &&
-                  gameStartData.isOpen && (
-                    <div className="bg-amber-500/10 text-amber-300 border border-amber-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
-                      <div className="w-3 h-3 border-2 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
-                      Launch Sequence Initiated...
-                    </div>
-                  )}
-
-                {/* Start Game Button - only show for host when lobby is full and no countdown active */}
-                {activeLobby.hostId === profile.userId &&
-                  activeLobby.playerId &&
-                  !gameStartData.isOpen && (
-                    <div className="bg-green-500/10 text-green-400 border border-green-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider animate-pulse">
-                      <div className="w-2 h-2 bg-green-500 rounded-full" />
-                      Deployment Ready
-                    </div>
-                  )}
-
-                {/* Waiting indicator for non-host when lobby is full but no countdown */}
-                {activeLobby.hostId !== profile.userId &&
-                  activeLobby.playerId &&
-                  !gameStartData.isOpen && (
-                    <div className="bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 px-4 py-1.5 rounded-sm flex items-center gap-2 text-xs font-mono uppercase tracking-wider">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-                      Awaiting Commander...
-                    </div>
-                  )}
-
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-sm font-mono text-xs uppercase tracking-wider h-8"
-                  onClick={() => void handleLeaveLobby(activeLobby._id)}
-                  disabled={leaveLobbyMutation.isPending}
-                >
-                  {leaveLobbyMutation.isPending ? (
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 border-2 border-red-400/30 border-t-red-400 rounded-full animate-spin" />
-                      Aborting...
-                    </div>
-                  ) : (
-                    "Abort Mission"
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Control Bar (Actions & Counts) */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-zinc-900/60 backdrop-blur-md p-4 rounded-sm border border-white/5 shadow-sm">
-        <motion.div
-          initial={{ x: -20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4"
-        >
-          {/* Battle Rooms Icon Section */}
-          <div className="flex items-center gap-3">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.1, type: "spring" }}
-              className="w-10 h-10 bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-sm flex items-center justify-center flex-shrink-0"
-            >
-              <Sword className="h-5 w-5 text-orange-400" />
-            </motion.div>
-
-            <div className="flex flex-col min-w-0">
-              <motion.h3
-                initial={{ y: -10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="text-sm font-mono uppercase tracking-wider text-white/90 font-semibold"
-              >
-                Available Operations
-              </motion.h3>
-              <motion.div
-                initial={{ scaleX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ delay: 0.4, duration: 0.6 }}
-                className="flex items-center gap-2"
-              >
-                <div className="h-0.5 w-6 bg-orange-500/50"></div>
-                <span className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest">
-                  {lobbies.length} Active Zones
-                </span>
-              </motion.div>
-            </div>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ x: 20, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto"
-        >
-          {/* Quick Match Button */}
-          {!activeLobby && !isInQueue && (
-            <Button
-              className="flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider shadow-[0_0_15px_rgba(34,197,94,0.3)] hover:shadow-[0_0_25px_rgba(34,197,94,0.5)] transition-all duration-300 border border-green-400"
-              onClick={() => joinQueueMutation.mutate({})}
-              disabled={joinQueueMutation.isPending}
-            >
-              <Zap className="h-3.5 w-3.5" />
-              <span className="sm:hidden">Quick Match</span>
-              <span className="hidden sm:inline">Quick Match</span>
-            </Button>
-          )}
-
-          {/* Queue Status */}
-          {isInQueue && (
-            <div className="bg-green-500/10 backdrop-blur-sm border border-green-500/20 rounded-sm px-4 py-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 w-full sm:w-auto">
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-ping absolute inset-0" />
-                  <div className="w-2 h-2 bg-green-500 rounded-full relative z-10" />
-                </div>
-                <div>
-                  <p className="text-green-300 font-mono text-xs uppercase tracking-wider">
-                    Scanning for Opponent...
-                  </p>
-                  {queueTimeRemaining && (
-                    <p className="text-[10px] text-green-500/70 font-mono">
-                      TIMEOUT IN {Math.ceil(queueTimeRemaining / 1000)}s
-                    </p>
-                  )}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-transparent hover:bg-red-500/10 text-red-400 border border-red-500/30 rounded-sm h-7 text-[10px] uppercase font-mono tracking-widest"
-                onClick={() => leaveQueueMutation.mutate({})}
-                disabled={leaveQueueMutation.isPending}
-              >
-                <X className="h-3 w-3 mr-1" />
-                {leaveQueueMutation.isPending ? "Aborting..." : "Cancel"}
-              </Button>
-            </div>
-          )}
-
-          <Dialog open={showJoinByCode} onOpenChange={setShowJoinByCode}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                className="flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 border border-white/10 text-zinc-300 hover:text-white rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider"
-              >
-                <Key className="h-3.5 w-3.5" />
-                <span className="sm:hidden">Enter Code</span>
-                <span className="hidden sm:inline">Join by Code</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-zinc-900 border border-white/10 rounded-sm">
-              <DialogHeader>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-sm bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                    <Key className="w-4 h-4 text-purple-400" />
-                  </div>
-                  <div>
-                    <DialogTitle className="text-white font-display tracking-wide uppercase text-lg">
-                      Private Access
-                    </DialogTitle>
-                  </div>
-                </div>
-                <DialogDescription className="text-zinc-400 font-mono text-xs">
-                  Enter the 6-character encryption key to access the private war
-                  room.
-                </DialogDescription>
-              </DialogHeader>
-              <form
-                onSubmit={(e) => void handleJoinByCode(e)}
-                className="space-y-6 mt-4"
-              >
-                <div className="relative">
-                  <div className="absolute inset-0 bg-amber-500/5 blur-xl pointer-events-none" />
-                  <Input
-                    value={joinCode}
-                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                    placeholder="ABC123"
-                    maxLength={6}
-                    required
-                    disabled={
-                      joinLobbyByCodeMutation.isPending ||
-                      startGameMutation.isPending
-                    }
-                    className="font-mono tracking-[0.5em] text-center text-2xl bg-black/50 border-white/10 text-amber-400 placeholder:text-zinc-700 h-16 rounded-sm focus-visible:ring-amber-500/50 focus-visible:border-amber-500/50 transition-all uppercase"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-2">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setShowJoinByCode(false)}
-                    className="text-zinc-400 hover:text-white font-mono text-xs uppercase tracking-wider hover:bg-white/5"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="bg-amber-600 hover:bg-amber-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider min-w-[100px]"
-                    disabled={
-                      joinLobbyByCodeMutation.isPending ||
-                      startGameMutation.isPending
-                    }
-                  >
-                    {joinLobbyByCodeMutation.isPending ||
-                    startGameMutation.isPending ? (
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Accessing...
-                      </div>
-                    ) : (
-                      "Join Lobby"
-                    )}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          {!activeLobby && (
-            <Dialog open={showCreateLobby} onOpenChange={setShowCreateLobby}>
-              <DialogTrigger asChild>
-                <Button className="flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white border border-amber-400/20 rounded-sm w-full sm:w-auto font-mono text-xs uppercase tracking-wider shadow-lg shadow-amber-900/20">
-                  <Plus className="h-3.5 w-3.5" />
-                  <span className="sm:hidden">Create</span>
-                  <span className="hidden sm:inline">Create Lobby</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px] bg-zinc-900 border border-white/10 rounded-sm">
-                <DialogHeader>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-sm bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
-                      <Sword className="w-4 h-4 text-amber-400" />
-                    </div>
-                    <div>
-                      <DialogTitle className="text-white font-display tracking-wide uppercase text-lg">
-                        Initialize Battlefield
-                      </DialogTitle>
-                    </div>
-                  </div>
-                  <DialogDescription className="text-zinc-400 font-mono text-xs">
-                    Configure parameters for a new strategic engagement.
-                  </DialogDescription>
-                </DialogHeader>
-                <form
-                  onSubmit={(e) => void handleCreateLobby(e)}
-                  className="space-y-5 mt-4"
-                >
-                  <div className="space-y-2">
-                    <label className="text-xs font-mono uppercase tracking-wider text-zinc-500">
-                      Operation Name
-                    </label>
-                    <div className="flex gap-2">
-                      <Input
-                        value={lobbyName}
-                        onChange={(e) => setLobbyName(e.target.value)}
-                        placeholder="ENTER LOBBY DESIGNATION"
-                        disabled={createLobbyMutation.isPending}
-                        className="flex-1 bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-sm focus-visible:ring-amber-500/50"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={generateRandomName}
-                        disabled={createLobbyMutation.isPending}
-                        className="bg-zinc-800 border-white/10 text-zinc-400 hover:text-white px-3 rounded-sm"
-                        title="Generate random name"
-                      >
-                        <Shuffle className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-zinc-600 font-mono">
-                      * Leave empty to auto-generate tactical designation
-                    </p>
-                  </div>
-
-                  <div className="space-y-4 pt-2 border-t border-white/5">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="private-lobby"
-                        checked={isPrivate}
-                        onChange={(e) => setIsPrivate(e.target.checked)}
-                        disabled={
-                          createLobbyMutation.isPending ||
-                          (privateLobbyLimit && !privateLobbyLimit.canCreate)
-                        }
-                        className="rounded-sm border-white/20 bg-black/40 text-amber-500 focus:ring-amber-500/50 disabled:opacity-50"
-                      />
-                      <label
-                        htmlFor="private-lobby"
-                        className="text-xs font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-2 cursor-pointer select-none"
-                      >
-                        <Lock className="h-3 w-3 text-zinc-500" />
-                        Private Channel (Code Required)
-                      </label>
-                    </div>
-                    {isPrivate && privateLobbyLimit && (
-                      <div className="ml-6 space-y-2 bg-zinc-950/50 p-2 rounded-sm border border-white/5">
-                        {!privateLobbyLimit.canCreate && (
-                          <div
-                            className={`rounded-sm p-2 text-xs font-mono border ${
-                              privateLobbyLimit.reason ===
-                              "subscription_expired"
-                                ? "bg-red-500/10 border-red-500/20 text-red-400"
-                                : "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 mb-1">
-                              <AlertTriangle className="w-3 h-3" />
-                              <span className="uppercase tracking-wider font-bold">
-                                {privateLobbyLimit.reason ===
-                                "subscription_expired"
-                                  ? "Subscription Expired"
-                                  : "Daily Limit Reached"}
-                              </span>
-                            </div>
-                            <p className="opacity-80">
-                              {privateLobbyLimit.reason ===
-                              "subscription_expired"
-                                ? "Renew subscription to restore access."
-                                : `Limit: ${privateLobbyLimit.limit} lobbies for ${privateLobbyLimit.tier === "free" ? "Free" : privateLobbyLimit.tier === "pro" ? "Pro" : "Pro+"} tier.`}
-                            </p>
-
-                            <Button
-                              variant="link"
-                              size="sm"
-                              onClick={() =>
-                                navigate({
-                                  to:
-                                    privateLobbyLimit.reason ===
-                                    "subscription_expired"
-                                      ? "/subscription"
-                                      : "/pricing",
-                                  search: {
-                                    subscription: undefined,
-                                    donation: undefined,
-                                  },
-                                })
-                              }
-                              className="text-xs p-0 h-auto mt-2 font-bold underline decoration-dotted underline-offset-4"
-                            >
-                              {privateLobbyLimit.reason ===
-                              "subscription_expired"
-                                ? "RENEW NOW"
-                                : "UPGRADE CLEARANCE LEVEL"}
-                            </Button>
-                          </div>
-                        )}
-                        {privateLobbyLimit.canCreate && (
-                          <div className="text-[10px] text-zinc-500 font-mono flex items-center gap-1">
-                            <div
-                              className={`w-1.5 h-1.5 rounded-full ${privateLobbyLimit.limit === Infinity ? "bg-green-500" : "bg-amber-500"}`}
-                            />
-                            {privateLobbyLimit.limit === Infinity
-                              ? "UNLIMITED ACCESS GRANTED"
-                              : `${privateLobbyLimit.limit - privateLobbyLimit.today} CREATIONS REMAINING TODAY`}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="allow-spectators"
-                      checked={allowSpectators}
-                      onChange={(e) => setAllowSpectators(e.target.checked)}
-                      disabled={createLobbyMutation.isPending}
-                      className="rounded-sm border-white/20 bg-black/40 text-blue-500 focus:ring-blue-500/50 disabled:opacity-50"
-                    />
-                    <label
-                      htmlFor="allow-spectators"
-                      className="text-xs font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-2 cursor-pointer select-none"
-                    >
-                      <Users className="h-3 w-3 text-zinc-500" />
-                      Allow Spectators
-                    </label>
-                  </div>
-
-                  {allowSpectators && (
-                    <div className="space-y-1 ml-6">
-                      <Input
-                        value={maxSpectators}
-                        onChange={(e) => setMaxSpectators(e.target.value)}
-                        placeholder="MAX LIMIT (EMPTY = UNLIMITED)"
-                        type="number"
-                        min="1"
-                        disabled={createLobbyMutation.isPending}
-                        className="bg-black/40 border-white/10 text-white placeholder:text-zinc-700 rounded-sm font-mono text-xs focus-visible:ring-amber-500/50 h-8 w-full"
-                      />
-                    </div>
-                  )}
-
-                  <div className="pt-2 border-t border-white/5">
-                    <label className="text-xs font-mono uppercase tracking-wider text-zinc-500 block mb-2">
-                      Game Protocol
-                    </label>
-                    <GameModeSelector
-                      value={gameMode}
-                      onChange={setGameMode}
-                      disabled={createLobbyMutation.isPending}
-                    />
-                  </div>
-
-                  {/* Warning about auto-deletion */}
-                  <div className="flex items-start gap-2 p-2 bg-amber-500/5 border border-amber-500/10 rounded-sm">
-                    <Clock className="h-3 w-3 text-amber-500/70 mt-0.5 flex-shrink-0" />
-                    <p className="text-[10px] text-amber-500/70 font-mono leading-relaxed">
-                      INACTIVE PROTOCOLS AUTOMATICALLY PURGED AFTER 30 MIN.
-                    </p>
-                  </div>
-
-                  <div className="flex justify-end gap-3 pt-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setShowCreateLobby(false)}
-                      className="text-zinc-400 hover:text-white font-mono text-xs uppercase tracking-wider hover:bg-white/5"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      className="bg-amber-600 hover:bg-amber-500 text-white rounded-sm font-mono text-xs uppercase tracking-wider w-[120px]"
-                      disabled={createLobbyMutation.isPending}
-                    >
-                      {createLobbyMutation.isPending ? (
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          Creating...
-                        </div>
-                      ) : (
-                        "Initialize"
-                      )}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          )}
-        </motion.div>
-      </div>
-
-      {/* Lobbies List */}
-      <div ref={listRef} className="space-y-3 pb-20">
-        {lobbiesQuery === undefined ? (
-          <div className="flex justify-center py-20">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-12 h-12 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
-              <p className="text-zinc-500 font-mono text-xs uppercase tracking-widest animate-pulse">
-                Scanning Grid...
-              </p>
-            </div>
-          </div>
-        ) : lobbies.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-20 border border-dashed border-white/10 rounded-sm bg-zinc-900/20"
+      {!lobbiesQuery.isDone && (
+        <div className="flex justify-center pt-4">
+          <Button
+            variant="secondary"
+            onClick={loadMoreLobbies}
+            disabled={isLoadingMore}
           >
-            <div className="bg-zinc-900/50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 border border-white/5">
-              <Sword className="h-10 w-10 text-zinc-700" />
-            </div>
-            <h3 className="text-zinc-400 font-display uppercase tracking-wide text-lg mb-2">
-              Sector Clear
-            </h3>
-            <p className="text-zinc-600 text-sm font-mono mb-6 max-w-sm mx-auto">
-              No active battle rooms detected in this sector.
-            </p>
-            <Button
-              onClick={() => setShowCreateLobby(true)}
-              variant="outline"
-              className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 font-mono text-xs uppercase tracking-wider"
-            >
-              Initialize New Operation
-            </Button>
-          </motion.div>
-        ) : (
-          <>
-            <div className="grid gap-4">
-              {lobbies.map((lobby, index) => (
-                <LobbyCard
-                  key={lobby._id}
-                  lobby={lobby}
-                  index={index}
-                  currentUserId={profile.userId}
-                  onJoin={(lobbyId) => void handleJoinLobby(lobbyId)}
-                  onLeave={(lobbyId) => void handleLeaveLobby(lobbyId)}
-                  onInviteToLobby={handleInviteToLobby}
-                  isJoining={
-                    joinLobbyMutation.isPending || startGameMutation.isPending
-                  }
-                  isLeaving={leaveLobbyMutation.isPending}
-                />
-              ))}
-            </div>
-
-            {/* Load More Button */}
-            {lobbiesQuery && !lobbiesQuery.isDone && (
-              <div className="flex justify-center pt-8">
-                <Button
-                  variant="outline"
-                  onClick={loadMoreLobbies}
-                  className="flex items-center gap-2 bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-sm font-mono text-xs uppercase tracking-wider px-8 h-10"
-                  disabled={isLoadingMore}
-                >
-                  {isLoadingMore ? (
-                    <>
-                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Loading Data...
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-3 w-3" />
-                      Load Extended Grid
-                    </>
-                  )}
-                </Button>
-              </div>
+            {isLoadingMore ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <ChevronDown />
             )}
-          </>
-        )}
-      </div>
-
-      {/* Game Start Countdown Modal */}
-      <GameStartCountdownModal
-        isOpen={gameStartData.isOpen}
-        onComplete={handleCountdownComplete}
-        player1Username={gameStartData.player1Username}
-        player2Username={gameStartData.player2Username}
-        currentUsername={gameStartData.currentUsername}
-      />
+            {isLoadingMore ? "Loading" : "Show more lobbies"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

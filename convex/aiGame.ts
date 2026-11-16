@@ -1350,8 +1350,7 @@ export const cleanupStaleAIGameSessions = internalMutation({
       // Find all AI game sessions older than 1 hour (uses by_created_at index)
       const staleSessions = await ctx.db
         .query("aiGameSessions")
-        .withIndex("by_created_at")
-        .filter((q) => q.lt(q.field("createdAt"), oneHourAgo))
+        .withIndex("by_created_at", (q) => q.lt("createdAt", oneHourAgo))
         .take(BATCH_SIZE);
 
       if (staleSessions.length === 0) {

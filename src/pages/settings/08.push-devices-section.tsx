@@ -1,16 +1,48 @@
 import { useState, useEffect } from "react";
-import { Bell, Smartphone } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { unsubscribeFromPush } from "@/lib/push-client";
-import { SettingsCard } from "./components/SettingsCard";
+import { SettingsCard, plainError } from "./components/SettingsCard";
 import { useAutoAnimate } from "@/lib/useAutoAnimate";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function describeDevice(userAgent: string | undefined): string {
+  if (!userAgent) return "Unknown device";
+  const ua = userAgent;
+  const os = /iPhone|iPad/.test(ua)
+    ? "iPhone or iPad"
+    : /Android/.test(ua)
+      ? "Android"
+      : /Windows/.test(ua)
+        ? "Windows"
+        : /Mac OS X|Macintosh/.test(ua)
+          ? "Mac"
+          : /Linux/.test(ua)
+            ? "Linux"
+            : null;
+  const browser = /Edg\//.test(ua)
+    ? "Edge"
+    : /OPR\//.test(ua)
+      ? "Opera"
+      : /Firefox\//.test(ua)
+        ? "Firefox"
+        : /Chrome\//.test(ua)
+          ? "Chrome"
+          : /Safari\//.test(ua)
+            ? "Safari"
+            : null;
+  if (os && browser) return `${browser} on ${os}`;
+  return os || browser || "Unknown device";
+}
 
 export function PushDevicesSection() {
   const pushSubsRef = useAutoAnimate();
-  const existingSubs = useQuery(api.push.getSubscriptionsForCurrentUser) || [];
+  const subs = useQuery(api.push.getSubscriptionsForCurrentUser);
+  const existingSubs = subs ?? [];
   const removeSubscriptionByEndpoint = useMutation(
     api.push.removeSubscriptionByEndpoint,
   );
@@ -39,9 +71,9 @@ export function PushDevicesSection() {
         await unsubscribeFromPush();
       }
       await removeSubscriptionByEndpoint({ endpoint });
-      toast.success("Device unregistered");
-    } catch (e: any) {
-      toast.error(e?.message || "Failed to remove subscription");
+      toast.success("Device removed");
+    } catch (e: unknown) {
+      toast.error(plainError(e, "Could not remove the device. Try again."));
     } finally {
       setIsRemovingEndpoint(null);
     }
@@ -49,63 +81,58 @@ export function PushDevicesSection() {
 
   return (
     <SettingsCard
-      title="Push Notifications"
-      description="Manage devices authorized to receive tactical alerts."
-      icon={<Bell className="w-5 h-5" />}
-      delay={0.2}
+      title="Notifications"
+      description="Devices that get push notifications from the game."
     >
-      <div ref={pushSubsRef} className="space-y-3">
-        {existingSubs.length > 0 ? (
+      <div ref={pushSubsRef} className="space-y-2">
+        {subs === undefined ? (
+          <Skeleton className="h-[68px] w-full" />
+        ) : existingSubs.length > 0 ? (
           existingSubs.map((sub: any) => {
             const isThisDevice = sub.endpoint === localEndpoint;
-            const ua: string = sub.userAgent || "Unknown device";
-            const label = isThisDevice ? "Current Terminal" : ua;
+            const removing = isRemovingEndpoint === sub.endpoint;
 
             return (
               <div
                 key={sub._id}
-                className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-sm bg-black/40 border border-white/5 hover:border-white/10 transition-colors group"
+                className="flex flex-col justify-between gap-3 rounded-md border border-border p-4 sm:flex-row sm:items-center"
               >
-                <div className="flex items-start gap-3 overflow-hidden">
-                  <div className="p-2 bg-zinc-900 rounded-sm border border-white/10 mt-1">
-                    <Smartphone className="w-4 h-4 text-zinc-500 group-hover:text-blue-400 transition-colors" />
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="truncate">
+                      {describeDevice(sub.userAgent)}
+                    </span>
+                    {isThisDevice && <Badge>This device</Badge>}
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-zinc-300 text-sm font-medium truncate flex items-center gap-2">
-                      {label}
-                      {isThisDevice && (
-                        <span className="text-[10px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded-sm border border-blue-500/20 uppercase tracking-wider font-mono">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-zinc-600 text-xs font-mono mt-1">
-                      Registered:{" "}
-                      {sub.createdAt
-                        ? new Date(sub.createdAt).toLocaleDateString()
-                        : "Unknown"}
-                    </div>
+                  <div className="mt-0.5 text-xs text-foreground/70">
+                    Added{" "}
+                    {sub.createdAt
+                      ? new Date(sub.createdAt).toLocaleDateString(undefined, {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "on an unknown date"}
                   </div>
                 </div>
 
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
-                  disabled={isRemovingEndpoint === sub.endpoint}
+                  disabled={removing}
                   onClick={() => void handleRemoveSubscription(sub.endpoint)}
-                  className="w-full sm:w-auto h-8 text-xs font-mono uppercase tracking-wider border-white/10 text-zinc-400 hover:text-red-400 hover:border-red-500/30 hover:bg-red-500/5 transition-all"
+                  className="w-full sm:w-auto"
                 >
-                  {isRemovingEndpoint === sub.endpoint
-                    ? "REVOKING..."
-                    : "REVOKE ACCESS"}
+                  {removing && <Loader2 className="animate-spin" />}
+                  {removing ? "Removing" : "Remove"}
                 </Button>
               </div>
             );
           })
         ) : (
-          <div className="text-center py-8 text-zinc-600 font-mono text-xs">
-            NO DEVICES REGISTERED FOR TACTICAL ALERTS
-          </div>
+          <p className="text-sm text-foreground/80">
+            No devices get notifications yet.
+          </p>
         )}
       </div>
     </SettingsCard>
