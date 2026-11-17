@@ -20,6 +20,7 @@ import type * as cloudflareEmail from "../cloudflareEmail.js";
 import type * as comments from "../comments.js";
 import type * as crons from "../crons.js";
 import type * as customizations from "../customizations.js";
+import type * as emailCampaigns from "../emailCampaigns.js";
 import type * as emailChangeVerification from "../emailChangeVerification.js";
 import type * as emailPreview from "../emailPreview.js";
 import type * as emails_catalog from "../emails/catalog.js";
@@ -79,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   comments: typeof comments;
   crons: typeof crons;
   customizations: typeof customizations;
+  emailCampaigns: typeof emailCampaigns;
   emailChangeVerification: typeof emailChangeVerification;
   emailPreview: typeof emailPreview;
   "emails/catalog": typeof emails_catalog;

@@ -81,3 +81,15 @@ describe("copy follows the facts", () => {
     expect(email.text).toContain("Forgot password?");
   });
 });
+
+describe("announcement unsubscribe", () => {
+  test("the link shows in both versions only when given", () => {
+    const base = { username: "a", rank: "Private", gamesPlayed: 1, wins: 0 };
+    const url = "https://example.convex.site/email/unsubscribe?t=abc";
+    const withLink = relaunchEmail({ ...base, unsubscribeUrl: url });
+    expect(withLink.html).toContain(escapeHtml(url));
+    expect(withLink.text).toContain(`Unsubscribe: ${url}`);
+    const without = relaunchEmail(base);
+    expect(without.html).not.toContain("Unsubscribe");
+  });
+});

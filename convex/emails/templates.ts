@@ -184,6 +184,7 @@ export function relaunchEmail(a: {
   gamesPlayed: number;
   wins: number;
   signInMethod?: SignInMethod;
+  unsubscribeUrl?: string;
 }): RenderedEmail {
   return renderEmail({
     subject: "Generals Online is back",
@@ -211,6 +212,7 @@ export function relaunchEmail(a: {
       { kind: "signature", lines: ["See you on the board,", "Gabriel"] },
     ],
     reason: "You got this email because you've played Games of the Generals at generalsonline.app.",
+    unsubscribeUrl: a.unsubscribeUrl,
   });
 }
 

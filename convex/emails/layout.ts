@@ -53,6 +53,8 @@ export type EmailContent = {
   blocks: Block[];
   /** Why this person got the email, shown in the footer. */
   reason: string;
+  /** One-click unsubscribe link, for announcements only. Shown in the footer. */
+  unsubscribeUrl?: string;
 };
 
 export type RenderedEmail = {
@@ -212,7 +214,7 @@ function lockup(markSize: number, fontSize: number, color: string): string {
 }
 
 export function renderEmail(content: EmailContent): RenderedEmail {
-  const { subject, preheader, hero, blocks, reason } = content;
+  const { subject, preheader, hero, blocks, reason, unsubscribeUrl } = content;
 
   const header = `<tr><td class="px" align="left" style="padding:36px 40px ${hero ? 24 : 36}px;">
       <a href="${SITE_URL}" target="_blank" style="text-decoration:none;">${lockup(24, 17, C.heading)}</a>
@@ -263,7 +265,11 @@ export function renderEmail(content: EmailContent): RenderedEmail {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="border-top:1px solid ${C.border};padding-top:24px;">
         ${lockup(16, 13, C.label)}
         <p style="margin:12px 0 4px;font-family:${FONT};font-size:13px;line-height:20px;color:${C.footer};">${escapeHtml(reason)}</p>
-        <p style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.footer};"><a href="${SITE_URL}" target="_blank" style="color:${C.footer};text-decoration:underline;">generalsonline.app</a></p>
+        <p style="margin:0;font-family:${FONT};font-size:13px;line-height:20px;color:${C.footer};"><a href="${SITE_URL}" target="_blank" style="color:${C.footer};text-decoration:underline;">generalsonline.app</a>${
+          unsubscribeUrl
+            ? ` · <a href="${escapeHtml(unsubscribeUrl)}" target="_blank" style="color:${C.footer};text-decoration:underline;">Unsubscribe</a>`
+            : ""
+        }</p>
       </td></tr></table>
     </td></tr>
   </table>
@@ -279,6 +285,7 @@ export function renderEmail(content: EmailContent): RenderedEmail {
     "---",
     reason,
     `${BRAND.name} · ${SITE_URL}`,
+    ...(unsubscribeUrl ? [`Unsubscribe: ${unsubscribeUrl}`] : []),
   ].join("\n");
 
   return { subject, preheader, html, text };

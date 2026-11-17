@@ -66,6 +66,33 @@ const applicationTables = {
       searchField: "username",
     }),
 
+  // One row per player per bulk email campaign (convex/emailCampaigns.ts). Written
+  // as "pending" before the send and updated after, so a resumed run never mails
+  // anyone twice. `token` is the one-click unsubscribe token for that email.
+  emailCampaignSends: defineTable({
+    campaign: v.string(),
+    userId: v.id("users"),
+    email: v.string(),
+    token: v.string(),
+    status: v.union(v.literal("pending"), v.literal("sent"), v.literal("failed")),
+    messageId: v.optional(v.string()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    sentAt: v.optional(v.number()),
+  })
+    .index("by_campaign_email", ["campaign", "email"])
+    .index("by_campaign_status", ["campaign", "status"])
+    .index("by_token", ["token"]),
+
+  // Addresses that unsubscribed from announcements. Account and moderation emails
+  // (codes, bans) still go out; only campaigns check this.
+  emailOptOuts: defineTable({
+    email: v.string(),
+    userId: v.optional(v.id("users")),
+    source: v.string(),
+    optedOutAt: v.number(),
+  }).index("by_email", ["email"]),
+
   // A player's final record for a finished season, written by seasonReset before
   // profiles are zeroed. `season` is the last season the record covers (2 means
   // everything before Season 3). `place` is the ELO standing among recorded players.

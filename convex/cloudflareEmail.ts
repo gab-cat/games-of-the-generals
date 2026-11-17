@@ -15,7 +15,25 @@ export type SendEmailInput = {
   subject: string;
   html: string;
   text: string;
+  /** Extra headers, e.g. List-Unsubscribe. Cloudflare rejects headers not on its allowlist. */
+  headers?: Record<string, string>;
 };
+
+/** A failed send. `status` 429 means Cloudflare throttled us and nothing was sent. */
+export class EmailSendError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly codes: number[],
+  ) {
+    super(message);
+    this.name = "EmailSendError";
+  }
+
+  get throttled(): boolean {
+    return this.status === 429 || this.codes.includes(10004);
+  }
+}
 
 type CloudflareSendResponse = {
   success: boolean;
@@ -29,7 +47,7 @@ type CloudflareSendResponse = {
   } | null;
 };
 
-export async function sendEmail({ to, subject, html, text }: SendEmailInput): Promise<string> {
+export async function sendEmail({ to, subject, html, text, headers }: SendEmailInput): Promise<string> {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   const apiToken = process.env.CLOUDFLARE_EMAIL_API_TOKEN;
   if (!accountId || !apiToken) {
@@ -44,7 +62,7 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
         Authorization: `Bearer ${apiToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ from: FROM, to, subject, html, text }),
+      body: JSON.stringify({ from: FROM, to, subject, html, text, ...(headers ? { headers } : {}) }),
     },
   );
 
@@ -61,13 +79,17 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
     const hint = body?.errors?.some((e) => e.code === 10000)
       ? ". CLOUDFLARE_EMAIL_API_TOKEN needs the Email Sending permission on this account."
       : "";
-    throw new Error(`Cloudflare email send failed: ${detail}${hint}`);
+    throw new EmailSendError(
+      `Cloudflare email send failed: ${detail}${hint}`,
+      res.status,
+      body?.errors?.map((e) => e.code) ?? [],
+    );
   }
 
   const { permanent_bounces, suppressed_recipients = [] } = body.result;
   const undeliverable = [...permanent_bounces, ...suppressed_recipients];
   if (undeliverable.length > 0) {
-    throw new Error(`Email could not be delivered to: ${undeliverable.join(", ")}`);
+    throw new EmailSendError(`Email could not be delivered to: ${undeliverable.join(", ")}`, 200, []);
   }
 
   return body.result.message_id;

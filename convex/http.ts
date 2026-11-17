@@ -1,6 +1,7 @@
 import { httpAction } from "./_generated/server";
 import { auth } from "./auth";
 import router from "./router";
+import { unsubscribe } from "./emailCampaigns";
 
 const http = router;
 
@@ -15,6 +16,10 @@ http.route({
         })
     })
 })
+
+// One-click unsubscribe for announcement emails (link in the footer and List-Unsubscribe).
+http.route({ method: "GET", path: "/email/unsubscribe", handler: unsubscribe });
+http.route({ method: "POST", path: "/email/unsubscribe", handler: unsubscribe });
 
 auth.addHttpRoutes(http);
 
