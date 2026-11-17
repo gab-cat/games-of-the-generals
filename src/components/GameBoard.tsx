@@ -50,7 +50,7 @@ import { SetupPresets } from "./setup-presets/SetupPresets";
 import { useSound } from "../lib/SoundProvider";
 import { UserNameWithBadge } from "./UserNameWithBadge";
 import { fadeUp, riseIn, stagger } from "../lib/motion";
-import usePresence from "@convex-dev/presence/react";
+import usePresence, { type PresenceState } from "@convex-dev/presence/react";
 
 interface GameBoardProps {
   gameId: Id<"games">;
@@ -464,6 +464,35 @@ function PieceLegend() {
   );
 }
 
+// A player who stops sending heartbeats shows offline after 2.5 intervals,
+// which starts the disconnect forfeit timer.
+const GAME_PRESENCE_INTERVAL = 60_000;
+
+// Heartbeats into the game's presence room. Rendered only while the game is
+// live: unmounting when it finishes ends the session, so the room the server
+// removed at game end isn't recreated by the result screen.
+function GamePresenceSession({
+  gameId,
+  username,
+  onChange,
+}: {
+  gameId: Id<"games">;
+  username: string;
+  onChange: (state: PresenceState[] | undefined) => void;
+}) {
+  const state = usePresence(
+    api.gamePresence,
+    gameId,
+    username,
+    GAME_PRESENCE_INTERVAL,
+  );
+  useEffect(() => {
+    onChange(state);
+  }, [state, onChange]);
+  useEffect(() => () => onChange(undefined), [onChange]);
+  return null;
+}
+
 const GameBoard = memo(function GameBoard({
   gameId,
   profile,
@@ -474,20 +503,17 @@ const GameBoard = memo(function GameBoard({
   const game = useQuery(api.games.getGame, { gameId });
   const isLoadingGame = game === undefined;
 
-  // Memoize stable parameters to prevent unnecessary presence hook re-initialization
-  // This prevents rapid heartbeat calls when component re-renders
-  const stableGameId = useMemo(() => gameId, [gameId]);
-  const stableUsername = useMemo(() => profile.username, [profile.username]);
-  const PRESENCE_INTERVAL = 60000; // 60 seconds - matches server-side retry logic
-
-  // Use presence system with stable parameters to prevent rapid re-initialization
-  // The hook manages heartbeats internally, so stable params prevent rapid heartbeat calls
-  const presenceState = usePresence(
-    api.gamePresence,
-    stableGameId,
-    stableUsername,
-    PRESENCE_INTERVAL,
-  );
+  // Filled by <GamePresenceSession>, which is mounted only during setup and play.
+  const [presenceState, setPresenceState] = useState<PresenceState[]>();
+  const presenceSession =
+    game && game.status !== "finished" ? (
+      <GamePresenceSession
+        key="presence"
+        gameId={gameId}
+        username={profile.username}
+        onChange={setPresenceState}
+      />
+    ) : null;
   const { playBGM, playSFX } = useSound();
 
   // Helper function to get online status for a player
@@ -1625,6 +1651,7 @@ const GameBoard = memo(function GameBoard({
 
     return (
       <>
+        {presenceSession}
         <motion.div {...riseIn} className="space-y-4 sm:space-y-6">
           {/* Header */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -1925,6 +1952,7 @@ const GameBoard = memo(function GameBoard({
 
   return (
     <>
+      {presenceSession}
       <motion.div
         {...riseIn}
         className="mx-auto grid max-w-5xl gap-4 sm:gap-6 lg:grid-cols-[minmax(0,600px)_minmax(0,1fr)] lg:items-start"

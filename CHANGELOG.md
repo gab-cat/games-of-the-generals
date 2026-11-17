@@ -117,6 +117,9 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 - Mentions now work for every player, not only the first thousand who signed up
 - The footer no longer jumps up and down between short and long pages
 - Two combat achievements (Eliminator and Destroyer) were missing from the achievements page
+- The online list in chat now shows only players who are actually here. Players who lost signal or closed the app used to stay "online" for good
+- If your opponent loses signal or their app closes mid-game, they now show as disconnected and the 2-minute forfeit timer starts. Before, they could stay "online" and the timer never ran
+- The app shows its loading screen right away instead of after a second of black on slow connections, and the loading screen is now the Season 3 title card. Pages that are loading show the board being set up
 
 ---
 

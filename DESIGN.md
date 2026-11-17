@@ -104,7 +104,14 @@ Rules for these pages: one signature moment per page, then the normal quiet layo
 
 ## Loader
 
-`LoadingSpinner` shows the blue and red chevrons charging in, meeting with a gold flash and falling back (1.6s). The same mark is drawn in plain CSS inside `#root` in `index.html` for the first paint. Keep the two in sync. Reduced motion shows the still mark.
+Two loaders, picked by Gab on 2026-11-17 (rejected: a row of face-down pieces flipping to show their ranks).
+
+- **App start: the title card.** `#boot` in `index.html`, outside `#root`: the blue and red chevrons charge in from the screen edges with the 1981-box halftone, meet with a gold flash and keep pushing, with "Games of the Generals" and the Season 3 sticker under them. Pure CSS plus inline SVG, and the words are Poppins outlines, so it paints before any script or web font. React renders underneath it; `src/lib/boot-screen.ts` fades it out once nothing holds it. Every `LoadingSpinner` that mounts while the app is starting, and every `fullScreen` one, holds the title card instead of drawing its own, so a player sees one loader from the first paint to the first real page.
+- **Inside a page: the board.** `DeployBoard` in `LoadingSpinner.tsx`: the real 9×8 board, both armies set up their 21 pieces back row first, the front line lights gold, the board clears (3 s). Sizes `sm`, `md`, `lg`.
+- Reduced motion shows both still: the chevrons met, the board full.
+- To change the words on the title card, regenerate the outlines from Poppins (opentype.js, Bold for "Generals" and "Season 3", SemiBold for "Games of the").
+
+Nothing in `<head>` may block the first paint, or the loader shows late (it took 1.1 s on a slow phone when Google Fonts and the app stylesheet blocked it; 0.3 s now). Google Fonts loads with `rel=preload` + `onload`, the app stylesheet is switched on when it loads (`nonBlockingAppCss` in `vite.config.ts`), and `main.tsx` waits for it before rendering React. The loader's first frame must already show the mark, never a fade in from nothing.
 
 ## Icons
 

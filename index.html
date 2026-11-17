@@ -108,10 +108,15 @@
 
 
     <!-- Optimized font loading with reduced weights -->
+    <!-- Loaded without blocking the first paint, so the loader shows at once.
+         Text falls back to the system font until Poppins arrives (display=swap). -->
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
-      rel="stylesheet"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" /></noscript>
 
     <!-- Critical CSS for above-the-fold content -->
     <style>
@@ -154,21 +159,72 @@
         font-family: Poppins, ui-sans-serif, system-ui, sans-serif;
       }
 
-      /* First-paint loader. Keep in sync with src/components/LoadingSpinner.tsx */
-      .boot { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: hsl(var(--background)); }
-      .boot-mark { overflow: visible; }
-      .boot-name { margin: 0; font-size: 14px; font-weight: 600; color: hsl(var(--foreground) / 0.8); }
+      /* Boot screen: the Season 3 title card, shown from the first paint until the
+         app has something to show. It sits outside #root, so React never replaces it;
+         src/lib/boot-screen.ts fades it out. Spec: "Loader" in DESIGN.md. */
+      .boot {
+        --band: min(34vh, 72vw);
+        --word: min(86vw, 560px, 62vh);
+        position: fixed; inset: 0; z-index: 100;
+        display: flex; flex-direction: column; justify-content: center;
+        overflow: hidden;
+        background: hsl(var(--background));
+        transition: opacity 0.25s ease-out;
+      }
+      .boot[hidden] { display: none; }
+      .boot.is-leaving { opacity: 0; pointer-events: none; }
       .boot-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-      .boot-blue, .boot-red, .boot-flash { animation: 1.6s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
-      .boot-blue { animation-name: boot-blue; }
-      .boot-red { animation-name: boot-red; }
-      .boot-flash { transform-origin: 24px 12px; transform-box: view-box; animation-name: boot-flash; }
-      @keyframes boot-blue { 0% { transform: translateX(-9px); opacity: 0; } 38%, 62% { transform: none; opacity: 1; } 100% { transform: translateX(-9px); opacity: 0; } }
-      @keyframes boot-red { 0% { transform: translateX(9px); opacity: 0; } 38%, 62% { transform: none; opacity: 1; } 100% { transform: translateX(9px); opacity: 0; } }
-      @keyframes boot-flash { 0%, 36% { opacity: 0; transform: scaleY(0.2); } 42% { opacity: 1; transform: none; } 70%, 100% { opacity: 0; transform: none; } }
+      .boot-band { position: relative; flex: none; height: var(--band); }
+      .boot-arm {
+        --tip: calc(var(--band) * 0.36);
+        position: absolute; top: 0; bottom: 0; width: 50%;
+        background-image:
+          radial-gradient(rgb(0 0 0 / 0.2) 0.9px, transparent 1.4px),
+          linear-gradient(var(--shade), transparent 55%, rgb(0 0 0 / 0.25));
+        background-size: 5px 5px, 100% 100%;
+      }
+      .boot-blue {
+        left: 0; background-color: #3b82f6; --shade: rgb(127 176 255 / 0.25);
+        clip-path: polygon(0 0, calc(100% - var(--tip)) 0, 100% 50%, calc(100% - var(--tip)) 100%, 0 100%, var(--tip) 50%);
+        animation: boot-blue-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both, boot-blue-push 1.8s cubic-bezier(0.7, 0, 0.2, 1) 0.55s infinite;
+      }
+      .boot-red {
+        right: 0; background-color: #ef4b40; --shade: rgb(255 154 143 / 0.25);
+        clip-path: polygon(var(--tip) 0, 100% 0, calc(100% - var(--tip)) 50%, 100% 100%, var(--tip) 100%, 0 50%);
+        animation: boot-red-in 0.55s cubic-bezier(0.16, 1, 0.3, 1) both, boot-red-push 1.8s cubic-bezier(0.7, 0, 0.2, 1) 0.55s infinite;
+      }
+      .boot-flash {
+        position: absolute; left: 50%; top: -6%; width: 3px; height: 112%; margin-left: -1.5px;
+        background: #f7e3b5; box-shadow: 0 0 28px 6px rgb(243 210 138 / 0.55);
+        animation: boot-flash-in 0.7s ease-out 0.38s both, boot-flash 1.8s ease-out 0.55s infinite;
+      }
+      .boot-sticker {
+        position: absolute; top: calc(var(--word) * -0.05); right: max(5vw, calc(50vw - var(--word) / 2));
+        display: block; box-sizing: content-box; width: calc(var(--word) * 0.24); height: auto;
+        padding: calc(var(--word) * 0.026) calc(var(--word) * 0.034);
+        border: 2px solid #17110a; border-radius: 6px; background: #d9a441; color: #17110a;
+        transform: rotate(-7deg);
+        animation: boot-sticker 0.45s cubic-bezier(0.34, 1.4, 0.5, 1) 0.7s both;
+      }
+      .boot-type {
+        width: var(--word); margin: calc(var(--word) * 0.07) auto 0;
+        color: #f3ead8;
+        animation: boot-type-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s both;
+      }
+      .boot-type svg { display: block; height: auto; }
+      .boot-small { width: calc(var(--word) * 0.42); margin: 0 0 calc(var(--word) * 0.035) 0.5%; opacity: 0.85; }
+      .boot-word { width: 100%; }
+      @keyframes boot-blue-in { from { transform: translateX(-100%); } 80% { transform: translateX(2%); } to { transform: none; } }
+      @keyframes boot-red-in { from { transform: translateX(100%); } 80% { transform: translateX(-2%); } to { transform: none; } }
+      @keyframes boot-blue-push { 0%, 20% { transform: none; } 62% { transform: translateX(calc(var(--band) * -0.07)); } 74% { transform: translateX(calc(var(--band) * 0.012)); } 82%, 100% { transform: none; } }
+      @keyframes boot-red-push { 0%, 20% { transform: none; } 62% { transform: translateX(calc(var(--band) * 0.07)); } 74% { transform: translateX(calc(var(--band) * -0.012)); } 82%, 100% { transform: none; } }
+      @keyframes boot-flash-in { from { opacity: 0; transform: scaleY(0.2); } 15% { opacity: 1; transform: none; } to { opacity: 0; } }
+      @keyframes boot-flash { 0%, 72% { opacity: 0; transform: scaleY(0.3); } 76% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+      @keyframes boot-type-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+      @keyframes boot-sticker { from { opacity: 0; transform: scale(1.7) rotate(-18deg); } to { opacity: 1; transform: rotate(-7deg); } }
       @media (prefers-reduced-motion: reduce) {
-        .boot-blue, .boot-red, .boot-flash { animation: none; }
-        .boot-flash { opacity: 0.9; }
+        .boot-blue, .boot-red, .boot-flash, .boot-sticker, .boot-type { animation: none; }
+        .boot-flash { opacity: 0; }
       }
     </style>
 
@@ -179,10 +235,6 @@
     <link rel="dns-prefetch" href="//vitals.vercel.com" />
     <link rel="dns-prefetch" href="//vitals.vercel-insights.com" />
 
-    <!-- High priority resource preloads -->
-    <link rel="preload" href="/src/index.css" as="style" onload="this.onload=null;this.rel='stylesheet'" fetchpriority="high">
-    <link rel="modulepreload" href="/src/main.tsx" fetchpriority="high">
-    <noscript><link rel="stylesheet" href="/src/index.css"></noscript>
 
     <!-- Structured data -->
     <script type="application/ld+json">
@@ -350,17 +402,24 @@
     </script>
   </head>
   <body>
-    <!-- First paint before the app loads: the loader's blue and red chevrons
-         meeting (LoadingSpinner.tsx draws the same mark). React replaces it. -->
-    <div id="root"><div class="boot" role="status" aria-live="polite">
-      <svg class="boot-mark" viewBox="0 0 48 24" width="96" height="48" aria-hidden="true">
-        <polygon class="boot-blue" points="2,0 13,0 23,12 13,24 2,24 12,12" fill="#3b82f6" />
-        <polygon class="boot-red" points="46,0 35,0 25,12 35,24 46,24 36,12" fill="#ef4b40" />
-        <rect class="boot-flash" x="23.25" y="-3" width="1.5" height="30" rx="0.75" fill="#f3d28a" />
-      </svg>
-      <p class="boot-name">Games of the Generals</p>
-      <span class="boot-sr">Loading</span>
-    </div></div>
+    <!-- Boot screen: the title card, painted before any script runs. React renders
+         into #root underneath it, and src/lib/boot-screen.ts fades it out once the
+         app has something to show. The words are drawn as Poppins outlines so they
+         don't wait for the web font. -->
+    <div id="boot" class="boot" role="status" aria-live="polite">
+      <span class="boot-sr">Loading Games of the Generals</span>
+      <div class="boot-band" aria-hidden="true">
+        <div class="boot-arm boot-blue"></div>
+        <div class="boot-arm boot-red"></div>
+        <div class="boot-flash"></div>
+        <svg class="boot-sticker" viewBox="0 0 449.9 75.5" aria-hidden="true"><path fill="currentColor" d="M27.4 75.4Q19.7 75.4 13.6 72.9Q7.5 70.4 3.9 65.5Q0.2 60.6 0 53.7L0 53.7L18.2 53.7Q18.6 57.6 20.9 59.7Q23.2 61.7 26.9 61.7L26.9 61.7Q30.7 61.7 32.9 60.0Q35.1 58.2 35.1 55.1L35.1 55.1Q35.1 52.5 33.4 50.8Q31.6 49.1 29.1 48Q26.5 46.9 21.8 45.5L21.8 45.5Q15.0 43.4 10.7 41.3Q6.4 39.2 3.3 35.1Q0.2 31 0.2 24.4L0.2 24.4Q0.2 14.6 7.3 9.0Q14.4 3.5 25.8 3.5L25.8 3.5Q37.4 3.5 44.5 9.0Q51.6 14.6 52.1 24.5L52.1 24.5L33.6 24.5Q33.4 21.1 31.1 19.1Q28.8 17.2 25.2 17.2L25.2 17.2Q22.1 17.2 20.2 18.9Q18.3 20.5 18.3 23.6L18.3 23.6Q18.3 27 21.5 28.9Q24.7 30.8 31.5 33L31.5 33Q38.3 35.3 42.5 37.4Q46.8 39.5 49.9 43.5Q53 47.5 53 53.8L53 53.8Q53 59.8 50.0 64.7Q46.9 69.6 41.1 72.5Q35.3 75.4 27.4 75.4L27.4 75.4ZM116.1 45.9Q116.1 48.3 115.8 50.9L115.8 50.9L77.1 50.9Q77.5 56.1 80.5 58.9Q83.4 61.6 87.7 61.6L87.7 61.6Q94.1 61.6 96.6 56.2L96.6 56.2L114.8 56.2Q113.4 61.7 109.8 66.1Q106.1 70.5 100.6 73Q95.1 75.5 88.3 75.5L88.3 75.5Q80.1 75.5 73.7 72Q67.3 68.5 63.7 62Q60.1 55.5 60.1 46.8L60.1 46.8Q60.1 38.1 63.6 31.6Q67.2 25.1 73.6 21.6Q80 18.1 88.3 18.1L88.3 18.1Q96.4 18.1 102.7 21.5Q109 24.9 112.5 31.2Q116.1 37.5 116.1 45.9L116.1 45.9ZM77.2 41.4L98.6 41.4Q98.6 37 95.6 34.4Q92.6 31.8 88.1 31.8L88.1 31.8Q83.8 31.8 80.8 34.3Q77.9 36.8 77.2 41.4L77.2 41.4ZM121.7 46.7Q121.7 38.1 125.0 31.6Q128.2 25.1 133.8 21.6Q139.4 18.1 146.3 18.1L146.3 18.1Q152.2 18.1 156.7 20.5Q161.1 22.9 163.5 26.8L163.5 26.8L163.5 18.9L180.6 18.9L180.6 74.7L163.5 74.7L163.5 66.8Q161 70.7 156.6 73.1Q152.1 75.5 146.2 75.5L146.2 75.5Q139.4 75.5 133.8 72.0Q128.2 68.4 125.0 61.9Q121.7 55.3 121.7 46.7L121.7 46.7ZM163.5 46.8Q163.5 40.4 160.0 36.7Q156.4 33 151.3 33L151.3 33Q146.2 33 142.7 36.6Q139.1 40.3 139.1 46.7L139.1 46.7Q139.1 53.1 142.7 56.9Q146.2 60.6 151.3 60.6L151.3 60.6Q156.4 60.6 160.0 56.9Q163.5 53.2 163.5 46.8L163.5 46.8ZM215.7 75.5Q208.4 75.5 202.7 73Q197 70.5 193.7 66.2Q190.4 61.8 190 56.4L190 56.4L206.9 56.4Q207.2 59.3 209.6 61.1Q212 62.9 215.5 62.9L215.5 62.9Q218.7 62.9 220.5 61.7Q222.2 60.4 222.2 58.4L222.2 58.4Q222.2 56 219.7 54.9Q217.2 53.7 211.6 52.3L211.6 52.3Q205.6 50.9 201.6 49.4Q197.6 47.8 194.7 44.5Q191.8 41.1 191.8 35.4L191.8 35.4Q191.8 30.6 194.5 26.6Q197.1 22.7 202.3 20.4Q207.4 18.1 214.5 18.1L214.5 18.1Q225 18.1 231.1 23.3Q237.1 28.5 238 37.1L238 37.1L222.2 37.1Q221.8 34.2 219.7 32.5Q217.5 30.8 214 30.8L214 30.8Q211 30.8 209.4 32.0Q207.8 33.1 207.8 35.1L207.8 35.1Q207.8 37.5 210.4 38.7Q212.9 39.9 218.3 41.1L218.3 41.1Q224.5 42.7 228.4 44.3Q232.3 45.8 235.3 49.3Q238.2 52.7 238.3 58.5L238.3 58.5Q238.3 63.4 235.6 67.3Q232.8 71.1 227.7 73.3Q222.5 75.5 215.7 75.5L215.7 75.5ZM274.2 75.5Q266 75.5 259.5 72Q252.9 68.5 249.2 62Q245.4 55.5 245.4 46.8L245.4 46.8Q245.4 38.2 249.2 31.6Q253 25.1 259.6 21.6Q266.2 18.1 274.4 18.1L274.4 18.1Q282.6 18.1 289.2 21.6Q295.8 25.1 299.6 31.6Q303.4 38.2 303.4 46.8L303.4 46.8Q303.4 55.4 299.6 62.0Q295.7 68.5 289.1 72Q282.4 75.5 274.2 75.5L274.2 75.5ZM274.2 60.7Q279.1 60.7 282.6 57.1Q286.0 53.5 286.0 46.8L286.0 46.8Q286.0 40.1 282.7 36.5Q279.3 32.9 274.4 32.9L274.4 32.9Q269.4 32.9 266.1 36.5Q262.8 40 262.8 46.8L262.8 46.8Q262.8 53.5 266.1 57.1Q269.3 60.7 274.2 60.7L274.2 60.7ZM346.5 18.3Q356.3 18.3 362.2 24.6Q368 31 368 42.1L368 42.1L368 74.7L351 74.7L351 44.4Q351 38.8 348.1 35.7Q345.2 32.6 340.3 32.6L340.3 32.6Q335.4 32.6 332.5 35.7Q329.6 38.8 329.6 44.4L329.6 44.4L329.6 74.7L312.5 74.7L312.5 18.9L329.6 18.9L329.6 26.3Q332.2 22.6 336.6 20.5Q341 18.3 346.5 18.3L346.5 18.3ZM400 22.3Q400.4 11.6 407 5.8Q413.6 0 424.9 0L424.9 0Q432.4 0 437.8 2.6Q443.1 5.2 445.8 9.7Q448.6 14.2 448.6 19.8L448.6 19.8Q448.6 26.4 445.3 30.5Q442 34.7 437.6 36.2L437.6 36.2L437.6 36.6Q443.3 38.5 446.6 42.9Q449.9 47.3 449.9 54.2L449.9 54.2Q449.9 60.4 447.1 65.2Q444.2 69.9 438.8 72.6Q433.3 75.3 425.8 75.3L425.8 75.3Q413.8 75.3 406.6 69.4Q399.5 63.5 399.1 51.6L399.1 51.6L415.7 51.6Q415.8 56 418.2 58.5Q420.6 61.1 425.2 61.1L425.2 61.1Q429.1 61.1 431.3 58.9Q433.4 56.6 433.4 52.9L433.4 52.9Q433.4 48.1 430.3 46.0Q427.3 43.8 420.6 43.8L420.6 43.8L417.4 43.8L417.4 29.9L420.6 29.9Q425.7 29.9 428.8 28.1Q432 26.4 432 21.9L432 21.9Q432 18.3 430 16.3Q428 14.3 424.5 14.3L424.5 14.3Q420.7 14.3 418.8 16.6Q417 18.9 416.7 22.3L416.7 22.3L400 22.3Z"/></svg>
+      </div>
+      <div class="boot-type" aria-hidden="true">
+        <svg class="boot-small" viewBox="0 0 671.3 78.6" aria-hidden="true"><path fill="currentColor" d="M68.1 28.9L52 28.9Q49.6 24.5 45.4 22.2Q41.2 19.9 35.6 19.9L35.6 19.9Q29.4 19.9 24.6 22.7Q19.8 25.5 17.1 30.7Q14.4 35.9 14.4 42.7L14.4 42.7Q14.4 49.7 17.2 54.9Q19.9 60.1 24.8 62.9Q29.7 65.7 36.2 65.7L36.2 65.7Q44.2 65.7 49.3 61.5Q54.4 57.2 56 49.6L56 49.6L32 49.6L32 38.9L69.8 38.9L69.8 51.1Q68.4 58.4 63.8 64.6Q59.2 70.8 52.0 74.6Q44.7 78.3 35.7 78.3L35.7 78.3Q25.6 78.3 17.5 73.8Q9.3 69.2 4.7 61.1Q0 53.0 0 42.7L0 42.7Q0 32.4 4.7 24.3Q9.3 16.1 17.5 11.6Q25.6 7.0 35.6 7.0L35.6 7.0Q47.4 7.0 56.1 12.8Q64.8 18.5 68.1 28.9L68.1 28.9ZM76.6 49.8Q76.6 41.4 80.0 34.9Q83.3 28.4 89.1 24.9Q94.8 21.4 101.9 21.4L101.9 21.4Q108.1 21.4 112.8 23.9Q117.4 26.4 120.2 30.2L120.2 30.2L120.2 22.3L134.3 22.3L134.3 77.7L120.2 77.7L120.2 69.6Q117.5 73.5 112.8 76.1Q108.0 78.6 101.8 78.6L101.8 78.6Q94.8 78.6 89.1 75.0Q83.3 71.4 80.0 64.9Q76.6 58.3 76.6 49.8L76.6 49.8ZM120.2 50.0Q120.2 44.9 118.2 41.3Q116.2 37.6 112.8 35.7Q109.4 33.7 105.5 33.7L105.5 33.7Q101.6 33.7 98.3 35.6Q95.0 37.5 93.0 41.2Q90.9 44.8 90.9 49.8L90.9 49.8Q90.9 54.8 93.0 58.6Q95.0 62.3 98.4 64.3Q101.7 66.3 105.5 66.3L105.5 66.3Q109.4 66.3 112.8 64.4Q116.2 62.4 118.2 58.8Q120.2 55.1 120.2 50.0L120.2 50.0ZM216.8 21.5Q227.0 21.5 233.3 27.8Q239.5 34.0 239.5 45.2L239.5 45.2L239.5 77.7L225.5 77.7L225.5 47.1Q225.5 40.6 222.2 37.2Q218.9 33.7 213.2 33.7L213.2 33.7Q207.5 33.7 204.2 37.2Q200.8 40.6 200.8 47.1L200.8 47.1L200.8 77.7L186.8 77.7L186.8 47.1Q186.8 40.6 183.5 37.2Q180.2 33.7 174.5 33.7L174.5 33.7Q168.7 33.7 165.4 37.2Q162.0 40.6 162.0 47.1L162.0 47.1L162.0 77.7L148.0 77.7L148.0 22.3L162.0 22.3L162.0 29.0Q164.7 25.5 169.0 23.5Q173.2 21.5 178.3 21.5L178.3 21.5Q184.8 21.5 189.9 24.3Q195.0 27.0 197.8 32.1L197.8 32.1Q200.5 27.3 205.7 24.4Q210.8 21.5 216.8 21.5L216.8 21.5ZM304.3 48.8Q304.3 51.8 303.9 54.2L303.9 54.2L263.4 54.2Q263.9 60.2 267.6 63.6Q271.3 67.0 276.7 67.0L276.7 67.0Q284.5 67.0 287.8 60.3L287.8 60.3L302.9 60.3Q300.5 68.3 293.7 73.5Q286.9 78.6 277.0 78.6L277.0 78.6Q269.0 78.6 262.7 75.1Q256.3 71.5 252.8 65.0Q249.2 58.5 249.2 50.0L249.2 50.0Q249.2 41.4 252.7 34.9Q256.2 28.4 262.5 24.9Q268.8 21.4 277.0 21.4L277.0 21.4Q284.9 21.4 291.2 24.8Q297.4 28.2 300.9 34.5Q304.3 40.7 304.3 48.8L304.3 48.8ZM263.5 44.8L289.8 44.8Q289.7 39.4 285.9 36.2Q282.1 32.9 276.6 32.9L276.6 32.9Q271.4 32.9 267.9 36.1Q264.3 39.2 263.5 44.8L263.5 44.8ZM335.7 78.6Q328.9 78.6 323.5 76.2Q318.1 73.7 315.0 69.5Q311.8 65.3 311.5 60.2L311.5 60.2L325.6 60.2Q326 63.4 328.8 65.5Q331.5 67.6 335.6 67.6L335.6 67.6Q339.6 67.6 341.9 66.0Q344.1 64.4 344.1 61.9L344.1 61.9Q344.1 59.2 341.4 57.9Q338.6 56.5 332.6 54.9L332.6 54.9Q326.4 53.4 322.5 51.8Q318.5 50.2 315.7 46.9Q312.8 43.6 312.8 38.0L312.8 38.0Q312.8 33.4 315.5 29.6Q318.1 25.8 323.1 23.6Q328 21.4 334.7 21.4L334.7 21.4Q344.6 21.4 350.5 26.4Q356.4 31.3 357 39.7L357 39.7L343.6 39.7Q343.3 36.4 340.9 34.5Q338.4 32.5 334.3 32.5L334.3 32.5Q330.5 32.5 328.5 33.9Q326.4 35.3 326.4 37.8L326.4 37.8Q326.4 40.6 329.2 42.1Q332 43.5 337.9 45.0L337.9 45.0Q343.9 46.5 347.8 48.1Q351.7 49.7 354.6 53.1Q357.4 56.4 357.5 61.9L357.5 61.9Q357.5 66.7 354.9 70.5Q352.2 74.3 347.3 76.5Q342.3 78.6 335.7 78.6L335.7 78.6ZM417.4 78.6Q409.4 78.6 403.0 75.1Q396.6 71.5 393.0 65.0Q389.3 58.5 389.3 50.0L389.3 50.0Q389.3 41.5 393.1 35.0Q396.8 28.5 403.3 25.0Q409.8 21.4 417.8 21.4L417.8 21.4Q425.8 21.4 432.3 25.0Q438.8 28.5 442.6 35.0Q446.3 41.5 446.3 50.0L446.3 50.0Q446.3 58.5 442.5 65.0Q438.6 71.5 432.1 75.1Q425.5 78.6 417.4 78.6L417.4 78.6ZM417.4 66.4Q421.2 66.4 424.6 64.6Q427.9 62.7 429.9 59.0Q431.9 55.3 431.9 50.0L431.9 50.0Q431.9 42.1 427.8 37.9Q423.6 33.6 417.6 33.6L417.6 33.6Q411.6 33.6 407.6 37.9Q403.5 42.1 403.5 50.0L403.5 50.0Q403.5 57.9 407.5 62.2Q411.4 66.4 417.4 66.4L417.4 66.4ZM482.0 22.3L482.0 33.8L472.3 33.8L472.3 77.7L458.1 77.7L458.1 33.8L451.8 33.8L451.8 22.3L458.1 22.3L458.1 19.5Q458.1 9.3 463.9 4.5Q469.7-0.3 481.4 0.0L481.4 0.0L481.4 11.8Q476.3 11.7 474.3 13.5Q472.3 15.3 472.3 20.0L472.3 20.0L472.3 22.3L482.0 22.3ZM543.6 33.8L531.2 33.8L531.2 60.6Q531.2 63.4 532.6 64.7Q533.9 65.9 537.1 65.9L537.1 65.9L543.6 65.9L543.6 77.7L534.8 77.7Q517.1 77.7 517.1 60.5L517.1 60.5L517.1 33.8L510.5 33.8L510.5 22.3L517.1 22.3L517.1 8.6L531.2 8.6L531.2 22.3L543.6 22.3L543.6 33.8ZM584.9 21.5Q591.2 21.5 596.1 24.3Q601.0 27.0 603.8 32.4Q606.5 37.7 606.5 45.2L606.5 45.2L606.5 77.7L592.5 77.7L592.5 47.1Q592.5 40.5 589.2 37.0Q585.9 33.4 580.2 33.4L580.2 33.4Q574.4 33.4 571.1 37.0Q567.7 40.5 567.7 47.1L567.7 47.1L567.7 77.7L553.7 77.7L553.7 3.7L567.7 3.7L567.7 29.2Q570.4 25.6 574.9 23.6Q579.4 21.5 584.9 21.5L584.9 21.5ZM671.3 48.8Q671.3 51.8 670.9 54.2L670.9 54.2L630.4 54.2Q630.9 60.2 634.6 63.6Q638.3 67.0 643.7 67.0L643.7 67.0Q651.5 67.0 654.8 60.3L654.8 60.3L669.9 60.3Q667.5 68.3 660.7 73.5Q653.9 78.6 644.0 78.6L644.0 78.6Q636.0 78.6 629.7 75.1Q623.3 71.5 619.8 65.0Q616.2 58.5 616.2 50.0L616.2 50.0Q616.2 41.4 619.7 34.9Q623.2 28.4 629.5 24.9Q635.8 21.4 644.0 21.4L644.0 21.4Q651.9 21.4 658.2 24.8Q664.4 28.2 667.9 34.5Q671.3 40.7 671.3 48.8L671.3 48.8ZM630.5 44.8L656.8 44.8Q656.7 39.4 652.9 36.2Q649.1 32.9 643.6 32.9L643.6 32.9Q638.4 32.9 634.9 36.1Q631.3 39.2 630.5 44.8L630.5 44.8Z"/></svg>
+        <svg class="boot-word" viewBox="0 0 430.7 74.8" aria-hidden="true"><path fill="currentColor" d="M68.4 26L49.5 26Q47.6 22.5 44.1 20.6Q40.5 18.8 35.7 18.8L35.7 18.8Q27.4 18.8 22.4 24.3Q17.4 29.7 17.4 38.8L17.4 38.8Q17.4 48.5 22.7 54.0Q27.9 59.4 37.1 59.4L37.1 59.4Q43.4 59.4 47.8 56.2Q52.1 53 54.1 47L54.1 47L32.4 47L32.4 34.4L69.6 34.4L69.6 50.3Q67.7 56.7 63.2 62.2Q58.6 67.7 51.6 71.1Q44.6 74.5 35.8 74.5L35.8 74.5Q25.4 74.5 17.3 70.0Q9.1 65.4 4.6 57.3Q0 49.2 0 38.8L0 38.8Q0 28.4 4.6 20.3Q9.1 12.1 17.2 7.5Q25.3 3 35.7 3L35.7 3Q48.3 3 57.0 9.1Q65.6 15.2 68.4 26L68.4 26ZM128.2 45.2Q128.2 47.6 127.9 50.2L127.9 50.2L89.2 50.2Q89.6 55.4 92.6 58.2Q95.5 60.9 99.8 60.9L99.8 60.9Q106.2 60.9 108.7 55.5L108.7 55.5L126.9 55.5Q125.5 61 121.9 65.4Q118.2 69.8 112.7 72.3Q107.2 74.8 100.4 74.8L100.4 74.8Q92.2 74.8 85.8 71.3Q79.4 67.8 75.8 61.3Q72.2 54.8 72.2 46.1L72.2 46.1Q72.2 37.4 75.8 30.9Q79.3 24.4 85.7 20.9Q92.1 17.4 100.4 17.4L100.4 17.4Q108.5 17.4 114.8 20.8Q121.1 24.2 124.7 30.5Q128.2 36.8 128.2 45.2L128.2 45.2ZM89.3 40.7L110.7 40.7Q110.7 36.3 107.7 33.7Q104.7 31.1 100.2 31.1L100.2 31.1Q95.9 31.1 93.0 33.6Q90.0 36.1 89.3 40.7L89.3 40.7ZM167.7 17.6Q177.5 17.6 183.3 23.9Q189.2 30.3 189.2 41.4L189.2 41.4L189.2 74L172.2 74L172.2 43.7Q172.2 38.1 169.3 35Q166.4 31.9 161.5 31.9L161.5 31.9Q156.6 31.9 153.7 35Q150.8 38.1 150.8 43.7L150.8 43.7L150.8 74L133.7 74L133.7 18.2L150.8 18.2L150.8 25.6Q153.4 21.9 157.8 19.8Q162.2 17.6 167.7 17.6L167.7 17.6ZM250.2 45.2Q250.2 47.6 249.9 50.2L249.9 50.2L211.2 50.2Q211.6 55.4 214.6 58.2Q217.5 60.9 221.8 60.9L221.8 60.9Q228.2 60.9 230.7 55.5L230.7 55.5L248.9 55.5Q247.5 61 243.9 65.4Q240.2 69.8 234.7 72.3Q229.2 74.8 222.4 74.8L222.4 74.8Q214.2 74.8 207.8 71.3Q201.4 67.8 197.8 61.3Q194.2 54.8 194.2 46.1L194.2 46.1Q194.2 37.4 197.8 30.9Q201.3 24.4 207.7 20.9Q214.1 17.4 222.4 17.4L222.4 17.4Q230.5 17.4 236.8 20.8Q243.1 24.2 246.7 30.5Q250.2 36.8 250.2 45.2L250.2 45.2ZM211.3 40.7L232.7 40.7Q232.7 36.3 229.7 33.7Q226.7 31.1 222.2 31.1L222.2 31.1Q217.9 31.1 215.0 33.6Q212 36.1 211.3 40.7L211.3 40.7ZM272.8 27.5Q275.8 22.9 280.3 20.3Q284.8 17.6 290.3 17.6L290.3 17.6L290.3 35.7L285.6 35.7Q279.2 35.7 276 38.4Q272.8 41.2 272.8 48.1L272.8 48.1L272.8 74L255.7 74L255.7 18.2L272.8 18.2L272.8 27.5ZM291.6 46Q291.6 37.4 294.9 30.9Q298.1 24.4 303.7 20.9Q309.3 17.4 316.2 17.4L316.2 17.4Q322.1 17.4 326.6 19.8Q331 22.2 333.4 26.1L333.4 26.1L333.4 18.2L350.5 18.2L350.5 74L333.4 74L333.4 66.1Q330.9 70 326.4 72.4Q322 74.8 316.1 74.8L316.1 74.8Q309.3 74.8 303.7 71.3Q298.1 67.7 294.9 61.2Q291.6 54.6 291.6 46L291.6 46ZM333.4 46.1Q333.4 39.7 329.9 36Q326.3 32.3 321.2 32.3L321.2 32.3Q316.1 32.3 312.6 35.9Q309 39.6 309 46L309 46Q309 52.4 312.6 56.2Q316.1 59.9 321.2 59.9L321.2 59.9Q326.3 59.9 329.9 56.2Q333.4 52.5 333.4 46.1L333.4 46.1ZM359.4 0L376.5 0L376.5 74L359.4 74L359.4 0ZM408.1 74.8Q400.8 74.8 395.1 72.3Q389.4 69.8 386.1 65.5Q382.8 61.1 382.4 55.7L382.4 55.7L399.3 55.7Q399.6 58.6 402 60.4Q404.4 62.2 407.9 62.2L407.9 62.2Q411.1 62.2 412.8 61.0Q414.6 59.7 414.6 57.7L414.6 57.7Q414.6 55.3 412.1 54.2Q409.6 53 404 51.6L404 51.6Q398 50.2 394 48.7Q390 47.1 387.1 43.8Q384.2 40.4 384.2 34.7L384.2 34.7Q384.2 29.9 386.8 25.9Q389.5 22 394.6 19.7Q399.8 17.4 406.9 17.4L406.9 17.4Q417.4 17.4 423.4 22.6Q429.5 27.8 430.4 36.4L430.4 36.4L414.6 36.4Q414.2 33.5 412.1 31.8Q409.9 30.1 406.4 30.1L406.4 30.1Q403.4 30.1 401.8 31.3Q400.2 32.4 400.2 34.4L400.2 34.4Q400.2 36.8 402.8 38Q405.3 39.2 410.7 40.4L410.7 40.4Q416.9 42 420.8 43.5Q424.7 45.1 427.6 48.5Q430.6 52 430.7 57.8L430.7 57.8Q430.7 62.7 427.9 66.5Q425.2 70.4 420.1 72.6Q414.9 74.8 408.1 74.8L408.1 74.8Z"/></svg>
+      </div>
+    </div>
+    <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

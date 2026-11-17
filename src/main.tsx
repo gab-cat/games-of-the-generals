@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { ConvexReactClient, ConvexProvider } from "convex/react";
@@ -15,6 +15,7 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 // Import the generated route tree
 import { routeTree } from "./routeTree.gen";
 import { convexDeploymentUrl } from "./lib/runtime-mode";
+import { releaseBootScreen } from "./lib/boot-screen";
 
 // Create a new router instance
 const router = createRouter({
@@ -71,6 +72,10 @@ function ConvexAppProviders({
 }
 
 function AppTree() {
+  // Loaders that mount during the first render hold the title card in their
+  // layout effects, which run before this; if none did, the app is ready.
+  useEffect(() => releaseBootScreen(), []);
+
   const tree = (
     <>
       <RouterProvider router={router} />
@@ -92,7 +97,33 @@ function AppTree() {
   );
 }
 
-createRoot(document.getElementById("root")!).render(<AppTree />);
+// In production the app stylesheet loads without blocking the first paint (see
+// nonBlockingAppCss in vite.config.ts), so the loader in index.html shows at
+// once. Render React only once that stylesheet is in, so nothing paints unstyled.
+function appStylesReady(): Promise<void> {
+  const link = document.querySelector<HTMLLinkElement>("link[data-app-css]");
+  if (!link || link.media === "all") return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      link.media = "all";
+      resolve();
+    };
+    link.addEventListener("load", done, { once: true });
+    link.addEventListener("error", done, { once: true });
+    // The load may have fired between parsing and this check.
+    if (link.sheet) done();
+  });
+}
+
+void appStylesReady().then(() => {
+  createRoot(document.getElementById("root")!, {
+    // Never leave the title card covering a crashed app.
+    onUncaughtError: (error) => {
+      releaseBootScreen(true);
+      reportError(error);
+    },
+  }).render(<AppTree />);
+});
 
 // Register PWA update checker
 if (typeof window !== "undefined" && !import.meta.env.DEV) {

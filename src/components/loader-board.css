@@ -1,0 +1,55 @@
+/* The loader inside a page: both armies set up on the real 9x8 board, back row
+   first, the front line lights gold, then the board clears and goes again.
+   Spec: "Loader" in DESIGN.md. */
+.deploy-board {
+  --cell: 12px;
+  --gap: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(9, var(--cell));
+  grid-auto-rows: var(--cell);
+  gap: var(--gap);
+}
+.deploy-board[data-size="sm"] { --cell: 8px; --gap: 1.5px; }
+.deploy-board[data-size="lg"] { --cell: 17px; --gap: 3px; }
+.deploy-board > i {
+  position: relative;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  background: rgb(255 255 255 / 0.025);
+  border-radius: 2px;
+}
+.deploy-board b {
+  position: absolute;
+  inset: 1px;
+  border-radius: 1.5px;
+  opacity: 0;
+  animation: deploy-wave 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  animation-delay: calc(var(--k) * 55ms);
+}
+.deploy-board b.blue { background: #3b82f6; --from: 4px; }
+.deploy-board b.red { background: #ef4b40; --from: -4px; }
+@keyframes deploy-wave {
+  0% { opacity: 0; transform: translateY(var(--from)) scale(0.6); }
+  7%, 64% { opacity: 1; transform: none; }
+  74%, 100% { opacity: 0; transform: scale(0.7); }
+}
+.deploy-front {
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: calc(4 * var(--cell) + 3.5 * var(--gap) - 1px);
+  height: 2px;
+  background: #f3d28a;
+  box-shadow: 0 0 14px 2px rgb(243 210 138 / 0.5);
+  opacity: 0;
+  animation: deploy-front 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+@keyframes deploy-front {
+  0%, 40% { opacity: 0; transform: scaleX(0); }
+  46%, 62% { opacity: 1; transform: none; }
+  72%, 100% { opacity: 0; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deploy-board b, .deploy-front { animation: none; }
+  .deploy-board b { opacity: 1; }
+}

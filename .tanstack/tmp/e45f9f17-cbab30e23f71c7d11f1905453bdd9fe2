@@ -1,0 +1,10 @@
+// Temporary dev-only page for the loader proposal. Delete after the pick.
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { LoaderDirections } from "@/pages/dev/LoaderDirections";
+
+export const Route = createFileRoute("/dev")({
+  beforeLoad: () => {
+    if (!import.meta.env.DEV) throw notFound();
+  },
+  component: LoaderDirections,
+});

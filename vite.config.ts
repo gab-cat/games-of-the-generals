@@ -4,6 +4,26 @@ import { TanStackRouterVite } from "@tanstack/router-vite-plugin";
 import { VitePWA } from "vite-plugin-pwa";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
+import type { Plugin } from "vite";
+
+// The app stylesheet must not block the first paint: the loader in index.html
+// carries its own inline CSS and should show the moment the HTML arrives. The
+// link is marked `data-app-css` and switched on when it loads; main.tsx waits
+// for it before rendering React, so the app never paints unstyled.
+function nonBlockingAppCss(): Plugin {
+  return {
+    name: "non-blocking-app-css",
+    apply: "build",
+    transformIndexHtml: {
+      order: "post",
+      handler: (html) =>
+        html.replace(
+          /<link rel="stylesheet" crossorigin href="(\/assets\/[^"]+\.css)">/g,
+          `<link rel="stylesheet" crossorigin href="$1" media="print" data-app-css onload="this.media='all'">`,
+        ),
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
@@ -13,6 +33,7 @@ export default defineConfig(() => ({
   plugins: [
     react(),
     TanStackRouterVite(),
+    nonBlockingAppCss(),
     // Bundle analyzer - run with ANALYZE=true bun run build
     ...(process.env.ANALYZE
       ? [

@@ -8,7 +8,7 @@
         "@2toad/profanity": "^3.1.1",
         "@convex-dev/action-retrier": "^0.2.1",
         "@convex-dev/auth": "^0.0.80",
-        "@convex-dev/presence": "^0.1.5",
+        "@convex-dev/presence": "0.4.0",
         "@convex-dev/react-query": "^0.0.0-alpha.11",
         "@convex-dev/sharded-counter": "^0.1.8",
         "@formkit/auto-animate": "^0.8.4",
@@ -301,7 +301,9 @@
 
     "@convex-dev/auth": ["@convex-dev/auth@0.0.80", "", { "dependencies": { "arctic": "^1.2.0", "cookie": "^1.0.1", "jose": "^5.2.2", "jwt-decode": "^4.0.0", "lucia": "^3.2.0", "oauth4webapi": "^3.1.2", "oslo": "^1.1.2", "path-to-regexp": "^6.3.0", "server-only": "^0.0.1" }, "peerDependencies": { "@auth/core": "^0.37.0", "convex": "^1.17.0", "react": "^18.2.0 || ^19.0.0-0" }, "bin": { "auth": "dist/bin.cjs" } }, "sha512-La/cAlmSxERWW8ekJdFysMVhlkpdD7AAIaZSWCk6mIZgoZIz2uu1XbqhodNzx/8ypLu7wyOlMJqH7ZtncHYDXA=="],
 
-    "@convex-dev/presence": ["@convex-dev/presence@0.1.5", "", { "peerDependencies": { "convex": ">=1.24.8 <1.35.0", "react": "~18.3.1 || ^19.0.0", "react-dom": "~18.3.1 || ^19.0.0" } }, "sha512-tHD03dLnP0bB4lHuXMVx64NkQqn/SR4dJakwkcOEsXZXFJsvoai/O0FcAnrd5KBYzbbt8GFZ7vxPdBO0l1CSUw=="],
+    "@convex-dev/batch-worker": ["@convex-dev/batch-worker@0.2.2", "", { "peerDependencies": { "convex": "^1.36.1", "react": "^18.3.1 || ^19.0.0" } }, "sha512-3knigElzTVhWw1sN28EYkGBTdrJZ03vMj2PJPuFq3V0Tg41i7tcv/EWDBFQWcUaKzBWWVw693hcJtxCF3CRtEw=="],
+
+    "@convex-dev/presence": ["@convex-dev/presence@0.4.0", "", { "dependencies": { "@convex-dev/batch-worker": "^0.2.0" }, "peerDependencies": { "convex": "^1.36.1", "expo-crypto": ">=14.1.0", "react": "~18.3.1 || ^19.0.0", "react-dom": "~18.3.1 || ^19.0.0", "react-native": ">=0.79.0" }, "optionalPeers": ["expo-crypto", "react-native"] }, "sha512-T1f2aHyS2D2dxvMnvY+qSJBIRG0W7ph8+mgOvZif52JLlLNscCHTangAgNWR4VLYGhXFFDxwSSpdh7vxzA/hPQ=="],
 
     "@convex-dev/react-query": ["@convex-dev/react-query@0.0.0-alpha.11", "", { "dependencies": { "@auth/core": "^0.37.0", "@convex-dev/auth": "^0.0.83", "convex-helpers": "^0.1.85" }, "peerDependencies": { "@tanstack/react-query": "^5.0.0", "convex": "^1.24.8" } }, "sha512-Fy/p3JOvUUNrbBBQD0AEXcSU40PBu567gm3XRgExHkiKlv07kBOjnuXA0TvodKkryyuHLbuIxYP8XIv03i6DEw=="],
 

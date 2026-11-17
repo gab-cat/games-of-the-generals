@@ -21,7 +21,7 @@
     "@2toad/profanity": "^3.1.1",
     "@convex-dev/action-retrier": "^0.2.1",
     "@convex-dev/auth": "^0.0.80",
-    "@convex-dev/presence": "^0.1.5",
+    "@convex-dev/presence": "0.4.0",
     "@convex-dev/react-query": "^0.0.0-alpha.11",
     "@convex-dev/sharded-counter": "^0.1.8",
     "@formkit/auto-animate": "^0.8.4",
