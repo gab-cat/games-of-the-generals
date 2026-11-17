@@ -20,7 +20,7 @@ If you'd like to help bring Games of the Generals back online, a donation or any
 
 Thank you for playing.
 
-![Games of the Generals Gameplay](public/screenshots/wide-1200x630.png)
+![Games of the Generals Gameplay](public/screenshots/wide-game-2880x1800.webp)
 
 ## 🎮 What is Games of the Generals?
 

@@ -1,7 +1,7 @@
 // Backs the admin Emails tab. Previews render in the browser from emails/catalog;
 // this file only sends a sample, to the admin's own address or one they type in.
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import { action, internalQuery, query, type QueryCtx } from "./_generated/server";
 import { sendEmail } from "./cloudflareEmail";
@@ -46,15 +46,23 @@ export const sendTestEmail = action({
     // Runs the admin check even when a recipient is given.
     const adminEmail: string | null = await ctx.runQuery(internal.emailPreview.getAdminEmail, {});
 
+    // ConvexError keeps its message in production, so the admin sees why it failed
+    // instead of a bare "Server Error".
     const recipient = (to?.trim() || adminEmail || "").toLowerCase();
-    if (!recipient) throw new Error("Your account has no email address. Type one in.");
-    if (!EMAIL.test(recipient)) throw new Error(`${recipient} isn't a valid email address`);
+    if (!recipient) throw new ConvexError("Your account has no email address. Type one in.");
+    if (!EMAIL.test(recipient)) throw new ConvexError(`${recipient} isn't a valid email address`);
 
     const entry = findCatalogEntry(emailId);
-    if (!entry) throw new Error(`Unknown email: ${emailId}`);
+    if (!entry) throw new ConvexError(`Unknown email: ${emailId}`);
 
     const email = entry.render();
-    const messageId = await sendEmail({ ...email, to: recipient, subject: `[Test] ${email.subject}` });
+    let messageId: string;
+    try {
+      messageId = await sendEmail({ ...email, to: recipient, subject: `[Test] ${email.subject}` });
+    } catch (error) {
+      console.error(`[email test] ${emailId} to ${recipient} failed`, error);
+      throw new ConvexError(error instanceof Error ? error.message : "Email send failed");
+    }
     console.log(`[email test] ${emailId} sent to ${recipient} (${messageId})`);
     return { sentTo: recipient, messageId };
   },

@@ -1,6 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useAction, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Check, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -332,9 +333,11 @@ function SendTestForm({ entry }: { entry: CatalogEntry }) {
       } catch (error) {
         setState("idle");
         const message =
-          error instanceof Error
-            ? error.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0]
-            : "";
+          error instanceof ConvexError && typeof error.data === "string"
+            ? error.data
+            : error instanceof Error
+              ? error.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0]
+              : "";
         toast.error(
           message
             ? `Couldn't send the test: ${message}`

@@ -1,89 +1,57 @@
+/*
+ * What each plan includes, as shown on the pricing and subscription pages and
+ * in the search tags. Every line here must match what the backend enforces:
+ * convex/featureGating.ts (TIER_LIMITS), convex/aiGame.ts (AI levels),
+ * convex/customizations.ts (frames and username colours), convex/globalChat.ts
+ * (message length), convex/matchmaking.ts (queue priority) and
+ * convex/fileUpload.ts (avatar upload). Change the code first, then this.
+ */
 export interface PricingTier {
-  name: string;
-  description: string;
+  name: "Standard" | "Pro" | "Pro+";
   price: string;
-  period: string;
-  color: string;
+  /** Most important first: the pricing page shows the first six. */
   features: string[];
-  comingSoon?: string[];
-  limitations: string[];
-  buttonText: string;
-  popular: boolean;
 }
 
 export const pricingTiers: PricingTier[] = [
   {
-    name: "Standard", // Formerly Free
-    description:
-      "Everything you need to jump into the action and start playing.",
+    name: "Standard",
     price: "Free",
-    period: "forever",
-    color: "zinc",
     features: [
-      "Full Multiplayer Access",
-      "Practice against AI (MK-1)",
-      "Watch any live match",
-      "Global Chat Access",
-      "Lifetime Service Record",
-      "3 Saved Formation Slots",
-      "Last Match Replay",
+      "Ranked quick match and private lobbies",
+      "Easy and medium AI",
+      "10 private lobbies a day",
+      "Watch live games",
+      "Global chat",
+      "2 setup presets",
+      "Your full match history",
     ],
-    limitations: [
-      "Limited Custom Loadouts (2)",
-      "Daily Match Limit (10)",
-      "Basic Analytics",
-      "Standard Matchmaking",
-    ],
-    buttonText: "Active",
-    popular: false,
   },
   {
     name: "Pro",
-    description:
-      "Unlock the full experience with advanced tools and more storage.",
     price: "₱99",
-    period: "month",
-    color: "blue",
     features: [
-      "All Standard Features",
-      "Unlimited Custom Loadouts",
-      "Up to 50 Matches per Day",
-      "Smarter AI Opponents (MK-2)",
-      "Custom Avatar & Frame Uploads",
-      "Built-in Battle Analytics",
-      "Priority Matchmaking",
-      "Exclusive Profile Badges",
-      "Detailed Career Stats",
-      "Save 50 Match Replays",
-      "Share your Loadouts",
+      "Everything in Standard",
+      "Hard AI",
+      "50 private lobbies a day",
+      "Upload your own avatar",
+      "Gold, silver and bronze avatar frames",
+      "50 saved replays",
+      "Unlimited setup presets",
+      "Username colour from the palette",
+      "Matched first in quick match",
+      "Chat messages up to 1,000 characters",
     ],
-    limitations: [],
-    buttonText: "Upgrade to Pro",
-    popular: true,
   },
   {
     name: "Pro+",
-    description: "The ultimate tier for serious players and community leaders.",
     price: "₱199",
-    period: "month",
-    color: "amber",
     features: [
-      "All Pro Features",
-      "Unlimited Daily Matches",
-      "Save 100 Match Replays",
-      "Expert AI Training (MK-3)",
-      "Deep Analytics Dashboard",
-      "Direct Priority Support",
-      "Early Access to New Features",
-      "Advanced Meta-Game Insights",
+      "Everything in Pro",
+      "Unlimited private lobbies",
+      "100 saved replays",
+      "5 more avatar frames",
+      "Any username colour",
     ],
-    comingSoon: [
-      "Tournament Hosting Tools",
-      "AI Strategy Coaching",
-      "Custom Board Themes",
-    ],
-    limitations: [],
-    buttonText: "Go Pro+",
-    popular: false,
   },
 ];

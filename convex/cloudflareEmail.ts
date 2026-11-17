@@ -57,7 +57,11 @@ export async function sendEmail({ to, subject, html, text }: SendEmailInput): Pr
 
   if (!res.ok || !body?.success || !body.result) {
     const detail = body?.errors?.map((e) => `${e.code} ${e.message}`).join("; ") || `HTTP ${res.status}`;
-    throw new Error(`Cloudflare email send failed: ${detail}`);
+    // 10000 means the token is valid but isn't allowed to send for this account.
+    const hint = body?.errors?.some((e) => e.code === 10000)
+      ? ". CLOUDFLARE_EMAIL_API_TOKEN needs the Email Sending permission on this account."
+      : "";
+    throw new Error(`Cloudflare email send failed: ${detail}${hint}`);
   }
 
   const { permanent_bounces, suppressed_recipients = [] } = body.result;

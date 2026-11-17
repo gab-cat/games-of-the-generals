@@ -26,7 +26,7 @@ export function passwordResetEmail(code: string): RenderedEmail {
     subject: "Your password reset code",
     preheader: `Use ${code} to reset your password. It expires in ${CODE_MINUTES} minutes.`,
     blocks: [
-      { kind: "heading", text: "Reset your", accent: "password" },
+      { kind: "heading", text: "Reset your password" },
       { kind: "paragraph", text: "Enter this code on the reset screen to choose a new password." },
       { kind: "code", code, caption: `Expires in ${CODE_MINUTES} minutes` },
       {
@@ -47,7 +47,7 @@ export function emailChangeEmail(args: {
     subject: "Confirm your new email address",
     preheader: `Use ${args.code} to confirm the change. It expires in ${CODE_MINUTES} minutes.`,
     blocks: [
-      { kind: "heading", text: "Confirm your", accent: "new email" },
+      { kind: "heading", text: "Confirm your new email" },
       {
         kind: "paragraph",
         text: `Someone asked to change the email on your account from **${args.currentEmail}** to **${args.newEmail}**. Enter this code in Settings to confirm.`,
@@ -82,7 +82,7 @@ export function muteEmail(a: ModerationArgs): RenderedEmail {
       ? `You can't post in global chat for ${duration}. You can still play games.`
       : "You can't post in global chat until a moderator lifts the mute. You can still play games.",
     blocks: [
-      { kind: "heading", text: "You've been muted", accent: "in chat" },
+      { kind: "heading", text: "You've been muted in chat" },
       {
         kind: "paragraph",
         text: `Hi ${a.username}, a moderator muted you in global chat. You can still play games and use the rest of the app.`,
@@ -90,7 +90,7 @@ export function muteEmail(a: ModerationArgs): RenderedEmail {
       {
         kind: "details",
         rows: [
-          { label: "Muted for", value: duration ?? "Until a moderator lifts it", tone: "brass" },
+          { label: "Muted for", value: duration ?? "Until a moderator lifts it", tone: "gold" },
           { label: "Moderator", value: a.moderatorUsername },
         ],
       },
@@ -107,7 +107,7 @@ export function unmuteEmail(a: Omit<ModerationArgs, "durationMs">): RenderedEmai
     subject: "You can chat again",
     preheader: "Your chat mute has been lifted.",
     blocks: [
-      { kind: "heading", text: "You can chat", accent: "again" },
+      { kind: "heading", text: "You can chat again" },
       {
         kind: "paragraph",
         text: `Hi ${a.username}, ${a.moderatorUsername} lifted your chat mute. You can post in global chat again.`,
@@ -127,7 +127,7 @@ export function banEmail(a: ModerationArgs): RenderedEmail {
       ? `You can't play for ${duration}. Sign in to see the details or send an appeal.`
       : "You can't play until the ban is lifted. Sign in to see the details or send an appeal.",
     blocks: [
-      { kind: "heading", text: "Your account", accent: "is banned" },
+      { kind: "heading", text: "Your account is banned" },
       {
         kind: "paragraph",
         text: `Hi ${a.username}, a moderator banned your account. You can't play games until the ban ${duration ? "ends" : "is lifted"}.`,
@@ -155,7 +155,7 @@ export function unbanEmail(a: Omit<ModerationArgs, "durationMs">): RenderedEmail
     subject: "Your ban has been lifted",
     preheader: "You can sign in and play again.",
     blocks: [
-      { kind: "heading", text: "Your ban", accent: "is lifted" },
+      { kind: "heading", text: "Your ban is lifted" },
       {
         kind: "paragraph",
         text: `Hi ${a.username}, ${a.moderatorUsername} lifted the ban on your account. You can sign in and play again.`,
@@ -189,11 +189,11 @@ export function relaunchEmail(a: {
     subject: "Generals Online is back",
     preheader: "Season 3 starts fresh. Your old record is saved on your profile.",
     hero: {
-      src: `${SITE_URL}/email/relaunch-hero.jpg`,
-      alt: "Painting of a general raising his fist over an army crossing an open field",
+      src: `${SITE_URL}/email/season-3-title.jpg`,
+      alt: "Season 3 starts now",
     },
     blocks: [
-      { kind: "heading", text: "Generals Online", accent: "is back." },
+      { kind: "heading", text: "Generals Online is back" },
       {
         kind: "paragraph",
         text: `Hi ${a.username}, the servers are back up and Season 3 starts fresh for every player. Your record from before is saved on your profile.`,
@@ -222,7 +222,7 @@ export function testEmail(): RenderedEmail {
     subject: "Test email",
     preheader: "Email sending works.",
     blocks: [
-      { kind: "heading", text: "Email sending", accent: "works" },
+      { kind: "heading", text: "Email sending works" },
       { kind: "paragraph", text: "This test was sent from Convex through Cloudflare Email Sending." },
     ],
     reason: "You got this email because someone ran the email test.",

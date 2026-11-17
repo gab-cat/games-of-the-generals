@@ -105,15 +105,32 @@ export default defineConfig(() => ({
         ],
         screenshots: [
           {
-            src: "/screenshots/wide-1200x630.png",
-            sizes: "1200x630",
-            type: "image/png",
+            src: "/screenshots/wide-game-2880x1800.webp",
+            sizes: "2880x1800",
+            type: "image/webp",
             form_factor: "wide",
+            label: "A game against the AI in progress",
           },
           {
-            src: "/screenshots/mobile-1080x1920.png",
-            sizes: "1080x1920",
-            type: "image/png",
+            src: "/screenshots/wide-opponents-2880x1800.webp",
+            sizes: "2880x1800",
+            type: "image/webp",
+            form_factor: "wide",
+            label: "Picking an AI opponent",
+          },
+          {
+            src: "/screenshots/narrow-game-1170x2532.webp",
+            sizes: "1170x2532",
+            type: "image/webp",
+            form_factor: "narrow",
+            label: "A game against the AI on a phone",
+          },
+          {
+            src: "/screenshots/narrow-opponents-1170x2532.webp",
+            sizes: "1170x2532",
+            type: "image/webp",
+            form_factor: "narrow",
+            label: "Picking an AI opponent on a phone",
           },
         ],
         shortcuts: [

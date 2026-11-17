@@ -179,8 +179,8 @@ export function SubscriptionPage() {
       features: [
         "Everything in Pro",
         "Unlimited private lobbies",
-        "Expert AI",
         "100 saved replays",
+        "5 more avatar frames",
       ],
       primary: false,
     },

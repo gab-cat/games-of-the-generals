@@ -113,6 +113,17 @@ Two loaders, picked by Gab on 2026-11-17 (rejected: a row of face-down pieces fl
 
 Nothing in `<head>` may block the first paint, or the loader shows late (it took 1.1 s on a slow phone when Google Fonts and the app stylesheet blocked it; 0.3 s now). Google Fonts loads with `rel=preload` + `onload`, the app stylesheet is switched on when it loads (`nonBlockingAppCss` in `vite.config.ts`), and `main.tsx` waits for it before rendering React. The loader's first frame must already show the mark, never a fade in from nothing.
 
+## Emails
+
+Every email goes through `convex/emails/layout.ts` and uses the same look as the app (Gab asked on 2026-11-18 to drop the old Playfair "poster" style):
+
+- Poppins with a system sans fallback (Gmail ignores web fonts and shows Roboto or Arial), the Season 3 colours as hex, everything left-aligned in a 600px column.
+- Top: the brand lockup (gold chevron mark `public/email/mark.png` plus "Games of the Generals"), like the app header. Season announcements add the title card under it (`public/email/season-3-title.jpg`, a still of `ChevronClash` with the sticker).
+- Heading: one plain sentence, 32px bold. No second-line accent.
+- Details and stats sit in flat 8px panels; a reason gets the gold left rule from the Season 3 dialog; one gold button per email.
+- Footer: a 1px rule, the small lockup, why they got it.
+- Images must be on www.generalsonline.app before a real send. The admin Emails tab loads `/email/` and `/icons/` from the local origin, so new art previews before it is deployed. To regenerate the title card or mark, screenshot them from HTML at 2x or 4x in headless Chrome.
+
 ## Icons
 
 Lucide, inline at `size-4`, next to text in nav, buttons and list rows. Never
