@@ -14,6 +14,8 @@
 //   Send to all:  npx convex run --prod emailCampaigns:sendRelaunch '{}'
 //   Progress:     npx convex run --prod emailCampaigns:campaignStats '{}'
 //   Pause:        npx convex env set --prod RELAUNCH_PAUSED true (remove it, then run again to resume)
+//   Daily cap:    500 sends per rolling 24 hours; when it is reached the job schedules
+//                 itself for when the oldest send in the window turns 24 hours old.
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -35,6 +37,10 @@ const PAGE_SIZE = 60;
 const CONCURRENCY = 1;
 const GAP_MS = 400;
 const MAX_FAILURES_IN_A_ROW = 15;
+// At most this many sends in any 24 hours, so other mail on the shared Cloudflare
+// account (1,000 a day) still gets through. Override with RELAUNCH_DAILY_CAP.
+const DEFAULT_DAILY_CAP = 500;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/;
 const SIGN_IN_ORDER: SignInMethod[] = ["google", "github", "password"];
@@ -164,6 +170,20 @@ function unsubscribeUrl(token: string): string {
   return `${site}/email/unsubscribe?t=${token}`;
 }
 
+// How many of this campaign's emails went out in the last 24 hours, and when the
+// oldest of them leaves the window.
+export const sentInLastDay = internalQuery({
+  args: { campaign: v.string(), cap: v.number() },
+  handler: async (ctx, { campaign, cap }) => {
+    const since = Date.now() - DAY_MS;
+    const rows = await ctx.db
+      .query("emailCampaignSends")
+      .withIndex("by_campaign_sentAt", (q) => q.eq("campaign", campaign).gt("sentAt", since))
+      .take(cap);
+    return { count: rows.length, oldestSentAt: rows[0]?.sentAt ?? null };
+  },
+});
+
 export const sendRelaunch = internalAction({
   args: {
     dryRun: v.optional(v.boolean()),
@@ -197,10 +217,27 @@ export const sendRelaunch = internalAction({
       add("scanned", page.scanned);
       for (const [why, n] of Object.entries(page.skipped)) add(`skipped: ${why}`, n);
 
-      const recipients = only ? page.recipients.filter((r) => only.includes(r.email)) : page.recipients;
+      let recipients = only ? page.recipients.filter((r) => only.includes(r.email)) : page.recipients;
       if (args.dryRun) {
         add("would send", recipients.length);
       } else {
+        // Daily cap. Test sends to a named address skip it.
+        let capReached = false;
+        if (!only) {
+          const cap = Number(process.env.RELAUNCH_DAILY_CAP) || DEFAULT_DAILY_CAP;
+          const window = await ctx.runQuery(internal.emailCampaigns.sentInLastDay, { campaign, cap });
+          const room = cap - window.count;
+          if (room <= 0) {
+            const resumeAt = (window.oldestSentAt ?? Date.now()) + DAY_MS + 60_000;
+            console.log(`[relaunch] ${cap} sent in the last 24 hours, resuming at ${new Date(resumeAt).toISOString()}`, totals);
+            await ctx.scheduler.runAt(resumeAt, internal.emailCampaigns.sendRelaunch, { cursor, totals });
+            return totals;
+          }
+          if (recipients.length > room) {
+            recipients = recipients.slice(0, room);
+            capReached = true;
+          }
+        }
         const result = await sendBatch(ctx, campaign, recipients);
         for (const [k, n] of Object.entries(result.counts)) add(k, n);
         if (result.stop) {
@@ -217,6 +254,12 @@ export const sendRelaunch = internalAction({
             cursor,
             totals,
           });
+          return totals;
+        }
+        // Part of this page is left; the cap check at the top of the next run waits
+        // out the window. Same cursor, since sent addresses are skipped.
+        if (capReached) {
+          await ctx.scheduler.runAfter(500, internal.emailCampaigns.sendRelaunch, { cursor, totals });
           return totals;
         }
       }

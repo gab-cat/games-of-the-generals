@@ -82,6 +82,7 @@ const applicationTables = {
   })
     .index("by_campaign_email", ["campaign", "email"])
     .index("by_campaign_status", ["campaign", "status"])
+    .index("by_campaign_sentAt", ["campaign", "sentAt"])
     .index("by_token", ["token"]),
 
   // Addresses that unsubscribed from announcements. Account and moderation emails
