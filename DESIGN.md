@@ -96,7 +96,7 @@ The pieces live in `src/components/season/art.tsx`:
 - `Insignia`: the player ranks drawn from Philippine Army insignia. Chevrons for Private and Sergeant, triangles for Lieutenant and Captain, suns for Major and Colonel, stars for General. These stars are rank insignia, not decoration; never use them to mean "special". `toPlayerRank`, `rankFor` and `nextRank` follow the server's thresholds (`convex/profiles.ts`: 3, 5, 10, 20, 30, 50 wins).
 - `CHEVRON` clip paths, `Grain`, `Sticker` (one tilted label per page at most).
 
-The support prompt (`UpgradeDonationCTA`) is an alert dialog on the same supply-line painting, at most once a day, only for free players who have finished a game, and never on top of another dialog. Prices on screen come from `convex/lib/planPricing.ts`, the same quote the server charges.
+The support prompt (`UpgradeDonationCTA`) is an alert dialog on the same supply-line painting, at most once an hour, only for free players who have finished a game, and never on top of another dialog. Prices on screen come from `convex/lib/planPricing.ts`, the same quote the server charges.
 
 The lobby also opens with the tournament invite (`src/pages/lobby/TournamentInvite.tsx`): a gold band in the sticker style, dark ink on gold, with a knockout bracket drawn in. Gab asked for it at the top and attention-grabbing (2026-11-17). It hides for 30 days when dismissed or after a ticket is sent, and stays compact on phones so Quick match is still above the fold.
 

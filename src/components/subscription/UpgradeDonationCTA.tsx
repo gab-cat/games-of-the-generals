@@ -22,9 +22,8 @@ import {
 } from "../../../convex/lib/planPricing";
 
 const STORAGE_KEY = "upgrade-cta-dismissed-until";
-// A dialog in front of the page is louder than the old corner card, so once
-// answered it stays away for a day instead of an hour.
-const SNOOZE_MS = 24 * 60 * 60 * 1000;
+// Once answered, it stays away for an hour.
+const SNOOZE_MS = 60 * 60 * 1000;
 // Let the page settle first so it never lands mid-click.
 const OPEN_DELAY_MS = 2500;
 
@@ -54,7 +53,7 @@ function anotherDialogOpen(): boolean {
 
 /**
  * Asks free players who have finished a game to get Pro or donate. Shown in
- * front of the page once a day at most, on the lobby, vs AI, leaderboard and
+ * front of the page once an hour at most, on the lobby, vs AI, leaderboard and
  * news pages.
  */
 export function UpgradeDonationCTA() {
