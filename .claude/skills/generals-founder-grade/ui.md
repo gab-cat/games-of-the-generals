@@ -28,6 +28,7 @@
 
 ## Motion pieces to reuse
 
+- Centre an animated framer-motion element with framer's own `style={{ x: "-50%" }}`, not Tailwind's `-translate-x-1/2`: any animated transform (`y`, `scale`) replaces the class, which pushed the lobby's "vs" about 28px off the middle.
 - framer-motion is used across the app; `riseIn` / `stagger()` + `fadeUp` from `src/lib/motion.ts` for entrances, `ExpandableCard` in `src/components/ExpandableCard.tsx` for expand and collapse.
 - `useAutoAnimate` in `src/lib/useAutoAnimate.ts` for list insert and remove animations.
 - Toasts are sonner, mounted in `src/routes/__root.tsx`.

@@ -1,7 +1,6 @@
 import { query, mutation, internalMutation, MutationCtx, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
 
@@ -361,15 +360,8 @@ export const createOrUpdateProfile = mutation({
         spiesRevealed: 0,
       });
 
-      // Initialize notification conversation for the user
-      await ctx.runMutation(
-        internal.notifications.ensureNotificationConversation,
-        {
-          userId,
-          username: args.username,
-        },
-      );
-
+      // The "Notifications" conversation is created with the first notification
+      // (notifications.ts), not here: most players never get one.
       return profileId;
     }
   },
@@ -512,124 +504,91 @@ export const updateAvatar = mutation({
 });
 
 // Get profile stats for profile page with highly optimized queries using new indexes
+// Shared by both profile views. Recent games come back as the few fields the
+// profile and leaderboard rows show, not whole game docs (boards, replays).
+async function buildProfileStats(ctx: QueryCtx, profile: Doc<"profiles">) {
+  const userId = profile.userId;
+  const winRate =
+    profile.gamesPlayed > 0 ? Math.round((profile.wins / profile.gamesPlayed) * 100) : 0;
+  const avgGameTime =
+    profile.totalPlayTime && profile.gamesPlayed > 0
+      ? Math.round(profile.totalPlayTime / profile.gamesPlayed)
+      : 0;
+
+  const [asPlayer1, asPlayer2, subscription, customization, pastSeasons] = await Promise.all([
+    ctx.db
+      .query("games")
+      .withIndex("by_player1_finished", (q) => q.eq("player1Id", userId).eq("status", "finished"))
+      .order("desc")
+      .take(5),
+    ctx.db
+      .query("games")
+      .withIndex("by_player2_finished", (q) => q.eq("player2Id", userId).eq("status", "finished"))
+      .order("desc")
+      .take(5),
+    ctx.db.query("subscriptions").withIndex("by_user", (q) => q.eq("userId", userId)).first(),
+    ctx.db.query("userCustomizations").withIndex("by_user", (q) => q.eq("userId", userId)).first(),
+    ctx.db
+      .query("seasonRecords")
+      .withIndex("by_user_season", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(10),
+  ]);
+
+  const recentGames = [...asPlayer1, ...asPlayer2]
+    .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
+    .slice(0, 5)
+    .map((g) => ({
+      _id: g._id,
+      player1Id: g.player1Id,
+      player2Id: g.player2Id,
+      player1Username: g.player1Username,
+      player2Username: g.player2Username,
+      winner: g.winner,
+      finishedAt: g.finishedAt,
+    }));
+
+  const isActive = subscription
+    ? isSubscriptionActive(
+        subscription.status,
+        subscription.expiresAt,
+        subscription.gracePeriodEndsAt || null,
+      )
+    : true;
+
+  return {
+    ...profile,
+    tier: isActive ? subscription?.tier || "free" : "free",
+    usernameColor: customization?.usernameColor,
+    avatarFrame: customization?.avatarFrame,
+    showBadges: customization?.showBadges ?? true,
+    winRate,
+    avgGameTime,
+    recentGames,
+    pastSeasons: pastSeasons.map((r) => ({
+      season: r.season,
+      elo: r.elo,
+      rank: r.rank,
+      wins: r.wins,
+      losses: r.losses,
+      gamesPlayed: r.gamesPlayed,
+      bestWinStreak: r.bestWinStreak,
+      place: r.place,
+    })),
+  };
+}
+
 export const getProfileStats = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-
     const profile = await ctx.db
       .query("profiles")
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
-
     if (!profile) return null;
-
-    // Calculate additional stats
-    const winRate =
-      profile.gamesPlayed > 0
-        ? Math.round((profile.wins / profile.gamesPlayed) * 100)
-        : 0;
-    const avgGameTime =
-      profile.totalPlayTime && profile.gamesPlayed > 0
-        ? Math.round(profile.totalPlayTime / profile.gamesPlayed)
-        : 0;
-
-    // Get recent games using the new optimized indexes for better performance
-    const [recentGamesAsPlayer1, recentGamesAsPlayer2] = await Promise.all([
-      ctx.db
-        .query("games")
-        .withIndex("by_player1_finished", (q) =>
-          q.eq("player1Id", userId).eq("status", "finished"),
-        )
-        .order("desc")
-        .take(3),
-
-      ctx.db
-        .query("games")
-        .withIndex("by_player2_finished", (q) =>
-          q.eq("player2Id", userId).eq("status", "finished"),
-        )
-        .order("desc")
-        .take(3),
-    ]);
-
-    // Combine and sort by finished time, take most recent 5
-    const recentGames = [...recentGamesAsPlayer1, ...recentGamesAsPlayer2]
-      .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
-      .slice(0, 5);
-
-    // Fallback compute for fastestWin if not yet stored (backfill-on-read)
-    // OPTIMIZED: Added limits to prevent excessive document scanning
-    let computedFastestWin = profile.fastestWin;
-    if (!computedFastestWin) {
-      const [allFinishedAsP1, allFinishedAsP2] = await Promise.all([
-        ctx.db
-          .query("games")
-          .withIndex("by_player1_finished", (q) =>
-            q.eq("player1Id", userId).eq("status", "finished"),
-          )
-          .take(500), // Reasonable limit - enough to find fastest win, prevents excessive scanning
-        ctx.db
-          .query("games")
-          .withIndex("by_player2_finished", (q) =>
-            q.eq("player2Id", userId).eq("status", "finished"),
-          )
-          .take(500), // Reasonable limit - enough to find fastest win, prevents excessive scanning
-      ]);
-
-      const wins = [
-        ...allFinishedAsP1.filter((g) => g.winner === "player1"),
-        ...allFinishedAsP2.filter((g) => g.winner === "player2"),
-      ];
-
-      let minDurationMs: number | undefined = undefined;
-      for (const g of wins) {
-        if (!g.finishedAt) continue;
-        const start = g.gameTimeStarted || g.createdAt;
-        const duration = g.finishedAt - start;
-        if (
-          duration > 0 &&
-          (minDurationMs === undefined || duration < minDurationMs)
-        ) {
-          minDurationMs = duration;
-        }
-      }
-
-      computedFastestWin = minDurationMs;
-    }
-
-    // Get subscription and customization data
-    const [subscription, customization] = await Promise.all([
-      ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first(),
-      ctx.db
-        .query("userCustomizations")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first(),
-    ]);
-
-    const isActive = subscription
-      ? isSubscriptionActive(
-          subscription.status,
-          subscription.expiresAt,
-          subscription.gracePeriodEndsAt || null,
-        )
-      : true;
-
-    return {
-      ...profile,
-      tier: isActive ? subscription?.tier || "free" : "free",
-      usernameColor: customization?.usernameColor,
-      avatarFrame: customization?.avatarFrame,
-      showBadges: customization?.showBadges ?? true,
-      winRate,
-      avgGameTime,
-      recentGames,
-      fastestWin: computedFastestWin ?? profile.fastestWin,
-    };
+    return await buildProfileStats(ctx, profile);
   },
 });
 
@@ -640,78 +599,15 @@ export const getProfileStatsByUsername = query({
   },
   handler: async (ctx, args) => {
     if (!args.username) return null;
-
     const profile = await ctx.db
       .query("profiles")
       .withIndex("by_username", (q) => q.eq("username", args.username))
       .unique();
-
     if (!profile) return null;
-
-    // Calculate additional stats
-    const winRate =
-      profile.gamesPlayed > 0
-        ? Math.round((profile.wins / profile.gamesPlayed) * 100)
-        : 0;
-    const avgGameTime =
-      profile.totalPlayTime && profile.gamesPlayed > 0
-        ? Math.round(profile.totalPlayTime / profile.gamesPlayed)
-        : 0;
-
-    // Get recent games using the optimized indexes
-    const [recentGamesAsPlayer1, recentGamesAsPlayer2] = await Promise.all([
-      ctx.db
-        .query("games")
-        .withIndex("by_player1_finished", (q) =>
-          q.eq("player1Id", profile.userId).eq("status", "finished"),
-        )
-        .order("desc")
-        .take(3),
-
-      ctx.db
-        .query("games")
-        .withIndex("by_player2_finished", (q) =>
-          q.eq("player2Id", profile.userId).eq("status", "finished"),
-        )
-        .order("desc")
-        .take(3),
-    ]);
-
-    // Combine and sort by finished time, take most recent 5
-    const recentGames = [...recentGamesAsPlayer1, ...recentGamesAsPlayer2]
-      .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0))
-      .slice(0, 5);
-
-    // Get customization and subscription data
-    const [subscription, customization] = await Promise.all([
-      ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-        .first(),
-      ctx.db
-        .query("userCustomizations")
-        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-        .first(),
-    ]);
-
-    const isActive = subscription
-      ? isSubscriptionActive(
-          subscription.status,
-          subscription.expiresAt,
-          subscription.gracePeriodEndsAt || null,
-        )
-      : true;
-
-    return {
-      ...profile,
-      tier: isActive ? subscription?.tier || "free" : "free",
-      avatarFrame: customization?.avatarFrame,
-      usernameColor: customization?.usernameColor,
-      showBadges: customization?.showBadges ?? true,
-      winRate,
-      avgGameTime,
-      recentGames,
-    };
+    // Another player's donation total and live whereabouts stay private.
+    const { totalDonated: _donated, currentPage: _page, gameId: _game, lobbyId: _lobby, aiSessionId: _ai, ...publicProfile } =
+      await buildProfileStats(ctx, profile);
+    return publicProfile;
   },
 });
 
@@ -749,7 +645,7 @@ export const getLeaderboard = query({
       // Use compound index for gamesPlayed + wins (ties broken by wins)
       queryBuilder = ctx.db
         .query("profiles")
-        .withIndex("by_games_wins", (q) => q.gte("gamesPlayed", 0))
+        .withIndex("by_games_wins", (q) => q.gte("gamesPlayed", 1))
         .order("desc");
     } else if (sortBy === "winRate") {
       // For win rate, we need to sort in memory after fetching
@@ -761,7 +657,7 @@ export const getLeaderboard = query({
       // Sort by wins using the optimized wins index
       queryBuilder = ctx.db
         .query("profiles")
-        .withIndex("by_wins", (q) => q.gte("wins", 0))
+        .withIndex("by_wins", (q) => q.gte("wins", 1)) // Players with a win this season
         .order("desc");
     }
 
@@ -812,8 +708,10 @@ export const getLeaderboard = query({
         : true;
       const tier = isActive ? subscription?.tier || "free" : "free";
 
+      // Leaderboard rows are public: no donation totals or live whereabouts.
+      const { totalDonated: _donated, currentPage: _page, gameId: _game, lobbyId: _lobby, aiSessionId: _ai, ...publicProfile } = profile;
       return {
-        ...profile,
+        ...publicProfile,
         winRate:
           profile.gamesPlayed > 0
             ? Math.round((profile.wins / profile.gamesPlayed) * 100)

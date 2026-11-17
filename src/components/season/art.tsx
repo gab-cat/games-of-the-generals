@@ -45,6 +45,10 @@ export const CROPS = {
   victory: { src: "/art/victory.webp", pos: "60% 45%", scale: 1 }, // game result: win
   defeat: { src: "/art/defeat.webp", pos: "40% 50%", scale: 1 }, // game result: loss
   ceremony: { src: "/art/ceremony.webp", pos: "50% 40%", scale: 1 }, // achievements
+  pricingStandard: { src: "/art/pricing-standard.webp", pos: "50% 20%", scale: 1 }, // pricing: Standard
+  pricingPro: { src: "/art/pricing-pro.webp", pos: "50% 25%", scale: 1 }, // pricing: Pro
+  pricingProPlus: { src: "/art/pricing-proplus.webp", pos: "50% 18%", scale: 1 }, // pricing: Pro+
+  support: { src: "/art/support.webp", pos: "60% 35%", scale: 1 }, // donate band, support dialog
 } as const;
 export type Crop = keyof typeof CROPS;
 

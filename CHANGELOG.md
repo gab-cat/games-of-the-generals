@@ -62,6 +62,14 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 
 ## [Unreleased] - Season 3
 
+### 🏆 A fresh start
+
+- Season 3 starts everyone at a 1500 rating and Private rank, with no wins or losses
+- Your record from before is saved on your profile under "Seasons 1 and 2": final rating, where you placed, rank, wins, losses and best streak
+- The leaderboard shows players with at least one win this season
+- Setups are checked on the server: an army must be the standard 21 pieces, one per square, and can't be changed after you lock it in
+- New global chat messages show up for everyone straight away, including a player's first message
+
 ### 🎨 A cleaner look for Season 3
 
 **Every screen, refreshed**
@@ -79,6 +87,7 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 **Pages with their own look**
 
 - The lobby is a fight card: you on the blue side, your next opponent on the red, and every open lobby is a bout with an empty seat waiting for you
+- Running a tournament? The top of the lobby now has a way to email us or send a ticket, and we'll help you host it here
 - Vs AI: pick Recruit, Veteran or Commander from their portraits
 - Game over is a title card: "Victory" or "Defeat" in your army's colour, with how the game ended
 - The leaderboard puts the top three on a podium and groups everyone else by rank, with a bar showing how far you are from the next one

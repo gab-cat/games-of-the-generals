@@ -7,6 +7,7 @@ import { updateEloRatings, isQuickMatchGame } from "./profiles";
 import { Doc, Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
 import { loadReplay } from "./gameArchive";
+import { encodeSetup } from "./lib/replayCodec";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -232,6 +233,7 @@ export const getGame = query({
     // only for the replay screen. Neither is sent with the live game.
     const {
       initialSetupBoard: _initialSetupBoard,
+      setupCode: _setupCode,
       replay: _replay,
       ...game
     } = stored;
@@ -278,130 +280,6 @@ export const getGame = query({
   },
 });
 
-// BANDWIDTH OPTIMIZED: Static game metadata that rarely changes
-// Use together with getGameState to reduce sync bandwidth by ~40%
-export const getGameMetadata = query({
-  args: {
-    gameId: v.id("games"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    const game = await ctx.db.get("games", args.gameId);
-
-    if (!game) return null;
-
-    // Authorization check
-    if (
-      userId &&
-      ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)
-    ) {
-      return null;
-    }
-
-    // Return only static/rarely-changing fields
-    return {
-      _id: game._id,
-      lobbyId: game.lobbyId,
-      lobbyName: game.lobbyName,
-      player1Id: game.player1Id,
-      player1Username: game.player1Username,
-      player2Id: game.player2Id,
-      player2Username: game.player2Username,
-      spectators: game.spectators,
-      createdAt: game.createdAt,
-      gameMode: game.gameMode,
-      disconnectionGracePeriod: game.disconnectionGracePeriod,
-    };
-  },
-});
-
-// BANDWIDTH OPTIMIZED: Dynamic game state that changes frequently
-// Use together with getGameMetadata to reduce sync bandwidth by ~40%
-export const getGameState = query({
-  args: {
-    gameId: v.id("games"),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    const game = await ctx.db.get("games", args.gameId);
-
-    if (!game) return null;
-
-    // Authorization check
-    if (
-      userId &&
-      ![game.player1Id, game.player2Id, ...game.spectators].includes(userId)
-    ) {
-      return null;
-    }
-
-    // Process board visibility based on player perspective
-    let processedBoard = game.board;
-
-    if (game.status !== "finished") {
-      const isSpectator = userId && game.spectators.includes(userId);
-
-      if (userId && (userId === game.player1Id || userId === game.player2Id)) {
-        const isPlayer1 = userId === game.player1Id;
-        processedBoard = game.board.map((row) =>
-          row.map((cell) => {
-            if (!cell) return null;
-
-            // Show own pieces and revealed pieces
-            if (
-              cell.player === (isPlayer1 ? "player1" : "player2") ||
-              cell.revealed
-            ) {
-              return cell;
-            }
-
-            // Hide opponent's unrevealed pieces
-            return {
-              piece: "Hidden",
-              player: cell.player,
-              revealed: false,
-            };
-          }),
-        );
-      } else if (!isSpectator) {
-        // Non-authenticated or non-participant - hide all pieces
-        processedBoard = game.board.map((row) =>
-          row.map((cell) =>
-            cell
-              ? { piece: "Hidden", player: cell.player, revealed: false }
-              : null,
-          ),
-        );
-      }
-    }
-
-    // Return only dynamic state fields
-    return {
-      status: game.status,
-      board: processedBoard,
-      currentTurn: game.currentTurn,
-      player1Setup: game.player1Setup,
-      player2Setup: game.player2Setup,
-      winner: game.winner,
-      gameEndReason: game.gameEndReason,
-      finishedAt: game.finishedAt,
-      setupTimeStarted: game.setupTimeStarted,
-      gameTimeStarted: game.gameTimeStarted,
-      lastMoveTime: game.lastMoveTime,
-      lastMoveFrom: game.lastMoveFrom,
-      lastMoveTo: game.lastMoveTo,
-      player1TimeUsed: game.player1TimeUsed,
-      player2TimeUsed: game.player2TimeUsed,
-      player1ResultAcknowledged: game.player1ResultAcknowledged,
-      player2ResultAcknowledged: game.player2ResultAcknowledged,
-      player1DisconnectedAt: game.player1DisconnectedAt,
-      player2DisconnectedAt: game.player2DisconnectedAt,
-      moveCount: game.moveCount,
-      eliminatedPieces: game.eliminatedPieces,
-    };
-  },
-});
-
 // Setup pieces on board
 
 export const setupPieces = mutation({
@@ -433,17 +311,36 @@ export const setupPieces = mutation({
       throw new Error("Not a player in this game");
     }
 
-    // Validate piece setup
+    if (isPlayer1 ? game.player1Setup : game.player2Setup) {
+      throw new Error("Your setup is already locked in");
+    }
+
+    // The army must be exactly the 21 standard pieces, one per square.
     if (args.pieces.length !== INITIAL_PIECES.length) {
       throw new Error("Invalid number of pieces");
+    }
+    const expected = [...INITIAL_PIECES].sort().join(",");
+    const submitted = args.pieces.map((p) => p.piece).sort().join(",");
+    if (submitted !== expected) {
+      throw new Error("Your setup doesn't match the standard pieces");
     }
 
     // Check if pieces are in correct area
     const validRows = isPlayer1 ? [5, 6, 7] : [0, 1, 2];
+    const squares = new Set<string>();
     for (const piece of args.pieces) {
-      if (!validRows.includes(piece.row) || piece.col < 0 || piece.col > 8) {
+      if (
+        !Number.isInteger(piece.col) ||
+        !validRows.includes(piece.row) ||
+        piece.col < 0 ||
+        piece.col > 8
+      ) {
         throw new Error("Pieces must be placed in your area");
       }
+      squares.add(`${piece.row},${piece.col}`);
+    }
+    if (squares.size !== args.pieces.length) {
+      throw new Error("Two pieces can't share a square");
     }
 
     // Update board with pieces
@@ -471,10 +368,8 @@ export const setupPieces = mutation({
     if ((isPlayer1 && game.player2Setup) || (isPlayer2 && game.player1Setup)) {
       updates.status = "playing";
       updates.gameTimeStarted = Date.now();
-      // Save the initial setup board for replay purposes
-      updates.initialSetupBoard = newBoard.map((row) =>
-        row.map((cell) => (cell ? { ...cell, revealed: false } : null)),
-      );
+      // Save the starting setup for the replay, packed (about 150 bytes)
+      updates.setupCode = encodeSetup(newBoard);
     }
 
     await ctx.db.patch(args.gameId, updates);
@@ -1650,79 +1545,63 @@ async function findActiveGame(ctx: QueryCtx, userId: Id<"users">) {
   return games.find((game) => game !== null) ?? null;
 }
 
+// A game this player finished in the last 5 minutes and hasn't dismissed the
+// result of. Reads only this player's own games, so other players finishing
+// games doesn't re-run the lobby's subscriptions.
+async function findUnacknowledgedResult(ctx: QueryCtx, userId: Id<"users">) {
+  const since = Date.now() - 5 * 60 * 1000;
+  const [asPlayer1, asPlayer2] = await Promise.all([
+    ctx.db
+      .query("games")
+      .withIndex("by_player1_finished", (q) =>
+        q.eq("player1Id", userId).eq("status", "finished").gte("finishedAt", since),
+      )
+      .order("desc")
+      .take(5),
+    ctx.db
+      .query("games")
+      .withIndex("by_player2_finished", (q) =>
+        q.eq("player2Id", userId).eq("status", "finished").gte("finishedAt", since),
+      )
+      .order("desc")
+      .take(5),
+  ]);
+  return (
+    [
+      ...asPlayer1.filter((g) => g.player1ResultAcknowledged !== true),
+      ...asPlayer2.filter((g) => g.player2ResultAcknowledged !== true),
+    ].sort((x, y) => (y.finishedAt ?? 0) - (x.finishedAt ?? 0))[0] ?? null
+  );
+}
+
+// The lobby only needs to know which game to send the player to. The full doc
+// holds the board with the opponent's hidden pieces, so it never leaves here.
 export const getCurrentUserGame = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-
-    const activeGame = await findActiveGame(ctx, userId);
-    if (activeGame) return activeGame;
-
-    // If no active game, check for recently finished games that need acknowledgment
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-    // Optimized: Single query with filter for both players
-    const finishedGames = await ctx.db
-      .query("games")
-      .withIndex("by_status_finished", (q) =>
-        q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo),
-      )
-      .filter((q) =>
-        q.or(
-          q.and(
-            q.eq(q.field("player1Id"), userId),
-            q.neq(q.field("player1ResultAcknowledged"), true),
-          ),
-          q.and(
-            q.eq(q.field("player2Id"), userId),
-            q.neq(q.field("player2ResultAcknowledged"), true),
-          ),
-        ),
-      )
-      .order("desc")
-      .first();
-
-    return finishedGames;
+    const game = (await findActiveGame(ctx, userId)) ?? (await findUnacknowledgedResult(ctx, userId));
+    if (!game) return null;
+    return {
+      _id: game._id,
+      status: game.status,
+      player1Id: game.player1Id,
+      player2Id: game.player2Id,
+      player1Username: game.player1Username,
+      player2Username: game.player2Username,
+    };
   },
 });
 
-// BANDWIDTH OPTIMIZED: Lightweight query that returns only game ID
-// Use this on lobby pages instead of getCurrentUserGame to reduce sync bandwidth by ~80%
 export const getCurrentUserGameId = query({
   args: {},
   returns: v.union(v.id("games"), v.null()),
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-
-    const activeGame = await findActiveGame(ctx, userId);
-    if (activeGame) return activeGame._id;
-
-    // Check for recently finished games needing acknowledgment
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-
-    const finishedGame = await ctx.db
-      .query("games")
-      .withIndex("by_status_finished", (q) =>
-        q.eq("status", "finished").gte("finishedAt", fiveMinutesAgo),
-      )
-      .filter((q) =>
-        q.or(
-          q.and(
-            q.eq(q.field("player1Id"), userId),
-            q.neq(q.field("player1ResultAcknowledged"), true),
-          ),
-          q.and(
-            q.eq(q.field("player2Id"), userId),
-            q.neq(q.field("player2ResultAcknowledged"), true),
-          ),
-        ),
-      )
-      .order("desc")
-      .first();
-
-    return finishedGame?._id ?? null;
+    const game = (await findActiveGame(ctx, userId)) ?? (await findUnacknowledgedResult(ctx, userId));
+    return game?._id ?? null;
   },
 });
 

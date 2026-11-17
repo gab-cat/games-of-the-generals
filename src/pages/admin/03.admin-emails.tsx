@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useAction } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Check, Loader2, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const GROUPS: EmailGroup[] = [
   "Announcements",
@@ -72,7 +73,7 @@ export function AdminEmailsPage() {
       <div className="text-foreground">
         <PageHeader
           title="Emails"
-          description="Preview every email the app sends and send yourself a test."
+          description="Preview every email the app sends and send a test to any inbox."
         />
 
         <div className="grid gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
@@ -133,7 +134,7 @@ export function AdminEmailsPage() {
                   { value: "text", label: "Plain text" },
                 ]}
               />
-              <SendTestButton entry={selected} />
+              <SendTestForm entry={selected} />
             </div>
 
             <div className="overflow-x-auto bg-background px-0 py-4 sm:p-6 rounded-b-lg">
@@ -287,8 +288,15 @@ function Segmented<T extends string>({
   );
 }
 
-function SendTestButton({ entry }: { entry: CatalogEntry }) {
-  const sendPreview = useAction(api.emailPreview.sendPreviewToMe);
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Sends the selected email for real through Cloudflare. Empty field = your own address.
+function SendTestForm({ entry }: { entry: CatalogEntry }) {
+  const sendTest = useAction(api.emailPreview.sendTestEmail);
+  const recipient = useQuery(api.emailPreview.getTestRecipient);
+  const ownEmail = recipient?.email ?? null;
+
+  const [to, setTo] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent">("idle");
   const resetTimer = useRef<number | undefined>(undefined);
 
@@ -297,48 +305,86 @@ function SendTestButton({ entry }: { entry: CatalogEntry }) {
     return () => window.clearTimeout(resetTimer.current);
   }, [entry.id]);
 
-  const send = useCallback(async () => {
-    setState("sending");
-    try {
-      const { sentTo } = await sendPreview({ emailId: entry.id });
-      setState("sent");
-      toast.success(`Test sent to ${sentTo}`);
-      resetTimer.current = window.setTimeout(() => setState("idle"), 2500);
-    } catch (error) {
-      setState("idle");
-      const message =
-        error instanceof Error
-          ? error.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0]
-          : "";
-      toast.error(
-        message
-          ? `Couldn't send the test: ${message}`
-          : "Couldn't send the test",
-      );
-    }
-  }, [entry.id, sendPreview]);
+  const trimmed = to.trim();
+  const invalid = trimmed !== "" && !EMAIL.test(trimmed);
+  const target = trimmed || ownEmail;
+
+  const send = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      if (invalid) {
+        toast.error(`${trimmed} isn't a valid email address`);
+        return;
+      }
+      if (!target) {
+        toast.error("Type an email address to send the test to");
+        return;
+      }
+      setState("sending");
+      try {
+        const { sentTo } = await sendTest({
+          emailId: entry.id,
+          to: trimmed || undefined,
+        });
+        setState("sent");
+        toast.success(`Test sent to ${sentTo}`);
+        resetTimer.current = window.setTimeout(() => setState("idle"), 2500);
+      } catch (error) {
+        setState("idle");
+        const message =
+          error instanceof Error
+            ? error.message.replace(/^.*Uncaught Error: /s, "").split("\n")[0]
+            : "";
+        toast.error(
+          message
+            ? `Couldn't send the test: ${message}`
+            : "Couldn't send the test",
+        );
+      }
+    },
+    [entry.id, invalid, sendTest, target, trimmed],
+  );
 
   return (
-    <Button
-      type="button"
-      onClick={() => void send()}
-      disabled={state === "sending"}
-      variant={state === "sent" ? "secondary" : "default"}
-      className="w-full sm:ml-auto sm:w-auto"
+    <form
+      onSubmit={(e) => void send(e)}
+      className="flex w-full flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row"
     >
-      {state === "sending" ? (
-        <Loader2 className="size-4 animate-spin" />
-      ) : state === "sent" ? (
-        <Check className="size-4 text-emerald-400" />
-      ) : (
-        <Send className="size-4" />
-      )}
-      {state === "sending"
-        ? "Sending"
-        : state === "sent"
-          ? "Sent"
-          : "Send test to me"}
-    </Button>
+      <label htmlFor="test-recipient" className="sr-only">
+        Send the test to
+      </label>
+      <Input
+        id="test-recipient"
+        type="email"
+        inputMode="email"
+        autoComplete="off"
+        spellCheck={false}
+        value={to}
+        onChange={(e) => {
+          setTo(e.target.value);
+          if (state === "sent") setState("idle");
+        }}
+        placeholder={ownEmail ?? "name@example.com"}
+        aria-invalid={invalid || undefined}
+        disabled={state === "sending"}
+        className="sm:w-64"
+      />
+      <Button
+        type="submit"
+        disabled={state === "sending"}
+        variant={state === "sent" ? "secondary" : "default"}
+        className="shrink-0"
+      >
+        {state === "sending" ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : state === "sent" ? (
+          <Check className="size-4 text-emerald-400" />
+        ) : (
+          <Send className="size-4" />
+        )}
+        {state === "sending" ? "Sending" : state === "sent" ? "Sent" : "Send test"}
+      </Button>
+    </form>
   );
 }
 

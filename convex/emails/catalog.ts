@@ -1,4 +1,4 @@
-// Every email with sample data, for the admin preview tab and "Send test to me".
+// Every email with sample data, for the admin preview tab and "Send test".
 import type { RenderedEmail } from "./layout";
 import * as t from "./templates";
 

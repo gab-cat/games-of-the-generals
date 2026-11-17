@@ -77,7 +77,7 @@ All in `src/components/ui/`.
 
 ## Signature pages
 
-Most screens stay quiet. Seven get one loud moment at the top, built from the season art, so the app feels like a game and not a settings page. Gab asked for this on 2026-11-17 ("some pages just need to be awesome").
+Most screens stay quiet. Eight get one loud moment at the top, built from the season art, so the app feels like a game and not a settings page. Gab asked for this on 2026-11-17 ("some pages just need to be awesome").
 
 | Page | The moment |
 |---|---|
@@ -88,12 +88,17 @@ Most screens stay quiet. Seven get one loud moment at the top, built from the se
 | Profile | Avatar in a blue chevron, name at poster size, the road through all seven ranks. |
 | News | Front page: "News" nameplate, lead story with art, older posts in ruled columns. |
 | Achievements | Ribbons on a rack; locked ones show their stripes at 40% and fill with progress. |
+| Pricing | Three painted posters (private, captain, general) with the price at poster size; a 1/3/6/12-month picker rolls every price. Donate is a wide band on the supply-line painting. |
 
 The pieces live in `src/components/season/art.tsx`:
 
 - `Painting` (full colour, faded toward one edge for type) and `Duotone` (grayscale with an army colour multiplied over, like the key art). Pick the crop from `CROPS`; each page has its own painting in `/public/art` so the same picture isn't everywhere. They were generated with the Antigravity CLI from the Season 3 painting, about 1 MB in total.
 - `Insignia`: the player ranks drawn from Philippine Army insignia. Chevrons for Private and Sergeant, triangles for Lieutenant and Captain, suns for Major and Colonel, stars for General. These stars are rank insignia, not decoration; never use them to mean "special". `toPlayerRank`, `rankFor` and `nextRank` follow the server's thresholds (`convex/profiles.ts`: 3, 5, 10, 20, 30, 50 wins).
 - `CHEVRON` clip paths, `Grain`, `Sticker` (one tilted label per page at most).
+
+The support prompt (`UpgradeDonationCTA`) is an alert dialog on the same supply-line painting, at most once a day, only for free players who have finished a game, and never on top of another dialog. Prices on screen come from `convex/lib/planPricing.ts`, the same quote the server charges.
+
+The lobby also opens with the tournament invite (`src/pages/lobby/TournamentInvite.tsx`): a gold band in the sticker style, dark ink on gold, with a knockout bracket drawn in. Gab asked for it at the top and attention-grabbing (2026-11-17). It hides for 30 days when dismissed or after a ticket is sent, and stays compact on phones so Quick match is still above the fold.
 
 Rules for these pages: one signature moment per page, then the normal quiet layout. The main action stays the most obvious thing. Type on a painting sits on its faded edge. Big names truncate. Everything still works at 390px.
 

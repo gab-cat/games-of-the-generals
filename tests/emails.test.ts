@@ -75,7 +75,8 @@ describe("copy follows the facts", () => {
       signInMethod: "password",
     });
     expect(email.text).toContain("Hi Rizal,");
-    expect(email.text).toContain("Your rank: Captain");
+    expect(email.text).toContain("Final rank: Captain");
+    expect(email.text).toContain("Season 3 starts fresh");
     expect(email.text).toContain("Games: 1,203");
     expect(email.text).toContain("Forgot password?");
   });

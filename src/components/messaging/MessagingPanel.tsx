@@ -392,6 +392,8 @@ export function MessagingPanel({
       api.messages.getConversations,
       {},
       {
+        // Live only while the panel is open; the header badge uses getUnreadCount.
+        enabled: isOpen,
         staleTime: 30000, // 30 seconds - conversations need moderate freshness
         gcTime: 300000, // 5 minutes cache
       },
@@ -413,7 +415,7 @@ export function MessagingPanel({
 
   const { data: existingSubs } = useConvexQuery(
     api.push.getSubscriptionsForCurrentUser,
-    isAuthenticated ? {} : "skip",
+    isAuthenticated && isOpen ? {} : "skip",
   );
 
   const { data: currentProfile } = useConvexQuery(

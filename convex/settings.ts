@@ -321,11 +321,15 @@ export const convertAnonymousAccount = action({
     }
 
     try {
-      // Create a password account for the existing anonymous user
+      // Link a password account to the existing anonymous user, then store the
+      // password through Convex Auth so it is hashed the way sign-in expects.
       await ctx.runMutation(internal.settings.createPasswordAccountForExistingUser, {
         userId,
         email: args.email,
-        password: args.password,
+      });
+      await modifyAccountCredentials(ctx, {
+        provider: "password",
+        account: { id: args.email, secret: args.password },
       });
 
       // Update user record to remove anonymous status and add email
@@ -347,25 +351,28 @@ export const convertAnonymousAccount = action({
   },
 });
 
-// Helper internal mutation to create password account for existing user
+// Helper internal mutation to link a password account to an existing user.
+// The secret is set afterwards with modifyAccountCredentials, which hashes it.
 export const createPasswordAccountForExistingUser = internalMutation({
-  args: { 
+  args: {
     userId: v.id("users"),
     email: v.string(),
-    password: v.string(),
   },
   handler: async (ctx, args) => {
-    // Create the auth account record directly
-    // We need to hash the password the same way the Password provider does
-    // For now, let's use a basic hash (this should match the provider's hashing)
-    const hashedPassword = args.password; // The Password provider will handle hashing
-    
-    // Create the auth account linked to the existing user
+    const existing = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", "password").eq("providerAccountId", args.email),
+      )
+      .unique();
+    if (existing) {
+      throw new Error("This email is already associated with another account");
+    }
+
     await ctx.db.insert("authAccounts", {
       userId: args.userId,
       provider: "password",
       providerAccountId: args.email,
-      secret: hashedPassword,
     });
   },
 });

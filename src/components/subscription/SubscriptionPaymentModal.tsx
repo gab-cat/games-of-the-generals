@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,12 @@ import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 import { AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatLongDate, formatPeso } from "./plan-copy";
+import { formatLongDate } from "./plan-copy";
+import {
+  formatCentavos,
+  PLAN_TERMS,
+  quotePlan,
+} from "../../../convex/lib/planPricing";
 
 interface SubscriptionPaymentModalProps {
   open: boolean;
@@ -23,14 +28,9 @@ interface SubscriptionPaymentModalProps {
   mode: "extend" | "upgrade";
   tier?: "pro" | "pro_plus"; // Required for upgrade mode
   onSuccess?: () => void;
+  /** The term to start on, e.g. the one picked on the pricing page. */
+  initialMonths?: number;
 }
-
-const DURATIONS: { months: number; discount: number }[] = [
-  { months: 1, discount: 0 },
-  { months: 3, discount: 15 },
-  { months: 6, discount: 20 },
-  { months: 12, discount: 25 },
-];
 
 export function SubscriptionPaymentModal({
   open,
@@ -38,8 +38,13 @@ export function SubscriptionPaymentModal({
   mode,
   tier: propTier,
   onSuccess,
+  initialMonths = 1,
 }: SubscriptionPaymentModalProps) {
-  const [selectedMonths, setSelectedMonths] = useState(1);
+  const [selectedMonths, setSelectedMonths] = useState(initialMonths);
+  // Each time it opens, start from the term the page passed in.
+  useEffect(() => {
+    if (open) setSelectedMonths(initialMonths);
+  }, [open, initialMonths]);
   const { data: subscription } = useConvexQuery(
     api.subscriptions.getCurrentSubscription,
     {},
@@ -80,39 +85,7 @@ export function SubscriptionPaymentModal({
     }
   };
 
-  // Calculate discounted price with new progressive discount structure
-  // 3 months: 15% discount (pay 2.55 months)
-  // 6 months: 20% discount (pay 4.8 months)
-  // 12 months: 25% discount (pay 9 months)
-  const calculatePrice = () => {
-    const basePrice = tierValue === "pro" ? 99 : 199;
-    const originalPrice = basePrice * selectedMonths;
-
-    let monthsToPay = selectedMonths;
-    if (selectedMonths === 12)
-      monthsToPay = 9; // 25% discount
-    else if (selectedMonths === 6)
-      monthsToPay = 4.8; // 20% discount
-    else if (selectedMonths === 3) monthsToPay = 2.55; // 15% discount
-
-    const discountedPrice = Math.round(basePrice * monthsToPay);
-    const savings = originalPrice - discountedPrice;
-    const discountPercent =
-      selectedMonths > 1 &&
-      (selectedMonths === 12 || selectedMonths === 6 || selectedMonths === 3)
-        ? (savings / originalPrice) * 100
-        : 0;
-
-    return {
-      originalPrice,
-      discountedPrice,
-      savings,
-      discountPercent,
-      hasDiscount: discountPercent > 0,
-    };
-  };
-
-  const priceInfo = calculatePrice();
+  const priceInfo = quotePlan(tierValue, selectedMonths);
 
   const handleSuccess = () => {
     onSuccess?.();
@@ -145,7 +118,7 @@ export function SubscriptionPaymentModal({
               className="grid grid-cols-2 gap-2 sm:grid-cols-4"
               role="radiogroup"
             >
-              {DURATIONS.map(({ months, discount }) => {
+              {PLAN_TERMS.map(({ months, discountPercent: discount }) => {
                 const isSelected = selectedMonths === months;
                 return (
                   <button
@@ -184,16 +157,16 @@ export function SubscriptionPaymentModal({
                 {selectedMonths === 1 ? "month" : "months"}
               </dt>
               <dd className="text-lg font-semibold tabular-nums text-foreground">
-                {formatPeso(priceInfo.discountedPrice)}
+                {formatCentavos(priceInfo.totalCentavos)}
               </dd>
             </div>
-            {priceInfo.hasDiscount && (
+            {priceInfo.discountPercent > 0 && (
               <div className="flex items-baseline justify-between gap-4 text-xs">
                 <dt className="text-foreground/80">You save</dt>
                 <dd className="tabular-nums text-emerald-400">
-                  {formatPeso(priceInfo.savings)}
+                  {formatCentavos(priceInfo.savingsCentavos)}
                   <span className="ml-2 text-foreground/60 line-through">
-                    {formatPeso(priceInfo.originalPrice)}
+                    {formatCentavos(priceInfo.originalCentavos)}
                   </span>
                 </dd>
               </div>

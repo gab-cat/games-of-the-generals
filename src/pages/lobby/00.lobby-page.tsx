@@ -10,6 +10,7 @@ import { SpectateTab } from "./04.spectate-tab";
 import type { LobbyTab } from "./02.lobby-tabs";
 import { useQuery } from "convex-helpers/react/cache";
 import { UpgradeDonationCTA } from "../../components/subscription/UpgradeDonationCTA";
+import { TournamentInvite } from "./TournamentInvite";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -85,6 +86,7 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
     <>
       <div className="space-y-6 pb-4 sm:space-y-8">
         <h1 className="sr-only">Lobbies</h1>
+        <TournamentInvite />
         <LobbyListTab
           profile={profile}
           activeTab={activeTab}

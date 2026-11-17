@@ -10,12 +10,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { api } from "./_generated/api";
-
-// Subscription tier pricing (in centavos)
-const TIER_PRICING = {
-  pro: 9900, // ₱99.00
-  pro_plus: 19900, // ₱199.00
-} as const;
+import { PLAN_TERMS, quotePlan } from "./lib/planPricing";
 
 // Helper function to calculate expiry date
 // When upgrading tiers: start from now (don't carry over remaining time from old tier)
@@ -51,44 +46,6 @@ function getDaysUntilExpiry(expiresAt: number): number {
   return Math.floor(diff / (1000 * 60 * 60 * 24));
 }
 
-// Helper function to calculate discounted price
-// Progressive discounts: 3 months = 15%, 6 months = 20%, 12 months = 25%
-// 3 months: pay 2.55 months, 6 months: pay 4.8 months, 12 months: pay 9 months
-function calculateDiscountedPrice(
-  tier: "pro" | "pro_plus",
-  months: number,
-): {
-  originalPrice: number; // in centavos
-  discountedPrice: number; // in centavos
-  savings: number; // in centavos
-  discountPercent: number;
-  monthsToPay: number;
-} {
-  const basePrice = TIER_PRICING[tier]; // in centavos
-  const originalPrice = basePrice * months;
-
-  let monthsToPay = months;
-  if (months === 12)
-    monthsToPay = 9; // 25% discount
-  else if (months === 6)
-    monthsToPay = 4.8; // 20% discount
-  else if (months === 3) monthsToPay = 2.55; // 15% discount
-
-  const discountedPrice = Math.round(basePrice * monthsToPay);
-  const savings = originalPrice - discountedPrice;
-  const discountPercent =
-    months > 1 && (months === 12 || months === 6 || months === 3)
-      ? (savings / originalPrice) * 100
-      : 0;
-
-  return {
-    originalPrice,
-    discountedPrice,
-    savings,
-    discountPercent,
-    monthsToPay,
-  };
-}
 
 // Get current user's subscription
 export const getCurrentSubscription = query({
@@ -594,10 +551,11 @@ export const createPayMongoPayment = action({
     if (!userId) throw new Error("Not authenticated");
 
     const months = args.months || 1;
-    const { discountedPrice: amount } = calculateDiscountedPrice(
-      args.tier,
-      months,
-    ); // Amount in centavos (with discount applied)
+    if (!PLAN_TERMS.some((term) => term.months === months)) {
+      throw new Error("Pick 1, 3, 6 or 12 months.");
+    }
+    // Centavos, with the term discount. The pricing page shows the same quote.
+    const amount = quotePlan(args.tier, months).totalCentavos;
 
     // Get current subscription to calculate new expiry
     const subscription = await ctx.runQuery(

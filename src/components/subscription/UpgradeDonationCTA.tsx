@@ -1,148 +1,201 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useConvexQuery } from "@/lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
-import { Button } from "@/components/ui/button";
-import { X } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { buttonVariants } from "@/components/ui/button";
+import { Painting } from "@/components/season/art";
+import { cn } from "@/lib/utils";
+import { DonationPaymentModal } from "./DonationPaymentModal";
+import {
+  formatCentavos,
+  quotePlan,
+} from "../../../convex/lib/planPricing";
 
+const STORAGE_KEY = "upgrade-cta-dismissed-until";
+// A dialog in front of the page is louder than the old corner card, so once
+// answered it stays away for a day instead of an hour.
+const SNOOZE_MS = 24 * 60 * 60 * 1000;
+// Let the page settle first so it never lands mid-click.
+const OPEN_DELAY_MS = 2500;
+
+function isSnoozed(): boolean {
+  try {
+    const until = Number(localStorage.getItem(STORAGE_KEY));
+    // The Season 3 welcome comes first; this waits for the next visit.
+    const seasonSeen = localStorage.getItem("season3_acknowledged") === "true";
+    return !seasonSeen || (Number.isFinite(until) && Date.now() < until);
+  } catch {
+    return true; // Storage blocked: don't nag on every page.
+  }
+}
+
+function snooze() {
+  try {
+    localStorage.setItem(STORAGE_KEY, String(Date.now() + SNOOZE_MS));
+  } catch {
+    // Private mode: it comes back on the next visit.
+  }
+}
+
+/** Another dialog already open (season news, tutorial, a payment)? */
+function anotherDialogOpen(): boolean {
+  return !!document.querySelector('[role="dialog"], [role="alertdialog"]');
+}
+
+/**
+ * Asks free players who have finished a game to get Pro or donate. Shown in
+ * front of the page once a day at most, on the lobby, vs AI, leaderboard and
+ * news pages.
+ */
 export function UpgradeDonationCTA() {
-  const [isDismissed, setIsDismissed] = useState(true); // Start dismissed to avoid flash while checking localStorage
   const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [donateOpen, setDonateOpen] = useState(false);
 
-  const STORAGE_KEY = "upgrade-cta-dismissed-until";
-  const DISMISS_DURATION = 60 * 60 * 1000; // 1 hour in ms
-
-  useEffect(() => {
-    const checkDismissal = () => {
-      const dismissedUntil = localStorage.getItem(STORAGE_KEY);
-      if (dismissedUntil) {
-        const expiry = parseInt(dismissedUntil, 10);
-        if (Date.now() < expiry) {
-          setIsDismissed(true);
-
-          // Set a timer to show it again exactly when it expires
-          const remaining = expiry - Date.now();
-          const timer = setTimeout(() => {
-            setIsDismissed(false);
-          }, remaining);
-
-          return () => clearTimeout(timer);
-        }
-      }
-      setIsDismissed(false);
-    };
-
-    checkDismissal();
-  }, []);
-
-  // Check subscription status
   const { data: subscription } = useConvexQuery(
     api.subscriptions.getCurrentSubscription,
     {},
   );
-
-  // Check donor status via profile
   const { data: profile } = useConvexQuery(api.profiles.getCurrentProfile, {});
-
-  // Guests get the "keep this account" prompt instead of this card.
+  // Guests get the "keep this account" prompt instead.
   const { data: userSettings } = useConvexQuery(api.settings.getUserSettings);
 
-  // Wait for data before determining eligibility to prevent flashing
-  const isLoading =
-    subscription === undefined ||
-    profile === undefined ||
-    userSettings === undefined;
+  const isLoaded =
+    subscription !== undefined &&
+    profile !== undefined &&
+    userSettings !== undefined;
+  const isEligible =
+    isLoaded &&
+    (subscription?.tier ?? "free") === "free" &&
+    !profile?.isDonor &&
+    userSettings?.isAnonymous !== true &&
+    // "Enjoying the game?" only makes sense after playing one.
+    (profile?.gamesPlayed ?? 0) >= 1;
 
-  // Determine persistent eligibility (should this ever be shown to this user?)
-  const tier = subscription?.tier || "free";
-  const isDonor = profile?.isDonor || false;
-  const isAnonymous = userSettings?.isAnonymous === true;
-  const isEligible = !isLoading && tier === "free" && !isDonor && !isAnonymous;
+  useEffect(() => {
+    if (!isEligible || isSnoozed()) return;
+    const timer = setTimeout(() => {
+      if (isSnoozed() || anotherDialogOpen()) return;
+      setOpen(true);
+    }, OPEN_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [isEligible]);
 
-  // Don't render if user is definitely not eligible (pro/donator)
-  // We keep it mounted if still loading OR if eligible, so AnimatePresence can handle the transition
-  if (!isLoading && !isEligible) {
-    return null;
-  }
-
-  const handleUpgrade = () => {
-    void navigate({
-      to: "/pricing",
-      search: { donation: undefined },
-    });
-  };
-
-  const handleDonate = () => {
-    void navigate({
-      to: "/pricing",
-      search: { donation: undefined },
-      hash: "donate",
-    });
-  };
-
-  const handleDismiss = () => {
-    const expiry = Date.now() + DISMISS_DURATION;
-    try {
-      localStorage.setItem(STORAGE_KEY, expiry.toString());
-    } catch {
-      // Private mode: it just comes back on the next visit.
-    }
-    setIsDismissed(true);
+  const handleOpenChange = (next: boolean) => {
+    // Esc, "Not now" and both actions all count as an answer.
+    if (!next) snooze();
+    setOpen(next);
   };
 
   return (
-    <AnimatePresence>
-      {isEligible && !isDismissed && (
-        <motion.aside
-          aria-label="Support the game"
-          initial={{ y: 12, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          exit={{ y: 12, opacity: 0 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          // Phones: sits above the bottom tab bar (h-16 plus the safe area).
-          // Desktop: bottom left, clear of the Global chat button on the right.
-          className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom)+0.75rem)] left-3 right-3 z-30 lg:bottom-6 lg:left-6 lg:right-auto lg:w-[22rem]"
-        >
-          <div className="relative rounded-lg border border-border-strong bg-card p-4 pr-12">
-            <button
-              type="button"
-              onClick={handleDismiss}
-              className="absolute right-1.5 top-1.5 inline-flex h-10 w-10 items-center justify-center rounded-md text-foreground/70 transition-colors hover:bg-white/[0.06] hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
-              aria-label="Dismiss for an hour"
-            >
-              <X className="size-4" />
-            </button>
+    <>
+      <SupportDialogView
+        open={open}
+        onOpenChange={handleOpenChange}
+        onSeePlans={() =>
+          void navigate({ to: "/pricing", search: { donation: undefined } })
+        }
+        onDonate={() => setDonateOpen(true)}
+      />
+      <DonationPaymentModal open={donateOpen} onOpenChange={setDonateOpen} />
+    </>
+  );
+}
 
-            <h3 className="font-display text-base font-semibold text-foreground">
-              Enjoying the game?
-            </h3>
-            <p className="mt-1 text-sm text-foreground/80">
-              Pro adds stronger AI and more saved replays. Donations pay for the
-              servers.
-            </p>
-            <div className="mt-3 flex gap-2">
-              <Button
-                onClick={handleUpgrade}
-                size="sm"
-                className="flex-1 sm:flex-none"
-              >
-                See plans
-              </Button>
-              <Button
-                onClick={handleDonate}
-                size="sm"
-                variant="secondary"
-                className="flex-1 sm:flex-none"
-              >
-                Donate
-              </Button>
-            </div>
+/** The dialog itself, without the rules for when it shows. */
+export function SupportDialogView({
+  open,
+  onOpenChange,
+  onSeePlans,
+  onDonate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSeePlans: () => void;
+  onDonate: () => void;
+}) {
+  const proFrom = formatCentavos(
+    Math.round(quotePlan("pro", 12).perMonthCentavos / 100) * 100,
+  );
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent
+        className="max-w-md gap-0 overflow-hidden border-white/10 p-0 focus-visible:outline-none"
+        // Focus the dialog, not "Not now": it opened on its own, so a ring on
+        // a button before anyone touched the keyboard reads as a glitch.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement | null)?.focus();
+        }}
+      >
+        <Painting crop="support" fade="bottom" className="h-44 sm:h-52">
+          <AlertDialogTitle className="absolute inset-x-0 bottom-0 p-5 text-3xl font-bold leading-none tracking-[-0.03em] text-white sm:p-6 sm:text-4xl">
+            Enjoying the game?
+          </AlertDialogTitle>
+        </Painting>
+
+        <div className="space-y-4 p-5 pt-3 sm:p-6 sm:pt-3">
+          <AlertDialogDescription className="text-sm text-foreground sm:text-base">
+            Pro and donations pay for the servers that keep the game free.
+          </AlertDialogDescription>
+
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            <li className="flex items-baseline justify-between gap-4 p-3 sm:p-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Pro</p>
+                <p className="mt-0.5 text-sm text-foreground/80">
+                  Stronger AI and 50 saved replays.
+                </p>
+              </div>
+              <p className="shrink-0 text-right text-sm text-foreground">
+                from <span className="font-semibold">{proFrom}</span> a month
+              </p>
+            </li>
+            <li className="flex items-baseline justify-between gap-4 p-3 sm:p-4">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Donate</p>
+                <p className="mt-0.5 text-sm text-foreground/80">
+                  ₱50 or more gets a donor badge and a profile frame.
+                </p>
+              </div>
+              <p className="shrink-0 text-right text-sm text-foreground">
+                any amount
+              </p>
+            </li>
+          </ul>
+
+          <div className="flex flex-col gap-2 sm:flex-row-reverse">
+            <AlertDialogAction onClick={onSeePlans} className="sm:flex-1">
+              See plans
+            </AlertDialogAction>
+            <AlertDialogAction
+              onClick={onDonate}
+              className={cn(buttonVariants({ variant: "secondary" }), "sm:flex-1")}
+            >
+              Donate
+            </AlertDialogAction>
+            <AlertDialogCancel
+              className={cn(
+                buttonVariants({ variant: "ghost" }),
+                "mt-0 border-0 sm:mt-0",
+              )}
+            >
+              Not now
+            </AlertDialogCancel>
           </div>
-        </motion.aside>
-      )}
-    </AnimatePresence>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

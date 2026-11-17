@@ -375,13 +375,6 @@ export const sendMessage = mutation({
         ipAddress: args.ipAddress,
       });
 
-      // Update user's online status
-      await ctx.runMutation(internal.globalChat.updateOnlineStatus, {
-        userId,
-        username: profile.username,
-        currentPage: "chat",
-      });
-
       // Send mention notifications (creates mentions and sends push notifications)
       if (mentionedUserIds.length > 0) {
         await ctx.runMutation(internal.globalChat.sendMentionNotifications, {
@@ -409,12 +402,15 @@ export const getMessages = query({
   },
   handler: async (ctx, args) => {
     const limit = Math.min(args.limit || 20, 50);
-    const beforeTimestamp = args.beforeTimestamp || Date.now();
+    const beforeTimestamp = args.beforeTimestamp;
 
-    // Use optimized timestamp index with better pagination
+    // The live page has no upper bound, so a new message re-runs it. A bound of
+    // Date.now() would leave new inserts outside the read set.
     const messages = await ctx.db
       .query("globalChat")
-      .withIndex("by_timestamp", (q) => q.lt("timestamp", beforeTimestamp))
+      .withIndex("by_timestamp", (q) =>
+        beforeTimestamp === undefined ? q : q.lt("timestamp", beforeTimestamp),
+      )
       .order("desc")
       .take(limit);
 
@@ -686,48 +682,6 @@ export const getChatRules = query({
   },
 });
 
-// Get all usernames for mention validation
-// OPTIMIZED: Reduced limit to prevent excessive document scanning
-export const getAllUsernames = query({
-  args: {},
-  handler: async (ctx) => {
-    // Get all profiles with their usernames
-    // OPTIMIZED: Reduced from 10000 to 1000 to reduce bandwidth usage
-    const profiles = await ctx.db
-      .query("profiles")
-      .take(1000); // Reduced limit - enough for mention autocomplete
-
-    // Batch fetch subscriptions for these users
-    const userIds = profiles.map(p => p.userId);
-    const subscriptions = await Promise.all(
-      userIds.map(id =>
-        ctx.db
-          .query("subscriptions")
-          .withIndex("by_user", (q) => q.eq("userId", id))
-          .unique()
-      )
-    );
-
-    const subscriptionsMap = new Map();
-    subscriptions.forEach(sub => {
-      if (sub) {
-        subscriptionsMap.set(sub.userId, sub);
-      }
-    });
-
-    return profiles.map(profile => {
-      const sub = subscriptionsMap.get(profile.userId);
-      const isActive = sub ? isSubscriptionActive(sub.status, sub.expiresAt, sub.gracePeriodEndsAt || null) : true;
-      return {
-        userId: profile.userId,
-        username: profile.username,
-        tier: isActive ? (sub?.tier || "free") : "free",
-        isDonor: profile.isDonor || false,
-      };
-    });
-  },
-});
-
 // Get unread mention count - OPTIMIZED
 export const getUnreadMentionCount = query({
   args: {},
@@ -813,34 +767,6 @@ export const getRecentMentions = query({
       .take(limit);
 
     return mentions;
-  },
-});
-
-// Internal: Update online status
-export const updateOnlineStatus = internalMutation({
-  args: {
-    userId: v.id("users"),
-    username: v.string(),
-    currentPage: v.optional(v.string()),
-    gameId: v.optional(v.id("games")),
-    lobbyId: v.optional(v.id("lobbies")),
-  },
-  handler: async (ctx, args) => {
-    const timestamp = Date.now();
-
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .unique();
-
-    if (profile) {
-      await ctx.db.patch(profile._id, {
-        lastSeenAt: timestamp,
-        currentPage: args.currentPage,
-        gameId: args.gameId,
-        lobbyId: args.lobbyId,
-      });
-    }
   },
 });
 
@@ -953,57 +879,6 @@ export const cleanupOldMessages = internalMutation({
 
     await Promise.all(deletePromises);
     return oldMessages.length;
-  },
-});
-
-// Legacy heartbeat - now uses presence component
-export const heartbeat = mutation({
-  args: {
-    userId: v.id("users"),
-    username: v.string(),
-    currentPage: v.optional(v.string()),
-    gameId: v.optional(v.id("games")),
-    lobbyId: v.optional(v.id("lobbies")),
-  },
-  handler: async (ctx, args) => {
-    // Update the legacy online status for backward compatibility
-    await ctx.runMutation(internal.globalChat.updateOnlineStatus, {
-      userId: args.userId,
-      username: args.username,
-      currentPage: args.currentPage,
-      gameId: args.gameId,
-      lobbyId: args.lobbyId,
-    });
-  },
-});
-
-// Mark user as online (called when user logs in or becomes active)
-export const markUserOnline = mutation({
-  args: {
-    currentPage: v.optional(v.string()),
-    gameId: v.optional(v.id("games")),
-    lobbyId: v.optional(v.id("lobbies")),
-  },
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("Not authenticated");
-
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .unique();
-
-    if (!profile) throw new Error("Profile not found");
-
-    await ctx.runMutation(internal.globalChat.updateOnlineStatus, {
-      userId,
-      username: profile.username,
-      currentPage: args.currentPage,
-      gameId: args.gameId,
-      lobbyId: args.lobbyId,
-    });
-
-    return { success: true };
   },
 });
 

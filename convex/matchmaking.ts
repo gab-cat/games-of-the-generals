@@ -239,22 +239,16 @@ export const attemptMatch = internalMutation({
         .withIndex("by_host_status", (q) => q.eq("hostId", player.userId).eq("status", "playing"))
         .first();
 
-      // Check if player has an active lobby as player (query by status, filter by playerId)
-      // OPTIMIZED: Query by status index first, then filter in memory (better than full scan)
-      const [waitingLobbies, playingLobbies] = await Promise.all([
-        ctx.db
+      // Check if player has joined someone else's lobby
+      const playerLobby =
+        (await ctx.db
           .query("lobbies")
-          .withIndex("by_status", (q) => q.eq("status", "waiting"))
-          .take(100), // Reasonable limit
-        ctx.db
+          .withIndex("by_player_status", (q) => q.eq("playerId", player.userId).eq("status", "waiting"))
+          .first()) ??
+        (await ctx.db
           .query("lobbies")
-          .withIndex("by_status", (q) => q.eq("status", "playing"))
-          .take(100), // Reasonable limit
-      ]);
-
-      const playerLobby = [...waitingLobbies, ...playingLobbies].find(
-        (lobby) => lobby.playerId === player.userId
-      );
+          .withIndex("by_player_status", (q) => q.eq("playerId", player.userId).eq("status", "playing"))
+          .first());
 
       const existingLobby = hostLobbyWaiting || hostLobbyPlaying || playerLobby;
 
@@ -269,10 +263,8 @@ export const attemptMatch = internalMutation({
     waitingPlayers = filteredPlayers;
 
     if (waitingPlayers.length < 2) {
-      // Not enough players, reschedule for later
-      if (waitingPlayers.length > 0) {
-        await ctx.scheduler.runAfter(8000, internal.matchmaking.attemptMatch, {});
-      }
+      // Any two waiting players match, so nothing changes until someone else
+      // joins, and joinQueue schedules another attempt then. No polling.
       return { success: false, matchesCreated: 0, playersMatched: 0 };
     }
 

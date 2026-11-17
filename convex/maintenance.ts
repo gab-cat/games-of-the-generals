@@ -3,100 +3,33 @@ import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { Presence } from "@convex-dev/presence";
 import { Doc } from "./_generated/dataModel";
+import { deleteUserAndData, hasRealLogin, isInLiveGame } from "./lib/userCleanup";
 
-// Internal: Delete all anonymous users and clean up dependent data that could break UIs
-// - Does NOT touch games or moves to keep replays safe
-// - Deletes profiles, presets, achievements, push subscriptions, email verifications
-// - Deletes waiting lobbies hosted by the anonymous user (avoids ghost lobbies)
-// - Leaves playing/finished lobbies and all games intact
-// OPTIMIZED: Added limits to prevent excessive document scanning
+// Guest accounts are deleted every day at 00:00 UTC (the sign-in page and the
+// "save your guest account" popup say so), with their data and login rows.
+// Skipped: guests mid-game (deleted the next day) and guests that have since
+// attached a real login. Walks every guest with a cursor, a page at a time.
 export const deleteAnonymousUsers = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    // Find all anonymous users - OPTIMIZED: Process in batches
-    const anonymousUsers = await ctx.db
+  args: { cursor: v.optional(v.union(v.string(), v.null())) },
+  handler: async (ctx, args) => {
+    const page = await ctx.db
       .query("users")
       .withIndex("by_isAnonymous", (q) => q.eq("isAnonymous", true))
-      .take(100); // Process in batches to avoid timeout
+      .paginate({ numItems: 40, cursor: args.cursor ?? null });
 
-    for (const user of anonymousUsers) {
-      const userId = user._id;
-
-      // Delete profile (if any)
-      const profile = await ctx.db
-        .query("profiles")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .unique();
-      if (profile) {
-        await ctx.db.delete(profile._id);
-      }
-
-      // Delete user-specific data that is safe to remove
-      // OPTIMIZED: Added limits to prevent excessive scanning
-      const [presets, achievements, pushes, verifications, aiSessions] = await Promise.all([
-        ctx.db.query("setupPresets").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
-        ctx.db.query("achievements").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
-        ctx.db.query("pushSubscriptions").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
-        ctx.db.query("emailChangeVerifications").withIndex("by_user", (q) => q.eq("userId", userId)).take(100),
-        ctx.db.query("aiGameSessions").withIndex("by_player", (q) => q.eq("playerId", userId)).take(100),
-      ]);
-
-      // Find conversations where user is participant1 or participant2
-      // OPTIMIZED: Added limits
-      const [conversationsAsParticipant1, conversationsAsParticipant2] = await Promise.all([
-        ctx.db.query("conversations").withIndex("by_participant1", (q) => q.eq("participant1Id", userId)).take(100),
-        ctx.db.query("conversations").withIndex("by_participant2", (q) => q.eq("participant2Id", userId)).take(100),
-      ]);
-
-      const conversations = [...conversationsAsParticipant1, ...conversationsAsParticipant2];
-
-      // Delete messages from conversations this user is part of
-      // OPTIMIZED: Added limits
-      for (const conversation of conversations) {
-        const otherParticipantId = conversation.participant1Id === userId ? conversation.participant2Id : conversation.participant1Id;
-
-        // Get all messages between these two users (in both directions)
-        // OPTIMIZED: Reduced limit to prevent excessive document scanning
-        const [messagesFromUser, messagesToUser] = await Promise.all([
-          ctx.db.query("messages").withIndex("by_sender", (q) => q.eq("senderId", userId))
-            .filter((q) => q.eq(q.field("recipientId"), otherParticipantId)).take(500),
-          ctx.db.query("messages").withIndex("by_recipient", (q) => q.eq("recipientId", userId))
-            .filter((q) => q.eq(q.field("senderId"), otherParticipantId)).take(500),
-        ]);
-
-        const conversationMessages = [...messagesFromUser, ...messagesToUser];
-        for (const message of conversationMessages) {
-          await ctx.db.delete(message._id);
-        }
-      }
-
-      // Delete the conversations themselves
-      for (const conversation of conversations) {
-        await ctx.db.delete(conversation._id);
-      }
-
-      for (const doc of [...presets, ...achievements, ...pushes, ...verifications, ...aiSessions]) {
-        await ctx.db.delete(doc._id);
-      }
-
-      // Delete waiting lobbies hosted by this user (avoid ghost lobbies)
-      // OPTIMIZED: Added limit
-      const hostedLobbies = await ctx.db
-        .query("lobbies")
-        .withIndex("by_host", (q) => q.eq("hostId", userId))
-        .take(100);
-
-      for (const lobby of hostedLobbies) {
-        if (lobby.status === "waiting") {
-          await ctx.db.delete(lobby._id);
-        }
-      }
-
-      // Finally, delete the auth user itself
-      await ctx.db.delete(userId);
+    let deletedUsers = 0;
+    for (const user of page.page) {
+      if ((await hasRealLogin(ctx, user._id)) || (await isInLiveGame(ctx, user._id))) continue;
+      await deleteUserAndData(ctx, user._id);
+      deletedUsers++;
     }
 
-    return { deletedUsers: anonymousUsers.length };
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(500, internal.maintenance.deleteAnonymousUsers, {
+        cursor: page.continueCursor,
+      });
+    }
+    return { deletedUsers, scanned: page.page.length };
   },
 });
 
