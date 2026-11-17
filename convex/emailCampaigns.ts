@@ -13,6 +13,7 @@
 //   Test to one:  npx convex run --prod emailCampaigns:sendRelaunch '{"onlyEmails":["you@example.com"]}'
 //   Send to all:  npx convex run --prod emailCampaigns:sendRelaunch '{}'
 //   Progress:     npx convex run --prod emailCampaigns:campaignStats '{}'
+//   Pause:        npx convex env set --prod RELAUNCH_PAUSED true (remove it, then run again to resume)
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -179,6 +180,12 @@ export const sendRelaunch = internalAction({
     const add = (key: string, n = 1) => (totals[key] = (totals[key] ?? 0) + n);
     let cursor = args.cursor ?? null;
 
+    // Pause switch: npx convex env set --prod RELAUNCH_PAUSED true
+    if (!args.dryRun && process.env.RELAUNCH_PAUSED === "true") {
+      console.warn("[relaunch] paused by RELAUNCH_PAUSED; run sendRelaunch again to resume", totals);
+      return "Paused";
+    }
+
     // A dry run or a test send scans every page in this one call; a real send does
     // one page per call so no single action runs long.
     for (;;) {
@@ -201,8 +208,11 @@ export const sendRelaunch = internalAction({
           return `Stopped: ${result.stop}. Fix it and run sendRelaunch again; it resumes where it left off.`;
         }
         if (result.throttled) {
-          console.warn("[relaunch] throttled, retrying this page in 60s", totals);
-          await ctx.scheduler.runAfter(60_000, internal.emailCampaigns.sendRelaunch, {
+          // Nothing got through: the account's daily quota is used up, so check back
+          // every 30 minutes. Some got through: a short-term rate limit, retry soon.
+          const waitMs = result.counts.sent ? 60_000 : 30 * 60_000;
+          console.warn(`[relaunch] throttled, retrying this page in ${waitMs / 60_000} min`, totals);
+          await ctx.scheduler.runAfter(waitMs, internal.emailCampaigns.sendRelaunch, {
             onlyEmails: args.onlyEmails,
             cursor,
             totals,
