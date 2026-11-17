@@ -30,7 +30,9 @@ import { relaunchEmail, type SignInMethod } from "./emails/templates";
 export const RELAUNCH_CAMPAIGN = "relaunch-2026-11";
 const SEASON = 2; // seasonRecords.season for everything before Season 3
 const PAGE_SIZE = 60;
-const CONCURRENCY = 4;
+// One at a time with a gap: four in parallel got throttled on the first page.
+const CONCURRENCY = 1;
+const GAP_MS = 400;
 const MAX_FAILURES_IN_A_ROW = 15;
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/;
@@ -266,9 +268,11 @@ async function sendBatch(
         });
         add("sent");
         failuresInARow = 0;
+        await new Promise((resolve) => setTimeout(resolve, GAP_MS));
       } catch (error) {
         if (error instanceof EmailSendError && error.throttled) {
           await ctx.runMutation(internal.emailCampaigns.finish, { id: claim.id, outcome: { status: "release" } });
+          console.warn(`[relaunch] throttled after ${counts.sent ?? 0} sent: ${error.message}`);
           throttled = true;
           return;
         }
