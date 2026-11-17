@@ -30,6 +30,13 @@ interface LobbyCardProps {
     isPrivate?: boolean;
     gameMode?: GameModeName;
     createdAt?: number;
+    hostCard?: {
+      rank: string;
+      wins: number;
+      elo: number;
+      avatarUrl?: string;
+      avatarFrame?: string;
+    };
   };
   currentUserId: Id<"users">;
   onJoin: (lobbyId: Id<"lobbies">) => void;
@@ -53,9 +60,13 @@ export function LobbyCard({
   isLeaving,
 }: LobbyCardProps) {
   // Host avatar, rank and rating
-  const hostProfile = useQuery(api.profiles.getProfileByUsername, {
-    username: lobby.hostUsername,
-  });
+  // New lobbies carry the host's card. Lobbies created before that change
+  // look the host up instead.
+  const fetchedHost = useQuery(
+    api.profiles.getProfileByUsername,
+    lobby.hostCard ? "skip" : { username: lobby.hostUsername },
+  );
+  const hostProfile = lobby.hostCard ?? fetchedHost;
 
   // Only this card's button shows the spinner when a join is in flight.
   const [joinedHere, setJoinedHere] = useState(false);

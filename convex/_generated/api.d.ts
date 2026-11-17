@@ -37,6 +37,7 @@ import type * as lib_matchHistoryCursor from "../lib/matchHistoryCursor.js";
 import type * as lib_planPricing from "../lib/planPricing.js";
 import type * as lib_replayCodec from "../lib/replayCodec.js";
 import type * as lib_userCleanup from "../lib/userCleanup.js";
+import type * as liveGames from "../liveGames.js";
 import type * as lobbies from "../lobbies.js";
 import type * as maintenance from "../maintenance.js";
 import type * as matchmaking from "../matchmaking.js";
@@ -95,6 +96,7 @@ declare const fullApi: ApiFromModules<{
   "lib/planPricing": typeof lib_planPricing;
   "lib/replayCodec": typeof lib_replayCodec;
   "lib/userCleanup": typeof lib_userCleanup;
+  liveGames: typeof liveGames;
   lobbies: typeof lobbies;
   maintenance: typeof maintenance;
   matchmaking: typeof matchmaking;

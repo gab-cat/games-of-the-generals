@@ -120,6 +120,15 @@ const applicationTables = {
     // Activity tracking for abandonment detection
     hostLastActiveAt: v.optional(v.number()),   // Last heartbeat from host
     playerLastActiveAt: v.optional(v.number()), // Last heartbeat from joiner
+    // The host's card as shown in the lobby list, copied when the lobby is
+    // created so each card doesn't subscribe to the host's profile.
+    hostCard: v.optional(v.object({
+      rank: v.string(),
+      wins: v.number(),
+      elo: v.number(),
+      avatarUrl: v.optional(v.string()),
+      avatarFrame: v.optional(v.string()),
+    })),
 
   })
     .index("by_status", ["status"])
@@ -129,6 +138,31 @@ const applicationTables = {
     .index("by_player_status", ["playerId", "status"])
     .index("by_status_created", ["status", "createdAt"]) // For sorting waiting lobbies by creation time
     .index("by_waiting_public", ["status", "isPrivate", "createdAt"]), // Optimized for public lobby list
+
+  // One small row per game in setup or play, for the spectate list and the
+  // spectator panel. Those used to read the full game row (about 5 KB with
+  // both boards) and re-ran on every move. This row changes only when the
+  // game starts, play begins, a spectator joins or leaves, and it is deleted
+  // when the game ends (every path that removes the game's presence room).
+  liveGames: defineTable({
+    gameId: v.id("games"),
+    lobbyName: v.optional(v.string()),
+    status: v.union(v.literal("setup"), v.literal("playing")),
+    player1Username: v.string(),
+    player2Username: v.string(),
+    gameMode: v.optional(v.union(
+      v.literal("classic"),
+      v.literal("blitz"),
+      v.literal("reveal")
+    )),
+    playingSince: v.optional(v.number()),
+    // allowSpectators && !isPrivate on the lobby; fixed at lobby creation.
+    isPublic: v.boolean(),
+    maxSpectators: v.optional(v.number()),
+    spectatorIds: v.array(v.id("users")),
+  })
+    .index("by_game", ["gameId"])
+    .index("by_public", ["isPublic"]),
 
   // Quick Match matchmaking queue
   matchmakingQueue: defineTable({

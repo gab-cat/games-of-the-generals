@@ -13,6 +13,11 @@ import {
   mergeNewestFirst,
   pickHistoryPage,
 } from "./lib/matchHistoryCursor";
+import {
+  createLiveGame,
+  markLiveGamePlaying,
+  removeLiveGame,
+} from "./liveGames";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -135,6 +140,9 @@ export const startGame = mutation({
       disconnectionGracePeriod: 120 * 1000, // 120 seconds in milliseconds
       gameMode, // Copy game mode from lobby
     });
+
+    const createdGame = await ctx.db.get(gameId);
+    if (createdGame) await createLiveGame(ctx, createdGame, lobby);
 
     // Schedule setup timeout check
     await ctx.scheduler.runAfter(
@@ -378,6 +386,9 @@ export const setupPieces = mutation({
     }
 
     await ctx.db.patch(args.gameId, updates);
+    if (updates.status === "playing" && updates.gameTimeStarted) {
+      await markLiveGamePlaying(ctx, args.gameId, updates.gameTimeStarted);
+    }
   },
 });
 
@@ -901,6 +912,7 @@ export const makeMove = mutation({
 
     // Clean up presence room when game ends
     if (gameWinner) {
+      await removeLiveGame(ctx, args.gameId);
       await presence.removeRoom(ctx, args.gameId as string);
       // Remove both players from presence
       await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
@@ -956,6 +968,7 @@ export const surrenderGame = mutation({
     });
 
     // Clean up presence room when game ends
+    await removeLiveGame(ctx, args.gameId);
     await presence.removeRoom(ctx, args.gameId as string);
     // Remove both players from presence
     await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
@@ -1090,6 +1103,7 @@ export const timeoutGame = mutation({
     });
 
     // Clean up presence room when game ends
+    await removeLiveGame(ctx, args.gameId);
     await presence.removeRoom(ctx, args.gameId as string);
     // Remove both players from presence
     await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
@@ -1197,6 +1211,7 @@ export const forfeitGame = internalMutation({
     }
 
     // Clean up presence room when game ends
+    await removeLiveGame(ctx, gameId);
     await presence.removeRoom(ctx, gameId as string);
     // Remove both players from presence
     await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
@@ -1454,6 +1469,7 @@ export const handleDisconnectionForfeit = internalMutation({
     await ctx.db.patch(game.lobbyId, { status: "finished" });
 
     // Clean up presence
+    await removeLiveGame(ctx, gameId);
     await presence.removeRoom(ctx, gameId as string);
     await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
     await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
@@ -1670,6 +1686,7 @@ export const checkOpponentTimeout = mutation({
       });
 
       // Clean up presence room when game ends
+      await removeLiveGame(ctx, args.gameId);
       await presence.removeRoom(ctx, args.gameId as string);
       // Remove both players from presence
       await presence.removeRoomUser(ctx, args.gameId as string, game.player1Id);
@@ -1846,6 +1863,9 @@ export const getMatchHistory = query({
         rankAtTime: v.string(),
         gameId: v.id("games"),
         lobbyName: v.string(),
+        opponentAvatarUrl: v.optional(v.string()),
+        opponentAvatarFrame: v.optional(v.string()),
+        opponentRank: v.optional(v.string()),
       }),
     ),
     isDone: v.boolean(),
@@ -1942,6 +1962,40 @@ export const getMatchHistory = query({
       continueCursor,
     };
 
+    // Each row shows the opponent's avatar and rank. Read them here, once per
+    // distinct opponent, instead of one profile subscription per row.
+    const opponentIds = [
+      ...new Set(
+        result.page.map((game) =>
+          game.player1Id === userId ? game.player2Id : game.player1Id,
+        ),
+      ),
+    ];
+    const opponents = new Map(
+      await Promise.all(
+        opponentIds.map(async (id) => {
+          const [opponent, customization] = await Promise.all([
+            ctx.db
+              .query("profiles")
+              .withIndex("by_user", (q) => q.eq("userId", id))
+              .unique(),
+            ctx.db
+              .query("userCustomizations")
+              .withIndex("by_user", (q) => q.eq("userId", id))
+              .first(),
+          ]);
+          return [
+            id,
+            {
+              avatarUrl: opponent?.avatarUrl,
+              avatarFrame: customization?.avatarFrame,
+              rank: opponent?.rank,
+            },
+          ] as const;
+        }),
+      ),
+    );
+
     // Transform games into match history format
     const matchHistory = await Promise.all(
       result.page.map(async (game) => {
@@ -1949,6 +2003,9 @@ export const getMatchHistory = query({
         const opponentUsername = isPlayer1
           ? game.player2Username
           : game.player1Username;
+        const opponent = opponents.get(
+          isPlayer1 ? game.player2Id : game.player1Id,
+        );
         const isWin = game.winner === (isPlayer1 ? "player1" : "player2");
         const isDraw = game.winner === undefined;
 
@@ -1973,6 +2030,9 @@ export const getMatchHistory = query({
           rankAtTime: profile?.rank || "Recruit",
           gameId: game._id,
           lobbyName: game.lobbyName || "Unknown",
+          opponentAvatarUrl: opponent?.avatarUrl,
+          opponentAvatarFrame: opponent?.avatarFrame,
+          opponentRank: opponent?.rank,
         };
       }),
     );
@@ -2117,6 +2177,7 @@ export const cleanupStaleGames = internalMutation({
         await ctx.db.delete(game._id);
 
         // Clean up presence room
+        await removeLiveGame(ctx, game._id);
         await presence.removeRoom(ctx, game._id as string);
         // Remove both players from presence
         await presence.removeRoomUser(ctx, game._id as string, game.player1Id);
@@ -2159,6 +2220,7 @@ export const cleanupStaleGames = internalMutation({
     console.log(
       `Cleaned up ${deletedSetupGames} stale setup games and ${forfeitedPlayingGames} stale playing games`,
     );
+    await ctx.runMutation(internal.liveGames.sweepLiveGames, {});
     return { deletedSetupGames, forfeitedPlayingGames };
   },
 });
@@ -2193,10 +2255,12 @@ export const handleSetupTimeout = internalMutation({
       console.log(
         `[handleSetupTimeout] Game ${gameId} both players ready, transitioning to playing`,
       );
+      const gameTimeStarted = Date.now();
       await ctx.db.patch(gameId, {
         status: "playing",
-        gameTimeStarted: Date.now(),
+        gameTimeStarted,
       });
+      await markLiveGamePlaying(ctx, gameId, gameTimeStarted);
       return { handled: true, reason: "both_ready" };
     }
 
@@ -2235,6 +2299,7 @@ export const handleSetupTimeout = internalMutation({
       await ctx.db.delete(gameId);
 
       // Cleanup presence
+      await removeLiveGame(ctx, gameId);
       await presence.removeRoom(ctx, gameId as string);
       await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
       await presence.removeRoomUser(ctx, gameId as string, game.player2Id);
@@ -2299,6 +2364,7 @@ export const handleSetupTimeout = internalMutation({
     }
 
     // Cleanup presence
+    await removeLiveGame(ctx, gameId);
     await presence.removeRoom(ctx, gameId as string);
     await presence.removeRoomUser(ctx, gameId as string, game.player1Id);
     await presence.removeRoomUser(ctx, gameId as string, game.player2Id);

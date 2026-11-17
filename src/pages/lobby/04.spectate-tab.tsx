@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useConvexQuery } from "../../lib/convex-query-hooks";
 import { api } from "../../../convex/_generated/api";
 
@@ -32,6 +32,11 @@ interface SpectateTabProps {
   spectateByIdMutation: any;
 }
 
+function playingFor(ms: number) {
+  const minutes = Math.max(0, Math.floor(ms / 60_000));
+  return minutes < 1 ? "just started" : `${minutes} min`;
+}
+
 export function SpectateTab(props: SpectateTabProps) {
   return (
     <ListErrorBoundary message="Couldn't load the live games.">
@@ -48,6 +53,12 @@ function LiveGames({ onSpectateGame, spectateByIdMutation }: SpectateTabProps) {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   // Which row was clicked, so only that button shows the spinner.
   const [openingId, setOpeningId] = useState<string | null>(null);
+  // Minutes in play tick on the client; the list doesn't re-run on moves.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const LOBBIES_PER_PAGE = 10;
 
@@ -266,8 +277,8 @@ function LiveGames({ onSpectateGame, spectateByIdMutation }: SpectateTabProps) {
                             <span className="inline-flex items-center gap-1.5 text-emerald-400">
                               <span className="size-1.5 animate-pulse rounded-full bg-emerald-400" />
                               Live
-                              {game.moveCount
-                                ? ` · move ${game.moveCount}`
+                              {game.playingSince
+                                ? ` · ${playingFor(now - game.playingSince)}`
                                 : ""}
                             </span>
                           )}

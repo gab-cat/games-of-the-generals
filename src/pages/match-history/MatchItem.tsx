@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Download, Loader2, Play } from "lucide-react";
-import { useQuery } from "convex-helpers/react/cache";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { UserAvatar } from "@/components/UserAvatar";
@@ -86,16 +85,15 @@ interface MatchItemProps {
     moves: number;
     rankAtTime: string;
     reason: string;
+    opponentAvatarUrl?: string;
+    opponentAvatarFrame?: string;
+    opponentRank?: string;
   };
   onViewReplay?: (gameId: Id<"games">) => void;
 }
 
 export function MatchItem({ match, onViewReplay }: MatchItemProps) {
   const [isDownloading, setIsDownloading] = useState(false);
-
-  const opponentProfile = useQuery(api.profiles.getProfileByUsername, {
-    username: match.opponentUsername,
-  });
 
   // Query replay data only when downloading
   const { data: replayData } = useConvexQuery(
@@ -126,10 +124,10 @@ export function MatchItem({ match, onViewReplay }: MatchItemProps) {
         </Badge>
         <UserAvatar
           username={match.opponentUsername}
-          avatarUrl={opponentProfile?.avatarUrl}
-          rank={opponentProfile?.rank}
+          avatarUrl={match.opponentAvatarUrl}
+          rank={match.opponentRank}
           size="sm"
-          frame={opponentProfile?.avatarFrame}
+          frame={match.opponentAvatarFrame}
           className="shrink-0"
         />
         <div className="min-w-0">

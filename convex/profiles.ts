@@ -141,11 +141,92 @@ export const getCurrentProfile = query({
   },
 });
 
-// Get profile by username (for getting avatar URLs in lobbies, etc.)
+// What any player may see about another player: name, record, rating and
+// cosmetics. Never ids, money (totalDonated), or where they are (gameId,
+// lobbyId, which can be a private lobby).
+export const publicProfileValidator = v.object({
+  username: v.string(),
+  rank: v.string(),
+  wins: v.number(),
+  losses: v.number(),
+  gamesPlayed: v.number(),
+  elo: v.number(),
+  avatarUrl: v.optional(v.string()),
+  bio: v.optional(v.string()),
+  isDonor: v.optional(v.boolean()),
+  adminRole: v.optional(v.union(v.literal("moderator"), v.literal("admin"))),
+  tier: v.union(v.literal("free"), v.literal("pro"), v.literal("pro_plus")),
+  usernameColor: v.optional(v.string()),
+  avatarFrame: v.optional(v.string()),
+  showBadges: v.boolean(),
+});
+
+export type PublicProfile = {
+  username: string;
+  rank: string;
+  wins: number;
+  losses: number;
+  gamesPlayed: number;
+  elo: number;
+  avatarUrl?: string;
+  bio?: string;
+  isDonor?: boolean;
+  adminRole?: "moderator" | "admin";
+  tier: "free" | "pro" | "pro_plus";
+  usernameColor?: string;
+  avatarFrame?: string;
+  showBadges: boolean;
+};
+
+export async function toPublicProfile(
+  ctx: QueryCtx,
+  profile: Doc<"profiles">,
+): Promise<PublicProfile> {
+  const [subscription, customization] = await Promise.all([
+    ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+      .first(),
+    ctx.db
+      .query("userCustomizations")
+      .withIndex("by_user", (q) => q.eq("userId", profile.userId))
+      .first(),
+  ]);
+
+  const isActive = subscription
+    ? isSubscriptionActive(
+        subscription.status,
+        subscription.expiresAt,
+        subscription.gracePeriodEndsAt || null,
+      )
+    : true;
+
+  return {
+    username: profile.username,
+    rank: profile.rank,
+    wins: profile.wins,
+    losses: profile.losses,
+    gamesPlayed: profile.gamesPlayed,
+    elo: profile.elo,
+    avatarUrl: profile.avatarUrl,
+    bio: profile.bio,
+    isDonor: profile.isDonor,
+    adminRole: profile.adminRole,
+    tier: isActive ? subscription?.tier || "free" : "free",
+    usernameColor: customization?.usernameColor,
+    avatarFrame: customization?.avatarFrame,
+    showBadges: customization?.showBadges ?? true,
+  };
+}
+
+// Another player's public card (lobby host, opponent, spectated players).
+// Until November 2026 this returned the whole profile row, unauthenticated,
+// including totalDonated and the lobby id of a private lobby.
 export const getProfileByUsername = query({
   args: {
     username: v.optional(v.string()),
   },
+  returns: v.union(publicProfileValidator, v.null()),
   handler: async (ctx, args) => {
     if (!args.username) return null;
     const profile = await ctx.db
@@ -155,33 +236,7 @@ export const getProfileByUsername = query({
       )
       .unique();
     if (!profile) return null;
-
-    const [subscription, customization] = await Promise.all([
-      ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-        .first(),
-      ctx.db
-        .query("userCustomizations")
-        .withIndex("by_user", (q) => q.eq("userId", profile.userId))
-        .first(),
-    ]);
-
-    const isActive = subscription
-      ? isSubscriptionActive(
-          subscription.status,
-          subscription.expiresAt,
-          subscription.gracePeriodEndsAt || null,
-        )
-      : true;
-
-    return {
-      ...profile,
-      tier: isActive ? subscription?.tier || "free" : "free",
-      usernameColor: customization?.usernameColor,
-      avatarFrame: customization?.avatarFrame,
-      showBadges: customization?.showBadges ?? true,
-    };
+    return await toPublicProfile(ctx, profile);
   },
 });
 

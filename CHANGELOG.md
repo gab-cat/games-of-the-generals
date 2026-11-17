@@ -85,6 +85,9 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 - Match history pages now go back through all your games for your plan, without repeats
 - Support screenshots keep the whole image instead of being cropped to a square
 - Changing your picture no longer downloads a large image library first
+- The Watch tab and the spectator list stay quiet during play instead of refreshing on every move; live games show how long they've been going
+- Lobby cards and match history show avatars and ranks without a separate lookup for each row
+- Other players' profiles no longer share private details such as which lobby they're in
 
 ### 🎨 A cleaner look for Season 3
 

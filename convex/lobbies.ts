@@ -6,6 +6,7 @@ import {
   MutationCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { setLiveGameSpectators } from "./liveGames";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
@@ -199,6 +200,11 @@ export const createLobby = mutation({
 
     const gameMode = args.gameMode ?? "classic"; // Default to classic if not provided
 
+    const customization = await ctx.db
+      .query("userCustomizations")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .first();
+
     const lobbyId = await ctx.db.insert("lobbies", {
       name: args.name,
       hostId: userId,
@@ -210,6 +216,13 @@ export const createLobby = mutation({
       maxSpectators,
       gameMode,
       createdAt: Date.now(),
+      hostCard: {
+        rank: profile.rank,
+        wins: profile.wins,
+        elo: profile.elo,
+        avatarUrl: profile.avatarUrl,
+        avatarFrame: customization?.avatarFrame,
+      },
     });
     // Note: Usage counter is now updated in games.startGame when game actually starts,
     // not at lobby creation time. This ensures private lobby usage is only consumed
@@ -515,6 +528,7 @@ export const spectateGameById = mutation({
     await ctx.db.patch(args.gameId, {
       spectators: updatedSpectators,
     });
+    await setLiveGameSpectators(ctx, args.gameId, updatedSpectators);
 
     return game._id;
   },

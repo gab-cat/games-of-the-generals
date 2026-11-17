@@ -44,7 +44,8 @@ and `npx convex insights --prod`.
 - `gamePresence.heartbeat` authorizes a player through `profile.gameId === roomId` and reads the game row only when that doesn't match. Every game-ending path must keep clearing `profile.gameId` in the same mutation.
 - The game room heartbeat (`api.gamePresence` in `src/components/GameBoard.tsx`) is 60s because disconnect forfeits use a 2-minute grace period. Don't shorten it.
 - Subscribe only while the thing is on screen: `useOnlineUsers(isOpen)`, `"skip"` until needed (`getMatchResult` is skipped until the game is finished).
-- A query re-runs for every subscriber whenever any doc it read changes. `getSpectatableGames` reads every live game, so it returns only list fields, not the 5 KB game row. Hot lists get slim return shapes; if it is still heavy, keep a summary row updated on write.
+- A query re-runs for every subscriber whenever any doc it read changes. Slimming the return doesn't slim the read. The spectate list and spectator panel read `liveGames` (`convex/liveGames.ts`), a small row per game in setup or play that is never written on a move. Any new game-ending path must call `removeLiveGame` next to `presence.removeRoom`; `sweepLiveGames` catches leftovers older than 45 minutes.
+- List rows don't open their own profile subscriptions. Return what the row shows from the list query (match history returns the opponent's avatar, frame and rank) or copy it at write time (lobbies carry `hostCard`).
 - `useLobbyPresence` (`src/lib/useLobbyPresence.ts`) is unused. Enabling it as written would add a 10s abandonment check per player; redesign it before use.
 - No `Date.now()` or random values in subscribed query args.
 
@@ -87,6 +88,7 @@ and `npx convex insights --prod`.
 ## Security
 
 - Public functions: `getAuthUserId` on every one, identity from the session. Admin screens use `verifyAdminAccess`.
+- Another player's data goes through `toPublicProfile` / `publicProfileValidator` in `convex/profiles.ts`: name, record, rating and cosmetics only. Never ids, `totalDonated`, `gameId` or `lobbyId`.
 - Never leave a public mutation that changes stats, achievements, game state or subscriptions without an auth and ownership check. Until November 2026, `updateProfileStats`, `forfeitGame`, the achievement checks and `extendSubscription` were all public and unauthenticated (anyone could grant themselves Pro+ or pump any player's wins).
 - Hidden pieces stay hidden: players get the masked board from `getGame`/`getGameState`. Never send `initialSetupBoard`, `replay` or move rows of a live game to a client.
 - Known open items: `presence.heartbeat` trusts the client's `userId` (a username); the PayMongo intent actions in `convex/paymongo.ts` don't check auth.

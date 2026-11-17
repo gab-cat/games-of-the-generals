@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, internalMutation, query, QueryCtx } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "./_generated/dataModel";
+import { getLiveGame, setLiveGameSpectators } from "./liveGames";
 
 // Helper function to check if user is admin
 async function isUserAdmin(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
@@ -47,9 +48,9 @@ export const joinAsSpectator = mutation({
 
     // Optimized: Only update if user is not already a spectator
     if (!game.spectators.includes(userId)) {
-      await ctx.db.patch(args.gameId, {
-        spectators: [...game.spectators, userId],
-      });
+      const spectators = [...game.spectators, userId];
+      await ctx.db.patch(args.gameId, { spectators });
+      await setLiveGameSpectators(ctx, args.gameId, spectators);
     }
   },
 });
@@ -66,14 +67,17 @@ export const leaveAsSpectator = mutation({
 
     // Optimized: Only update if user is actually a spectator
     if (userId && game && game.spectators.includes(userId)) {
-      await ctx.db.patch(args.gameId, {
-        spectators: game.spectators.filter(id => id !== userId),
-      });
+      const spectators = game.spectators.filter((id) => id !== userId);
+      await ctx.db.patch(args.gameId, { spectators });
+      await setLiveGameSpectators(ctx, args.gameId, spectators);
     }
   },
 });
 
-// Get spectatable games (setup and playing only) - Optimized with better filtering
+// Games open to watch, newest first. Reads the small liveGames rows, which
+// change only when a game starts, begins play, gains or loses a spectator, or
+// ends. It used to read every live game row (about 5 KB each) plus its lobby
+// and re-ran on every move of every live game for everyone on this tab.
 export const getSpectatableGames = query({
   args: {
     paginationOpts: v.optional(v.object({
@@ -84,88 +88,38 @@ export const getSpectatableGames = query({
   handler: async (ctx, args) => {
     const { paginationOpts } = args;
 
-    // Check if current user is admin (if authenticated)
-    let userIsAdmin = false;
-    try {
-      const userId = await getAuthUserId(ctx);
-      if (userId) {
-        userIsAdmin = await isUserAdmin(ctx, userId);
-      }
-    } catch {
-      // If we can't determine admin status, assume not admin
-      userIsAdmin = false;
-    }
+    // Admins and moderators also see private games and ones closed to spectators.
+    const userId = await getAuthUserId(ctx);
+    const userIsAdmin = userId ? await isUserAdmin(ctx, userId) : false;
 
-    // Optimized: Use status index for better performance
-    const queryBuilder = ctx.db
-      .query("games")
-      .withIndex("by_status", (q) => q.gte("status", "playing"))
-      .filter((q) => q.or(
-        q.eq(q.field("status"), "setup"),
-        q.eq(q.field("status"), "playing")
-      ))
-      .order("desc");
+    const queryBuilder = userIsAdmin
+      ? ctx.db.query("liveGames").order("desc")
+      : ctx.db
+          .query("liveGames")
+          .withIndex("by_public", (q) => q.eq("isPublic", true))
+          .order("desc");
 
-    let games;
-    let result;
-
-    if (paginationOpts) {
-      const paginationOptions = {
-        numItems: Math.min(paginationOpts.numItems, 50), // Limit max items per page
-        cursor: paginationOpts.cursor ?? null,
-      };
-      result = await queryBuilder.paginate(paginationOptions);
-      games = result.page;
-    } else {
-      // Limit collection size to prevent performance issues
-      games = await queryBuilder.take(20);
-      result = {
-        page: games,
-        isDone: games.length < 20,
-        continueCursor: "",
-      };
-    }
-
-    // Get associated lobby information to check spectator settings
-    const gamesWithLobbyInfo = await Promise.all(
-      games.map(async (game) => {
-        const lobby = await ctx.db.get("lobbies", game.lobbyId);
-        // Only what the spectate list shows. The full row carries both
-        // boards (about 5 KB) and this query re-runs on every move of every
-        // live game, for every open spectate tab.
-        return {
-          _id: game._id,
-          _creationTime: game._creationTime,
-          lobbyName: game.lobbyName,
-          status: game.status,
-          player1Username: game.player1Username,
-          player2Username: game.player2Username,
-          gameMode: game.gameMode,
-          moveCount: game.moveCount,
-          gameId: game._id, // Explicitly include gameId for easy access
-          allowSpectators: lobby?.allowSpectators ?? true,
-          maxSpectators: lobby?.maxSpectators,
-          spectatorCount: game.spectators.length,
-          isPrivate: lobby?.isPrivate ?? false,
-        };
-      })
-    );
-
-    let spectatableGames;
-
-    if (userIsAdmin) {
-      // Admins can see all active games
-      spectatableGames = gamesWithLobbyInfo;
-    } else {
-      // Regular users can only see games that allow spectators and are not private
-      spectatableGames = gamesWithLobbyInfo.filter(game =>
-        game.allowSpectators && !game.isPrivate
-      );
-    }
+    const result = await queryBuilder.paginate({
+      numItems: Math.min(paginationOpts?.numItems ?? 20, 50),
+      cursor: paginationOpts?.cursor ?? null,
+    });
 
     return {
       ...result,
-      page: spectatableGames,
+      page: result.page.map((live) => ({
+        _id: live.gameId,
+        gameId: live.gameId,
+        _creationTime: live._creationTime,
+        lobbyName: live.lobbyName,
+        status: live.status,
+        player1Username: live.player1Username,
+        player2Username: live.player2Username,
+        gameMode: live.gameMode,
+        playingSince: live.playingSince,
+        maxSpectators: live.maxSpectators,
+        spectatorCount: live.spectatorIds.length,
+        isPublic: live.isPublic,
+      })),
     };
   },
 });
@@ -246,12 +200,13 @@ export const getGameSpectators = query({
     gameId: v.id("games"),
   },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get("games", args.gameId);
-    if (!game || game.spectators.length === 0) return [];
+    // The liveGames row, not the game row: it doesn't change on moves, so
+    // this list re-runs only when someone joins or leaves.
+    const live = await getLiveGame(ctx, args.gameId);
+    if (!live || live.spectatorIds.length === 0) return [];
 
-    // OPTIMIZED: Batch query spectator profiles more efficiently
     const spectatorProfiles = await Promise.all(
-      game.spectators.map(async (userId) => {
+      live.spectatorIds.map(async (userId) => {
         try {
           const profile = await ctx.db
             .query("profiles")
