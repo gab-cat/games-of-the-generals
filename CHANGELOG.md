@@ -70,6 +70,22 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 - Setups are checked on the server: an army must be the standard 21 pieces, one per square, and can't be changed after you lock it in
 - New global chat messages show up for everyone straight away, including a player's first message
 
+### 🔗 Easier to find and share
+
+- Links to the game now show a Season 3 preview card on Messenger, Facebook, X and Discord
+- The About, Plans, Privacy and Terms pages each have their own title and description in search results
+- Search engines only list the public pages, not sign-in screens or admin pages
+- Each tab shows the page you're on, with your unread message count in front
+
+### ⚡ Faster on every visit
+
+- The first page downloads about half as much code, and each page loads its own code when you open it
+- Music and sounds load when they first play instead of all at once, which saves about 2 MB of data on every visit
+- Return visits reuse what your browser already downloaded instead of checking every file again
+- Match history pages now go back through all your games for your plan, without repeats
+- Support screenshots keep the whole image instead of being cropped to a square
+- Changing your picture no longer downloads a large image library first
+
 ### 🎨 A cleaner look for Season 3
 
 **Every screen, refreshed**

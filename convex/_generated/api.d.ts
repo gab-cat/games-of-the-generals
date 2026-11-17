@@ -33,6 +33,7 @@ import type * as games from "../games.js";
 import type * as globalChat from "../globalChat.js";
 import type * as helpers_subscriptionHelpers from "../helpers/subscriptionHelpers.js";
 import type * as http from "../http.js";
+import type * as lib_matchHistoryCursor from "../lib/matchHistoryCursor.js";
 import type * as lib_planPricing from "../lib/planPricing.js";
 import type * as lib_replayCodec from "../lib/replayCodec.js";
 import type * as lib_userCleanup from "../lib/userCleanup.js";
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   globalChat: typeof globalChat;
   "helpers/subscriptionHelpers": typeof helpers_subscriptionHelpers;
   http: typeof http;
+  "lib/matchHistoryCursor": typeof lib_matchHistoryCursor;
   "lib/planPricing": typeof lib_planPricing;
   "lib/replayCodec": typeof lib_replayCodec;
   "lib/userCleanup": typeof lib_userCleanup;

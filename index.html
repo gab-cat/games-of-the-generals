@@ -4,75 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Primary Meta Tags -->
-    <title>
-      Games of the Generals - Online Multiplayer Strategy Board Game
-    </title>
-    <meta
-      name="title"
-      content="Games of the Generals - Online Multiplayer Strategy Board Game"
-    />
-    <meta
-      name="description"
-      content="Battle of wits in this classic Filipino strategy board game. Play Games of the Generals online with friends and players worldwide. Real-time multiplayer battles, AI opponents, and tournaments."
-    />
-    <meta
-      name="keywords"
-      content="games of the generals, board game, strategy game, multiplayer, online game, Filipino game, chess-like, strategy board, real-time game, AI opponent, tournament, battle of wits"
-    />
-    <meta name="author" content="Games of the Generals" />
-    <meta name="robots" content="index, follow" />
-    <meta name="language" content="English" />
+    <!-- Title, description, canonical, share tags and schema.org data, per
+         page. Filled at build time from src/lib/seo/pages.ts by
+         scripts/seo-plugin.ts. -->
+    <!--seo-head-->
+    <meta name="author" content="Gabriel Catimbang" />
     <meta name="theme-color" content="#0b0b0d" />
-    <meta name="msapplication-TileColor" content="#0f172a" />
-    <link rel="canonical" href="https://www.generalsonline.app" />
-
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://www.generalsonline.app" />
-    <meta
-      property="og:title"
-      content="Games of the Generals - Online Multiplayer Strategy Board Game"
-    />
-    <meta
-      property="og:description"
-      content="Battle of wits in this classic Filipino strategy board game. Play online with friends and players worldwide. Real-time multiplayer battles and AI opponents."
-    />
-    <meta property="og:image" content="/screenshots/wide-1200x630.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta
-      property="og:image:alt"
-      content="Games of the Generals - Online multiplayer strategy board game screenshot"
-    />
-    <meta property="og:image:type" content="image/png" />
-    <meta
-      property="article:published_time"
-      content="2024-01-01T00:00:00.000Z"
-    />
-    <meta property="article:modified_time" content="2025-10-24T00:00:00.000Z" />
-    <meta property="og:see_also" content="https://www.generalsonline.app" />
-    <meta property="og:site_name" content="Games of the Generals" />
-    <meta property="og:locale" content="en_US" />
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image" />
-    <meta property="twitter:url" content="https://www.generalsonline.app" />
-    <meta
-      property="twitter:title"
-      content="Games of the Generals - Online Multiplayer Strategy Board Game"
-    />
-    <meta
-      property="twitter:description"
-      content="Battle of wits in this classic Filipino strategy board game. Play online with friends and players worldwide. Real-time multiplayer battles and AI opponents."
-    />
-    <meta property="twitter:image" content="/screenshots/wide-1200x630.png" />
-    <meta
-      property="twitter:image:alt"
-      content="Games of the Generals - Online multiplayer strategy board game screenshot"
-    />
-    <meta property="twitter:site" content="@generalsonline" />
-    <meta property="twitter:creator" content="@generalsonline" />
 
     <!-- Favicon and Icons -->
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -92,15 +29,7 @@
     <!-- Additional SEO Meta Tags -->
     <meta name="format-detection" content="telephone=no" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta name="color-scheme" content="dark light" />
-
-    <!-- Language Targeting -->
-    <link rel="alternate" hreflang="en" href="https://www.generalsonline.app" />
-    <link
-      rel="alternate"
-      hreflang="x-default"
-      href="https://www.generalsonline.app"
-    />
+    <meta name="color-scheme" content="dark" />
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -158,6 +87,13 @@
       .font-mono {
         font-family: Poppins, ui-sans-serif, system-ui, sans-serif;
       }
+
+      /* Static page text from the build (scripts/seo-plugin.ts) for crawlers
+         that don't run JavaScript. React replaces it; the boot screen covers it
+         until then. */
+      .seo-shell { max-width: 40rem; margin: 0 auto; padding: 3rem 1rem; line-height: 1.6; }
+      .seo-shell h1 { font-size: 2rem; line-height: 1.1; margin: 0 0 1rem; }
+      .seo-shell a { color: #e0b45a; }
 
       /* Boot screen: the Season 3 title card, shown from the first paint until the
          app has something to show. It sits outside #root, so React never replaces it;
@@ -227,6 +163,9 @@
         .boot-flash { opacity: 0; }
       }
     </style>
+    <!-- Without JavaScript the app can't start, so show the page text instead
+         of a title card that never leaves. -->
+    <noscript><style>.boot { display: none; }</style></noscript>
 
     <!-- Performance Resource Hints - Prioritized for LCP -->
     <!-- DNS prefetch for external domains -->
@@ -236,170 +175,6 @@
     <link rel="dns-prefetch" href="//vitals.vercel-insights.com" />
 
 
-    <!-- Structured data -->
-    <script type="application/ld+json">
-      {
-        "@context": "https://schema.org",
-        "@graph": [
-          {
-            "@type": "Organization",
-            "@id": "https://www.generalsonline.app/#organization",
-            "name": "Games of the Generals",
-            "url": "https://www.generalsonline.app",
-            "description": "Developer and publisher of Games of the Generals, a classic Filipino strategy board game",
-            "foundingDate": "2024-01-01",
-            "logo": {
-              "@type": "ImageObject",
-              "url": "https://www.generalsonline.app/icons/icon-192.png",
-              "width": 192,
-              "height": 192
-            },
-            "sameAs": []
-          },
-          {
-            "@type": "WebSite",
-            "@id": "https://www.generalsonline.app/#website",
-            "url": "https://www.generalsonline.app",
-            "name": "Games of the Generals - Online Multiplayer Strategy Board Game",
-            "description": "Battle of wits in this classic Filipino strategy board game. Play online with friends and players worldwide.",
-            "inLanguage": "en-US",
-            "potentialAction": {
-              "@type": "SearchAction",
-              "target": {
-                "@type": "EntryPoint",
-                "urlTemplate": "https://www.generalsonline.app/search?q={search_term_string}"
-              },
-              "query-input": "required name=search_term_string"
-            },
-            "publisher": {
-              "@id": "https://www.generalsonline.app/#organization"
-            }
-          },
-          {
-            "@type": "VideoGame",
-            "@id": "https://www.generalsonline.app/#game",
-            "name": "Games of the Generals",
-            "description": "A classic Filipino strategy board game where players battle of wits in real-time multiplayer matches or against AI opponents",
-            "genre": ["Strategy", "Board Game"],
-            "playMode": ["MultiPlayer", "SinglePlayer"],
-            "gamePlatform": ["Web Browser", "Mobile Browser"],
-            "applicationCategory": "Game",
-            "applicationSubCategory": "Strategy Game",
-            "operatingSystem": "Any",
-            "softwareVersion": "1.0",
-            "contentRating": "ESRB Everyone",
-            "numberOfPlayers": "2",
-            "gameLocation": "Online",
-            "inLanguage": "en-US",
-            "url": "https://www.generalsonline.app",
-            "datePublished": "2024-01-01T00:00:00.000Z",
-            "dateModified": "2025-10-24T00:00:00.000Z",
-            "author": {
-              "@id": "https://www.generalsonline.app/#organization"
-            },
-            "publisher": {
-              "@id": "https://www.generalsonline.app/#organization"
-            },
-            "offers": {
-              "@type": "Offer",
-              "price": "0",
-              "priceCurrency": "USD",
-              "availability": "https://schema.org/InStock"
-            },
-            "aggregateRating": {
-              "@type": "AggregateRating",
-              "ratingValue": "5.0",
-              "ratingCount": "12390",
-              "bestRating": "5",
-              "worstRating": "0"
-            },
-            "screenshot": [
-              {
-                "@type": "ImageObject",
-                "url": "https://www.generalsonline.app/screenshots/wide-1200x630.png",
-                "width": 1200,
-                "height": 630,
-                "caption": "Games of the Generals game board"
-              },
-              {
-                "@type": "ImageObject",
-                "url": "https://www.generalsonline.app/screenshots/mobile-1080x1920.png",
-                "width": 1080,
-                "height": 1920,
-                "caption": "Games of the Generals mobile gameplay"
-              }
-            ],
-            "featureList": [
-              "Real-time multiplayer",
-              "AI opponents",
-              "Tournament support",
-              "Cross-platform play"
-            ],
-            "accessMode": ["visual", "textual"],
-            "accessibilityFeature": ["captions", "alternativeText"],
-            "isAccessibleForFree": true
-          },
-          {
-            "@type": "WebApplication",
-            "@id": "https://www.generalsonline.app/#webapp",
-            "name": "Games of the Generals",
-            "description": "Online multiplayer strategy board game web application",
-            "url": "https://www.generalsonline.app",
-            "applicationCategory": "GameApplication",
-            "operatingSystem": "Any",
-            "browserRequirements": "Modern web browser with JavaScript enabled",
-            "softwareVersion": "1.0",
-            "offers": {
-              "@type": "Offer",
-              "price": "0",
-              "priceCurrency": "USD"
-            },
-            "screenshot": [
-              {
-                "@type": "ImageObject",
-                "url": "https://www.generalsonline.app/screenshots/wide-1200x630.png",
-                "width": 1200,
-                "height": 630
-              },
-              {
-                "@type": "ImageObject",
-                "url": "https://www.generalsonline.app/screenshots/mobile-1080x1920.png",
-                "width": 1080,
-                "height": 1920
-              }
-            ],
-            "featureList": [
-              "Real-time multiplayer",
-              "AI opponents",
-              "Progressive Web App"
-            ],
-            "author": {
-              "@id": "https://www.generalsonline.app/#organization"
-            },
-            "publisher": {
-              "@id": "https://www.generalsonline.app/#organization"
-            }
-          },
-          {
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-              {
-                "@type": "ListItem",
-                "position": 1,
-                "name": "Home",
-                "item": "https://www.generalsonline.app"
-              },
-              {
-                "@type": "ListItem",
-                "position": 2,
-                "name": "Games of the Generals",
-                "item": "https://www.generalsonline.app"
-              }
-            ]
-          }
-        ]
-      }
-    </script>
   </head>
   <body>
     <!-- Boot screen: the title card, painted before any script runs. React renders
@@ -419,7 +194,7 @@
         <svg class="boot-word" viewBox="0 0 430.7 74.8" aria-hidden="true"><path fill="currentColor" d="M68.4 26L49.5 26Q47.6 22.5 44.1 20.6Q40.5 18.8 35.7 18.8L35.7 18.8Q27.4 18.8 22.4 24.3Q17.4 29.7 17.4 38.8L17.4 38.8Q17.4 48.5 22.7 54.0Q27.9 59.4 37.1 59.4L37.1 59.4Q43.4 59.4 47.8 56.2Q52.1 53 54.1 47L54.1 47L32.4 47L32.4 34.4L69.6 34.4L69.6 50.3Q67.7 56.7 63.2 62.2Q58.6 67.7 51.6 71.1Q44.6 74.5 35.8 74.5L35.8 74.5Q25.4 74.5 17.3 70.0Q9.1 65.4 4.6 57.3Q0 49.2 0 38.8L0 38.8Q0 28.4 4.6 20.3Q9.1 12.1 17.2 7.5Q25.3 3 35.7 3L35.7 3Q48.3 3 57.0 9.1Q65.6 15.2 68.4 26L68.4 26ZM128.2 45.2Q128.2 47.6 127.9 50.2L127.9 50.2L89.2 50.2Q89.6 55.4 92.6 58.2Q95.5 60.9 99.8 60.9L99.8 60.9Q106.2 60.9 108.7 55.5L108.7 55.5L126.9 55.5Q125.5 61 121.9 65.4Q118.2 69.8 112.7 72.3Q107.2 74.8 100.4 74.8L100.4 74.8Q92.2 74.8 85.8 71.3Q79.4 67.8 75.8 61.3Q72.2 54.8 72.2 46.1L72.2 46.1Q72.2 37.4 75.8 30.9Q79.3 24.4 85.7 20.9Q92.1 17.4 100.4 17.4L100.4 17.4Q108.5 17.4 114.8 20.8Q121.1 24.2 124.7 30.5Q128.2 36.8 128.2 45.2L128.2 45.2ZM89.3 40.7L110.7 40.7Q110.7 36.3 107.7 33.7Q104.7 31.1 100.2 31.1L100.2 31.1Q95.9 31.1 93.0 33.6Q90.0 36.1 89.3 40.7L89.3 40.7ZM167.7 17.6Q177.5 17.6 183.3 23.9Q189.2 30.3 189.2 41.4L189.2 41.4L189.2 74L172.2 74L172.2 43.7Q172.2 38.1 169.3 35Q166.4 31.9 161.5 31.9L161.5 31.9Q156.6 31.9 153.7 35Q150.8 38.1 150.8 43.7L150.8 43.7L150.8 74L133.7 74L133.7 18.2L150.8 18.2L150.8 25.6Q153.4 21.9 157.8 19.8Q162.2 17.6 167.7 17.6L167.7 17.6ZM250.2 45.2Q250.2 47.6 249.9 50.2L249.9 50.2L211.2 50.2Q211.6 55.4 214.6 58.2Q217.5 60.9 221.8 60.9L221.8 60.9Q228.2 60.9 230.7 55.5L230.7 55.5L248.9 55.5Q247.5 61 243.9 65.4Q240.2 69.8 234.7 72.3Q229.2 74.8 222.4 74.8L222.4 74.8Q214.2 74.8 207.8 71.3Q201.4 67.8 197.8 61.3Q194.2 54.8 194.2 46.1L194.2 46.1Q194.2 37.4 197.8 30.9Q201.3 24.4 207.7 20.9Q214.1 17.4 222.4 17.4L222.4 17.4Q230.5 17.4 236.8 20.8Q243.1 24.2 246.7 30.5Q250.2 36.8 250.2 45.2L250.2 45.2ZM211.3 40.7L232.7 40.7Q232.7 36.3 229.7 33.7Q226.7 31.1 222.2 31.1L222.2 31.1Q217.9 31.1 215.0 33.6Q212 36.1 211.3 40.7L211.3 40.7ZM272.8 27.5Q275.8 22.9 280.3 20.3Q284.8 17.6 290.3 17.6L290.3 17.6L290.3 35.7L285.6 35.7Q279.2 35.7 276 38.4Q272.8 41.2 272.8 48.1L272.8 48.1L272.8 74L255.7 74L255.7 18.2L272.8 18.2L272.8 27.5ZM291.6 46Q291.6 37.4 294.9 30.9Q298.1 24.4 303.7 20.9Q309.3 17.4 316.2 17.4L316.2 17.4Q322.1 17.4 326.6 19.8Q331 22.2 333.4 26.1L333.4 26.1L333.4 18.2L350.5 18.2L350.5 74L333.4 74L333.4 66.1Q330.9 70 326.4 72.4Q322 74.8 316.1 74.8L316.1 74.8Q309.3 74.8 303.7 71.3Q298.1 67.7 294.9 61.2Q291.6 54.6 291.6 46L291.6 46ZM333.4 46.1Q333.4 39.7 329.9 36Q326.3 32.3 321.2 32.3L321.2 32.3Q316.1 32.3 312.6 35.9Q309 39.6 309 46L309 46Q309 52.4 312.6 56.2Q316.1 59.9 321.2 59.9L321.2 59.9Q326.3 59.9 329.9 56.2Q333.4 52.5 333.4 46.1L333.4 46.1ZM359.4 0L376.5 0L376.5 74L359.4 74L359.4 0ZM408.1 74.8Q400.8 74.8 395.1 72.3Q389.4 69.8 386.1 65.5Q382.8 61.1 382.4 55.7L382.4 55.7L399.3 55.7Q399.6 58.6 402 60.4Q404.4 62.2 407.9 62.2L407.9 62.2Q411.1 62.2 412.8 61.0Q414.6 59.7 414.6 57.7L414.6 57.7Q414.6 55.3 412.1 54.2Q409.6 53 404 51.6L404 51.6Q398 50.2 394 48.7Q390 47.1 387.1 43.8Q384.2 40.4 384.2 34.7L384.2 34.7Q384.2 29.9 386.8 25.9Q389.5 22 394.6 19.7Q399.8 17.4 406.9 17.4L406.9 17.4Q417.4 17.4 423.4 22.6Q429.5 27.8 430.4 36.4L430.4 36.4L414.6 36.4Q414.2 33.5 412.1 31.8Q409.9 30.1 406.4 30.1L406.4 30.1Q403.4 30.1 401.8 31.3Q400.2 32.4 400.2 34.4L400.2 34.4Q400.2 36.8 402.8 38Q405.3 39.2 410.7 40.4L410.7 40.4Q416.9 42 420.8 43.5Q424.7 45.1 427.6 48.5Q430.6 52 430.7 57.8L430.7 57.8Q430.7 62.7 427.9 66.5Q425.2 70.4 420.1 72.6Q414.9 74.8 408.1 74.8L408.1 74.8Z"/></svg>
       </div>
     </div>
-    <div id="root"></div>
+    <div id="root"><!--seo-shell--></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

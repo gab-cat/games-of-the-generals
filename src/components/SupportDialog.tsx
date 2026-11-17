@@ -106,7 +106,6 @@ export function SupportDialog({
 
   const handleFileSelect = async (file: File) => {
     try {
-      // Dynamically import image utilities to load jimp only when needed
       const { validateImageFile, compressImage } = await import(
         "@/lib/image-utils"
       );
@@ -118,8 +117,8 @@ export function SupportDialog({
         return;
       }
 
-      // Compress image to reasonable size for attachments (max 800px)
-      const compressedBlob = await compressImage(file, 800);
+      // Keep the whole screenshot, longest side at most 800px.
+      const compressedBlob = await compressImage(file, 800, 0.8, "fit");
       const compressedFile = new File([compressedBlob], file.name, {
         type: compressedBlob.type,
       });

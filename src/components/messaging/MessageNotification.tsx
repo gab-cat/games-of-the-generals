@@ -6,6 +6,7 @@ import { api } from "../../../convex/_generated/api";
 import { Button } from "../ui/button";
 import { useQuery } from "convex-helpers/react/cache";
 import { UserAvatar } from "../UserAvatar";
+import { setTitleBadge } from "@/lib/seo/runtime";
 
 interface Message {
   _id: string;
@@ -247,29 +248,10 @@ export function MessageNotification({
     [hasPermission, handleNotificationClick],
   );
 
-  // Update document title based on unread count
+  // Unread count in front of the page title, e.g. "(2) Leaderboard · ..."
   useEffect(() => {
-    const originalTitle = "Games of the Generals";
-    const currentUnreadCount = unreadCount ?? 0;
-
-    if (currentUnreadCount > 0) {
-      document.title = `(${currentUnreadCount}) ${originalTitle}`;
-
-      // Add favicon badge effect by updating the favicon
-      const favicon =
-        document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-      if (favicon && currentUnreadCount > 0) {
-        // You could implement a dynamic favicon with a red dot here
-        // For now, just ensure the title shows the count
-      }
-    } else {
-      document.title = originalTitle;
-    }
-
-    // Cleanup on unmount
-    return () => {
-      document.title = originalTitle;
-    };
+    setTitleBadge(unreadCount ?? 0);
+    return () => setTitleBadge(0);
   }, [unreadCount]);
 
   // OPTIMIZATION: Listen for new messages and show notifications

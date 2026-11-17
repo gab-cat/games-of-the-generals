@@ -20,6 +20,9 @@ import { releaseBootScreen } from "./lib/boot-screen";
 // Create a new router instance
 const router = createRouter({
   routeTree,
+  // Pages are split into their own chunks; fetch a page's code when the
+  // player hovers or touches its link so navigation doesn't wait on it.
+  defaultPreload: "intent",
   defaultPreloadStaleTime: 0,
   scrollRestoration: true,
 });
@@ -79,7 +82,7 @@ function AppTree() {
   const tree = (
     <>
       <RouterProvider router={router} />
-      {import.meta.env.NODE_ENV === "production" && (
+      {import.meta.env.PROD && (
         <>
           <Analytics />
           <SpeedInsights />

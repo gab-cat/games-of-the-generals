@@ -11,14 +11,6 @@ crons.cron(
   {}
 );
 
-// Run daily at 00:02 UTC to delete all presence rooms
-crons.cron(
-  "Delete all presence rooms (daily 00:02 UTC)",
-  "2 0 * * *",
-  internal.maintenance.deleteAllPresenceRooms,
-  {}
-);
-
 // Run daily at 00:03 UTC to cleanup presence table records
 crons.cron(
   "Cleanup presence table records (daily 00:03 UTC)",

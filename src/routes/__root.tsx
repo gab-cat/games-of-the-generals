@@ -3,6 +3,7 @@ import {
   Outlet,
   useLocation,
   useNavigate,
+  useRouterState,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { lazy, Suspense, useState, useCallback, useEffect } from "react";
@@ -16,6 +17,7 @@ import { LoadingSpinner } from "../components/LoadingSpinner";
 import { SoundProvider } from "@/lib/SoundProvider";
 import { isOfflineApp } from "@/lib/runtime-mode";
 import { MaintenancePage } from "../pages/maintenance/maintenance-page";
+import { applyRouteSeo } from "@/lib/seo/runtime";
 
 // Lazy load Layout component for better code splitting
 const Layout = lazy(() =>
@@ -115,6 +117,10 @@ function OnlineRoot() {
 }
 
 function RootComponent() {
+  // Tab title, description, canonical and robots tags follow the route.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  useEffect(() => applyRouteSeo(pathname), [pathname]);
+
   if (isOfflineApp) {
     return <OfflineRoot />;
   }

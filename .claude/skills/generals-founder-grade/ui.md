@@ -56,6 +56,13 @@
 - The board must work at 360px wide with touch: hit targets at least 40px, no hover-only affordances.
 - Spectators see both sides; players see only their own. Check both views when you change the board.
 
+## Loading speed
+
+- Routes are split automatically (`autoCodeSplitting` in `vite.config.ts`), and links preload on hover or touch (`defaultPreload: "intent"`). Don't import page modules into route files from shared code that the entry imports.
+- Don't add a catch-all `node_modules` chunk group in `vite.config.ts`. It made every library part of the first download (about 400 KB gzipped). First load is about 190 KB gzipped of JavaScript; check with a build before adding a big dependency to anything the root or `Layout` imports.
+- Sounds load on first play (`src/lib/useSoundManager.ts`); never preload all music.
+- Image resizing uses a canvas (`src/lib/image-utils.ts`), not a library.
+
 ## Interaction details
 
 - Real links for navigation (TanStack Router `Link`) so Cmd-click opens a new tab.

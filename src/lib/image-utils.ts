@@ -1,76 +1,72 @@
 /**
- * Compresses an image file using Jimp to the specified size and returns as blob
- * Uses dynamic import to load Jimp only when needed
+ * Resizes an image in the browser with a canvas and returns a WebP blob
+ * (JPEG where the browser can't encode WebP).
+ *
+ * - "square" (avatars): centre-crops to a square of maxSize.
+ * - "fit" (attachments): keeps the whole image, longest side at most maxSize.
+ *
+ * This used to load Jimp (about 720 KB) just to crop and resize.
  */
-export async function compressImage(file: File, maxSize: number = 250, quality: number = 0.8): Promise<Blob> {
-  // Validate file type
-  if (!file.type.startsWith('image/')) {
-    throw new Error('File must be an image');
+export async function compressImage(
+  file: File,
+  maxSize: number = 250,
+  quality: number = 0.8,
+  mode: "square" | "fit" = "square",
+): Promise<Blob> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("File must be an image");
+  }
+
+  let bitmap: ImageBitmap;
+  try {
+    // Applies EXIF orientation, so phone photos come out upright.
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error("Failed to compress image");
   }
 
   try {
-    // Dynamically import Jimp only when needed
-    const { Jimp } = await import(/* webpackChunkName: "image-processing" */ 'jimp');
+    const { width, height } = bitmap;
+    let sx = 0;
+    let sy = 0;
+    let sw = width;
+    let sh = height;
+    let dw: number;
+    let dh: number;
 
-    // Convert file to array buffer
-    const arrayBuffer = await file.arrayBuffer();
-
-    // Read image with Jimp
-    const image = await Jimp.read(arrayBuffer);
-
-    // Get original dimensions
-    const { width, height } = image.bitmap;
-
-    // Calculate how to crop to square (center crop)
-    const size = Math.min(width, height);
-    const x = Math.floor((width - size) / 2);
-    const y = Math.floor((height - size) / 2);
-
-    // Crop to square then resize
-    const processedImage = image
-      .crop({ x, y, w: size, h: size })
-      .resize({ w: maxSize, h: maxSize });
-
-    // Get a high-quality JPEG buffer from Jimp (WebP not supported in our Jimp types)
-    const buffer = await processedImage.getBuffer('image/jpeg');
-
-    // Convert JPEG blob to WebP using Canvas when available; fall back to JPEG
-    const jpegBlob = new Blob([buffer as any], { type: 'image/jpeg' });
-
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      const webpBlob = await new Promise<Blob | null>((resolve) => {
-        const img = new Image();
-        const url = URL.createObjectURL(jpegBlob);
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0);
-          canvas.toBlob(
-            (blob) => {
-              URL.revokeObjectURL(url);
-              resolve(blob);
-            },
-            'image/webp',
-            quality
-          );
-        };
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          resolve(null);
-        };
-        img.src = url;
-      });
-
-      if (webpBlob) return webpBlob;
+    if (mode === "square") {
+      const side = Math.min(width, height);
+      sx = Math.floor((width - side) / 2);
+      sy = Math.floor((height - side) / 2);
+      sw = side;
+      sh = side;
+      dw = dh = Math.min(maxSize, side);
+    } else {
+      const scale = Math.min(1, maxSize / Math.max(width, height));
+      dw = Math.max(1, Math.round(width * scale));
+      dh = Math.max(1, Math.round(height * scale));
     }
 
-    return jpegBlob;
+    const canvas = document.createElement("canvas");
+    canvas.width = dw;
+    canvas.height = dh;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Failed to compress image");
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bitmap, sx, sy, sw, sh, 0, 0, dw, dh);
 
-  } catch (error) {
-    console.error('Error compressing image:', error);
-    throw new Error('Failed to compress image');
+    const toBlob = (type: string) =>
+      new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, quality));
+
+    // Browsers that can't encode WebP hand back a PNG; use JPEG then.
+    const webp = await toBlob("image/webp");
+    if (webp && webp.type === "image/webp") return webp;
+    const jpeg = await toBlob("image/jpeg");
+    if (jpeg) return jpeg;
+    throw new Error("Failed to compress image");
+  } finally {
+    bitmap.close();
   }
 }
 

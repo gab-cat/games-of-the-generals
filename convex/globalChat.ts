@@ -1591,10 +1591,14 @@ export const cleanupExpiredModeration = internalMutation({
   handler: async (ctx) => {
     const now = Date.now();
 
+    // Permanent bans and mutes have no expiresAt, and Convex sorts a missing
+    // value before every number, so `lt("expiresAt", now)` alone matched them
+    // and this cron lifted permanent bans within the hour. The lower bound
+    // keeps the range to rows that really have an expiry.
     // Find expired bans
     const expiredBans = await ctx.db
       .query("userModeration")
-      .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
+      .withIndex("by_expires_at", (q) => q.gt("expiresAt", 0).lt("expiresAt", now))
       .filter((q) => q.eq(q.field("isActive"), true))
       .filter((q) => q.eq(q.field("action"), "ban"))
       .take(50);
@@ -1602,7 +1606,7 @@ export const cleanupExpiredModeration = internalMutation({
     // Find expired mutes
     const expiredMutes = await ctx.db
       .query("userModeration")
-      .withIndex("by_expires_at", (q) => q.lt("expiresAt", now))
+      .withIndex("by_expires_at", (q) => q.gt("expiresAt", 0).lt("expiresAt", now))
       .filter((q) => q.eq(q.field("isActive"), true))
       .filter((q) => q.eq(q.field("action"), "mute"))
       .take(50);

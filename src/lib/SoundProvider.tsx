@@ -1,4 +1,4 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, useMemo, ReactNode } from 'react';
 import { useSoundManager, BGMType, SFXType } from './useSoundManager';
 
 interface SoundContextType {
@@ -15,9 +15,6 @@ interface SoundContextType {
   sfxVolume: number;
   setBGMVolume: (volume: number) => void;
   setSFXVolume: (volume: number) => void;
-
-  // State
-  isInitialized: boolean;
 }
 
 const SoundContext = createContext<SoundContextType | null>(null);
@@ -29,24 +26,22 @@ interface SoundProviderProps {
 export function SoundProvider({ children }: SoundProviderProps) {
   const soundManager = useSoundManager();
 
-  const contextValue: SoundContextType = {
-    // BGM controls
-    currentBGM: soundManager.currentBGM,
-    playBGM: soundManager.playBGM,
-    stopBGM: soundManager.stopBGM,
+  const { currentBGM, settings, playBGM, stopBGM, playSFX, setBGMVolume, setSFXVolume } = soundManager;
 
-    // SFX controls
-    playSFX: soundManager.playSFX,
-
-    // Volume controls
-    bgmVolume: soundManager.settings.bgmVolume,
-    sfxVolume: soundManager.settings.sfxVolume,
-    setBGMVolume: soundManager.setBGMVolume,
-    setSFXVolume: soundManager.setSFXVolume,
-
-    // State
-    isInitialized: soundManager.isInitialized,
-  };
+  // Stable value: consumers re-render only when a field they get changes.
+  const contextValue = useMemo<SoundContextType>(
+    () => ({
+      currentBGM,
+      playBGM,
+      stopBGM,
+      playSFX,
+      bgmVolume: settings.bgmVolume,
+      sfxVolume: settings.sfxVolume,
+      setBGMVolume,
+      setSFXVolume,
+    }),
+    [currentBGM, playBGM, stopBGM, playSFX, settings.bgmVolume, settings.sfxVolume, setBGMVolume, setSFXVolume],
+  );
 
   return (
     <SoundContext.Provider value={contextValue}>

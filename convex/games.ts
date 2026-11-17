@@ -8,6 +8,11 @@ import { Doc, Id } from "./_generated/dataModel";
 import { isSubscriptionActive } from "./featureGating";
 import { loadReplay } from "./gameArchive";
 import { encodeSetup } from "./lib/replayCodec";
+import {
+  decodeHistoryCursor,
+  mergeNewestFirst,
+  pickHistoryPage,
+} from "./lib/matchHistoryCursor";
 
 // Game pieces and their ranks
 const PIECES = {
@@ -1874,7 +1879,20 @@ export const getMatchHistory = query({
     const maxReplays = isActive ? replayLimits[tier] || 1 : 1;
 
     const { paginationOpts } = args;
-    const limit = Math.min(paginationOpts.numItems, Math.min(20, maxReplays));
+    const cursor = decodeHistoryCursor(paginationOpts.cursor);
+    const seen = cursor?.seen ?? 0;
+    const limit = Math.min(
+      paginationOpts.numItems,
+      20,
+      Math.max(0, maxReplays - seen),
+    );
+    // `seen` comes from the client. When every allowed game fits on the first
+    // page (Free), there is no next page, so a hand-made cursor can't page
+    // past the limit. Pro and Pro+ could reset `seen` that way; it would only
+    // list older games, and checking it would cost a read of up to 100 games.
+    if (limit === 0 || (cursor && maxReplays <= 20)) {
+      return { page: [], isDone: true, continueCursor: null, hasMore: false };
+    }
 
     // Get user's profile once for rank info
     const profile = await ctx.db
@@ -1882,58 +1900,46 @@ export const getMatchHistory = query({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .unique();
 
-    // Optimized: Use player-specific indexes to avoid scanning all finished games
-    // Query both player positions separately and merge results
-    const fetchLimit = limit * 2; // Fetch more to account for merging
-
+    // Both seats, newest first, from where the last page stopped. The old
+    // id-based cursor compared random ids, so later pages repeated games from
+    // the first 2x page and never reached older ones.
     const [player1Games, player2Games] = await Promise.all([
       ctx.db
         .query("games")
         .withIndex("by_player1_finished", (q) =>
-          q.eq("player1Id", userId).eq("status", "finished"),
+          cursor
+            ? q
+                .eq("player1Id", userId)
+                .eq("status", "finished")
+                .lt("finishedAt", cursor.before)
+            : q.eq("player1Id", userId).eq("status", "finished"),
         )
         .order("desc")
-        .take(fetchLimit),
+        .take(limit + 1),
       ctx.db
         .query("games")
         .withIndex("by_player2_finished", (q) =>
-          q.eq("player2Id", userId).eq("status", "finished"),
+          cursor
+            ? q
+                .eq("player2Id", userId)
+                .eq("status", "finished")
+                .lt("finishedAt", cursor.before)
+            : q.eq("player2Id", userId).eq("status", "finished"),
         )
         .order("desc")
-        .take(fetchLimit),
+        .take(limit + 1),
     ]);
 
-    // Merge and sort results by finishedAt descending, then by _id for tie-breaking
-    const allGames = [...player1Games, ...player2Games].sort((a, b) => {
-      const timeDiff = (b.finishedAt || 0) - (a.finishedAt || 0);
-      if (timeDiff !== 0) return timeDiff;
-      // If finishedAt is the same, sort by _id lexicographically
-      return b._id.localeCompare(a._id);
-    });
-
-    // Handle cursor-based pagination manually
-    let filteredGames = allGames;
-    if (paginationOpts.cursor && paginationOpts.cursor.trim() !== "") {
-      // Filter out games we've already seen (games before cursor)
-      filteredGames = allGames.filter(
-        (game) => game._id > paginationOpts.cursor!,
-      );
-    }
-
-    // Apply replay limit based on subscription tier
-    const limitedGames = filteredGames.slice(0, maxReplays);
-
-    // Take the requested page size (within the replay limit)
-    const pageGames = limitedGames.slice(0, limit);
-
-    // Determine if we have more results (within replay limit)
-    const hasMore = limitedGames.length > limit;
-
+    const { page: pageGames, continueCursor } = pickHistoryPage(
+      mergeNewestFirst(player1Games, player2Games),
+      limit,
+      seen,
+      maxReplays,
+    );
     const result = {
       page: pageGames,
-      isDone: !hasMore,
-      continueCursor:
-        pageGames.length > 0 ? pageGames[pageGames.length - 1]._id : null,
+      isDone: continueCursor === null,
+      continueCursor,
     };
 
     // Transform games into match history format

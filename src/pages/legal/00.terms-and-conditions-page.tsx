@@ -17,7 +17,7 @@ const sections = [
   { id: "s13", label: "13. Force majeure" },
   { id: "s14", label: "14. Governing law and dispute resolution" },
   { id: "s15", label: "15. Consumer rights and remedies" },
-  { id: "s16", label: "15. Miscellaneous provisions" },
+  { id: "s16", label: "16. Miscellaneous provisions" },
 ];
 
 export function TermsAndConditionsPage() {
@@ -568,7 +568,7 @@ export function TermsAndConditionsPage() {
             id="s16"
             className="mt-10 scroll-mt-24 border-t border-border pt-6 text-xl font-semibold text-foreground"
           >
-            15. Miscellaneous provisions
+            16. Miscellaneous provisions
           </h2>
           <ul className="list-disc space-y-2 pl-5 text-[15px] leading-7 text-foreground/90 marker:text-foreground/50">
             <li>

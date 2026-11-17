@@ -91,7 +91,6 @@ export function AvatarUpload({
     try {
       setIsUploading(true);
 
-      // Dynamically import image utilities to load jimp only when needed
       const { validateImageFile, compressImage } = await import(
         "@/lib/image-utils"
       );

@@ -11,9 +11,30 @@
       ],
       "destination": "https://www.generalsonline.app/:path*",
       "permanent": true
+    },
+    {
+      "source": "/:page(about|pricing|privacy|terms).html",
+      "destination": "/:page",
+      "permanent": true
     }
   ],
   "rewrites": [
+    {
+      "source": "/about",
+      "destination": "/about.html"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/pricing.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/privacy.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/terms.html"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
@@ -21,9 +42,66 @@
   ],
   "headers": [
     {
+      "source": "/:page(achievements|admin|ai-game|announcements|auth|game|leaderboard|maintenance|match-history|profile|replay|settings|spectate|subscription|support|support-resolve|test-countdown)/:rest*",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/(llms.txt|robots.txt)",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "text/plain; charset=UTF-8"
+        }
+      ]
+    },
+    {
+      "source": "/og/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
+      "source": "/(bgm|sfx|art|season|defaults|screenshots)/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
+      "source": "/main-bg.webp",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=86400, stale-while-revalidate=604800"
+        }
+      ]
+    },
+    {
       "source": "/(.*\\.html)",
       "headers": [
-        { "key": "Content-Type", "value": "text/html; charset=UTF-8" }
+        {
+          "key": "Content-Type",
+          "value": "text/html; charset=UTF-8"
+        }
       ]
     },
     {
@@ -33,12 +111,20 @@
           "key": "Cache-Control",
           "value": "no-store, no-cache, must-revalidate, proxy-revalidate"
         },
-        { "key": "Service-Worker-Allowed", "value": "/" }
+        {
+          "key": "Service-Worker-Allowed",
+          "value": "/"
+        }
       ]
     },
     {
       "source": "/manifest.webmanifest",
-      "headers": [{ "key": "Cache-Control", "value": "no-store" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
     },
     {
       "source": "/icons/icon-192.svg",

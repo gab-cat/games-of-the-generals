@@ -5,6 +5,7 @@ import { VitePWA } from "vite-plugin-pwa";
 import { visualizer } from "rollup-plugin-visualizer";
 import path from "path";
 import type { Plugin } from "vite";
+import { seoPages } from "./scripts/seo-plugin";
 
 // The app stylesheet must not block the first paint: the loader in index.html
 // carries its own inline CSS and should show the moment the HTML arrives. The
@@ -32,8 +33,9 @@ export default defineConfig(() => ({
   },
   plugins: [
     react(),
-    TanStackRouterVite(),
+    TanStackRouterVite({ autoCodeSplitting: true }),
     nonBlockingAppCss(),
+    seoPages(),
     // Bundle analyzer - run with ANALYZE=true bun run build
     ...(process.env.ANALYZE
       ? [
@@ -180,8 +182,8 @@ export default defineConfig(() => ({
             // Convex backend (excluding react-query integration)
             { name: "convex", test: /node_modules\/convex(?!.*react-query)/ },
 
-            // UI components (Radix UI)
-            { name: "ui-components", test: /node_modules\/@radix-ui/ },
+            // Radix is not grouped: each primitive loads with the screens that
+            // use it, so the first page doesn't download menus, selects and sliders.
 
             // Animation libraries
             { name: "animations", test: /node_modules\/framer-motion/ },
@@ -189,9 +191,6 @@ export default defineConfig(() => ({
               name: "formkit-animate",
               test: /node_modules\/@formkit\/auto-animate/,
             },
-
-            // Heavy image processing library
-            { name: "image-processing", test: /node_modules\/jimp/ },
 
             // Utility libraries
             {
@@ -205,20 +204,29 @@ export default defineConfig(() => ({
             // Email libraries
             { name: "email", test: /node_modules\/(@react-email|resend)/ },
 
-            // Catch-all for other vendor libraries
-            { name: "vendor", test: /node_modules/ },
+            // No catch-all "vendor" group: it pulled every other library
+            // (markdown, date-fns, the profanity list, confetti) into one chunk
+            // the entry imports, so every first visit downloaded all of them.
+            // Libraries outside the groups above load with the page that uses them.
           ],
         },
         // Optimize chunk file names
         chunkFileNames: (chunkInfo) => {
-          const facadeModuleId = chunkInfo.facadeModuleId
-            ? chunkInfo.facadeModuleId
+          // Route chunks from autoCodeSplitting have ids like
+          // "pricing.tsx?tsr-split=component". A "?" in the file name is read
+          // as a query string, so the file 404s; keep only safe characters.
+          const base = chunkInfo.facadeModuleId
+            ? (chunkInfo.facadeModuleId
+                .split("?")[0]
                 .split("/")
                 .pop()
-                ?.replace(".tsx", "")
-                .replace(".ts", "")
-            : "chunk";
-          return `assets/${facadeModuleId}-[hash].js`;
+                ?.replace(/\.(tsx|ts|jsx|js)$/, "")
+                .replace(/[^A-Za-z0-9._-]/g, "") ?? "")
+            : "";
+          const split = chunkInfo.facadeModuleId?.includes("tsr-split")
+            ? "-route"
+            : "";
+          return `assets/${base || "chunk"}${split}-[hash].js`;
         },
         // Optimize entry file names
         entryFileNames: "assets/[name]-[hash].js",

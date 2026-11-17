@@ -39,7 +39,9 @@ and `npx convex insights --prod`.
 
 ## Live data on the client
 
-- Every heartbeat is a function call per player. Global presence is one `usePresence` per tab, mounted once in `Layout` through `GlobalPresenceHeartbeat` at 120s. Never add a second `usePresence` for the same room; before November 2026 the chat and messaging panels each ran one at 60s (about 7M calls a month at 200 players).
+- Every heartbeat is a function call per player. Global presence is one heartbeat per tab, mounted once in `Layout` through `GlobalPresenceHeartbeat` at 120s. Never add a second `usePresence` for the same room; before November 2026 the chat and messaging panels each ran one at 60s (about 7M calls a month at 200 players).
+- The library's `usePresence` always subscribes to `presence.list` for its room. The global heartbeat (`useGlobalPresenceHeartbeat` in `src/lib/useOnlineUsers.tsx`) is a heartbeat-only copy, because every tab re-ran a 100-row list it never used. Use `usePresence` only where the room list is shown (the game board).
+- `gamePresence.heartbeat` authorizes a player through `profile.gameId === roomId` and reads the game row only when that doesn't match. Every game-ending path must keep clearing `profile.gameId` in the same mutation.
 - The game room heartbeat (`api.gamePresence` in `src/components/GameBoard.tsx`) is 60s because disconnect forfeits use a 2-minute grace period. Don't shorten it.
 - Subscribe only while the thing is on screen: `useOnlineUsers(isOpen)`, `"skip"` until needed (`getMatchResult` is skipped until the game is finished).
 - A query re-runs for every subscriber whenever any doc it read changes. `getSpectatableGames` reads every live game, so it returns only list fields, not the 5 KB game row. Hot lists get slim return shapes; if it is still heavy, keep a summary row updated on write.
@@ -50,6 +52,8 @@ and `npx convex insights --prod`.
 
 - Every query path uses `.withIndex(name, q => range)`. `.withIndex("x").filter(field < cutoff)` looks indexed but scans every row past the cutoff when fewer rows match than the `take`. Five crons did this until November 2026.
 - Bound every read: `.take(n)`, `.paginate()`, or a tight index range. `.collect()` only on tables that stay small.
+- Convex sorts a missing field before every number. `.lt("field", x)` on an optional field matches every row without it. Add a lower bound (`.gt("field", 0).lt(...)`). `cleanupExpiredModeration` lifted permanent bans this way until November 2026.
+- Paginating two merged index ranges (player 1 and player 2 seats) needs a cursor in index order, not a document id: ids are random. See `convex/lib/matchHistoryCursor.ts`.
 - Point lookups for "current game": `findActiveGame` uses `by_player1_status` and `by_player2_status`. Filtering `by_player1` on status read a player's whole history.
 - Conversations: use `by_participants`; the system notification thread is `participant1Id === participant2Id === userId` with `isSystemNotification`.
 - Don't return whole game rows. `getGame` strips `initialSetupBoard` and `replay`; `getGameReplay` returns `{ _id, _creationTime }` for the game.

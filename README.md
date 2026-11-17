@@ -185,6 +185,10 @@ This game is a fully functional PWA that can be installed on your device:
 2. Click "Install" when prompted, or use the menu option
 3. Play offline with the same features!
 
+## 🔎 Search and link previews
+
+Page titles, descriptions, indexing and schema.org data live in one place: `src/lib/seo/pages.ts`. The build (`scripts/seo-plugin.ts`) writes a pre-filled HTML file for each public page (`dist/about.html`, ...), plus `sitemap.xml`, `robots.txt` and `llms.txt`. `vercel.json` rewrites `/about` to `/about.html` and sends `X-Robots-Tag: noindex` for pages behind sign-in. In the browser, `src/lib/seo/runtime.ts` keeps the tags in step with the route. When you add a route, add it to `PUBLIC_PAGES` or `PRIVATE_PAGES`; `tests/seo.test.ts` fails until you do.
+
 ## 🔧 Development
 
 ### Available Scripts
@@ -202,7 +206,7 @@ npm run build:analyze   # Build with bundle analysis
 # Quality Assurance
 npm run lint            # Run ESLint and TypeScript checks
 npm run icons           # Generate PWA icons
-npm run sitemap         # Generate sitemap
+node scripts/generate-og-image.mjs  # Redraw the link preview image from the title card
 ```
 
 ### Code Quality
