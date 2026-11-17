@@ -12,8 +12,9 @@ function requireEnv(name: string, value: string | undefined): string {
   return value;
 }
 
-const PAYMONGO_SECRET_KEY = requireEnv("PAYMONGO_SECRET_KEY", process.env.PAYMONGO_SECRET_KEY);
-const PAYMONGO_WEBHOOK_SECRET = requireEnv("PAYMONGO_WEBHOOK_SECRET", process.env.PAYMONGO_WEBHOOK_SECRET);
+// Read at call time, not module load: a deployment without PayMongo keys
+// (like a Vercel preview backend) must still be able to load this module.
+const paymongoSecretKey = () => requireEnv("PAYMONGO_SECRET_KEY", process.env.PAYMONGO_SECRET_KEY);
 
 // Helper function to base64 encode
 function base64Encode(str: string): string {
@@ -32,7 +33,7 @@ async function paymongoRequest(
   body?: any
 ): Promise<any> {
   const url = `${PAYMONGO_API_BASE}${endpoint}`;
-  const authString = base64Encode(PAYMONGO_SECRET_KEY + ":");
+  const authString = base64Encode(paymongoSecretKey() + ":");
   const headers: Record<string, string> = {
     "Authorization": `Basic ${authString}`,
     "Content-Type": "application/json",
@@ -217,7 +218,8 @@ export async function verifyWebhookSignature(
   timestamp: string,
   _isLiveMode: boolean = false
 ): Promise<boolean> {
-  if (!PAYMONGO_WEBHOOK_SECRET) {
+  const webhookSecret = process.env.PAYMONGO_WEBHOOK_SECRET;
+  if (!webhookSecret) {
     console.warn("PayMongo webhook secret not configured");
     return false;
   }
@@ -226,7 +228,7 @@ export async function verifyWebhookSignature(
   
   // Use Web Crypto API for HMAC
   const encoder = new TextEncoder();
-  const keyData = encoder.encode(PAYMONGO_WEBHOOK_SECRET);
+  const keyData = encoder.encode(webhookSecret);
   const messageData = encoder.encode(signedPayload);
   
   const cryptoKey = await crypto.subtle.importKey(
