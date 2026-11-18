@@ -126,3 +126,12 @@ describe("rendered files", () => {
     expect(llms).toContain(`(${SITE_URL}/pricing)`);
   });
 });
+
+describe("Discord link", () => {
+  test("is in the organization's sameAs and in llms.txt", async () => {
+    const { DISCORD_INVITE_URL } = await import("../src/lib/community");
+    expect(DISCORD_INVITE_URL).toMatch(/^https:\/\/discord\.gg\/\w+$/);
+    expect(JSON.stringify(structuredData(PUBLIC_PAGES[0]))).toContain(DISCORD_INVITE_URL);
+    expect(renderLlmsTxt()).toContain(`(${DISCORD_INVITE_URL})`);
+  });
+});

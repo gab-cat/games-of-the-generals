@@ -1,6 +1,9 @@
 import { motion } from "framer-motion";
+import { ArrowUpRight } from "lucide-react";
 import { ChevronClash, SeasonSticker } from "@/components/season/ChevronClash";
 import { OtherGameCard } from "@/components/OtherGames";
+import { DiscordIcon } from "@/components/Discord";
+import { DISCORD_INVITE_URL, DISCORD_SERVER_NAME } from "@/lib/community";
 import { cn } from "@/lib/utils";
 
 /*
@@ -79,6 +82,24 @@ export function SignInHero() {
           The Filipino strategy board game of hidden ranks, played live against
           real opponents.
         </motion.p>
+
+        <motion.a
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.3, duration: 0.5 }}
+          href={DISCORD_INVITE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group mt-4 inline-flex w-fit items-center gap-2 rounded-md border border-[#5865F2]/45 bg-[#5865F2]/10 px-3 py-2 text-sm font-medium text-foreground transition-[background-color,border-color,transform] duration-150 hover:border-[#5865F2]/70 hover:bg-[#5865F2]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 active:scale-[0.98]"
+        >
+          <DiscordIcon className="size-[18px] text-[#8c95ff]" />
+          Join the {DISCORD_SERVER_NAME} Discord
+          <ArrowUpRight
+            aria-hidden="true"
+            className="size-3.5 transition-transform duration-150 group-hover:-translate-y-0.5 group-hover:translate-x-0.5"
+          />
+          <span className="sr-only">(opens in a new tab)</span>
+        </motion.a>
 
         <motion.div
           initial={{ opacity: 0, y: 8 }}

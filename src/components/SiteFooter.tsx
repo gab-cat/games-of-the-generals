@@ -4,6 +4,8 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { BrandLockup } from "./BrandMark";
 import { ChevronClash } from "./season/ChevronClash";
 import { OtherGameCard, OtherGameLink } from "./OtherGames";
+import { DiscordIcon } from "./Discord";
+import { DISCORD_INVITE_URL } from "@/lib/community";
 import { cn } from "@/lib/utils";
 import packageJson from "../../package.json";
 
@@ -22,11 +24,11 @@ import packageJson from "../../package.json";
 export const SOURCE_URL = "https://github.com/gab-cat/games-of-the-generals";
 const LINKEDIN_URL = "https://www.linkedin.com/in/gabrielcatimbang/";
 
-type FooterLink = {
-  label: string;
-  to: string;
-  search?: Record<string, unknown>;
-};
+type FooterLink =
+  | { label: string; to: string; search?: Record<string, unknown> }
+  | { label: string; href: string };
+
+const DISCORD_LINK: FooterLink = { label: "Discord", href: DISCORD_INVITE_URL };
 
 const FOOTER_GROUPS: Array<{ title: string; links: FooterLink[] }> = [
   {
@@ -42,6 +44,7 @@ const FOOTER_GROUPS: Array<{ title: string; links: FooterLink[] }> = [
   {
     title: "Help",
     links: [
+      DISCORD_LINK,
       { label: "Support", to: "/support", search: { ticketId: undefined } },
       { label: "About", to: "/about" },
       { label: "Pricing", to: "/pricing" },
@@ -62,6 +65,7 @@ const MINIMAL_LINKS: FooterLink[] = [
   { label: "About", to: "/about" },
   { label: "Pricing", to: "/pricing" },
   { label: "Support", to: "/support", search: { ticketId: undefined } },
+  DISCORD_LINK,
   { label: "Privacy", to: "/privacy" },
   { label: "Terms", to: "/terms" },
 ];
@@ -70,6 +74,20 @@ const linkClass =
   "rounded-sm text-sm text-foreground/80 underline decoration-transparent underline-offset-4 transition-colors hover:text-foreground hover:decoration-gold-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70";
 
 function FooterLinkItem({ link }: { link: FooterLink }) {
+  if ("href" in link) {
+    return (
+      <a
+        href={link.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={cn(linkClass, "inline-flex items-center gap-1.5")}
+      >
+        <DiscordIcon className="size-3.5 text-[#8c95ff]" />
+        {link.label}
+        <span className="sr-only">(opens in a new tab)</span>
+      </a>
+    );
+  }
   return (
     <Link to={link.to} search={link.search as never} className={linkClass}>
       {link.label}

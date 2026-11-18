@@ -55,6 +55,8 @@ import { MessageNotification } from "./messaging/MessageNotification";
 import { useQuery } from "convex-helpers/react/cache";
 import { useSound } from "../lib/SoundProvider";
 import { SiteFooter } from "./SiteFooter";
+import { DiscordHeaderButton, DiscordIcon } from "./Discord";
+import { DISCORD_INVITE_URL } from "@/lib/community";
 import { ExpiryWarningBanner } from "./subscription/ExpiryWarningBanner";
 
 // Lazy load components
@@ -365,6 +367,7 @@ export function Layout({
 
           {showAppChrome && user && (
             <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+              <DiscordHeaderButton />
               <TutorialButton onOpen={() => setShowTutorial(true)} />
               <Suspense fallback={<div className="h-9 w-9" />}>
                 <MessageButton
@@ -495,6 +498,16 @@ export function Layout({
                       <LifeBuoy /> Support
                     </Link>
                   </DropdownMenuItem>
+                  <DropdownMenuItem asChild className={menuItemClass}>
+                    <a
+                      href={DISCORD_INVITE_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <DiscordIcon className="!text-[#8c95ff]" /> Discord
+                      <span className="sr-only">(opens in a new tab)</span>
+                    </a>
+                  </DropdownMenuItem>
                   {profile?.adminRole && (
                     <DropdownMenuItem asChild className={menuItemClass}>
                       <Link to="/admin">
@@ -522,9 +535,19 @@ export function Layout({
 
           {!isAuthenticated && (
             <nav
-              aria-label="Legal"
+              aria-label="Site"
               className="hidden shrink-0 items-center gap-1 sm:flex"
             >
+              <a
+                href={DISCORD_INVITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-[#5865F2]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+              >
+                <DiscordIcon className="size-4 text-[#8c95ff]" />
+                Discord
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
               <Link
                 to="/about"
                 className="rounded-md px-3 py-2 text-sm text-foreground/75 transition-colors hover:bg-white/[0.04] hover:text-foreground"

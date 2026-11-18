@@ -311,7 +311,7 @@ Need help or have questions?
 - **Website**: [https://generalsonline.app](https://generalsonline.app)
 - **Live Demo**: [Play Now](https://generalsonline.app)
 - **Documentation**: [Wiki](https://github.com/yourusername/games-of-generals/wiki)
-- **Discord**: [Join Community](https://discord.gg/generalsonline)
+- **Discord**: [Join Community](https://discord.gg/FM7BNNjqqW)
 
 ---
 

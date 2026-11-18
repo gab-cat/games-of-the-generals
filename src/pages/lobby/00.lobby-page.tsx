@@ -11,6 +11,7 @@ import type { LobbyTab } from "./02.lobby-tabs";
 import { useQuery } from "convex-helpers/react/cache";
 import { UpgradeDonationCTA } from "../../components/subscription/UpgradeDonationCTA";
 import { TournamentInvite } from "./TournamentInvite";
+import { DiscordLobbyInvite } from "../../components/Discord";
 
 interface Profile {
   _id: Id<"profiles">;
@@ -86,7 +87,11 @@ export function LobbyPage({ profile, onOpenMessaging }: LobbyPageProps) {
     <>
       <div className="space-y-6 pb-4 sm:space-y-8">
         <h1 className="sr-only">Lobbies</h1>
-        <TournamentInvite />
+        {/* Both invites can be hidden; the wrapper collapses when they are. */}
+        <div className="space-y-3 empty:hidden">
+          <TournamentInvite />
+          <DiscordLobbyInvite />
+        </div>
         <LobbyListTab
           profile={profile}
           activeTab={activeTab}

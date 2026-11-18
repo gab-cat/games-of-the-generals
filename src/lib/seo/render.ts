@@ -5,6 +5,7 @@
  * tests/seo.test.ts.
  */
 import { pricingTiers } from "../pricing-tiers";
+import { DISCORD_INVITE_URL } from "../community";
 import {
   PUBLIC_PAGES,
   SHARE_IMAGE,
@@ -62,7 +63,7 @@ export function structuredData(page: PublicPage) {
         name: "Gabriel Catimbang",
         sameAs: ["https://www.linkedin.com/in/gabrielcatimbang/"],
       },
-      sameAs: ["https://github.com/gab-cat/games-of-the-generals"],
+      sameAs: ["https://github.com/gab-cat/games-of-the-generals", DISCORD_INVITE_URL],
     },
     {
       "@type": "WebSite",
@@ -232,5 +233,9 @@ ${pages}
 ## Source
 
 - [Source code on GitHub](https://github.com/gab-cat/games-of-the-generals)
+
+## Community
+
+- [Generals Online Discord](${DISCORD_INVITE_URL})
 `;
 }

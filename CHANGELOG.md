@@ -76,6 +76,11 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 - Once we confirm a QR Ph donation in your support ticket, donations of ₱50 or more in total turn on the donor badge, name colour and profile frame
 - On a phone, save the QR image and upload it in your app's scanner
 
+### 🌐 Join us on Discord
+
+- Generals Online has a Discord server. Find players for a match, report bugs and hear about updates first
+- Open it from the Discord button at the top of every page, your account menu, the lobby, the sign-in page or the footer
+
 ### 🔗 Easier to find and share
 
 - Links to the game now show a Season 3 preview card on Messenger, Facebook, X and Discord

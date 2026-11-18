@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PageHeader } from "@/components/ui/page-header";
+import { DISCORD_INVITE_URL } from "@/lib/community";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SupportDialog } from "@/components/SupportDialog";
@@ -101,7 +102,21 @@ export function SupportTicketsPage({
     <div className="mx-auto max-w-3xl pb-10">
       <PageHeader
         title="Support"
-        description="Report a bug, ask about your account or suggest a feature. We reply in the ticket."
+        description={
+          <>
+            Report a bug, ask about your account or suggest a feature. We reply
+            in the ticket. For quick questions, ask in the{" "}
+            <a
+              href={DISCORD_INVITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-sm font-medium text-[#aab0ff] underline underline-offset-4 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+            >
+              Discord
+            </a>
+            .
+          </>
+        }
         actions={newTicketButton}
       />
 

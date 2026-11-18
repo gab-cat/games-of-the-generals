@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Github, Linkedin, Mail, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BrandLockup } from "@/components/BrandMark";
+import { DiscordIcon } from "@/components/Discord";
+import { DISCORD_INVITE_URL } from "@/lib/community";
 import { fadeUp, stagger } from "@/lib/motion";
 
 const CONTACT = {
@@ -12,6 +14,7 @@ const CONTACT = {
 } as const;
 
 const LINKS = [
+  { label: "Discord", href: DISCORD_INVITE_URL, icon: DiscordIcon },
   { label: "GitHub", href: CONTACT.github, icon: Github },
   { label: "LinkedIn", href: CONTACT.linkedin, icon: Linkedin },
   { label: "Messenger", href: CONTACT.messenger, icon: MessageCircle },
@@ -63,6 +66,9 @@ export function MaintenancePage() {
                 If you&apos;d like to help keep it alive, I&apos;d really
                 appreciate it. Send me a note anytime.
               </p>
+              <p>
+                News about the game coming back goes to the Discord first.
+              </p>
             </div>
           </motion.div>
 
@@ -73,7 +79,7 @@ export function MaintenancePage() {
                 {CONTACT.email}
               </a>
             </Button>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {LINKS.map(({ label, href, icon: Icon }) => (
                 <Button key={label} asChild variant="secondary">
                   <a href={href} target="_blank" rel="noopener noreferrer">

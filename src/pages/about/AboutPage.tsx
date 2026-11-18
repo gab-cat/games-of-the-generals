@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { Github, Linkedin, Mail } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { OtherGameCard } from "@/components/OtherGames";
+import { DiscordIcon } from "@/components/Discord";
+import { DISCORD_INVITE_URL } from "@/lib/community";
 import { Button } from "@/components/ui/button";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { fadeUp, stagger } from "@/lib/motion";
@@ -48,6 +50,12 @@ export function AboutPage() {
           </p>
           <OtherGameCard placement="about" className="mt-4 max-w-md" />
           <div className="mt-5 flex flex-wrap gap-2">
+            <Button variant="secondary" asChild>
+              <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener noreferrer">
+                <DiscordIcon className="text-[#8c95ff]" />
+                Discord
+              </a>
+            </Button>
             <Button variant="secondary" asChild>
               <a
                 href="https://github.com/gab-cat/games-of-the-generals"
@@ -102,6 +110,15 @@ export function AboutPage() {
             <Link to="/announcements" className={linkClass}>
               news page
             </Link>
+            . To talk with other players or find a match, join the{" "}
+            <a
+              href={DISCORD_INVITE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkClass}
+            >
+              Discord
+            </a>
             .
           </p>
         </motion.section>
