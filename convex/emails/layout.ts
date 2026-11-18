@@ -42,7 +42,12 @@ export type Block =
   | { kind: "quote"; label: string; text: string }
   | { kind: "stats"; items: { label: string; value: string }[] }
   | { kind: "note"; text: string }
-  | { kind: "signature"; lines: string[] };
+  | { kind: "signature"; lines: string[] }
+  /** A checklist of things to act on, each with its own link. */
+  | {
+      kind: "items";
+      items: { title: string; tag?: string; meta: string; href: string; linkLabel: string }[];
+    };
 
 export type EmailContent = {
   subject: string;
@@ -168,6 +173,26 @@ function blockHtml(block: Block, index: number): string {
         `<p style="margin:0;font-family:${FONT};font-size:14px;line-height:22px;color:${C.label};">${inlineHtml(block.text)}</p>`,
         "0 40px 18px",
       );
+    case "items": {
+      const rows = block.items
+        .map((item, i) => {
+          const top = i === 0 ? "none" : `1px solid ${C.border}`;
+          const tag = item.tag
+            ? ` <span style="display:inline-block;margin-left:6px;padding:1px 8px;border:1px solid ${C.gold};border-radius:4px;font-size:12px;line-height:18px;font-weight:600;color:${C.gold};">${escapeHtml(item.tag)}</span>`
+            : "";
+          return `<tr>
+            <td align="left" valign="top" style="padding:14px 20px;border-top:${top};">
+              <div style="font-family:${FONT};font-size:15px;line-height:22px;font-weight:600;color:${C.heading};">${escapeHtml(item.title)}${tag}</div>
+              <div style="margin-top:2px;font-family:${FONT};font-size:14px;line-height:20px;color:${C.label};">${escapeHtml(item.meta)}</div>
+            </td>
+            <td align="right" valign="middle" style="padding:14px 20px;border-top:${top};white-space:nowrap;">
+              <a href="${escapeHtml(item.href)}" target="_blank" style="font-family:${FONT};font-size:14px;line-height:20px;font-weight:600;color:${C.gold};text-decoration:underline;">${escapeHtml(item.linkLabel)}</a>
+            </td>
+          </tr>`;
+        })
+        .join("");
+      return row(panel(rows), "6px 40px 24px");
+    }
     case "signature": {
       // Last line is the name.
       const lines = block.lines.map((line, i) =>
@@ -202,6 +227,10 @@ function blockText(block: Block): string {
       return block.items.map((s) => `${s.label}: ${s.value}`).join("\n");
     case "signature":
       return block.lines.join("\n");
+    case "items":
+      return block.items
+        .map((i) => `${i.title}${i.tag ? ` (${i.tag.toLowerCase()})` : ""}\n${i.meta}\n${i.linkLabel}: ${i.href}`)
+        .join("\n\n");
   }
 }
 

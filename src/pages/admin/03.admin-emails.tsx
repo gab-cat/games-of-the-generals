@@ -30,6 +30,7 @@ const GROUPS: EmailGroup[] = [
   "Announcements",
   "Account",
   "Moderation",
+  "Admin",
   "Other",
 ];
 const FROM = "Games of the Generals <noreply@generalsonline.app>";

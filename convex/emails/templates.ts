@@ -217,6 +217,84 @@ export function relaunchEmail(a: {
 }
 
 // ---------------------------------------------------------------------------
+// Admin
+
+export type DonationDigestReport = {
+  ticketId: string;
+  username: string;
+  amountCentavos: number;
+  methodLabel: string;
+  reference: string;
+  createdAt: number;
+  isNew: boolean;
+};
+
+const peso = (centavos: number) =>
+  `₱${(centavos / 100).toLocaleString("en-PH", { maximumFractionDigits: 2 })}`;
+
+const ago = (ms: number) => `${formatDuration(Math.max(ms, 60_000))} ago`;
+
+/** Batched alert for admins: new QR Ph donation reports, or a reminder about old ones. */
+export function donationReportsEmail(a: {
+  mode: "new" | "reminder";
+  reports: DonationDigestReport[];
+  overdueCount: number;
+  now: number;
+}): RenderedEmail {
+  const fresh = a.reports.filter((r) => r.isNew);
+  const total = a.reports.reduce((sum, r) => sum + r.amountCentavos, 0);
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+  let subject: string;
+  let heading: string;
+  if (a.mode === "reminder") {
+    subject = `${plural(a.overdueCount, "donation report")} waiting over a day`;
+    heading = `${plural(a.reports.length, "donation report")} to check`;
+  } else if (fresh.length === 1 && fresh[0]) {
+    subject = `New donation: ${peso(fresh[0].amountCentavos)} from ${fresh[0].username}`;
+    heading = `${fresh[0].username} sent ${peso(fresh[0].amountCentavos)}`;
+  } else {
+    const freshTotal = fresh.reduce((sum, r) => sum + r.amountCentavos, 0);
+    subject = `${plural(fresh.length, "new donation report")}, ${peso(freshTotal)} in total`;
+    heading = `${plural(fresh.length, "new donation report")}`;
+  }
+
+  const older = a.reports.length - fresh.length;
+  const intro =
+    a.mode === "reminder"
+      ? "These players are waiting for their donor badge. Find each reference number in your Maya history, then confirm it in the ticket."
+      : "Find each reference number in your Maya history, then confirm it in the ticket. Confirming turns on the player's donor badge.";
+
+  return renderEmail({
+    subject,
+    preheader:
+      older > 0 && a.mode === "new"
+        ? `${plural(older, "older report")} still waiting too.`
+        : `${peso(total)} waiting to be confirmed.`,
+    blocks: [
+      { kind: "heading", text: heading },
+      { kind: "paragraph", text: intro },
+      {
+        kind: "items",
+        items: a.reports.map((r) => ({
+          title: `${peso(r.amountCentavos)} from ${r.username}`,
+          tag: r.isNew && a.mode === "new" ? "New" : undefined,
+          meta: `${r.methodLabel} · Ref ${r.reference} · ${ago(a.now - r.createdAt)}`,
+          href: `${SITE_URL}/admin/tickets?ticketId=${encodeURIComponent(r.ticketId)}`,
+          linkLabel: "Open",
+        })),
+      },
+      { kind: "button", label: "All tickets", href: `${SITE_URL}/admin/tickets` },
+      {
+        kind: "note",
+        text: "New reports are grouped into one email at most once an hour. Reports waiting over a day get a reminder at 9 AM. Not in your account? Reply in the ticket and close it.",
+      },
+    ],
+    reason: "You got this email because you're an admin of Games of the Generals.",
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Internal
 
 export function testEmail(): RenderedEmail {

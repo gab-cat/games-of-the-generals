@@ -687,13 +687,25 @@ const applicationTables = {
         confirmedAt: v.optional(v.number()),
         confirmedAmountCentavos: v.optional(v.number()),
         confirmedById: v.optional(v.id("users")),
+        // When this report was first in an alert email to the admins (donationAlerts.ts).
+        alertedAt: v.optional(v.number()),
       }),
     ),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
     .index("by_status_created", ["status", "createdAt"])
+    // Waiting donation reports, for the admin alert emails.
+    .index("by_category_status", ["category", "status", "createdAt"])
     .index("by_user_created", ["userId", "createdAt"]),
+
+  // One row per kind of batched admin alert email: when the next one is due and
+  // when the last one went out, so bursts become one email (donationAlerts.ts).
+  adminAlerts: defineTable({
+    kind: v.literal("donation_reports"),
+    scheduledFor: v.optional(v.number()),
+    lastSentAt: v.optional(v.number()),
+  }).index("by_kind", ["kind"]),
 
   // Support Ticket Updates/Comments
   supportTicketUpdates: defineTable({

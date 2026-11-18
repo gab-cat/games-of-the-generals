@@ -2,7 +2,7 @@
 import type { RenderedEmail } from "./layout";
 import * as t from "./templates";
 
-export type EmailGroup = "Announcements" | "Account" | "Moderation" | "Other";
+export type EmailGroup = "Announcements" | "Account" | "Moderation" | "Admin" | "Other";
 
 export type CatalogEntry = {
   id: string;
@@ -82,6 +82,26 @@ export const EMAIL_CATALOG: CatalogEntry[] = [
     group: "Moderation",
     trigger: "A moderator lifts a ban",
     render: () => t.unbanEmail({ ...sample, reason: "Appeal approved." }),
+  },
+  {
+    id: "donation-reports",
+    name: "Donation reports",
+    group: "Admin",
+    trigger: "Players report QR Ph donations; batched, at most once an hour, plus a 9 AM reminder",
+    render: () => {
+      const now = Date.now();
+      const minute = 60_000;
+      return t.donationReportsEmail({
+        mode: "new",
+        now,
+        overdueCount: 0,
+        reports: [
+          { ticketId: "sample1", username: "MarcoReyes", amountCentavos: 10000, methodLabel: "GCash", reference: "1034567890123", createdAt: now - 12 * minute, isNew: true },
+          { ticketId: "sample2", username: "liza.sy", amountCentavos: 50000, methodLabel: "Maya", reference: "A7K29QX0", createdAt: now - 4 * minute, isNew: true },
+          { ticketId: "sample3", username: "jun_dela", amountCentavos: 5000, methodLabel: "Bank app", reference: "IP20261117883", createdAt: now - 26 * 60 * minute, isNew: false },
+        ],
+      });
+    },
   },
   {
     id: "test",

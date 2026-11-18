@@ -37,9 +37,13 @@ import {
   statusLabel,
 } from "./support-ui";
 
-export function SupportResolvePage() {
+export function SupportResolvePage({
+  initialTicketId,
+}: { initialTicketId?: string } = {}) {
   const [selectedTicketId, setSelectedTicketId] =
-    useState<Id<"supportTickets"> | null>(null);
+    useState<Id<"supportTickets"> | null>(
+      (initialTicketId as Id<"supportTickets"> | undefined) ?? null,
+    );
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");

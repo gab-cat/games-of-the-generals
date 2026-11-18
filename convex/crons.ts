@@ -126,6 +126,15 @@ crons.cron(
   {}
 );
 
+// 01:00 UTC is 9 AM in Manila. Sends only when a QR Ph donation report has
+// waited over a day (donationAlerts.ts), so most days it does nothing.
+crons.cron(
+  "Remind admins about waiting donation reports (daily 9 AM Manila)",
+  "0 1 * * *",
+  internal.donationAlerts.sendDonationDigest,
+  { mode: "reminder" },
+);
+
 export default crons;
 
 

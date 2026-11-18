@@ -3,6 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
 import { applyDonationToProfile } from "./subscriptions";
+import { scheduleDonationDigest } from "./donationAlerts";
 import {
   DONOR_THRESHOLD_CENTAVOS,
   MAX_PENDING_REPORTS,
@@ -88,7 +89,7 @@ export const reportQrDonation = mutation({
     if (note) lines.push("", note);
 
     const now = Date.now();
-    return await ctx.db.insert("supportTickets", {
+    const ticketId = await ctx.db.insert("supportTickets", {
       userId,
       username: profile.username,
       category: "donation",
@@ -102,6 +103,9 @@ export const reportQrDonation = mutation({
       createdAt: now,
       updatedAt: now,
     });
+    // One batched email to the admins, not one per report.
+    await scheduleDonationDigest(ctx);
+    return ticketId;
   },
 });
 

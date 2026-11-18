@@ -9,6 +9,8 @@ const SupportResolvePage = lazy(() =>
 );
 
 function AdminTicketsComponent() {
+  // ?ticketId= opens one ticket, e.g. from a donation alert email.
+  const { ticketId } = Route.useSearch();
   return (
     <Suspense
       fallback={
@@ -18,11 +20,13 @@ function AdminTicketsComponent() {
         </div>
       }
     >
-      <SupportResolvePage />
+      <SupportResolvePage key={ticketId} initialTicketId={ticketId} />
     </Suspense>
   );
 }
 
 export const Route = createFileRoute("/admin/tickets")({
   component: AdminTicketsComponent,
+  validateSearch: (search: Record<string, unknown>): { ticketId?: string } =>
+    typeof search.ticketId === "string" ? { ticketId: search.ticketId } : {},
 });
