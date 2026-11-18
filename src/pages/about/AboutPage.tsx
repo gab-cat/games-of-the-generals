@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Github, Linkedin, Mail } from "lucide-react";
 import { Link } from "@tanstack/react-router";
+import { OtherGameCard } from "@/components/OtherGames";
 import { Button } from "@/components/ui/button";
 import { PageHeader, SectionHeader } from "@/components/ui/page-header";
 import { fadeUp, stagger } from "@/lib/motion";
@@ -45,6 +46,7 @@ export function AboutPage() {
             built it to preserve the classic Game of the Generals and bring it
             online.
           </p>
+          <OtherGameCard placement="about" className="mt-4 max-w-md" />
           <div className="mt-5 flex flex-wrap gap-2">
             <Button variant="secondary" asChild>
               <a

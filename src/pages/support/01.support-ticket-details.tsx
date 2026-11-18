@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Id } from "../../../convex/_generated/dataModel";
 import { fadeUp } from "@/lib/motion";
+import { DonationConfirmPanel } from "./donation-confirm-panel";
 import {
   PriorityText,
   ReplyBox,
@@ -231,6 +232,14 @@ export function SupportTicketDetails({
             </Select>
           </div>
         </motion.section>
+      )}
+
+      {isAdminView && ticket.category === "donation" && ticket.donationReport && (
+        <DonationConfirmPanel
+          ticketId={ticket._id}
+          username={ticket.username}
+          report={ticket.donationReport}
+        />
       )}
 
       <TicketThread ticket={ticket} updates={updates} />

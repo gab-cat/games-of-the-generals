@@ -647,7 +647,9 @@ const applicationTables = {
       v.literal("feature_request"),
       v.literal("account_issue"),
       v.literal("game_issue"),
-      v.literal("other")
+      v.literal("other"),
+      // A player's report of a QR Ph transfer (qrDonations.ts); an admin confirms it.
+      v.literal("donation")
     ),
     subject: v.string(),
     description: v.string(),
@@ -670,6 +672,23 @@ const applicationTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
     closedAt: v.optional(v.number()),
+    // Only on "donation" tickets: what the player says they sent, and the
+    // admin's confirmation once the money is seen in the account.
+    donationReport: v.optional(
+      v.object({
+        amountCentavos: v.number(),
+        method: v.union(
+          v.literal("gcash"),
+          v.literal("maya"),
+          v.literal("bank"),
+          v.literal("other"),
+        ),
+        reference: v.string(),
+        confirmedAt: v.optional(v.number()),
+        confirmedAmountCentavos: v.optional(v.number()),
+        confirmedById: v.optional(v.id("users")),
+      }),
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
@@ -777,8 +796,10 @@ const applicationTables = {
   donations: defineTable({
     userId: v.id("users"),
     amount: v.number(), // Amount in PHP (centavos)
-    paymongoPaymentId: v.string(), // PayMongo payment intent ID
+    paymongoPaymentId: v.string(), // PayMongo payment intent ID, or "qrph:<ticketId>" for QR Ph
     status: v.union(v.literal("pending"), v.literal("succeeded"), v.literal("failed")),
+    // Missing on older rows, which are all PayMongo.
+    source: v.optional(v.union(v.literal("paymongo"), v.literal("qrph"))),
     donorPerks: v.optional(v.array(v.string())), // Array of perk strings
     createdAt: v.number(),
   })

@@ -4,6 +4,7 @@ import {
   action,
   internalMutation,
   internalQuery,
+  type MutationCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
@@ -11,6 +12,7 @@ import { Doc, Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
 import { api } from "./_generated/api";
 import { PLAN_TERMS, quotePlan } from "./lib/planPricing";
+import { DONOR_THRESHOLD_CENTAVOS } from "./lib/qrDonation";
 
 // Helper function to calculate expiry date
 // When upgrading tiers: start from now (don't carry over remaining time from old tier)
@@ -1033,6 +1035,39 @@ export const updateDonationStatus = internalMutation({
   },
 });
 
+/**
+ * Adds a donation to the player's total and turns on donor status once the
+ * total reaches ₱50. Shared by the PayMongo webhook and QR Ph confirmations.
+ */
+export async function applyDonationToProfile(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  donationAmount: number, // centavos
+): Promise<{ totalDonated: number; isDonor: boolean } | null> {
+  const profile = await ctx.db
+    .query("profiles")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+
+  if (!profile) {
+    console.warn(`[Donor Status] Profile not found for user ${userId}`);
+    return null;
+  }
+
+  const newTotal = (profile.totalDonated || 0) + donationAmount;
+  const isDonor = newTotal >= DONOR_THRESHOLD_CENTAVOS || !!profile.isDonor; // Stay donor if already one
+
+  await ctx.db.patch(profile._id, {
+    isDonor,
+    totalDonated: newTotal,
+  });
+
+  console.log(
+    `[Donor Status] Updated profile ${profile._id}: isDonor=${isDonor}, totalDonated=${newTotal} (added ${donationAmount})`,
+  );
+  return { totalDonated: newTotal, isDonor };
+}
+
 // Internal mutation to update donor status on profile
 export const updateDonorStatus = internalMutation({
   args: {
@@ -1040,33 +1075,7 @@ export const updateDonorStatus = internalMutation({
     donationAmount: v.number(), // Amount in centavos
   },
   handler: async (ctx, args) => {
-    // Get user's profile
-    const profile = await ctx.db
-      .query("profiles")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .unique();
-
-    if (!profile) {
-      console.warn(`[Donor Status] Profile not found for user ${args.userId}`);
-      return;
-    }
-
-    // Update donor status and total donated
-    const currentTotal = profile.totalDonated || 0;
-    const donationAmount = args.donationAmount;
-    const newTotal = currentTotal + donationAmount;
-
-    // Minimum ₱50 (5000 centavos) to be considered a donor
-    const isNowDonor = newTotal >= 5000;
-
-    await ctx.db.patch(profile._id, {
-      isDonor: isNowDonor || profile.isDonor, // Stay donor if already one
-      totalDonated: newTotal,
-    });
-
-    console.log(
-      `[Donor Status] Updated profile ${profile._id}: isDonor=${isNowDonor || profile.isDonor}, totalDonated=${newTotal} (added ${donationAmount})`,
-    );
+    await applyDonationToProfile(ctx, args.userId, args.donationAmount);
   },
 });
 

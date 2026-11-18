@@ -1,10 +1,12 @@
 import { motion } from "framer-motion";
 import { ChevronClash, SeasonSticker } from "@/components/season/ChevronClash";
+import { OtherGameCard } from "@/components/OtherGames";
 import { cn } from "@/lib/utils";
 
 /*
  * The sign-in page's left side: a title card for the game. The Season 3
- * chevrons collide over a huge wordmark, with the developer credit below.
+ * chevrons collide over a huge wordmark, with the developer credit and a link
+ * to their other game below.
  */
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -45,7 +47,7 @@ function MadeBy({ className }: { className?: string }) {
 export function SignInHero() {
   return (
     <section className="relative isolate flex min-w-0 flex-col overflow-hidden border-b border-border bg-[#0a0909] lg:border-b-0 lg:border-r">
-      <ChevronClash className="h-[240px] shrink-0 sm:h-[340px] lg:h-[48vh] lg:min-h-[340px] lg:max-h-[560px]">
+      <ChevronClash className="h-[240px] shrink-0 sm:h-[340px] lg:h-[41vh] lg:min-h-[300px] lg:max-h-[560px]">
         <SeasonSticker className="right-5 top-5 sm:right-8 sm:top-8 lg:right-12 lg:top-10" />
       </ChevronClash>
 
@@ -78,7 +80,17 @@ export function SignInHero() {
           real opponents.
         </motion.p>
 
-        <MadeBy className="mt-6 border-t border-white/10 pt-4 sm:mt-auto" />
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.35, duration: 0.5, ease: EASE }}
+          className="pt-6 sm:mt-auto"
+        >
+          <div className="border-t border-white/10 pt-4">
+            <MadeBy />
+            <OtherGameCard placement="signin" className="mt-3" />
+          </div>
+        </motion.div>
       </div>
     </section>
   );

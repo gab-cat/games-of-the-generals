@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import { easeOut, fadeUp, riseIn, stagger } from "@/lib/motion";
 import { SubscriptionPaymentModal } from "@/components/subscription/SubscriptionPaymentModal";
 import { DonationPaymentModal } from "@/components/subscription/DonationPaymentModal";
+import { QrDonationDialog } from "@/components/subscription/QrDonationDialog";
 import { plainFeature } from "@/components/subscription/plan-copy";
 import { pricingTiers } from "@/lib/pricing-tiers";
 import { Painting, Sticker, type Crop } from "@/components/season/art";
@@ -291,6 +292,7 @@ function PosterPrice({ plan, months }: { plan: PlanKey; months: PlanMonths }) {
 
 export function PricingPage({ profile: _profile }: PricingPageProps) {
   const [donateDialogOpen, setDonateDialogOpen] = useState(false);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
   const [thankYouModalOpen, setThankYouModalOpen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [selectedTier, setSelectedTier] = useState<PaidTier>("pro");
@@ -330,6 +332,14 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
       return;
     }
     setDonateDialogOpen(true);
+  };
+
+  const handleQrOpen = () => {
+    if (!isAuthenticated) {
+      void navigate({ to: "/auth" });
+      return;
+    }
+    setQrDialogOpen(true);
   };
 
   // Signed out, nobody has a plan yet; don't mark Standard as theirs.
@@ -530,9 +540,12 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
               Donations pay for the servers and new features. Give ₱50 or more
               for a donor badge, a custom name colour and a profile frame.
             </p>
-            <div>
+            <div className="flex flex-wrap gap-2">
               <Button onClick={handleDonateOpen} className="min-w-32">
                 Donate
+              </Button>
+              <Button variant="secondary" onClick={handleQrOpen}>
+                Scan QR Ph
               </Button>
             </div>
           </div>
@@ -607,7 +620,12 @@ export function PricingPage({ profile: _profile }: PricingPageProps) {
       <DonationPaymentModal
         open={donateDialogOpen}
         onOpenChange={setDonateDialogOpen}
+        onChooseQr={() => {
+          setDonateDialogOpen(false);
+          setQrDialogOpen(true);
+        }}
       />
+      <QrDonationDialog open={qrDialogOpen} onOpenChange={setQrDialogOpen} />
 
       <Dialog open={thankYouModalOpen} onOpenChange={setThankYouModalOpen}>
         <DialogContent className="sm:max-w-md">

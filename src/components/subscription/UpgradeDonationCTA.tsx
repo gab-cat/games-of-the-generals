@@ -14,8 +14,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { buttonVariants } from "@/components/ui/button";
 import { Painting } from "@/components/season/art";
+import { OtherGameCard } from "@/components/OtherGames";
 import { cn } from "@/lib/utils";
 import { DonationPaymentModal } from "./DonationPaymentModal";
+import { QrDonationDialog } from "./QrDonationDialog";
 import {
   formatCentavos,
   quotePlan,
@@ -52,7 +54,8 @@ function anotherDialogOpen(): boolean {
 }
 
 /**
- * Asks free players who have finished a game to get Pro or donate. Shown in
+ * Asks free players who have finished a game to get Pro or donate (PayMongo
+ * checkout, or Gab's own QR Ph code with a report form). Shown in
  * front of the page once an hour at most, on the lobby, vs AI, leaderboard and
  * news pages.
  */
@@ -60,6 +63,7 @@ export function UpgradeDonationCTA() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [donateOpen, setDonateOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
 
   const { data: subscription } = useConvexQuery(
     api.subscriptions.getCurrentSubscription,
@@ -105,8 +109,17 @@ export function UpgradeDonationCTA() {
           void navigate({ to: "/pricing", search: { donation: undefined } })
         }
         onDonate={() => setDonateOpen(true)}
+        onDonateQr={() => setQrOpen(true)}
       />
-      <DonationPaymentModal open={donateOpen} onOpenChange={setDonateOpen} />
+      <DonationPaymentModal
+        open={donateOpen}
+        onOpenChange={setDonateOpen}
+        onChooseQr={() => {
+          setDonateOpen(false);
+          setQrOpen(true);
+        }}
+      />
+      <QrDonationDialog open={qrOpen} onOpenChange={setQrOpen} />
     </>
   );
 }
@@ -117,11 +130,13 @@ export function SupportDialogView({
   onOpenChange,
   onSeePlans,
   onDonate,
+  onDonateQr,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSeePlans: () => void;
   onDonate: () => void;
+  onDonateQr: () => void;
 }) {
   const proFrom = formatCentavos(
     Math.round(quotePlan("pro", 12).perMonthCentavos / 100) * 100,
@@ -161,28 +176,41 @@ export function SupportDialogView({
                 from <span className="font-semibold">{proFrom}</span> a month
               </p>
             </li>
-            <li className="flex items-baseline justify-between gap-4 p-3 sm:p-4">
-              <div>
-                <p className="text-sm font-semibold text-foreground">Donate</p>
-                <p className="mt-0.5 text-sm text-foreground/80">
-                  ₱50 or more gets a donor badge and a profile frame.
+            <li className="p-3 sm:p-4">
+              <div className="flex items-baseline justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Donate</p>
+                  <p className="mt-0.5 text-sm text-foreground/80">
+                    ₱50 or more gets a donor badge and a profile frame.
+                  </p>
+                </div>
+                <p className="shrink-0 text-right text-sm text-foreground">
+                  any amount
                 </p>
               </div>
-              <p className="shrink-0 text-right text-sm text-foreground">
-                any amount
-              </p>
+              {/* Both close this dialog (an answer, so it snoozes) and open their own. */}
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <AlertDialogAction
+                  onClick={onDonateQr}
+                  className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-auto flex-col gap-0 py-2")}
+                >
+                  <span>Scan QR Ph</span>
+                  <span className="text-xs font-normal text-foreground/75">GCash, Maya, banks</span>
+                </AlertDialogAction>
+                <AlertDialogAction
+                  onClick={onDonate}
+                  className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "h-auto flex-col gap-0 py-2")}
+                >
+                  <span>PayMongo checkout</span>
+                  <span className="text-xs font-normal text-foreground/75">Badge right away</span>
+                </AlertDialogAction>
+              </div>
             </li>
           </ul>
 
           <div className="flex flex-col gap-2 sm:flex-row-reverse">
             <AlertDialogAction onClick={onSeePlans} className="sm:flex-1">
               See plans
-            </AlertDialogAction>
-            <AlertDialogAction
-              onClick={onDonate}
-              className={cn(buttonVariants({ variant: "secondary" }), "sm:flex-1")}
-            >
-              Donate
             </AlertDialogAction>
             <AlertDialogCancel
               className={cn(
@@ -194,6 +222,13 @@ export function SupportDialogView({
             </AlertDialogCancel>
           </div>
         </div>
+
+        {/* Below the actions and quieter than them, so it never competes with Pro. */}
+        <OtherGameCard
+          placement="upgrade-dialog"
+          size="sm"
+          className="rounded-none border-0 border-t border-border bg-transparent px-5 py-3 hover:border-border sm:px-6"
+        />
       </AlertDialogContent>
     </AlertDialog>
   );

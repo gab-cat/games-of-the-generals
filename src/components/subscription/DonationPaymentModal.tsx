@@ -21,12 +21,15 @@ interface DonationPaymentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  /** Switch to the direct QR Ph flow (QrDonationDialog). */
+  onChooseQr?: () => void;
 }
 
 export function DonationPaymentModal({
   open,
   onOpenChange,
   onSuccess,
+  onChooseQr,
 }: DonationPaymentModalProps) {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
@@ -158,6 +161,18 @@ export function DonationPaymentModal({
 
           <p className="text-xs text-foreground/70">
             You pay on the PayMongo checkout page.
+            {onChooseQr && (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={onChooseQr}
+                  className="rounded-sm text-gold-300 underline underline-offset-4 transition-colors hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70"
+                >
+                  Scan our QR Ph code instead
+                </button>
+              </>
+            )}
           </p>
         </div>
 

@@ -36,6 +36,7 @@ import type * as helpers_subscriptionHelpers from "../helpers/subscriptionHelper
 import type * as http from "../http.js";
 import type * as lib_matchHistoryCursor from "../lib/matchHistoryCursor.js";
 import type * as lib_planPricing from "../lib/planPricing.js";
+import type * as lib_qrDonation from "../lib/qrDonation.js";
 import type * as lib_replayCodec from "../lib/replayCodec.js";
 import type * as lib_userCleanup from "../lib/userCleanup.js";
 import type * as liveGames from "../liveGames.js";
@@ -52,6 +53,7 @@ import type * as presence from "../presence.js";
 import type * as profiles from "../profiles.js";
 import type * as push from "../push.js";
 import type * as pushNode from "../pushNode.js";
+import type * as qrDonations from "../qrDonations.js";
 import type * as router from "../router.js";
 import type * as seasonReset from "../seasonReset.js";
 import type * as sendEmails from "../sendEmails.js";
@@ -96,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   "lib/matchHistoryCursor": typeof lib_matchHistoryCursor;
   "lib/planPricing": typeof lib_planPricing;
+  "lib/qrDonation": typeof lib_qrDonation;
   "lib/replayCodec": typeof lib_replayCodec;
   "lib/userCleanup": typeof lib_userCleanup;
   liveGames: typeof liveGames;
@@ -112,6 +115,7 @@ declare const fullApi: ApiFromModules<{
   profiles: typeof profiles;
   push: typeof push;
   pushNode: typeof pushNode;
+  qrDonations: typeof qrDonations;
   router: typeof router;
   seasonReset: typeof seasonReset;
   sendEmails: typeof sendEmails;

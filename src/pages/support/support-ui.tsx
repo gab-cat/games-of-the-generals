@@ -35,6 +35,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   account_issue: "Account",
   game_issue: "Gameplay",
   other: "Other",
+  donation: "Donation",
 };
 
 export function statusLabel(status: string) {

@@ -1,8 +1,9 @@
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { BrandLockup } from "./BrandMark";
 import { ChevronClash } from "./season/ChevronClash";
+import { OtherGameCard, OtherGameLink } from "./OtherGames";
 import { cn } from "@/lib/utils";
 import packageJson from "../../package.json";
 
@@ -11,7 +12,8 @@ import packageJson from "../../package.json";
  * standing on the bottom of the page, with the Season 3 clash (ChevronClash) charging
  * through the letters when the footer comes into view.
  *
- * - "full": signed-out pages. Brand, credit, link columns, version.
+ * - "full": signed-out pages. Brand, credit, Gabriel's other game, link
+ *   columns, version.
  * - "minimal": signed-in pages, where the header, tab bar and account menu
  *   already carry the main navigation. One row of the links that live nowhere
  *   else, over a smaller word.
@@ -127,6 +129,8 @@ export function SiteFooter({ variant }: { variant: "full" | "minimal" }) {
   const version = packageJson.version;
   const footerRef = useRef<HTMLElement>(null);
   const footerSeen = useInView(footerRef, { once: true, amount: 0.25 });
+  // The signed-out home page already shows the other-game card next to the credit.
+  const onSignInPage = useLocation({ select: (l) => l.pathname === "/" });
 
   if (variant === "minimal") {
     return (
@@ -145,9 +149,12 @@ export function SiteFooter({ variant }: { variant: "full" | "minimal" }) {
                 Source code
               </a>
             </nav>
-            <p className="text-xs text-muted-foreground">
-              © {year} · v{version}
-            </p>
+            <div className="flex flex-col items-center gap-1 sm:items-end">
+              <OtherGameLink placement="footer-minimal" className={linkClass} />
+              <p className="text-xs text-muted-foreground">
+                © {year} · v{version}
+              </p>
+            </div>
           </div>
           <ClashWordmark compact />
         </div>
@@ -186,6 +193,7 @@ export function SiteFooter({ variant }: { variant: "full" | "minimal" }) {
                   Gabriel Catimbang
                 </a>
               </p>
+              {!onSignInPage && <OtherGameCard placement="footer" className="mt-3" />}
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3">
               {FOOTER_GROUPS.map((group) => (

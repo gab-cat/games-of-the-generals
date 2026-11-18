@@ -70,6 +70,12 @@ Changelogs communicate the evolution of the game to players, highlighting new fe
 - Setups are checked on the server: an army must be the standard 21 pieces, one per square, and can't be changed after you lock it in
 - New global chat messages show up for everyone straight away, including a player's first message
 
+### 💛 More ways to support the game
+
+- Donate by scanning our QR Ph code with GCash, Maya or any bank app, then send a short report with the amount and reference number
+- Once we confirm a QR Ph donation in your support ticket, donations of ₱50 or more in total turn on the donor badge, name colour and profile frame
+- On a phone, save the QR image and upload it in your app's scanner
+
 ### 🔗 Easier to find and share
 
 - Links to the game now show a Season 3 preview card on Messenger, Facebook, X and Discord
